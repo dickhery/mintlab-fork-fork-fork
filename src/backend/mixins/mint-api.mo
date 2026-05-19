@@ -270,6 +270,37 @@ mixin (
 
   transient let managementCanister : ManagementCanisterActor = actor "aaaaa-aa";
 
+  func attachCyclesForNextCall<system>(amount : Nat, operationLabel : Text) {
+    if (amount == 0) {
+      Runtime.trap(operationLabel # ": refusing to attach 0 cycles");
+    };
+
+    let backendBalance = Cycles.balance();
+    let reserve = minimumFactoryOperatingReserveCycles();
+    if (backendBalance <= amount + reserve) {
+      Runtime.trap(
+        operationLabel #
+        ": backend does not have enough cycles to attach " #
+        Nat.toText(amount) #
+        " while keeping reserve " #
+        Nat.toText(reserve) #
+        ". Backend balance: " #
+        Nat.toText(backendBalance)
+      );
+    };
+
+    Debug.print(
+      "MINTLAB cycles-add-v5 preparing " #
+      operationLabel #
+      " attachCycles=" #
+      Nat.toText(amount) #
+      " backendBalanceBefore=" #
+      Nat.toText(backendBalance)
+    );
+
+    Prim.cyclesAdd<system>(amount);
+  };
+
   public query func getMintConfig() : async MintTypes.MintConfig {
     MintLib.getConfig(mintState);
   };
@@ -544,7 +575,7 @@ mixin (
       backendCycles;
       requiredBackendCycles;
       canCreateNow = backendCycles > requiredBackendCycles;
-      buildVersion = "mintlab-collection-create-attach-direct-v4";
+      buildVersion = "mintlab-collection-create-cycles-add-v5";
     });
   };
 
@@ -2811,7 +2842,8 @@ mixin (
       " imageKind=" # moderationImageKind(imageUrl) #
       " imageChars=" # Nat.toText(imageUrl.size())
     );
-    await (with cycles = cost) ic.http_request(request);
+    attachCyclesForNextCall<system>(cost, "OpenAI moderation HTTPS outcall");
+    await ic.http_request(request);
   };
 
   func moderationTextInput(kind : Text, title : Text, description : Text, extraText : Text) : Text {
@@ -3292,14 +3324,15 @@ mixin (
       );
     };
     Debug.print(
-      "MINTLAB create_canister direct-v4 attaching cycles=" #
+      "MINTLAB create_canister cycles-add-v5 attaching cycles=" #
       Nat.toText(attachCycles) #
       " backendBalanceBefore=" #
       Nat.toText(backendBalance) #
       " owner=" #
       owner.toText()
     );
-    let createResult = await (with cycles = attachCycles) managementCanister.create_canister({
+    attachCyclesForNextCall<system>(attachCycles, "create collection canister");
+    let createResult = await managementCanister.create_canister({
       settings = ?{
         controllers = ?[canisterId, owner];
         compute_allocation = null;
@@ -3309,7 +3342,7 @@ mixin (
       sender_canister_version = null;
     });
     Debug.print(
-      "MINTLAB create_canister direct-v4 created child=" #
+      "MINTLAB create_canister cycles-add-v5 created child=" #
       createResult.canister_id.toText() #
       " backendBalanceAfter=" #
       Nat.toText(Cycles.balance())
@@ -3361,7 +3394,8 @@ mixin (
       Runtime.trap("The app canister needs more cycles before it can top up and install this collection canister");
     };
     let ic = managementCanister;
-    await (with cycles = cyclesToAttach) ic.deposit_cycles({
+    attachCyclesForNextCall<system>(cyclesToAttach, "deposit cycles into collection canister");
+    await ic.deposit_cycles({
       canister_id = childCanisterId;
     });
   };
