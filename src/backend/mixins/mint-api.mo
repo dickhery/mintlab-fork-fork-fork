@@ -270,7 +270,7 @@ mixin (
 
   transient let managementCanister : ManagementCanisterActor = actor "aaaaa-aa";
 
-  func attachCyclesForNextCall<system>(amount : Nat, operationLabel : Text) {
+  func assertCyclesForCall(amount : Nat, operationLabel : Text) {
     if (amount == 0) {
       Runtime.trap(operationLabel # ": refusing to attach 0 cycles");
     };
@@ -290,15 +290,13 @@ mixin (
     };
 
     Debug.print(
-      "MINTLAB cycles-add-v5 preparing " #
+      "MINTLAB with-cycles-v6 preparing " #
       operationLabel #
       " attachCycles=" #
       Nat.toText(amount) #
       " backendBalanceBefore=" #
       Nat.toText(backendBalance)
     );
-
-    Prim.cyclesAdd<system>(amount);
   };
 
   public query func getMintConfig() : async MintTypes.MintConfig {
@@ -575,7 +573,7 @@ mixin (
       backendCycles;
       requiredBackendCycles;
       canCreateNow = backendCycles > requiredBackendCycles;
-      buildVersion = "mintlab-collection-create-cycles-add-v5";
+      buildVersion = "mintlab-collection-create-with-cycles-v6";
     });
   };
 
@@ -2826,7 +2824,7 @@ mixin (
       // This response gates minting/payment, so replicas must agree on it.
       is_replicated = null;
     };
-    let ic = managementCanister;
+    let ic : ManagementCanisterActor = actor "aaaaa-aa";
     let requestSize = httpRequestSize(request);
     let cost = httpRequestCost(requestSize, request.max_response_bytes);
     if (Cycles.balance() <= cost + minimumFactoryOperatingReserveCycles()) {
@@ -2842,8 +2840,8 @@ mixin (
       " imageKind=" # moderationImageKind(imageUrl) #
       " imageChars=" # Nat.toText(imageUrl.size())
     );
-    attachCyclesForNextCall<system>(cost, "OpenAI moderation HTTPS outcall");
-    await ic.http_request(request);
+    assertCyclesForCall(cost, "OpenAI moderation HTTPS outcall");
+    await (with cycles = cost) ic.http_request(request);
   };
 
   func moderationTextInput(kind : Text, title : Text, description : Text, extraText : Text) : Text {
@@ -3324,15 +3322,16 @@ mixin (
       );
     };
     Debug.print(
-      "MINTLAB create_canister cycles-add-v5 attaching cycles=" #
+      "MINTLAB create_canister with-cycles-v6 attaching cycles=" #
       Nat.toText(attachCycles) #
       " backendBalanceBefore=" #
       Nat.toText(backendBalance) #
       " owner=" #
       owner.toText()
     );
-    attachCyclesForNextCall<system>(attachCycles, "create collection canister");
-    let createResult = await managementCanister.create_canister({
+    assertCyclesForCall(attachCycles, "create collection canister");
+    let ic : ManagementCanisterActor = actor "aaaaa-aa";
+    let createResult = await (with cycles = attachCycles) ic.create_canister({
       settings = ?{
         controllers = ?[canisterId, owner];
         compute_allocation = null;
@@ -3342,7 +3341,7 @@ mixin (
       sender_canister_version = null;
     });
     Debug.print(
-      "MINTLAB create_canister cycles-add-v5 created child=" #
+      "MINTLAB create_canister with-cycles-v6 created child=" #
       createResult.canister_id.toText() #
       " backendBalanceAfter=" #
       Nat.toText(Cycles.balance())
@@ -3393,9 +3392,9 @@ mixin (
     if (Cycles.balance() <= cyclesToAttach + minimumFactoryOperatingReserveCycles()) {
       Runtime.trap("The app canister needs more cycles before it can top up and install this collection canister");
     };
-    let ic = managementCanister;
-    attachCyclesForNextCall<system>(cyclesToAttach, "deposit cycles into collection canister");
-    await ic.deposit_cycles({
+    assertCyclesForCall(cyclesToAttach, "deposit cycles into collection canister");
+    let ic : ManagementCanisterActor = actor "aaaaa-aa";
+    await (with cycles = cyclesToAttach) ic.deposit_cycles({
       canister_id = childCanisterId;
     });
   };
