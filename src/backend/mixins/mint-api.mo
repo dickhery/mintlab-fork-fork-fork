@@ -252,7 +252,7 @@ mixin (
   transient let MODERATION_MAX_REQUEST_BODY_BYTES : Nat = 600_000;
   transient var moderationImageNonce : Nat = 0;
 
-  func managementCanister() : actor {
+  type ManagementCanisterActor = actor {
     create_canister : shared ({
       settings : ?CanisterSettings;
       sender_canister_version : ?Nat64;
@@ -266,9 +266,9 @@ mixin (
       sender_canister_version : ?Nat64;
     }) -> async ();
     http_request : shared HttpRequestArgs -> async HttpRequestResult;
-  } {
-    actor "aaaaa-aa";
   };
+
+  transient let managementCanister : ManagementCanisterActor = actor "aaaaa-aa";
 
   public query func getMintConfig() : async MintTypes.MintConfig {
     MintLib.getConfig(mintState);
@@ -544,7 +544,7 @@ mixin (
       backendCycles;
       requiredBackendCycles;
       canCreateNow = backendCycles > requiredBackendCycles;
-      buildVersion = "mintlab-collection-create-diagnostics-v3";
+      buildVersion = "mintlab-collection-create-attach-direct-v4";
     });
   };
 
@@ -1182,6 +1182,22 @@ mixin (
           createCallCycles,
         );
         ignore MintLib.markCollectionCreationCanisterCreated(collectionCreationState, requestId, childCanisterId);
+        switch (await collectionCanisterStatus(childCanisterId)) {
+          case (?status) {
+            Debug.print(
+              "MINTLAB child canister created child=" #
+              childCanisterId.toText() #
+              " childCycles=" #
+              Nat.toText(status.cycles)
+            );
+          };
+          case null {
+            Debug.print(
+              "MINTLAB child canister created but status could not be read child=" #
+              childCanisterId.toText()
+            );
+          };
+        };
       };
 
       request := switch (MintLib.getCollectionCreationRequest(collectionCreationState, requestId)) {
@@ -2779,7 +2795,7 @@ mixin (
       // This response gates minting/payment, so replicas must agree on it.
       is_replicated = null;
     };
-    let ic = managementCanister();
+    let ic = managementCanister;
     let requestSize = httpRequestSize(request);
     let cost = httpRequestCost(requestSize, request.max_response_bytes);
     if (Cycles.balance() <= cost + minimumFactoryOperatingReserveCycles()) {
@@ -3257,31 +3273,33 @@ mixin (
     owner : Principal,
     cyclesToAttach : Nat,
   ) : async Principal {
+    let attachCycles : Nat = cyclesToAttach;
     let creationFee = canisterCreationFeeCycles();
     let reserve = minimumFactoryOperatingReserveCycles();
     let backendBalance = Cycles.balance();
-    if (cyclesToAttach <= creationFee) {
+    if (attachCycles <= creationFee) {
       Runtime.trap(
         "Collection canister create call needs more than the IC canister creation fee. Requested attach cycles: " #
-        Nat.toText(cyclesToAttach)
+        Nat.toText(attachCycles)
       );
     };
-    if (backendBalance <= cyclesToAttach + reserve) {
+    if (backendBalance <= attachCycles + reserve) {
       Runtime.trap(
         "The app canister does not have enough cycles to attach " #
-        Nat.toText(cyclesToAttach) #
+        Nat.toText(attachCycles) #
         " cycles to create_canister while keeping the factory reserve. Backend balance: " #
         Nat.toText(backendBalance)
       );
     };
     Debug.print(
-      "MINTLAB create_canister v3 call attaching cycles=" #
-      Nat.toText(cyclesToAttach) #
-      " backendBalance=" #
-      Nat.toText(backendBalance)
+      "MINTLAB create_canister direct-v4 attaching cycles=" #
+      Nat.toText(attachCycles) #
+      " backendBalanceBefore=" #
+      Nat.toText(backendBalance) #
+      " owner=" #
+      owner.toText()
     );
-    let ic = managementCanister();
-    let createResult = await (with cycles = cyclesToAttach) ic.create_canister({
+    let createResult = await (with cycles = attachCycles) managementCanister.create_canister({
       settings = ?{
         controllers = ?[canisterId, owner];
         compute_allocation = null;
@@ -3290,6 +3308,12 @@ mixin (
       };
       sender_canister_version = null;
     });
+    Debug.print(
+      "MINTLAB create_canister direct-v4 created child=" #
+      createResult.canister_id.toText() #
+      " backendBalanceAfter=" #
+      Nat.toText(Cycles.balance())
+    );
     createResult.canister_id;
   };
 
@@ -3307,7 +3331,7 @@ mixin (
     initArgs : CollectionCanisterInitArgs,
     mode : InstallCodeMode,
   ) : async () {
-    let ic = managementCanister();
+    let ic = managementCanister;
     await ic.install_code({
       mode;
       canister_id = childCanisterId;
@@ -3336,7 +3360,7 @@ mixin (
     if (Cycles.balance() <= cyclesToAttach + minimumFactoryOperatingReserveCycles()) {
       Runtime.trap("The app canister needs more cycles before it can top up and install this collection canister");
     };
-    let ic = managementCanister();
+    let ic = managementCanister;
     await (with cycles = cyclesToAttach) ic.deposit_cycles({
       canister_id = childCanisterId;
     });
@@ -3346,7 +3370,7 @@ mixin (
     childCanisterId : Principal
   ) : async ?CanisterStatusResult {
     try {
-      let ic = managementCanister();
+      let ic = managementCanister;
       ?(await ic.canister_status({ canister_id = childCanisterId }));
     } catch (_error) {
       null;
@@ -3370,7 +3394,7 @@ mixin (
     targetCanisterId : Principal,
   ) : async MintTypes.AppCanisterHealth {
     try {
-      let status = await managementCanister().canister_status({
+      let status = await managementCanister.canister_status({
         canister_id = targetCanisterId;
       });
       {
@@ -3450,7 +3474,7 @@ mixin (
     childCanisterId : Principal,
     controllers : [Principal],
   ) : async () {
-    let ic = managementCanister();
+    let ic = managementCanister;
     await ic.update_settings({
       canister_id = childCanisterId;
       settings = {
