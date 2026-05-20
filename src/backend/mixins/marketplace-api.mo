@@ -20,6 +20,7 @@ import Nat64 "mo:core/Nat64";
 mixin (
   marketplaceState : MarketplaceLib.MarketplaceState,
   marketplacePaymentState : MarketplaceLib.MarketplacePaymentState,
+  marketplaceSettlementState : MarketplaceLib.MarketplaceSettlementState,
   marketplaceFeeState : MarketplaceLib.MarketplaceFeeState,
   walletState : WalletLib.WalletState,
   mintState : MintLib.MintState,
@@ -145,11 +146,11 @@ mixin (
 
   /// Return all currently active listings (fixed + auction)
   public query func getActiveListings() : async [MarketplaceTypes.ActiveListing] {
-    MarketplaceLib.getAvailableActiveListings(marketplaceState, marketplacePaymentState);
+    MarketplaceLib.getAvailableActiveListings(marketplaceState, marketplaceSettlementState);
   };
 
   public query func getActiveListingDetails() : async [MarketplaceTypes.ActiveListingDetail] {
-    MarketplaceLib.getAvailableActiveListingDetails(marketplaceState, marketplacePaymentState);
+    MarketplaceLib.getAvailableActiveListingDetails(marketplaceState, marketplaceSettlementState);
   };
 
   public func getMarketplaceFeeConfig() : async MarketplaceTypes.MarketplaceFeeConfig {
@@ -212,7 +213,7 @@ mixin (
       Runtime.trap("Listing is processing another payment. Try again shortly.");
     };
     try {
-      switch (MarketplaceLib.getFixedPurchaseSettlement(marketplacePaymentState, listingId)) {
+      switch (MarketplaceLib.getFixedPurchaseSettlement(marketplaceSettlementState, listingId)) {
         case null {
           ignore await* startFixedPurchaseSettlement(listingId, caller);
         };
@@ -282,13 +283,13 @@ mixin (
       createdAt = now;
       updatedAt = now;
     };
-    MarketplaceLib.putFixedPurchaseSettlement(marketplacePaymentState, settlement);
+    MarketplaceLib.putFixedPurchaseSettlement(marketplaceSettlementState, settlement);
     settlement;
   };
 
   func continueFixedPurchaseSettlement(listingId : MarketplaceTypes.ListingId) : async* () {
     let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
-    var settlement = switch (MarketplaceLib.getFixedPurchaseSettlement(marketplacePaymentState, listingId)) {
+    var settlement = switch (MarketplaceLib.getFixedPurchaseSettlement(marketplaceSettlementState, listingId)) {
       case null Runtime.trap("Fixed purchase settlement not found");
       case (?value) value;
     };
@@ -315,7 +316,7 @@ mixin (
           stage = #NFTTransferPending;
           updatedAt = Time.now();
         };
-        MarketplaceLib.putFixedPurchaseSettlement(marketplacePaymentState, settlement);
+        MarketplaceLib.putFixedPurchaseSettlement(marketplaceSettlementState, settlement);
       };
       case (?_) {};
     };
@@ -337,7 +338,7 @@ mixin (
           stage = if (settlement.mintlabFee > 0) #MintlabFeePending else #SellerPaymentPending;
           updatedAt = Time.now();
         };
-        MarketplaceLib.putFixedPurchaseSettlement(marketplacePaymentState, settlement);
+        MarketplaceLib.putFixedPurchaseSettlement(marketplaceSettlementState, settlement);
       };
       case (?_) {};
     };
@@ -354,7 +355,7 @@ mixin (
                 mintlabFeeCreatedAt = ?timestamp;
                 updatedAt = Time.now();
               };
-              MarketplaceLib.putFixedPurchaseSettlement(marketplacePaymentState, settlement);
+              MarketplaceLib.putFixedPurchaseSettlement(marketplaceSettlementState, settlement);
               timestamp;
             };
           };
@@ -378,7 +379,7 @@ mixin (
             stage = #SellerPaymentPending;
             updatedAt = Time.now();
           };
-          MarketplaceLib.putFixedPurchaseSettlement(marketplacePaymentState, settlement);
+          MarketplaceLib.putFixedPurchaseSettlement(marketplaceSettlementState, settlement);
         };
         case (?_) {};
       };
@@ -395,7 +396,7 @@ mixin (
               sellerPaymentCreatedAt = ?timestamp;
               updatedAt = Time.now();
             };
-            MarketplaceLib.putFixedPurchaseSettlement(marketplacePaymentState, settlement);
+            MarketplaceLib.putFixedPurchaseSettlement(marketplaceSettlementState, settlement);
             timestamp;
           };
         };
@@ -416,7 +417,7 @@ mixin (
           sellerPaymentBlock = ?sellerBlock;
           updatedAt = Time.now();
         };
-        MarketplaceLib.putFixedPurchaseSettlement(marketplacePaymentState, settlement);
+        MarketplaceLib.putFixedPurchaseSettlement(marketplaceSettlementState, settlement);
       };
       case (?_) {};
     };
@@ -424,7 +425,7 @@ mixin (
     ignore MarketplaceLib.settleFixedListing(marketplaceState, settlement.listingId);
     ignore MarketplaceLib.takeEscrowedNFT(marketplaceState, settlement.listingId);
     ignore MarketplaceLib.clearListingsForToken(marketplaceState, settlement.nft.collectionId, settlement.nft.tokenId);
-    ignore MarketplaceLib.removeFixedPurchaseSettlement(marketplacePaymentState, settlement.listingId);
+    ignore MarketplaceLib.removeFixedPurchaseSettlement(marketplaceSettlementState, settlement.listingId);
   };
 
   /// Place a bid on an active auction listing
@@ -523,7 +524,7 @@ mixin (
       Runtime.trap("Auction is processing another payment. Try again shortly.");
     };
     try {
-      switch (MarketplaceLib.getAuctionSettlement(marketplacePaymentState, listingId)) {
+      switch (MarketplaceLib.getAuctionSettlement(marketplaceSettlementState, listingId)) {
         case null {
           let listing = switch (MarketplaceLib.getAuctionListing(marketplaceState, listingId)) {
             case null Runtime.trap("Auction listing not found");
@@ -611,13 +612,13 @@ mixin (
       createdAt = now;
       updatedAt = now;
     };
-    MarketplaceLib.putAuctionSettlement(marketplacePaymentState, settlement);
+    MarketplaceLib.putAuctionSettlement(marketplaceSettlementState, settlement);
     settlement;
   };
 
   func continueAuctionSettlement(listingId : MarketplaceTypes.ListingId) : async* () {
     let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
-    var settlement = switch (MarketplaceLib.getAuctionSettlement(marketplacePaymentState, listingId)) {
+    var settlement = switch (MarketplaceLib.getAuctionSettlement(marketplaceSettlementState, listingId)) {
       case null Runtime.trap("Auction settlement not found");
       case (?value) value;
     };
@@ -640,7 +641,7 @@ mixin (
           stage = if (settlement.mintlabFee > 0) #MintlabFeePending else #SellerPaymentPending;
           updatedAt = Time.now();
         };
-        MarketplaceLib.putAuctionSettlement(marketplacePaymentState, settlement);
+        MarketplaceLib.putAuctionSettlement(marketplaceSettlementState, settlement);
       };
       case (?_) {};
     };
@@ -657,7 +658,7 @@ mixin (
                 mintlabFeeCreatedAt = ?timestamp;
                 updatedAt = Time.now();
               };
-              MarketplaceLib.putAuctionSettlement(marketplacePaymentState, settlement);
+              MarketplaceLib.putAuctionSettlement(marketplaceSettlementState, settlement);
               timestamp;
             };
           };
@@ -681,7 +682,7 @@ mixin (
             stage = #SellerPaymentPending;
             updatedAt = Time.now();
           };
-          MarketplaceLib.putAuctionSettlement(marketplacePaymentState, settlement);
+          MarketplaceLib.putAuctionSettlement(marketplaceSettlementState, settlement);
         };
         case (?_) {};
       };
@@ -698,7 +699,7 @@ mixin (
               sellerPaymentCreatedAt = ?timestamp;
               updatedAt = Time.now();
             };
-            MarketplaceLib.putAuctionSettlement(marketplacePaymentState, settlement);
+            MarketplaceLib.putAuctionSettlement(marketplaceSettlementState, settlement);
             timestamp;
           };
         };
@@ -719,7 +720,7 @@ mixin (
           sellerPaymentBlock = ?sellerBlock;
           updatedAt = Time.now();
         };
-        MarketplaceLib.putAuctionSettlement(marketplacePaymentState, settlement);
+        MarketplaceLib.putAuctionSettlement(marketplaceSettlementState, settlement);
       };
       case (?_) {};
     };
@@ -729,7 +730,7 @@ mixin (
     ignore MarketplaceLib.settleAuction(marketplaceState, settlement.listingId);
     ignore MarketplaceLib.takeEscrowedNFT(marketplaceState, settlement.listingId);
     ignore MarketplaceLib.clearListingsForToken(marketplaceState, settlement.nft.collectionId, settlement.nft.tokenId);
-    ignore MarketplaceLib.removeAuctionSettlement(marketplacePaymentState, settlement.listingId);
+    ignore MarketplaceLib.removeAuctionSettlement(marketplaceSettlementState, settlement.listingId);
   };
 
   func resolveWinningEscrow(
@@ -798,12 +799,12 @@ mixin (
         if (not Principal.equal(listing.seller, caller) and not isCallerAdmin) {
           Runtime.trap("Unauthorized: must be seller or admin");
         };
-        switch (MarketplaceLib.getFixedPurchaseSettlement(marketplacePaymentState, listingId)) {
+        switch (MarketplaceLib.getFixedPurchaseSettlement(marketplaceSettlementState, listingId)) {
           case null {};
           case (?settlement) {
             switch (settlement.paymentBlock) {
               case null {
-                ignore MarketplaceLib.removeFixedPurchaseSettlement(marketplacePaymentState, listingId);
+                ignore MarketplaceLib.removeFixedPurchaseSettlement(marketplaceSettlementState, listingId);
               };
               case (?_) Runtime.trap("Listing is already settling and cannot be cancelled");
             };
@@ -847,7 +848,7 @@ mixin (
         if (not Principal.equal(listing.seller, caller) and not isCallerAdmin) {
           Runtime.trap("Unauthorized: must be seller or admin");
         };
-        switch (MarketplaceLib.getAuctionSettlement(marketplacePaymentState, listingId)) {
+        switch (MarketplaceLib.getAuctionSettlement(marketplaceSettlementState, listingId)) {
           case null {};
           case (?_) Runtime.trap("Auction is already settling and cannot be cancelled");
         };

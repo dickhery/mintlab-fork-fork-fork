@@ -25,11 +25,14 @@ module {
   public type MarketplacePaymentState = {
     auctionEscrows : Map.Map<Types.ListingId, Types.AuctionEscrow>;
     pendingRefunds : Map.Map<Nat, Types.AuctionEscrow>;
-    fixedPurchaseSettlements : Map.Map<Types.ListingId, Types.FixedPurchaseSettlement>;
-    auctionSettlements : Map.Map<Types.ListingId, Types.AuctionSettlement>;
     listingLocks : Map.Map<Types.ListingId, Bool>;
     var nextEscrowId : Nat;
     var mintlabFeeRecipient : ?Types.AccountIdentifier;
+  };
+
+  public type MarketplaceSettlementState = {
+    fixedPurchaseSettlements : Map.Map<Types.ListingId, Types.FixedPurchaseSettlement>;
+    auctionSettlements : Map.Map<Types.ListingId, Types.AuctionSettlement>;
   };
 
   public type MarketplaceFeeState = {
@@ -50,11 +53,16 @@ module {
     {
       auctionEscrows = Map.empty<Types.ListingId, Types.AuctionEscrow>();
       pendingRefunds = Map.empty<Nat, Types.AuctionEscrow>();
-      fixedPurchaseSettlements = Map.empty<Types.ListingId, Types.FixedPurchaseSettlement>();
-      auctionSettlements = Map.empty<Types.ListingId, Types.AuctionSettlement>();
       listingLocks = Map.empty<Types.ListingId, Bool>();
       var nextEscrowId = 1;
       var mintlabFeeRecipient = null;
+    };
+  };
+
+  public func newSettlementState() : MarketplaceSettlementState {
+    {
+      fixedPurchaseSettlements = Map.empty<Types.ListingId, Types.FixedPurchaseSettlement>();
+      auctionSettlements = Map.empty<Types.ListingId, Types.AuctionSettlement>();
     };
   };
 
@@ -160,21 +168,21 @@ module {
   };
 
   public func putFixedPurchaseSettlement(
-    state : MarketplacePaymentState,
+    state : MarketplaceSettlementState,
     settlement : Types.FixedPurchaseSettlement,
   ) {
     Map.add(state.fixedPurchaseSettlements, Nat.compare, settlement.listingId, settlement);
   };
 
   public func getFixedPurchaseSettlement(
-    state : MarketplacePaymentState,
+    state : MarketplaceSettlementState,
     listingId : Types.ListingId,
   ) : ?Types.FixedPurchaseSettlement {
     Map.get(state.fixedPurchaseSettlements, Nat.compare, listingId);
   };
 
   public func removeFixedPurchaseSettlement(
-    state : MarketplacePaymentState,
+    state : MarketplaceSettlementState,
     listingId : Types.ListingId,
   ) : ?Types.FixedPurchaseSettlement {
     let current = Map.get(state.fixedPurchaseSettlements, Nat.compare, listingId);
@@ -183,21 +191,21 @@ module {
   };
 
   public func putAuctionSettlement(
-    state : MarketplacePaymentState,
+    state : MarketplaceSettlementState,
     settlement : Types.AuctionSettlement,
   ) {
     Map.add(state.auctionSettlements, Nat.compare, settlement.listingId, settlement);
   };
 
   public func getAuctionSettlement(
-    state : MarketplacePaymentState,
+    state : MarketplaceSettlementState,
     listingId : Types.ListingId,
   ) : ?Types.AuctionSettlement {
     Map.get(state.auctionSettlements, Nat.compare, listingId);
   };
 
   public func removeAuctionSettlement(
-    state : MarketplacePaymentState,
+    state : MarketplaceSettlementState,
     listingId : Types.ListingId,
   ) : ?Types.AuctionSettlement {
     let current = Map.get(state.auctionSettlements, Nat.compare, listingId);
@@ -206,7 +214,7 @@ module {
   };
 
   public func isListingSettling(
-    state : MarketplacePaymentState,
+    state : MarketplaceSettlementState,
     listingId : Types.ListingId,
   ) : Bool {
     switch (Map.get(state.fixedPurchaseSettlements, Nat.compare, listingId)) {
@@ -373,16 +381,16 @@ module {
 
   public func getAvailableActiveListings(
     state : MarketplaceState,
-    paymentState : MarketplacePaymentState,
+    settlementState : MarketplaceSettlementState,
   ) : [Types.ActiveListing] {
     var listings : [Types.ActiveListing] = [];
     for ((listingId, listing) in Map.entries(state.fixedListings)) {
-      if (listing.status == #Active and not isListingSettling(paymentState, listingId)) {
+      if (listing.status == #Active and not isListingSettling(settlementState, listingId)) {
         listings := Array.concat<Types.ActiveListing>(listings, [#Fixed(listing)]);
       };
     };
     for ((listingId, listing) in Map.entries(state.auctionListings)) {
-      if (listing.status == #Active and not isListingSettling(paymentState, listingId)) {
+      if (listing.status == #Active and not isListingSettling(settlementState, listingId)) {
         listings := Array.concat<Types.ActiveListing>(listings, [#Auction(listing)]);
       };
     };
@@ -422,11 +430,11 @@ module {
 
   public func getAvailableActiveListingDetails(
     state : MarketplaceState,
-    paymentState : MarketplacePaymentState,
+    settlementState : MarketplaceSettlementState,
   ) : [Types.ActiveListingDetail] {
     var listings : [Types.ActiveListingDetail] = [];
     for ((listingId, listing) in Map.entries(state.fixedListings)) {
-      if (listing.status == #Active and not isListingSettling(paymentState, listingId)) {
+      if (listing.status == #Active and not isListingSettling(settlementState, listingId)) {
         switch (Map.get(state.escrowedNFTs, Nat.compare, listingId)) {
           case (?nft) {
             listings := Array.concat<Types.ActiveListingDetail>(
@@ -439,7 +447,7 @@ module {
       };
     };
     for ((listingId, listing) in Map.entries(state.auctionListings)) {
-      if (listing.status == #Active and not isListingSettling(paymentState, listingId)) {
+      if (listing.status == #Active and not isListingSettling(settlementState, listingId)) {
         switch (Map.get(state.escrowedNFTs, Nat.compare, listingId)) {
           case (?nft) {
             listings := Array.concat<Types.ActiveListingDetail>(
