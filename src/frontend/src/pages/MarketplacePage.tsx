@@ -32,6 +32,7 @@ import { formatICPAmount, parseICPToE8s } from "@/lib/icp";
 import type {
   ActiveListing,
   ActiveListingDetail,
+  AuctionBidStatus,
   AuctionListing,
   Collection,
   FixedListing,
@@ -70,9 +71,38 @@ function nftKey(collectionId: bigint, tokenId: string): string {
 const DEFAULT_ICP_LEDGER_FEE_E8S = 10_000n;
 const DEFAULT_MINTLAB_FEE_BPS = 200n;
 const BPS_DENOMINATOR = 10_000n;
+const MIN_AUCTION_STARTING_BID_E8S = 1_000_000n;
+const MIN_AUCTION_BID_INCREMENT_E8S = 1_000_000n;
 
 function marketplaceFee(amount: bigint, feeBps: bigint): bigint {
   return (amount * feeBps) / BPS_DENOMINATOR;
+}
+
+function nextAuctionMinimumBid(listing: AuctionListing): bigint {
+  if (listing.highestBid > 0n) {
+    return listing.highestBid + MIN_AUCTION_BID_INCREMENT_E8S;
+  }
+
+  return listing.startingBid >= MIN_AUCTION_STARTING_BID_E8S
+    ? listing.startingBid
+    : MIN_AUCTION_STARTING_BID_E8S;
+}
+
+function auctionHighBidderText(listing: AuctionListing): string {
+  return listing.highestBidder
+    ? truncatePrincipal(listing.highestBidder.toString())
+    : "No bids yet";
+}
+
+function isViewerWinningAuction(
+  listing: AuctionListing,
+  currentPrincipal: string | null,
+  bidStatus?: AuctionBidStatus,
+): boolean {
+  return (
+    bidStatus?.isWinning ??
+    listing.highestBidder?.toString() === currentPrincipal
+  );
 }
 
 function useCountdown(endTimeNs: bigint) {
@@ -250,6 +280,7 @@ interface ListingDetailModalProps {
     dividendE8s: bigint;
   } | null;
   currentPrincipal: string | null;
+  bidStatusMap: Map<string, AuctionBidStatus>;
   onClose: () => void;
   onBuy: (id: ListingId) => void;
   onCancel: (id: ListingId) => void;
@@ -259,6 +290,7 @@ interface ListingDetailModalProps {
 function ListingDetailModal({
   detail,
   currentPrincipal,
+  bidStatusMap,
   onClose,
   onBuy,
   onCancel,
@@ -273,6 +305,14 @@ function ListingDetailModal({
   const auction = listing.__kind__ === "Auction" ? listing.Auction : null;
   const seller = fixed?.seller ?? auction?.seller;
   const isOwner = seller != null && currentPrincipal === seller.toString();
+  const auctionBidStatus = auction
+    ? bidStatusMap.get(auction.id.toString())
+    : undefined;
+  const isWinningAuction = auction
+    ? isViewerWinningAuction(auction, currentPrincipal, auctionBidStatus)
+    : false;
+  const hasBeenOutbid =
+    auction != null && !!auctionBidStatus?.hasBid && !isWinningAuction;
   const auctionRemaining = auction
     ? formatRemaining(
         Math.max(0, Number(auction.endTime / 1_000_000n) - Date.now()),
@@ -352,21 +392,43 @@ function ListingDetailModal({
                   </p>
                 </div>
               )}
+              {auction && (
+                <div className="rounded-lg border border-border/50 bg-muted/35 px-3 py-2">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Current High Bidder
+                  </p>
+                  <p className="font-mono text-sm text-foreground truncate mt-0.5">
+                    {auction.highestBidder?.toString() ?? "No bids yet"}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="rounded-lg border border-border/60 bg-muted/25 p-3 flex items-center justify-between gap-3">
-              {fixed ? (
-                <PriceDisplay e8s={fixed.price} label="Price" />
-              ) : auction ? (
-                <PriceDisplay
-                  e8s={
-                    auction.highestBid > 0n
-                      ? auction.highestBid
-                      : auction.startingBid
-                  }
-                  label={auction.highestBid > 0n ? "Top bid" : "Starting bid"}
-                />
-              ) : null}
+              <div className="flex flex-col gap-2">
+                {fixed ? (
+                  <PriceDisplay e8s={fixed.price} label="Price" />
+                ) : auction ? (
+                  <PriceDisplay
+                    e8s={
+                      auction.highestBid > 0n
+                        ? auction.highestBid
+                        : auction.startingBid
+                    }
+                    label={auction.highestBid > 0n ? "Top bid" : "Starting bid"}
+                  />
+                ) : null}
+                {auction && isWinningAuction && (
+                  <Badge className="w-fit bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
+                    You're Winning
+                  </Badge>
+                )}
+                {auction && hasBeenOutbid && (
+                  <Badge className="w-fit bg-amber-500/10 text-amber-700 border border-amber-500/20">
+                    You've been outbid
+                  </Badge>
+                )}
+              </div>
               {auction && (
                 <span className="text-xs text-muted-foreground font-mono">
                   {auctionRemaining}
@@ -442,6 +504,7 @@ interface AuctionCardProps {
   dividendE8s?: bigint;
   index: number;
   currentPrincipal: string | null;
+  bidStatus?: AuctionBidStatus;
   onBid: (listing: AuctionListing) => void;
   onSettle: (id: ListingId) => void;
   onCancel: (id: ListingId) => void;
@@ -457,6 +520,7 @@ function AuctionListingCard({
   dividendE8s = 0n,
   index,
   currentPrincipal,
+  bidStatus,
   onBid,
   onSettle,
   onCancel,
@@ -469,7 +533,8 @@ function AuctionListingCard({
   const name = nft?.metadata.name ?? `NFT #${nft?.tokenId ?? "?"}`;
   const sellerText = listing.seller.toString();
   const isOwner = currentPrincipal === sellerText;
-  const isWinner = listing.highestBidder?.toString() === currentPrincipal;
+  const isWinner = isViewerWinningAuction(listing, currentPrincipal, bidStatus);
+  const hasBeenOutbid = !!bidStatus?.hasBid && !isWinner;
 
   return (
     <motion.div
@@ -529,6 +594,22 @@ function AuctionListingCard({
             {formatRemaining(remaining)}
           </span>
         </div>
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono min-w-0">
+          <Gavel className="w-3 h-3 shrink-0" />
+          <span className="truncate">
+            High bidder: {auctionHighBidderText(listing)}
+          </span>
+        </div>
+        {isWinner && (
+          <Badge className="w-fit bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[10px]">
+            You're Winning
+          </Badge>
+        )}
+        {hasBeenOutbid && (
+          <Badge className="w-fit bg-amber-500/10 text-amber-700 border border-amber-500/20 text-[10px]">
+            You've been outbid
+          </Badge>
+        )}
 
         <div className="mt-auto pt-2 border-t border-border/60 flex items-end justify-between gap-2">
           <PriceDisplay
@@ -637,7 +718,7 @@ function ListNFTModal({
   const [selectedNFT, setSelectedNFT] = useState<bigint | null>(null);
   const [mode, setMode] = useState<"fixed" | "auction">("fixed");
   const [price, setPrice] = useState("");
-  const [startBid, setStartBid] = useState("");
+  const [startBid, setStartBid] = useState("0.01");
   const [durationAmount, setDurationAmount] = useState("3");
   const [durationUnit, setDurationUnit] = useState<"hours" | "days">("days");
 
@@ -645,7 +726,7 @@ function ListNFTModal({
     setSelectedNFT(null);
     setMode("fixed");
     setPrice("");
-    setStartBid("");
+    setStartBid("0.01");
     setDurationAmount("3");
     setDurationUnit("days");
   }, []);
@@ -667,6 +748,9 @@ function ListNFTModal({
     } else {
       const bid = parseICP(startBid);
       if (!bid) return toast.error("Enter a valid starting bid");
+      if (bid < MIN_AUCTION_STARTING_BID_E8S) {
+        return toast.error("Starting bid must be at least 0.01 ICP");
+      }
       const amount = Number.parseInt(durationAmount, 10);
       if (Number.isNaN(amount) || amount < 1)
         return toast.error("Duration must be at least 1 hour");
@@ -835,14 +919,14 @@ function ListNFTModal({
                   id="list-startbid"
                   type="text"
                   inputMode="decimal"
-                  placeholder="e.g. 5.0"
+                  placeholder="0.01"
                   value={startBid}
                   onChange={(e) => setStartBid(e.target.value)}
                   className="bg-background border-input font-mono"
                   data-ocid="marketplace.list_startbid_input"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Use any positive ICP amount with up to 8 decimals.
+                  Minimum starting bid is 0.01 ICP. Use up to 8 decimals.
                 </p>
               </div>
               <div className="space-y-1.5">
@@ -963,8 +1047,7 @@ function PlaceBidModal({
 
   if (!listing) return null;
 
-  const minBid =
-    listing.highestBid > 0n ? listing.highestBid + 1n : listing.startingBid;
+  const minBid = nextAuctionMinimumBid(listing);
   const minBidICP = formatICPAmount(minBid);
   const name = nft?.metadata.name ?? `NFT #${nft?.tokenId ?? "?"}`;
   const pendingAmount = pendingBidAmount ?? 0n;
@@ -1033,7 +1116,11 @@ function PlaceBidModal({
                 data-ocid="marketplace.bid_amount_input"
               />
               <p className="text-xs text-muted-foreground">
-                Enter any positive ICP amount with up to 8 decimals.
+                Bids must be at least 0.01 ICP above the current top bid.
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Bids placed with less than 2 minutes remaining extend the
+                auction by 5 minutes.
               </p>
             </div>
 
@@ -1245,6 +1332,34 @@ export default function MarketplacePage() {
       : [],
   );
 
+  const auctionListingIds = auctionListings.map(({ listing }) => listing.id);
+  const auctionListingIdsKey = auctionListingIds
+    .map((id) => id.toString())
+    .join(",");
+
+  const { data: myAuctionBidStatuses = [] } = useQuery<AuctionBidStatus[]>({
+    queryKey: [
+      "myAuctionBidStatuses",
+      principal?.toString(),
+      auctionListingIdsKey,
+    ],
+    queryFn: async () => {
+      if (!actor || auctionListingIds.length === 0) return [];
+      return actor.getMyAuctionBidStatuses(auctionListingIds);
+    },
+    enabled:
+      !!actor &&
+      !actorLoading &&
+      isAuthenticated &&
+      !!principal &&
+      auctionListingIds.length > 0,
+    refetchInterval: 30_000,
+  });
+
+  const myAuctionBidStatusMap = new Map(
+    myAuctionBidStatuses.map((status) => [status.listingId.toString(), status]),
+  );
+
   const listedNFTKeys = new Set(
     listingDetails
       .filter((detail) => {
@@ -1278,6 +1393,7 @@ export default function MarketplacePage() {
     void qc.invalidateQueries({ queryKey: ["userNFTs"] });
     void qc.invalidateQueries({ queryKey: ["userStats"] });
     void qc.invalidateQueries({ queryKey: ["icp-balance"] });
+    void qc.invalidateQueries({ queryKey: ["myAuctionBidStatuses"] });
   };
 
   async function ensureNFTReadyForListing(nft: WalletNFT): Promise<bigint> {
@@ -1615,6 +1731,7 @@ export default function MarketplacePage() {
                     }
                     index={i}
                     currentPrincipal={principalStr}
+                    bidStatus={myAuctionBidStatusMap.get(listing.id.toString())}
                     onBid={(l) => setBidTarget(l)}
                     onSettle={(id) => settleAuction(id)}
                     onCancel={(id) => setCancelTarget(id)}
@@ -1642,6 +1759,7 @@ export default function MarketplacePage() {
       <ListingDetailModal
         detail={detailTarget}
         currentPrincipal={principalStr}
+        bidStatusMap={myAuctionBidStatusMap}
         onClose={() => setDetailTarget(null)}
         onBuy={(id) => setBuyTarget(id)}
         onCancel={(id) => setCancelTarget(id)}

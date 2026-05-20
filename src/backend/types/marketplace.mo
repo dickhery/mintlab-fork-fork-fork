@@ -38,6 +38,15 @@ module {
     placedAt : Timestamp;
   };
 
+  public type AuctionBidStatus = {
+    listingId : ListingId;
+    hasBid : Bool;
+    isWinning : Bool;
+    highestBidder : ?UserId;
+    highestBid : Nat64;
+    myHighestBid : ?Nat64;
+  };
+
   public type AuctionEscrow = {
     escrowId : Nat;
     listingId : ListingId;

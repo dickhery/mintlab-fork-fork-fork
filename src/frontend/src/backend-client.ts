@@ -117,6 +117,15 @@ export interface AuctionListing {
   startingBid: bigint;
 }
 
+export interface AuctionBidStatus {
+  listingId: ListingId;
+  hasBid: boolean;
+  isWinning: boolean;
+  highestBidder?: UserId;
+  highestBid: bigint;
+  myHighestBid?: bigint;
+}
+
 export type ActiveListing =
   | { __kind__: "Fixed"; Fixed: FixedListing }
   | { __kind__: "Auction"; Auction: AuctionListing };
@@ -542,6 +551,9 @@ export interface backendInterface {
   >;
   getActiveListingDetails(): Promise<Array<ActiveListingDetail>>;
   getActiveListings(): Promise<Array<ActiveListing>>;
+  getMyAuctionBidStatuses(
+    listingIds: Array<ListingId>,
+  ): Promise<Array<AuctionBidStatus>>;
   getAdminPrincipal(): Promise<Principal | null>;
   getCollection(id: CollectionId): Promise<Collection | null>;
   getCollectionBrowseStats(
@@ -943,6 +955,14 @@ type RawAuctionListing = {
   nftId: NFTId;
   startingBid: bigint;
 };
+type RawAuctionBidStatus = {
+  listingId: ListingId;
+  hasBid: boolean;
+  isWinning: boolean;
+  highestBidder: [] | [UserId];
+  highestBid: bigint;
+  myHighestBid: [] | [bigint];
+};
 type RawAuctionEscrow = {
   amount: bigint;
   bidder: UserId;
@@ -1197,6 +1217,17 @@ function fromRawAuctionListing(value: RawAuctionListing): AuctionListing {
     highestBid: value.highestBid,
     nftId: value.nftId,
     startingBid: value.startingBid,
+  };
+}
+
+function fromRawAuctionBidStatus(value: RawAuctionBidStatus): AuctionBidStatus {
+  return {
+    listingId: value.listingId,
+    hasBid: value.hasBid,
+    isWinning: value.isWinning,
+    highestBidder: fromRawOption(value.highestBidder) ?? undefined,
+    highestBid: value.highestBid,
+    myHighestBid: fromRawOption(value.myHighestBid) ?? undefined,
   };
 }
 
@@ -2054,6 +2085,15 @@ export class Backend implements backendInterface {
       this.actor.getActiveListings(),
     )) as Array<RawActiveListing>;
     return result.map(fromRawActiveListing);
+  }
+
+  async getMyAuctionBidStatuses(
+    listingIds: Array<ListingId>,
+  ): Promise<Array<AuctionBidStatus>> {
+    const result = (await this.run(() =>
+      this.actor.getMyAuctionBidStatuses(listingIds),
+    )) as Array<RawAuctionBidStatus>;
+    return result.map(fromRawAuctionBidStatus);
   }
 
   async getAdminPrincipal(): Promise<Principal | null> {

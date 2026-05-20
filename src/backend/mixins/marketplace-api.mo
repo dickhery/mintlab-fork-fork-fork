@@ -8,6 +8,7 @@ import MarketplaceTypes "../types/marketplace";
 import WalletTypes "../types/wallet";
 import CollectionTypes "../types/collections";
 import CommonTypes "../types/common";
+import Array "mo:core/Array";
 import Blob "mo:core/Blob";
 import Error "mo:core/Error";
 import Int "mo:core/Int";
@@ -174,7 +175,9 @@ mixin (
     endTime : Int,
   ) : async MarketplaceTypes.AuctionListing {
     if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
-    if (startingBid == 0) Runtime.trap("Starting bid must be greater than zero");
+    if (startingBid < MarketplaceLib.MIN_AUCTION_STARTING_BID_E8S) {
+      Runtime.trap("Starting bid must be at least 0.01 ICP");
+    };
     ensureMintlabFeeApplies(startingBid, "Starting bid");
     ignore configuredFeeRecipientForAmount(startingBid);
     validateAuctionEndTime(endTime);
@@ -198,6 +201,23 @@ mixin (
 
   public query func getActiveListingDetails() : async [MarketplaceTypes.ActiveListingDetail] {
     MarketplaceLib.getAvailableActiveListingDetails(marketplaceState, marketplaceSettlementState);
+  };
+
+  public shared query ({ caller }) func getMyAuctionBidStatuses(
+    listingIds : [MarketplaceTypes.ListingId]
+  ) : async [MarketplaceTypes.AuctionBidStatus] {
+    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+
+    var statuses : [MarketplaceTypes.AuctionBidStatus] = [];
+    for (listingId in listingIds.values()) {
+      switch (MarketplaceLib.getAuctionBidStatus(marketplaceState, listingId, caller)) {
+        case null {};
+        case (?status) {
+          statuses := Array.concat<MarketplaceTypes.AuctionBidStatus>(statuses, [status]);
+        };
+      };
+    };
+    statuses;
   };
 
   public func getMarketplaceFeeConfig() : async MarketplaceTypes.MarketplaceFeeConfig {
@@ -543,12 +563,10 @@ mixin (
     if (Time.now() >= listing.endTime) Runtime.trap("Auction has ended");
     if (Principal.equal(listing.seller, bidder)) Runtime.trap("Seller cannot bid on their own auction");
 
-    let minimum = if (listing.highestBid == 0) {
-      listing.startingBid;
-    } else {
-      listing.highestBid + 1;
+    let minimum = MarketplaceLib.nextMinimumAuctionBid(listing);
+    if (amount < minimum) {
+      Runtime.trap("Bid must be at least 0.01 ICP above the current high bid");
     };
-    if (amount < minimum) Runtime.trap("Bid too low or listing not found");
 
     let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
     let ledgerFeeE8s = await* IcpLib.getTransferFee(ledger);
@@ -650,6 +668,10 @@ mixin (
       case null Runtime.trap("Pending bid is missing its payment block");
       case (?value) value;
     };
+    let bidObservedAt = switch (pending.paymentAttemptedAt) {
+      case (?timestamp) timestamp;
+      case null pending.createdAt;
+    };
 
     let previousEscrow = MarketplaceLib.getAuctionEscrow(marketplacePaymentState, listingId);
     switch (previousEscrow) {
@@ -658,7 +680,7 @@ mixin (
           let currentListing = if (auctionListingHasPendingBid(listing, pending)) {
             listing
           } else {
-            switch (MarketplaceLib.placeBid(marketplaceState, listingId, pending.bidder, pending.amount)) {
+            switch (MarketplaceLib.placeBidAt(marketplaceState, listingId, pending.bidder, pending.amount, bidObservedAt)) {
               case null Runtime.trap("Bid too low or listing not found");
               case (?value) value;
             }
@@ -673,7 +695,7 @@ mixin (
     let updated = if (auctionListingHasPendingBid(listing, pending)) {
       listing
     } else {
-      switch (MarketplaceLib.placeBid(marketplaceState, listingId, pending.bidder, pending.amount)) {
+      switch (MarketplaceLib.placeBidAt(marketplaceState, listingId, pending.bidder, pending.amount, bidObservedAt)) {
         case null Runtime.trap("Bid too low or listing not found");
         case (?value) value;
       }

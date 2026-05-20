@@ -422,7 +422,8 @@ export const mockBackend: backendInterface = {
     nftId,
     startingBid,
     endTime,
-    highestBid: startingBid,
+    highestBid: 0n,
+    highestBidder: undefined,
   }),
   createUserCollection: async (name, description, symbol, imageUrl, dividendsEnabled) => ({
     __kind__: "ok" as const,
@@ -449,6 +450,27 @@ export const mockBackend: backendInterface = {
   }),
   getActiveListingDetails: async () => sampleActiveListingDetails,
   getActiveListings: async () => sampleActiveListings,
+  getMyAuctionBidStatuses: async (listingIds) =>
+    listingIds.flatMap((listingId) => {
+      const active = sampleActiveListings.find(
+        (listing) =>
+          listing.__kind__ === "Auction" && listing.Auction.id === listingId,
+      );
+      if (!active || active.__kind__ !== "Auction") return [];
+      const auction = active.Auction;
+      const isWinning =
+        auction.highestBidder?.toString() === samplePrincipal.toString();
+      return [
+        {
+          listingId,
+          hasBid: isWinning,
+          isWinning,
+          highestBidder: auction.highestBidder,
+          highestBid: auction.highestBid,
+          myHighestBid: isWinning ? auction.highestBid : undefined,
+        },
+      ];
+    }),
   getAdminPrincipal: async () => samplePrincipal,
   getCollection: async (id) => sampleCollections.find((c) => c.id === id) ?? null,
   getCollectionBrowseStats: async (collectionId) => {

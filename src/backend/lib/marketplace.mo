@@ -13,6 +13,10 @@ module {
   public let MINTLAB_FEE_BASIS_POINTS : Nat = DEFAULT_MINTLAB_FEE_BASIS_POINTS;
   public let BASIS_POINTS_DENOMINATOR : Nat = 10_000;
   public let AUCTION_SETTLEMENT_TRANSFER_COUNT : Nat = 2;
+  public let MIN_AUCTION_STARTING_BID_E8S : Nat64 = 1_000_000; // 0.01 ICP
+  public let MIN_AUCTION_BID_INCREMENT_E8S : Nat64 = 1_000_000; // 0.01 ICP
+  public let ANTI_SNIPE_THRESHOLD_NANOS : Int = 120_000_000_000; // 2 minutes
+  public let ANTI_SNIPE_EXTENSION_NANOS : Int = 300_000_000_000; // 5 minutes
 
   public type MarketplaceState = {
     fixedListings : Map.Map<Types.ListingId, Types.FixedListing>;
@@ -127,6 +131,34 @@ module {
 
   public func totalBidderDebit(amount : Nat64, ledgerFeeE8s : Nat64) : Nat64 {
     Nat64.fromNat(Nat64.toNat(auctionBidEscrowDeposit(amount, ledgerFeeE8s)) + Nat64.toNat(ledgerFeeE8s));
+  };
+
+  public func nextMinimumAuctionBid(listing : Types.AuctionListing) : Nat64 {
+    if (listing.highestBid == 0) {
+      if (listing.startingBid < MIN_AUCTION_STARTING_BID_E8S) {
+        MIN_AUCTION_STARTING_BID_E8S;
+      } else {
+        listing.startingBid;
+      };
+    } else {
+      listing.highestBid + MIN_AUCTION_BID_INCREMENT_E8S;
+    };
+  };
+
+  public func extendedAuctionEndTimeAfterBid(
+    listing : Types.AuctionListing,
+    bidObservedAt : Types.Timestamp,
+  ) : Types.Timestamp {
+    if (listing.endTime <= bidObservedAt) {
+      listing.endTime;
+    } else {
+      let remaining = listing.endTime - bidObservedAt;
+      if (remaining < ANTI_SNIPE_THRESHOLD_NANOS) {
+        listing.endTime + ANTI_SNIPE_EXTENSION_NANOS;
+      } else {
+        listing.endTime;
+      };
+    };
   };
 
   public func fixedPurchaseLedgerFeeCount(state : MarketplaceFeeState, amount : Nat64) : Nat64 {
@@ -510,22 +542,25 @@ module {
     };
   };
 
-  public func placeBid(
+  public func placeBidAt(
     state : MarketplaceState,
     listingId : Types.ListingId,
     bidder : Types.UserId,
     amount : Nat64,
+    bidObservedAt : Types.Timestamp,
   ) : ?Types.AuctionListing {
     switch (Map.get(state.auctionListings, Nat.compare, listingId)) {
       case null null;
       case (?listing) {
         if (listing.status != #Active) return null;
-        let minimum = if (listing.highestBid == 0) listing.startingBid else listing.highestBid + 1;
+        let minimum = nextMinimumAuctionBid(listing);
         if (amount < minimum) return null;
+        let updatedEndTime = extendedAuctionEndTimeAfterBid(listing, bidObservedAt);
         let updated : Types.AuctionListing = {
           listing with
           highestBidder = ?bidder;
           highestBid = amount;
+          endTime = updatedEndTime;
         };
         Map.add(state.auctionListings, Nat.compare, listingId, updated);
         let history = switch (Map.get(state.bids, Nat.compare, listingId)) {
@@ -543,7 +578,7 @@ module {
                 listingId;
                 bidder;
                 amount;
-                placedAt = Time.now();
+                placedAt = bidObservedAt;
               },
             ],
           ),
@@ -551,6 +586,15 @@ module {
         ?updated;
       };
     };
+  };
+
+  public func placeBid(
+    state : MarketplaceState,
+    listingId : Types.ListingId,
+    bidder : Types.UserId,
+    amount : Nat64,
+  ) : ?Types.AuctionListing {
+    placeBidAt(state, listingId, bidder, amount, Time.now());
   };
 
   public func settleAuction(
@@ -607,6 +651,55 @@ module {
     listingId : Types.ListingId,
   ) : ?Types.AuctionListing {
     Map.get(state.auctionListings, Nat.compare, listingId);
+  };
+
+  public func getAuctionBidStatus(
+    state : MarketplaceState,
+    listingId : Types.ListingId,
+    bidder : Types.UserId,
+  ) : ?Types.AuctionBidStatus {
+    switch (Map.get(state.auctionListings, Nat.compare, listingId)) {
+      case null null;
+      case (?listing) {
+        var hasBid = false;
+        var myHighestBid : ?Nat64 = null;
+
+        switch (Map.get(state.bids, Nat.compare, listingId)) {
+          case null {};
+          case (?history) {
+            for (bid in history.values()) {
+              if (Principal.equal(bid.bidder, bidder)) {
+                hasBid := true;
+                switch (myHighestBid) {
+                  case null {
+                    myHighestBid := ?bid.amount;
+                  };
+                  case (?current) {
+                    if (bid.amount > current) {
+                      myHighestBid := ?bid.amount;
+                    };
+                  };
+                };
+              };
+            };
+          };
+        };
+
+        let isWinning = switch (listing.highestBidder) {
+          case null false;
+          case (?winner) Principal.equal(winner, bidder);
+        };
+
+        ?{
+          listingId;
+          hasBid;
+          isWinning;
+          highestBidder = listing.highestBidder;
+          highestBid = listing.highestBid;
+          myHighestBid;
+        };
+      };
+    };
   };
 
   public func getEscrowedNFT(

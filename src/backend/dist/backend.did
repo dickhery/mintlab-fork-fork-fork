@@ -572,6 +572,15 @@ type AuctionEscrow =
    ledgerFeeE8s: nat64;
    listingId: ListingId;
  };
+type AuctionBidStatus =
+ record {
+   hasBid: bool;
+   highestBid: nat64;
+   highestBidder: opt UserId;
+   isWinning: bool;
+   listingId: ListingId;
+   myHighestBid: opt nat64;
+ };
 type AssetHttpResponse = 
  record {
    body: blob;
@@ -748,6 +757,8 @@ service : {
   getMarketplaceFeeConfig: () -> (MarketplaceFeeConfig);
   getMintConfig: () -> (MintConfig) query;
   getModerationConfig: () -> (PublicModerationConfig) query;
+  getMyAuctionBidStatuses: (listingIds: vec ListingId) ->
+   (vec AuctionBidStatus) query;
   getMyCollectionCanisterStatuses: () -> (vec CollectionCanisterStatus);
   getMyCollectionCreationRequests: () -> (vec CollectionCreationRequestView);
   getMyCreatedCollections: () -> (vec Collection);

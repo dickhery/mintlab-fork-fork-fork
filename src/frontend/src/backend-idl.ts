@@ -84,6 +84,14 @@ export const idlFactory = ({ IDL }) => {
     'nftId' : NFTId,
     'startingBid' : IDL.Nat64,
   });
+  const AuctionBidStatus = IDL.Record({
+    'listingId' : ListingId,
+    'hasBid' : IDL.Bool,
+    'isWinning' : IDL.Bool,
+    'highestBidder' : IDL.Opt(UserId),
+    'highestBid' : IDL.Nat64,
+    'myHighestBid' : IDL.Opt(IDL.Nat64),
+  });
   const FixedListing = IDL.Record({
     'id' : ListingId,
     'status' : ListingStatus,
@@ -539,6 +547,11 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getActiveListings' : IDL.Func([], [IDL.Vec(ActiveListing)], ['query']),
+    'getMyAuctionBidStatuses' : IDL.Func(
+        [IDL.Vec(ListingId)],
+        [IDL.Vec(AuctionBidStatus)],
+        ['query'],
+      ),
     'getAdminPrincipal' : IDL.Func([], [IDL.Opt(IDL.Principal)], ['query']),
     'getAllCollectionCreationRequests' : IDL.Func(
         [],

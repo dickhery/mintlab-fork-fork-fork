@@ -5,6 +5,7 @@ export type {
   WalletNFT,
   NFTStandard,
   AuctionListing,
+  AuctionBidStatus,
   AuctionEscrow,
   ActiveListing,
   ActiveListingDetail,
