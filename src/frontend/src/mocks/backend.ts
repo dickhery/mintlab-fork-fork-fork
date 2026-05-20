@@ -793,6 +793,10 @@ export const mockBackend: backendInterface = {
     id: listingId,
     highestBid: amount,
   }),
+  retryPendingBid: async (listingId) => ({
+    ...auctionListing,
+    id: listingId,
+  }),
   prepareVaultDeposit: async () => ({ __kind__: "ok" as const, ok: "Mock deposit prepared" }),
   previewMyCollectionNFTs: async (collectionId) => ({
     __kind__: "ok" as const,

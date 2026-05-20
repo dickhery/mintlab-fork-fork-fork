@@ -26,6 +26,7 @@ persistent actor Backend {
   let marketplaceState = MarketplaceLib.newState();
   let marketplacePaymentState = MarketplaceLib.newPaymentState();
   let marketplaceSettlementState = MarketplaceLib.newSettlementState();
+  let marketplaceBidState = MarketplaceLib.newBidState();
   let marketplaceFeeState = MarketplaceLib.newFeeState();
   let dividendsState = DividendsLib.newState();
 
@@ -53,6 +54,7 @@ persistent actor Backend {
     marketplaceState,
     marketplacePaymentState,
     marketplaceSettlementState,
+    marketplaceBidState,
     marketplaceFeeState,
     walletState,
     mintState,

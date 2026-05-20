@@ -104,6 +104,7 @@ export interface _SERVICE {
   'isNFTInUserWallet' : ActorMethod<[CollectionId, string, UserId], boolean>,
   'listCollections' : ActorMethod<[], Array<Collection>>,
   'placeBid' : ActorMethod<[ListingId, bigint], AuctionListing>,
+  'retryPendingBid' : ActorMethod<[ListingId], AuctionListing>,
   'registerNFT' : ActorMethod<
     [CollectionId, string, NFTMetadata],
     { 'ok' : WalletNFT } |

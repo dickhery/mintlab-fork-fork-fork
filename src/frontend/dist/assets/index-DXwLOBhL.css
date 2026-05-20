@@ -1403,6 +1403,9 @@ video {
 .grid-cols-\[0_1fr\] {
   grid-template-columns: 0 1fr;
 }
+.grid-cols-\[1fr_auto\] {
+  grid-template-columns: 1fr auto;
+}
 .grid-rows-\[auto_auto\] {
   grid-template-rows: auto auto;
 }

@@ -722,6 +722,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'placeBid' : IDL.Func([ListingId, IDL.Nat64], [AuctionListing], []),
+    'retryPendingBid' : IDL.Func([ListingId], [AuctionListing], []),
     'prepareVaultDeposit' : IDL.Func(
         [CollectionId, IDL.Text],
         [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],

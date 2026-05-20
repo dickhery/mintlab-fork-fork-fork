@@ -872,6 +872,7 @@ service : {
       err: text;
       ok: Collection;
     });
+  retryPendingBid: (listingId: ListingId) -> (AuctionListing);
   sendNFT: (nftId: NFTId, recipient: principal) ->
    (variant {
       err: text;

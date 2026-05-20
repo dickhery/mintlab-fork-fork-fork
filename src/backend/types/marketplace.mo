@@ -49,6 +49,21 @@ module {
     createdAt : Timestamp;
   };
 
+  public type PendingBidDeposit = {
+    listingId : ListingId;
+    bidder : UserId;
+    amount : Nat64;
+    escrowId : Nat;
+    escrowDeposit : Nat64;
+    feeReserve : Nat64;
+    ledgerFeeE8s : Nat64;
+    paymentCreatedAt : Nat64;
+    paymentAttemptedAt : ?Timestamp;
+    paymentBlock : ?Nat64;
+    createdAt : Timestamp;
+    updatedAt : Timestamp;
+  };
+
   public type SettlementStage = {
     #PaymentPending;
     #NFTTransferPending;

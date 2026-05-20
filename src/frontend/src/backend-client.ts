@@ -630,6 +630,7 @@ export interface backendInterface {
     { __kind__: "ok"; ok: MintReceipt } | { __kind__: "err"; err: string }
   >;
   placeBid(listingId: ListingId, amount: bigint): Promise<AuctionListing>;
+  retryPendingBid(listingId: ListingId): Promise<AuctionListing>;
   prepareVaultDeposit(
     collectionId: CollectionId,
     tokenId: string,
@@ -2344,6 +2345,12 @@ export class Backend implements backendInterface {
   ): Promise<AuctionListing> {
     return fromRawAuctionListing(
       await this.run(() => this.actor.placeBid(listingId, amount)),
+    );
+  }
+
+  async retryPendingBid(listingId: ListingId): Promise<AuctionListing> {
+    return fromRawAuctionListing(
+      await this.run(() => this.actor.retryPendingBid(listingId)),
     );
   }
 

@@ -35,6 +35,10 @@ module {
     auctionSettlements : Map.Map<Types.ListingId, Types.AuctionSettlement>;
   };
 
+  public type MarketplaceBidState = {
+    pendingBidDeposits : Map.Map<Types.ListingId, Types.PendingBidDeposit>;
+  };
+
   public type MarketplaceFeeState = {
     var mintlabFeeBasisPoints : Nat;
   };
@@ -63,6 +67,12 @@ module {
     {
       fixedPurchaseSettlements = Map.empty<Types.ListingId, Types.FixedPurchaseSettlement>();
       auctionSettlements = Map.empty<Types.ListingId, Types.AuctionSettlement>();
+    };
+  };
+
+  public func newBidState() : MarketplaceBidState {
+    {
+      pendingBidDeposits = Map.empty<Types.ListingId, Types.PendingBidDeposit>();
     };
   };
 
@@ -241,6 +251,29 @@ module {
   ) : ?Types.AuctionEscrow {
     let current = Map.get(state.auctionEscrows, Nat.compare, listingId);
     Map.remove(state.auctionEscrows, Nat.compare, listingId);
+    current;
+  };
+
+  public func putPendingBidDeposit(
+    state : MarketplaceBidState,
+    pending : Types.PendingBidDeposit,
+  ) {
+    Map.add(state.pendingBidDeposits, Nat.compare, pending.listingId, pending);
+  };
+
+  public func getPendingBidDeposit(
+    state : MarketplaceBidState,
+    listingId : Types.ListingId,
+  ) : ?Types.PendingBidDeposit {
+    Map.get(state.pendingBidDeposits, Nat.compare, listingId);
+  };
+
+  public func removePendingBidDeposit(
+    state : MarketplaceBidState,
+    listingId : Types.ListingId,
+  ) : ?Types.PendingBidDeposit {
+    let current = Map.get(state.pendingBidDeposits, Nat.compare, listingId);
+    Map.remove(state.pendingBidDeposits, Nat.compare, listingId);
     current;
   };
 

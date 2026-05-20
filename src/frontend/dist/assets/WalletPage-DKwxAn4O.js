@@ -1,17 +1,17 @@
-import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useQueryClient, r as reactExports, e as useQuery, f as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-C-SuI0H7.js";
-import { A as AppCanisterTopUpDialog, P as Plus, i as isLowCyclesError } from "./AppCanisterTopUpDialog-CMTWW2le.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-Br6VJClg.js";
-import { M as MediaImage, E as EmptyState } from "./MediaImage-DqaTE_uL.js";
-import { B as Badge, u as useMutation, L as Label, I as Input, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle } from "./badge-LGuHE_hG.js";
-import { I as ImageOff, r as resolveImageUrl } from "./media-BmIf_JTe.js";
-import { P as PaymentConfirmationDialog, T as Tag } from "./PaymentConfirmationDialog-BB8dVMJu.js";
-import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-BqRI6e9-.js";
-import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-D_8457pQ.js";
-import { S as Skeleton, C as Copy } from "./skeleton-Cpu2nHSJ.js";
-import { c as compressModerationImage, S as Sparkles } from "./imageUtils-BZIirfSy.js";
-import { C as CircleCheck, S as Send } from "./send-SvaMhwRZ.js";
-import { C as Coins } from "./coins-B1sRqan3.js";
-import "./index-CkvwFxL7.js";
+import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useQueryClient, r as reactExports, e as useQuery, f as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-BDnW_hP0.js";
+import { A as AppCanisterTopUpDialog, P as Plus, i as isLowCyclesError } from "./AppCanisterTopUpDialog-BcSeaNho.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-B69tyZNW.js";
+import { M as MediaImage, E as EmptyState } from "./MediaImage-C9oGFk9A.js";
+import { B as Badge, u as useMutation, L as Label, I as Input, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle } from "./badge-Ccmd6a9O.js";
+import { I as ImageOff, r as resolveImageUrl } from "./media-Ce65QKRE.js";
+import { P as PaymentConfirmationDialog, T as Tag } from "./PaymentConfirmationDialog-JyA62yR3.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-g-zyc6cB.js";
+import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-DdsS5fBm.js";
+import { S as Skeleton, C as Copy } from "./skeleton-Bwdv65LD.js";
+import { c as compressModerationImage, S as Sparkles } from "./imageUtils-Cb7X_gll.js";
+import { C as CircleCheck, S as Send } from "./send-Dh-p30R_.js";
+import { C as Coins } from "./coins-DuOPBoq4.js";
+import "./index-CXeDKeWV.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *

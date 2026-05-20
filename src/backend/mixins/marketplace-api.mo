@@ -21,6 +21,7 @@ mixin (
   marketplaceState : MarketplaceLib.MarketplaceState,
   marketplacePaymentState : MarketplaceLib.MarketplacePaymentState,
   marketplaceSettlementState : MarketplaceLib.MarketplaceSettlementState,
+  marketplaceBidState : MarketplaceLib.MarketplaceBidState,
   marketplaceFeeState : MarketplaceLib.MarketplaceFeeState,
   walletState : WalletLib.WalletState,
   mintState : MintLib.MintState,
@@ -93,6 +94,52 @@ mixin (
     };
   };
 
+  func minimumAuctionDurationNanos() : Int {
+    3_600_000_000_000; // 1 hour
+  };
+
+  func maximumAuctionDurationNanos() : Int {
+    30 * 86_400_000_000_000; // 30 days
+  };
+
+  func auctionDurationToleranceNanos() : Int {
+    120_000_000_000; // allow 1-hour UI submissions to survive network latency
+  };
+
+  func validateAuctionEndTime(endTime : Int) {
+    let now = Time.now();
+    if (endTime <= now) Runtime.trap("End time must be in the future");
+    if (endTime + auctionDurationToleranceNanos() < now + minimumAuctionDurationNanos()) {
+      Runtime.trap("Auction duration must be at least 1 hour");
+    };
+    if (endTime > now + maximumAuctionDurationNanos()) {
+      Runtime.trap("Auction duration cannot exceed 30 days");
+    };
+  };
+
+  func auctionEscrowMatchesPending(
+    escrow : MarketplaceTypes.AuctionEscrow,
+    pending : MarketplaceTypes.PendingBidDeposit,
+    depositedBlock : Nat64,
+  ) : Bool {
+    escrow.escrowId == pending.escrowId and
+    escrow.listingId == pending.listingId and
+    Principal.equal(escrow.bidder, pending.bidder) and
+    escrow.amount == pending.amount and
+    escrow.depositedBlock == depositedBlock;
+  };
+
+  func auctionListingHasPendingBid(
+    listing : MarketplaceTypes.AuctionListing,
+    pending : MarketplaceTypes.PendingBidDeposit,
+  ) : Bool {
+    if (listing.highestBid != pending.amount) return false;
+    switch (listing.highestBidder) {
+      case (?bidder) Principal.equal(bidder, pending.bidder);
+      case null false;
+    };
+  };
+
   func settlementPayoutDebit(amount : Nat64, mintlabFee : Nat64, ledgerFeeE8s : Nat64) : Nat64 {
     let transferCount : Nat = if (mintlabFee > 0) 2 else 1;
     Nat64.fromNat(Nat64.toNat(amount) + (Nat64.toNat(ledgerFeeE8s) * transferCount));
@@ -130,7 +177,7 @@ mixin (
     if (startingBid == 0) Runtime.trap("Starting bid must be greater than zero");
     ensureMintlabFeeApplies(startingBid, "Starting bid");
     ignore configuredFeeRecipientForAmount(startingBid);
-    if (endTime <= Time.now()) Runtime.trap("End time must be in the future");
+    validateAuctionEndTime(endTime);
     let nft = switch (WalletLib.getNFT(walletState, nftId)) {
       case null Runtime.trap("NFT not found");
       case (?n) n;
@@ -441,80 +488,238 @@ mixin (
       Runtime.trap("Auction is processing another payment. Try again shortly.");
     };
     try {
-      let listing = switch (MarketplaceLib.getAuctionListing(marketplaceState, listingId)) {
-        case null Runtime.trap("Auction listing not found");
-        case (?l) l;
-      };
-      if (listing.status != #Active) Runtime.trap("Auction is not active");
-      if (Time.now() >= listing.endTime) Runtime.trap("Auction has ended");
-      if (Principal.equal(listing.seller, caller)) Runtime.trap("Seller cannot bid on their own auction");
-      let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
-      let ledgerFeeE8s = await* IcpLib.getTransferFee(ledger);
-      let escrowDeposit = MarketplaceLib.auctionBidEscrowDeposit(amount, ledgerFeeE8s);
-      let requiredDebit = MarketplaceLib.totalBidderDebit(amount, ledgerFeeE8s);
-      let selfPrincipal = canisterId;
-      let bidderSub = IcpLib.principalToSubaccount(caller);
-      let bidderAccount = IcpLib.accountIdentifier(selfPrincipal, bidderSub);
-      let bidderBalance = await* IcpLib.getBalance(ledger, bidderAccount);
-      if (bidderBalance < requiredDebit) {
-        Runtime.trap(
-          "Insufficient ICP for bid escrow and ledger fees. Required: " #
-          Nat64.toText(requiredDebit) # " e8s"
-        );
-      };
-
-      let escrowId = MarketplaceLib.peekNextEscrowId(marketplacePaymentState);
-      let escrowSub = IcpLib.marketplaceEscrowSubaccount(escrowId);
-      let escrowAccount = IcpLib.accountIdentifier(selfPrincipal, escrowSub);
-      let depositResult = await* IcpLib.transferOutWithFee(
-        ledger,
-        ?bidderSub,
-        escrowAccount,
-        escrowDeposit,
-        Nat64.fromNat(listingId),
-        ledgerFeeE8s,
-      );
-      let depositBlock = switch (depositResult) {
-        case (#Err(error)) Runtime.trap("Bid escrow transfer failed: " # IcpLib.transferErrorText(error));
-        case (#Ok(blockIndex)) blockIndex;
-      };
-
-      let previousEscrow = MarketplaceLib.getAuctionEscrow(marketplacePaymentState, listingId);
-      let updated = switch (MarketplaceLib.placeBid(marketplaceState, listingId, caller, amount)) {
-        case null Runtime.trap("Bid too low or listing not found");
-        case (?value) value;
-      };
-      MarketplaceLib.recordAuctionEscrow(
-        marketplacePaymentState,
-        listingId,
-        {
-          escrowId;
-          listingId;
-          bidder = caller;
-          amount;
-          feeReserve = MarketplaceLib.auctionBidFeeReserve(ledgerFeeE8s);
-          ledgerFeeE8s;
-          depositedBlock = depositBlock;
-          createdAt = Time.now();
-        },
-      );
-
-      switch (previousEscrow) {
-        case null {};
-        case (?escrow) {
-          MarketplaceLib.queueAuctionRefund(marketplacePaymentState, escrow);
-          switch (await* refundAuctionEscrow(ledger, escrow, ledgerFeeE8s)) {
-            case (#ok(_)) {
-              ignore MarketplaceLib.removePendingRefund(marketplacePaymentState, escrow.escrowId);
-            };
-            case (#err(_)) {};
+      switch (MarketplaceLib.getPendingBidDeposit(marketplaceBidState, listingId)) {
+        case null {
+          ignore await* startPendingBidDeposit(listingId, caller, amount);
+        };
+        case (?pending) {
+          let isCallerAdmin = AuthLib.isAdmin(authState, caller);
+          if (not Principal.equal(pending.bidder, caller) and not isCallerAdmin) {
+            Runtime.trap("This auction already has a pending bid deposit being recovered");
+          };
+          if (pending.amount != amount and not isCallerAdmin) {
+            Runtime.trap("Retry the pending bid with the same amount");
           };
         };
       };
-      updated;
+      await* continuePendingBidDeposit(listingId);
     } finally {
       MarketplaceLib.releaseListingLock(marketplacePaymentState, listingId);
     };
+  };
+
+  public shared ({ caller }) func retryPendingBid(
+    listingId : MarketplaceTypes.ListingId
+  ) : async MarketplaceTypes.AuctionListing {
+    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    let pending = switch (MarketplaceLib.getPendingBidDeposit(marketplaceBidState, listingId)) {
+      case null Runtime.trap("Pending bid deposit not found");
+      case (?value) value;
+    };
+    let isCallerAdmin = AuthLib.isAdmin(authState, caller);
+    if (not Principal.equal(pending.bidder, caller) and not isCallerAdmin) {
+      Runtime.trap("Unauthorized: must be bidder or admin");
+    };
+    if (not MarketplaceLib.acquireListingLock(marketplacePaymentState, listingId)) {
+      Runtime.trap("Auction is processing another payment. Try again shortly.");
+    };
+    try {
+      await* continuePendingBidDeposit(listingId);
+    } finally {
+      MarketplaceLib.releaseListingLock(marketplacePaymentState, listingId);
+    };
+  };
+
+  func startPendingBidDeposit(
+    listingId : MarketplaceTypes.ListingId,
+    bidder : Principal,
+    amount : Nat64,
+  ) : async* MarketplaceTypes.PendingBidDeposit {
+    let listing = switch (MarketplaceLib.getAuctionListing(marketplaceState, listingId)) {
+      case null Runtime.trap("Auction listing not found");
+      case (?value) value;
+    };
+    if (listing.status != #Active) Runtime.trap("Auction is not active");
+    if (Time.now() >= listing.endTime) Runtime.trap("Auction has ended");
+    if (Principal.equal(listing.seller, bidder)) Runtime.trap("Seller cannot bid on their own auction");
+
+    let minimum = if (listing.highestBid == 0) {
+      listing.startingBid;
+    } else {
+      listing.highestBid + 1;
+    };
+    if (amount < minimum) Runtime.trap("Bid too low or listing not found");
+
+    let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+    let ledgerFeeE8s = await* IcpLib.getTransferFee(ledger);
+    let escrowDeposit = MarketplaceLib.auctionBidEscrowDeposit(amount, ledgerFeeE8s);
+    let requiredDebit = MarketplaceLib.totalBidderDebit(amount, ledgerFeeE8s);
+    let bidderSub = IcpLib.principalToSubaccount(bidder);
+    let bidderAccount = IcpLib.accountIdentifier(canisterId, bidderSub);
+    let bidderBalance = await* IcpLib.getBalance(ledger, bidderAccount);
+    if (bidderBalance < requiredDebit) {
+      Runtime.trap(
+        "Insufficient ICP for bid escrow and ledger fees. Required: " #
+        Nat64.toText(requiredDebit) # " e8s"
+      );
+    };
+    if (Time.now() >= listing.endTime) Runtime.trap("Auction has ended");
+
+    let now = Time.now();
+    let pending : MarketplaceTypes.PendingBidDeposit = {
+      listingId;
+      bidder;
+      amount;
+      escrowId = MarketplaceLib.reserveEscrowId(marketplacePaymentState);
+      escrowDeposit;
+      feeReserve = MarketplaceLib.auctionBidFeeReserve(ledgerFeeE8s);
+      ledgerFeeE8s;
+      paymentCreatedAt = ledgerTimestampNow();
+      paymentAttemptedAt = null;
+      paymentBlock = null;
+      createdAt = now;
+      updatedAt = now;
+    };
+    MarketplaceLib.putPendingBidDeposit(marketplaceBidState, pending);
+    pending;
+  };
+
+  func continuePendingBidDeposit(
+    listingId : MarketplaceTypes.ListingId
+  ) : async* MarketplaceTypes.AuctionListing {
+    let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+    var pending = switch (MarketplaceLib.getPendingBidDeposit(marketplaceBidState, listingId)) {
+      case null Runtime.trap("Pending bid deposit not found");
+      case (?value) value;
+    };
+    let listing = switch (MarketplaceLib.getAuctionListing(marketplaceState, listingId)) {
+      case null Runtime.trap("Auction listing not found");
+      case (?value) value;
+    };
+    if (listing.status != #Active) Runtime.trap("Auction is not active");
+
+    switch (pending.paymentBlock) {
+      case null {
+        if (Time.now() >= listing.endTime) {
+          switch (pending.paymentAttemptedAt) {
+            case null {
+              ignore MarketplaceLib.removePendingBidDeposit(marketplaceBidState, listingId);
+              Runtime.trap("Auction ended before the bid escrow was funded");
+            };
+            case (?_) {};
+          };
+        };
+
+        switch (pending.paymentAttemptedAt) {
+          case null {
+            let now = Time.now();
+            pending := {
+              pending with
+              paymentAttemptedAt = ?now;
+              updatedAt = now;
+            };
+            MarketplaceLib.putPendingBidDeposit(marketplaceBidState, pending);
+          };
+          case (?_) {};
+        };
+
+        let bidderSub = IcpLib.principalToSubaccount(pending.bidder);
+        let escrowSub = IcpLib.marketplaceEscrowSubaccount(pending.escrowId);
+        let escrowAccount = IcpLib.accountIdentifier(canisterId, escrowSub);
+        let depositResult = await* IcpLib.transferOutWithFeeAt(
+          ledger,
+          ?bidderSub,
+          escrowAccount,
+          pending.escrowDeposit,
+          Nat64.fromNat(pending.listingId),
+          pending.ledgerFeeE8s,
+          pending.paymentCreatedAt,
+        );
+        let depositBlock = transferBlockOrTrap(depositResult, "Bid escrow transfer failed");
+        pending := {
+          pending with
+          paymentBlock = ?depositBlock;
+          updatedAt = Time.now();
+        };
+        MarketplaceLib.putPendingBidDeposit(marketplaceBidState, pending);
+      };
+      case (?_) {};
+    };
+
+    let depositedBlock = switch (pending.paymentBlock) {
+      case null Runtime.trap("Pending bid is missing its payment block");
+      case (?value) value;
+    };
+
+    let previousEscrow = MarketplaceLib.getAuctionEscrow(marketplacePaymentState, listingId);
+    switch (previousEscrow) {
+      case (?escrow) {
+        if (auctionEscrowMatchesPending(escrow, pending, depositedBlock)) {
+          let currentListing = if (auctionListingHasPendingBid(listing, pending)) {
+            listing
+          } else {
+            switch (MarketplaceLib.placeBid(marketplaceState, listingId, pending.bidder, pending.amount)) {
+              case null Runtime.trap("Bid too low or listing not found");
+              case (?value) value;
+            }
+          };
+          ignore MarketplaceLib.removePendingBidDeposit(marketplaceBidState, listingId);
+          return currentListing;
+        };
+      };
+      case null {};
+    };
+
+    let updated = if (auctionListingHasPendingBid(listing, pending)) {
+      listing
+    } else {
+      switch (MarketplaceLib.placeBid(marketplaceState, listingId, pending.bidder, pending.amount)) {
+        case null Runtime.trap("Bid too low or listing not found");
+        case (?value) value;
+      }
+    };
+
+    let previousEscrowToRefund = switch (previousEscrow) {
+      case null null;
+      case (?escrow) ?escrow;
+    };
+
+    switch (previousEscrowToRefund) {
+      case null {};
+      case (?escrow) {
+        MarketplaceLib.queueAuctionRefund(marketplacePaymentState, escrow);
+      };
+    };
+
+    MarketplaceLib.recordAuctionEscrow(
+      marketplacePaymentState,
+      listingId,
+      {
+        escrowId = pending.escrowId;
+        listingId;
+        bidder = pending.bidder;
+        amount = pending.amount;
+        feeReserve = pending.feeReserve;
+        ledgerFeeE8s = pending.ledgerFeeE8s;
+        depositedBlock;
+        createdAt = pending.createdAt;
+      },
+    );
+    ignore MarketplaceLib.removePendingBidDeposit(marketplaceBidState, listingId);
+
+    switch (previousEscrowToRefund) {
+      case null {};
+      case (?escrow) {
+        switch (await* refundAuctionEscrow(ledger, escrow, pending.ledgerFeeE8s)) {
+          case (#ok(_)) {
+            ignore MarketplaceLib.removePendingRefund(marketplacePaymentState, escrow.escrowId);
+          };
+          case (#err(_)) {};
+        };
+      };
+    };
+
+    updated;
   };
 
   /// Settle an auction after its end time; NFT delivery happens before escrow payout and can be retried.

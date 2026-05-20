@@ -1,11 +1,11 @@
-import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, g as useComposedRefs, a as cn, b as useBackend, u as useAuth, d as useQueryClient, e as useQuery, B as Button, S as ShoppingBag, h as LoadingSpinner, m as motion, X, f as ue } from "./index-C-SuI0H7.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-Br6VJClg.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-DqaTE_uL.js";
-import { T as Tag, P as PaymentConfirmationDialog } from "./PaymentConfirmationDialog-BB8dVMJu.js";
-import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-CkvwFxL7.js";
-import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, B as Badge, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-LGuHE_hG.js";
-import { C as Coins } from "./coins-B1sRqan3.js";
-import { I as ImageOff } from "./media-BmIf_JTe.js";
+import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, g as useComposedRefs, a as cn, b as useBackend, u as useAuth, d as useQueryClient, e as useQuery, B as Button, S as ShoppingBag, h as LoadingSpinner, m as motion, X, f as ue } from "./index-BDnW_hP0.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-B69tyZNW.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-C9oGFk9A.js";
+import { T as Tag, P as PaymentConfirmationDialog } from "./PaymentConfirmationDialog-JyA62yR3.js";
+import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-CXeDKeWV.js";
+import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, B as Badge, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-Ccmd6a9O.js";
+import { C as Coins } from "./coins-DuOPBoq4.js";
+import { I as ImageOff } from "./media-Ce65QKRE.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -937,13 +937,15 @@ function ListNFTModal({
   const [mode, setMode] = reactExports.useState("fixed");
   const [price, setPrice] = reactExports.useState("");
   const [startBid, setStartBid] = reactExports.useState("");
-  const [endDays, setEndDays] = reactExports.useState("3");
+  const [durationAmount, setDurationAmount] = reactExports.useState("3");
+  const [durationUnit, setDurationUnit] = reactExports.useState("days");
   const reset = reactExports.useCallback(() => {
     setSelectedNFT(null);
     setMode("fixed");
     setPrice("");
     setStartBid("");
-    setEndDays("3");
+    setDurationAmount("3");
+    setDurationUnit("days");
   }, []);
   reactExports.useEffect(() => {
     if (!open) reset();
@@ -960,10 +962,14 @@ function ListNFTModal({
     } else {
       const bid = parseICP(startBid);
       if (!bid) return ue.error("Enter a valid starting bid");
-      const days = Number.parseInt(endDays, 10);
-      if (Number.isNaN(days) || days < 1)
-        return ue.error("Duration must be at least 1 day");
-      const endTimeNs = BigInt(Date.now() + days * 864e5) * 1000000n;
+      const amount = Number.parseInt(durationAmount, 10);
+      if (Number.isNaN(amount) || amount < 1)
+        return ue.error("Duration must be at least 1 hour");
+      const durationHours = durationUnit === "days" ? amount * 24 : amount;
+      const maxDurationHours = 30 * 24;
+      if (durationHours > maxDurationHours)
+        return ue.error("Duration cannot exceed 30 days");
+      const endTimeNs = BigInt(Date.now() + durationHours * 36e5) * 1000000n;
       onList({
         type: "auction",
         nft,
@@ -1104,24 +1110,49 @@ function ListNFTModal({
                 {
                   htmlFor: "list-duration",
                   className: "text-xs text-muted-foreground uppercase tracking-wider",
-                  children: "Duration (days)"
+                  children: "Duration"
                 }
               ),
-              /* @__PURE__ */ jsxRuntimeExports.jsx(
-                Input,
-                {
-                  id: "list-duration",
-                  type: "number",
-                  min: "1",
-                  max: "30",
-                  step: "1",
-                  placeholder: "e.g. 3",
-                  value: endDays,
-                  onChange: (e) => setEndDays(e.target.value),
-                  className: "bg-background border-input font-mono",
-                  "data-ocid": "marketplace.list_duration_input"
-                }
-              )
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-[1fr_auto] gap-2", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  Input,
+                  {
+                    id: "list-duration",
+                    type: "number",
+                    min: "1",
+                    max: durationUnit === "days" ? "30" : "720",
+                    step: "1",
+                    placeholder: durationUnit === "days" ? "e.g. 3" : "e.g. 1",
+                    value: durationAmount,
+                    onChange: (e) => setDurationAmount(e.target.value),
+                    className: "bg-background border-input font-mono",
+                    "data-ocid": "marketplace.list_duration_input"
+                  }
+                ),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex overflow-hidden rounded-lg border border-border", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "button",
+                    {
+                      type: "button",
+                      onClick: () => setDurationUnit("hours"),
+                      className: `px-3 text-xs font-semibold transition-smooth ${durationUnit === "hours" ? "bg-accent text-accent-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`,
+                      "data-ocid": "marketplace.list_duration_unit_hours",
+                      children: "Hours"
+                    }
+                  ),
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    "button",
+                    {
+                      type: "button",
+                      onClick: () => setDurationUnit("days"),
+                      className: `px-3 text-xs font-semibold transition-smooth ${durationUnit === "days" ? "bg-accent text-accent-foreground" : "bg-background text-muted-foreground hover:bg-muted"}`,
+                      "data-ocid": "marketplace.list_duration_unit_days",
+                      children: "Days"
+                    }
+                  )
+                ] })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Auctions can run from 1 hour up to 30 days." })
             ] })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 pt-1", children: [
@@ -1516,7 +1547,15 @@ function MarketplacePage() {
       setBidTarget(null);
       refreshMarketplace();
     },
-    onError: (e) => ue.error(`Bid failed: ${e.message}`)
+    onError: (e) => {
+      if (e.message.toLowerCase().includes("pending bid")) {
+        ue.error(
+          "This auction has a pending bid recovery. Retry with the same amount or contact an admin."
+        );
+        return;
+      }
+      ue.error(`Bid failed: ${e.message}`);
+    }
   });
   const { mutate: settleAuction, isPending: isSettling } = useMutation({
     mutationFn: async (id) => {
@@ -1575,7 +1614,8 @@ function MarketplacePage() {
   const buyPrice = (buyListingDetail == null ? void 0 : buyListingDetail.listing.price) ?? 0n;
   const buyMintlabFee = marketplaceFee(buyPrice, mintlabFeeBps);
   const buySellerProceeds = buyPrice - buyMintlabFee;
-  const buyLedgerFees = ledgerFeeE8s * (buyMintlabFee > 0n ? 2n : 1n);
+  const buySettlementLedgerFees = ledgerFeeE8s * (buyMintlabFee > 0n ? 2n : 1n);
+  const buyTotalLedgerFees = buySettlementLedgerFees + ledgerFeeE8s;
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-h-screen bg-background", "data-ocid": "marketplace.page", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "border-b border-border bg-card/80 backdrop-blur-sm sticky top-0 z-10", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
@@ -1765,7 +1805,7 @@ function MarketplacePage() {
             children: [
               /* @__PURE__ */ jsxRuntimeExports.jsxs(AlertDialogHeader, { children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx(AlertDialogTitle, { className: "font-display", children: "Confirm Purchase" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx(AlertDialogDescription, { children: "Confirm the ICP payment from your in-app account before this NFT is purchased and sent to you." })
+                /* @__PURE__ */ jsxRuntimeExports.jsx(AlertDialogDescription, { children: "Confirm the ICP payment from your in-app account. The purchase is funded into marketplace escrow first, then the NFT and seller payout are settled from there." })
               ] }),
               buyListingDetail && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-sm", children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between gap-4", children: [
@@ -1793,16 +1833,26 @@ function MarketplacePage() {
                   ] })
                 ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between gap-4", children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-muted-foreground", children: "Ledger fees" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-muted-foreground", children: [
+                    "Settlement ledger fees",
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "block text-[11px] leading-snug", children: "Reserved in escrow for the seller and Mintlab payouts" })
+                  ] }),
                   /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "font-mono", children: [
-                    formatICPAmount(buyLedgerFees),
+                    formatICPAmount(buySettlementLedgerFees),
+                    " ICP"
+                  ] })
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between gap-4", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-muted-foreground", children: "Transfer to escrow fee" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "font-mono", children: [
+                    formatICPAmount(ledgerFeeE8s),
                     " ICP"
                   ] })
                 ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between gap-4 border-t border-border pt-2 font-medium", children: [
                   /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Total debit" }),
                   /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "font-mono", children: [
-                    formatICPAmount(buyPrice + buyLedgerFees),
+                    formatICPAmount(buyPrice + buyTotalLedgerFees),
                     " ICP"
                   ] })
                 ] })

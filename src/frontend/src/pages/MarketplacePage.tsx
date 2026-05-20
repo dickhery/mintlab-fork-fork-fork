@@ -638,14 +638,16 @@ function ListNFTModal({
   const [mode, setMode] = useState<"fixed" | "auction">("fixed");
   const [price, setPrice] = useState("");
   const [startBid, setStartBid] = useState("");
-  const [endDays, setEndDays] = useState("3");
+  const [durationAmount, setDurationAmount] = useState("3");
+  const [durationUnit, setDurationUnit] = useState<"hours" | "days">("days");
 
   const reset = useCallback(() => {
     setSelectedNFT(null);
     setMode("fixed");
     setPrice("");
     setStartBid("");
-    setEndDays("3");
+    setDurationAmount("3");
+    setDurationUnit("days");
   }, []);
 
   useEffect(() => {
@@ -665,10 +667,15 @@ function ListNFTModal({
     } else {
       const bid = parseICP(startBid);
       if (!bid) return toast.error("Enter a valid starting bid");
-      const days = Number.parseInt(endDays, 10);
-      if (Number.isNaN(days) || days < 1)
-        return toast.error("Duration must be at least 1 day");
-      const endTimeNs = BigInt(Date.now() + days * 86_400_000) * 1_000_000n;
+      const amount = Number.parseInt(durationAmount, 10);
+      if (Number.isNaN(amount) || amount < 1)
+        return toast.error("Duration must be at least 1 hour");
+      const durationHours = durationUnit === "days" ? amount * 24 : amount;
+      const maxDurationHours = 30 * 24;
+      if (durationHours > maxDurationHours)
+        return toast.error("Duration cannot exceed 30 days");
+      const endTimeNs =
+        BigInt(Date.now() + durationHours * 3_600_000) * 1_000_000n;
       onList({
         type: "auction",
         nft,
@@ -843,20 +850,51 @@ function ListNFTModal({
                   htmlFor="list-duration"
                   className="text-xs text-muted-foreground uppercase tracking-wider"
                 >
-                  Duration (days)
+                  Duration
                 </Label>
-                <Input
-                  id="list-duration"
-                  type="number"
-                  min="1"
-                  max="30"
-                  step="1"
-                  placeholder="e.g. 3"
-                  value={endDays}
-                  onChange={(e) => setEndDays(e.target.value)}
-                  className="bg-background border-input font-mono"
-                  data-ocid="marketplace.list_duration_input"
-                />
+                <div className="grid grid-cols-[1fr_auto] gap-2">
+                  <Input
+                    id="list-duration"
+                    type="number"
+                    min="1"
+                    max={durationUnit === "days" ? "30" : "720"}
+                    step="1"
+                    placeholder={durationUnit === "days" ? "e.g. 3" : "e.g. 1"}
+                    value={durationAmount}
+                    onChange={(e) => setDurationAmount(e.target.value)}
+                    className="bg-background border-input font-mono"
+                    data-ocid="marketplace.list_duration_input"
+                  />
+                  <div className="flex overflow-hidden rounded-lg border border-border">
+                    <button
+                      type="button"
+                      onClick={() => setDurationUnit("hours")}
+                      className={`px-3 text-xs font-semibold transition-smooth ${
+                        durationUnit === "hours"
+                          ? "bg-accent text-accent-foreground"
+                          : "bg-background text-muted-foreground hover:bg-muted"
+                      }`}
+                      data-ocid="marketplace.list_duration_unit_hours"
+                    >
+                      Hours
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDurationUnit("days")}
+                      className={`px-3 text-xs font-semibold transition-smooth ${
+                        durationUnit === "days"
+                          ? "bg-accent text-accent-foreground"
+                          : "bg-background text-muted-foreground hover:bg-muted"
+                      }`}
+                      data-ocid="marketplace.list_duration_unit_days"
+                    >
+                      Days
+                    </button>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Auctions can run from 1 hour up to 30 days.
+                </p>
               </div>
             </div>
           )}
@@ -1320,7 +1358,15 @@ export default function MarketplacePage() {
       setBidTarget(null);
       refreshMarketplace();
     },
-    onError: (e: Error) => toast.error(`Bid failed: ${e.message}`),
+    onError: (e: Error) => {
+      if (e.message.toLowerCase().includes("pending bid")) {
+        toast.error(
+          "This auction has a pending bid recovery. Retry with the same amount or contact an admin.",
+        );
+        return;
+      }
+      toast.error(`Bid failed: ${e.message}`);
+    },
   });
 
   const { mutate: settleAuction, isPending: isSettling } = useMutation({
