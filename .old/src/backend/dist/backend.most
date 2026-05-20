@@ -25,6 +25,28 @@ type AuctionListing__214662739 =
     startingBid : Nat64;
     status : ListingStatus__992681670
   };
+type AuctionSettlement__620895947 =
+  {
+    createdAt : Timestamp__534280185;
+    feeRecipient : ?AccountIdentifier__659921903;
+    ledgerFeeE8s : Nat64;
+    listingId : ListingId__411740840;
+    mintlabFee : Nat64;
+    mintlabFeeBlock : ?Nat64;
+    mintlabFeeCreatedAt : ?Nat64;
+    nft : WalletNFT__72979044;
+    nftDeliveredAt : ?Timestamp__534280185;
+    price : Nat64;
+    seller : UserId__166399690;
+    sellerPaymentBlock : ?Nat64;
+    sellerPaymentCreatedAt : ?Nat64;
+    sellerProceeds : Nat64;
+    stage : SettlementStage__594654131;
+    updatedAt : Timestamp__534280185;
+    winner : UserId__166399690;
+    winningEscrowDepositedBlock : Nat64;
+    winningEscrowId : Nat
+  };
 type Bid__832380272 =
   {
     amount : Nat64;
@@ -108,6 +130,29 @@ type FixedListing__362219521 =
     seller : UserId__166399690;
     status : ListingStatus__992681670
   };
+type FixedPurchaseSettlement__878942942 =
+  {
+    buyer : UserId__166399690;
+    createdAt : Timestamp__534280185;
+    feeRecipient : ?AccountIdentifier__659921903;
+    ledgerFeeE8s : Nat64;
+    listingId : ListingId__411740840;
+    mintlabFee : Nat64;
+    mintlabFeeBlock : ?Nat64;
+    mintlabFeeCreatedAt : ?Nat64;
+    nft : WalletNFT__72979044;
+    nftDeliveredAt : ?Timestamp__534280185;
+    paymentBlock : ?Nat64;
+    paymentCreatedAt : Nat64;
+    paymentEscrowId : Nat;
+    price : Nat64;
+    seller : UserId__166399690;
+    sellerPaymentBlock : ?Nat64;
+    sellerPaymentCreatedAt : ?Nat64;
+    sellerProceeds : Nat64;
+    stage : SettlementStage__594654131;
+    updatedAt : Timestamp__534280185
+  };
 type Internal__8484328<K, V> =
   {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
 type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
@@ -175,6 +220,28 @@ type Nat__490723111 = Nat__920180692;
 type Nat__920180692 = Nat;
 type Node__46230540<K, V> =
   {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type PendingBidDeposit__499993912 =
+  {
+    amount : Nat64;
+    bidder : UserId__166399690;
+    createdAt : Timestamp__534280185;
+    escrowDeposit : Nat64;
+    escrowId : Nat;
+    feeReserve : Nat64;
+    ledgerFeeE8s : Nat64;
+    listingId : ListingId__411740840;
+    paymentAttemptedAt : ?Timestamp__534280185;
+    paymentBlock : ?Nat64;
+    paymentCreatedAt : Nat64;
+    updatedAt : Timestamp__534280185
+  };
+type SettlementStage__594654131 =
+  {
+    #MintlabFeePending;
+    #NFTTransferPending;
+    #PaymentPending;
+    #SellerPaymentPending
+  };
 type Timestamp__301639476 = Int;
 type Timestamp__534280185 = Timestamp__301639476;
 type UserId__158757552 = Principal;
@@ -211,6 +278,11 @@ actor {
       pendingClaims : Map__605269027<Text, Bool>;
       processedBalanceE8s : Map__605269027<CollectionId__674876002, Nat64>
     };
+  stable marketplaceBidState :
+    {
+      pendingBidDeposits :
+        Map__605269027<ListingId__411740840, PendingBidDeposit__499993912>
+    };
   stable marketplaceFeeState : {var mintlabFeeBasisPoints : Nat};
   stable marketplacePaymentState :
     {
@@ -220,6 +292,14 @@ actor {
       var mintlabFeeRecipient : ?AccountIdentifier__659921903;
       var nextEscrowId : Nat;
       pendingRefunds : Map__605269027<Nat, AuctionEscrow__460860708>
+    };
+  stable marketplaceSettlementState :
+    {
+      auctionSettlements :
+        Map__605269027<ListingId__411740840, AuctionSettlement__620895947>;
+      fixedPurchaseSettlements :
+        Map__605269027<ListingId__411740840,
+                        FixedPurchaseSettlement__878942942>
     };
   stable marketplaceState :
     {

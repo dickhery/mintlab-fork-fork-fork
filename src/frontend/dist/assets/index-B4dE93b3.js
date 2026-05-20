@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-DKwxAn4O.js","assets/AppCanisterTopUpDialog-BcSeaNho.js","assets/badge-Ccmd6a9O.js","assets/external-nft-transfer-B69tyZNW.js","assets/media-Ce65QKRE.js","assets/MediaImage-C9oGFk9A.js","assets/PaymentConfirmationDialog-JyA62yR3.js","assets/index-CXeDKeWV.js","assets/card-g-zyc6cB.js","assets/textarea-DdsS5fBm.js","assets/skeleton-Bwdv65LD.js","assets/imageUtils-Cb7X_gll.js","assets/send-Dh-p30R_.js","assets/coins-DuOPBoq4.js","assets/MarketplacePage-JQPt_Rll.js","assets/AdminPage-D1K_dWc5.js","assets/switch-C-gkHPSt.js","assets/circle-alert-3o0ELOvL.js","assets/ICPAccountPage-Bd0aowzQ.js","assets/CollectionsPage-D6ZNABuE.js","assets/DividendsPage-Pk3zo9go.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-BYMdZjPm.js","assets/AppCanisterTopUpDialog-IoVy3-UY.js","assets/badge-Cfscz_la.js","assets/external-nft-transfer-BxSzAiTm.js","assets/media-D1JRCSNO.js","assets/MediaImage-Xbn4RKUo.js","assets/PaymentConfirmationDialog-BGRL8xw8.js","assets/index-BH3DMg4O.js","assets/card-B8jCyL9t.js","assets/textarea-B2dJWUNF.js","assets/skeleton-tUYazNYs.js","assets/imageUtils-DiS5ja-w.js","assets/send-Bfz6SdXK.js","assets/coins-DXlKy9bH.js","assets/MarketplacePage-CxRfI4P3.js","assets/AdminPage-B4KFsJka.js","assets/switch-CvdQJXfu.js","assets/circle-alert-CikaGAOL.js","assets/ICPAccountPage-BJPJyKSQ.js","assets/CollectionsPage-BtnyaA0Q.js","assets/DividendsPage-imgn2mUU.js"])))=>i.map(i=>d[i]);
 var __defProp = Object.defineProperty;
 var __typeError = (msg) => {
   throw TypeError(msg);
@@ -15595,7 +15595,7 @@ function mergeLoginOptions(loginOptions, otherLoginOptions) {
   };
 }
 const ONE_HOUR_IN_NANOSECONDS = BigInt(36e11);
-const DEFAULT_IDENTITY_PROVIDER = "https://identity.internetcomputer.org/";
+const DEFAULT_IDENTITY_PROVIDER = "https://id.ai";
 const InternetIdentityReactContext = reactExports.createContext(void 0);
 async function createAuthClient(createOptions) {
   const config = await loadConfig();
@@ -46124,13 +46124,13 @@ const Toaster = ({ ...props }) => {
     }
   );
 };
-const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-DKwxAn4O.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
-const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-JQPt_Rll.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,13]) : void 0));
-const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-D1K_dWc5.js"), true ? __vite__mapDeps([15,1,2,16,9,7,8,10,4,17]) : void 0));
-const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-Bd0aowzQ.js"), true ? __vite__mapDeps([18,2,8,10,12,17]) : void 0));
-const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-C_XZVr4_.js"), true ? [] : void 0));
-const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-D6ZNABuE.js"), true ? __vite__mapDeps([19,1,2,16,9,7,5,4,6,8,10,11]) : void 0));
-const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-Pk3zo9go.js"), true ? __vite__mapDeps([20,1,2,5,4,8,13]) : void 0));
+const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-BYMdZjPm.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
+const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-CxRfI4P3.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,13]) : void 0));
+const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-B4KFsJka.js"), true ? __vite__mapDeps([15,1,2,16,9,7,8,10,4,17]) : void 0));
+const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-BJPJyKSQ.js"), true ? __vite__mapDeps([18,2,8,10,12,17]) : void 0));
+const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-CY5lrYsF.js"), true ? [] : void 0));
+const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-BtnyaA0Q.js"), true ? __vite__mapDeps([19,1,2,16,9,7,5,4,6,8,10,11]) : void 0));
+const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-imgn2mUU.js"), true ? __vite__mapDeps([20,1,2,5,4,8,13]) : void 0));
 const rootRoute = createRootRoute({
   component: () => /* @__PURE__ */ jsxRuntimeExports.jsx(Layout, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(
     reactExports.Suspense,
