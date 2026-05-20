@@ -302,6 +302,25 @@ module {
     );
   };
 
+  /// Derive an isolated marketplace fixed-purchase escrow subaccount.
+  public func marketplacePurchaseEscrowSubaccount(escrowId : Nat) : Blob {
+    let prefix : [Nat8] = [77, 76, 66, 85, 89]; // "MLBUY"
+    Blob.fromArray(
+      Array.tabulate<Nat8>(
+        32,
+        func(i) {
+          if (i < prefix.size()) {
+            prefix[i];
+          } else if (i >= 24) {
+            Nat8.fromNat((escrowId / pow256(31 - i)) % 256);
+          } else {
+            0;
+          };
+        },
+      )
+    );
+  };
+
   public func transferErrorText(error : CommonTypes.TransferError) : Text {
     switch (error) {
       case (#InsufficientFunds({ balance })) {

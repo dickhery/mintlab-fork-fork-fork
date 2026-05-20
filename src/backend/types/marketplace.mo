@@ -49,6 +49,58 @@ module {
     createdAt : Timestamp;
   };
 
+  public type SettlementStage = {
+    #PaymentPending;
+    #NFTTransferPending;
+    #MintlabFeePending;
+    #SellerPaymentPending;
+  };
+
+  public type FixedPurchaseSettlement = {
+    listingId : ListingId;
+    buyer : UserId;
+    seller : UserId;
+    nft : WalletTypes.WalletNFT;
+    price : Nat64;
+    sellerProceeds : Nat64;
+    mintlabFee : Nat64;
+    feeRecipient : ?AccountIdentifier;
+    ledgerFeeE8s : Nat64;
+    paymentEscrowId : Nat;
+    paymentCreatedAt : Nat64;
+    paymentBlock : ?Nat64;
+    nftDeliveredAt : ?Timestamp;
+    mintlabFeeCreatedAt : ?Nat64;
+    mintlabFeeBlock : ?Nat64;
+    sellerPaymentCreatedAt : ?Nat64;
+    sellerPaymentBlock : ?Nat64;
+    stage : SettlementStage;
+    createdAt : Timestamp;
+    updatedAt : Timestamp;
+  };
+
+  public type AuctionSettlement = {
+    listingId : ListingId;
+    seller : UserId;
+    winner : UserId;
+    nft : WalletTypes.WalletNFT;
+    price : Nat64;
+    sellerProceeds : Nat64;
+    mintlabFee : Nat64;
+    feeRecipient : ?AccountIdentifier;
+    ledgerFeeE8s : Nat64;
+    winningEscrowId : Nat;
+    winningEscrowDepositedBlock : Nat64;
+    nftDeliveredAt : ?Timestamp;
+    mintlabFeeCreatedAt : ?Nat64;
+    mintlabFeeBlock : ?Nat64;
+    sellerPaymentCreatedAt : ?Nat64;
+    sellerPaymentBlock : ?Nat64;
+    stage : SettlementStage;
+    createdAt : Timestamp;
+    updatedAt : Timestamp;
+  };
+
   public type MarketplaceFeeConfig = {
     mintlabFeeBasisPoints : Nat;
     mintlabFeeRecipient : ?AccountIdentifier;

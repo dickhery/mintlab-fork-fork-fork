@@ -7,8 +7,10 @@ import CollectionsLib "../lib/collections";
 import MarketplaceTypes "../types/marketplace";
 import WalletTypes "../types/wallet";
 import CollectionTypes "../types/collections";
+import CommonTypes "../types/common";
 import Blob "mo:core/Blob";
 import Error "mo:core/Error";
+import Int "mo:core/Int";
 import Runtime "mo:core/Runtime";
 import Nat "mo:core/Nat";
 import Principal "mo:core/Principal";
@@ -68,6 +70,33 @@ mixin (
     };
   };
 
+  func configuredFeeRecipientForAmount(amount : Nat64) : ?MarketplaceTypes.AccountIdentifier {
+    if (MarketplaceLib.mintlabFee(marketplaceFeeState, amount) == 0) {
+      return null;
+    };
+    switch (marketplacePaymentState.mintlabFeeRecipient) {
+      case null Runtime.trap("Mintlab sales fee account must be configured before marketplace sales are enabled");
+      case (?account) ?account;
+    };
+  };
+
+  func ledgerTimestampNow() : Nat64 {
+    Nat64.fromNat(Int.abs(Time.now()));
+  };
+
+  func transferBlockOrTrap(result : CommonTypes.TransferResult, errorLabel : Text) : Nat64 {
+    switch (result) {
+      case (#Ok(blockIndex)) blockIndex;
+      case (#Err(#TxDuplicate({ duplicate_of }))) duplicate_of;
+      case (#Err(error)) Runtime.trap(errorLabel # ": " # IcpLib.transferErrorText(error));
+    };
+  };
+
+  func settlementPayoutDebit(amount : Nat64, mintlabFee : Nat64, ledgerFeeE8s : Nat64) : Nat64 {
+    let transferCount : Nat = if (mintlabFee > 0) 2 else 1;
+    Nat64.fromNat(Nat64.toNat(amount) + (Nat64.toNat(ledgerFeeE8s) * transferCount));
+  };
+
   /// List an NFT at a fixed price; caller must own the NFT (escrow transfer happens here)
   public shared ({ caller }) func createFixedListing(
     nftId : MarketplaceTypes.NFTId,
@@ -76,6 +105,7 @@ mixin (
     if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
     if (price == 0) Runtime.trap("Price must be greater than zero");
     ensureMintlabFeeApplies(price, "Price");
+    ignore configuredFeeRecipientForAmount(price);
     let nft = switch (WalletLib.getNFT(walletState, nftId)) {
       case null Runtime.trap("NFT not found");
       case (?n) n;
@@ -98,6 +128,7 @@ mixin (
     if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
     if (startingBid == 0) Runtime.trap("Starting bid must be greater than zero");
     ensureMintlabFeeApplies(startingBid, "Starting bid");
+    ignore configuredFeeRecipientForAmount(startingBid);
     if (endTime <= Time.now()) Runtime.trap("End time must be in the future");
     let nft = switch (WalletLib.getNFT(walletState, nftId)) {
       case null Runtime.trap("NFT not found");
@@ -114,11 +145,11 @@ mixin (
 
   /// Return all currently active listings (fixed + auction)
   public query func getActiveListings() : async [MarketplaceTypes.ActiveListing] {
-    MarketplaceLib.getActiveListings(marketplaceState);
+    MarketplaceLib.getAvailableActiveListings(marketplaceState, marketplacePaymentState);
   };
 
   public query func getActiveListingDetails() : async [MarketplaceTypes.ActiveListingDetail] {
-    MarketplaceLib.getActiveListingDetails(marketplaceState);
+    MarketplaceLib.getAvailableActiveListingDetails(marketplaceState, marketplacePaymentState);
   };
 
   public func getMarketplaceFeeConfig() : async MarketplaceTypes.MarketplaceFeeConfig {
@@ -174,102 +205,226 @@ mixin (
     };
   };
 
-  /// Buy a fixed-price listing; ICP transferred from buyer's subaccount, NFT registered to buyer
+  /// Buy a fixed-price listing; ICP first moves into marketplace escrow, then settlement can be retried safely.
   public shared ({ caller }) func buyFixedListing(listingId : MarketplaceTypes.ListingId) : async () {
     if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
     if (not MarketplaceLib.acquireListingLock(marketplacePaymentState, listingId)) {
       Runtime.trap("Listing is processing another payment. Try again shortly.");
     };
     try {
+      switch (MarketplaceLib.getFixedPurchaseSettlement(marketplacePaymentState, listingId)) {
+        case null {
+          ignore await* startFixedPurchaseSettlement(listingId, caller);
+        };
+        case (?settlement) {
+          let isCallerAdmin = AuthLib.isAdmin(authState, caller);
+          if (not Principal.equal(settlement.buyer, caller) and not isCallerAdmin) {
+            Runtime.trap("This listing is already being settled by another buyer");
+          };
+        };
+      };
+      await* continueFixedPurchaseSettlement(listingId);
+    } finally {
+      MarketplaceLib.releaseListingLock(marketplacePaymentState, listingId);
+    };
+  };
+
+  func startFixedPurchaseSettlement(
+    listingId : MarketplaceTypes.ListingId,
+    buyer : Principal,
+  ) : async* MarketplaceTypes.FixedPurchaseSettlement {
     let listing = switch (MarketplaceLib.getFixedListing(marketplaceState, listingId)) {
       case null Runtime.trap("Listing not found");
       case (?l) l;
     };
     if (listing.status != #Active) Runtime.trap("Listing is not active");
-    if (Principal.equal(listing.seller, caller)) Runtime.trap("Seller cannot buy their own listing");
+    if (Principal.equal(listing.seller, buyer)) Runtime.trap("Seller cannot buy their own listing");
     let escrowedNFT = switch (MarketplaceLib.getEscrowedNFT(marketplaceState, listingId)) {
       case null Runtime.trap("Escrowed NFT not found for listing");
       case (?nft) nft;
     };
     await* ensureEscrowedNFTReady(escrowedNFT);
 
-    // Transfer ICP from buyer's subaccount and split the sale proceeds.
     let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
-    let selfPrincipal = canisterId;
     let ledgerFeeE8s = await* IcpLib.getTransferFee(ledger);
-    let mintlabFee = MarketplaceLib.mintlabFee(marketplaceFeeState, listing.price);
-    let feeRecipient = if (mintlabFee > 0) {
-      switch (marketplacePaymentState.mintlabFeeRecipient) {
-        case null Runtime.trap("Mintlab sales fee account has not been configured");
-        case (?account) account;
-      };
-    } else {
-      IcpLib.accountIdentifier(selfPrincipal, IcpLib.zeroSubaccount());
-    };
-    let buyerSub = IcpLib.principalToSubaccount(caller);
-    let buyerAccount = IcpLib.accountIdentifier(selfPrincipal, buyerSub);
-    let sellerSub = IcpLib.principalToSubaccount(listing.seller);
-    let sellerAccount = IcpLib.accountIdentifier(selfPrincipal, sellerSub);
-    let requiredDebit = MarketplaceLib.totalFixedBuyerDebit(marketplaceFeeState, listing.price, ledgerFeeE8s);
+    let buyerSub = IcpLib.principalToSubaccount(buyer);
+    let buyerAccount = IcpLib.accountIdentifier(canisterId, buyerSub);
+    let requiredDebit = MarketplaceLib.totalFixedEscrowBuyerDebit(marketplaceFeeState, listing.price, ledgerFeeE8s);
     let buyerBalance = await* IcpLib.getBalance(ledger, buyerAccount);
     if (buyerBalance < requiredDebit) {
       Runtime.trap(
-        "Insufficient ICP for purchase, Mintlab fee split, and ledger fees. Required: " #
+        "Insufficient ICP for purchase escrow and ledger fees. Required: " #
         Nat64.toText(requiredDebit) # " e8s"
       );
     };
-    if (mintlabFee > 0) {
-      let feeResult = await* IcpLib.transferOutWithFee(
-        ledger,
-        ?buyerSub,
-        feeRecipient,
-        mintlabFee,
-        Nat64.fromNat(listingId),
-        ledgerFeeE8s,
-      );
-      switch (feeResult) {
-        case (#Err(error)) Runtime.trap("Mintlab sales fee transfer failed: " # IcpLib.transferErrorText(error));
-        case (#Ok(_)) {};
-      };
+
+    let mintlabFee = MarketplaceLib.mintlabFee(marketplaceFeeState, listing.price);
+    let now = Time.now();
+    let settlement : MarketplaceTypes.FixedPurchaseSettlement = {
+      listingId;
+      buyer;
+      seller = listing.seller;
+      nft = escrowedNFT;
+      price = listing.price;
+      sellerProceeds = MarketplaceLib.sellerProceeds(marketplaceFeeState, listing.price);
+      mintlabFee;
+      feeRecipient = configuredFeeRecipientForAmount(listing.price);
+      ledgerFeeE8s;
+      paymentEscrowId = MarketplaceLib.reserveEscrowId(marketplacePaymentState);
+      paymentCreatedAt = ledgerTimestampNow();
+      paymentBlock = null;
+      nftDeliveredAt = null;
+      mintlabFeeCreatedAt = null;
+      mintlabFeeBlock = null;
+      sellerPaymentCreatedAt = null;
+      sellerPaymentBlock = null;
+      stage = #PaymentPending;
+      createdAt = now;
+      updatedAt = now;
     };
-    let sellerResult = await* IcpLib.transferOutWithFee(
-      ledger,
-      ?buyerSub,
-      sellerAccount,
-      MarketplaceLib.sellerProceeds(marketplaceFeeState, listing.price),
-      Nat64.fromNat(listingId),
-      ledgerFeeE8s,
-    );
-    switch (sellerResult) {
-      case (#Err(error)) Runtime.trap("Seller ICP transfer failed: " # IcpLib.transferErrorText(error));
-      case (#Ok(_)) {};
+    MarketplaceLib.putFixedPurchaseSettlement(marketplacePaymentState, settlement);
+    settlement;
+  };
+
+  func continueFixedPurchaseSettlement(listingId : MarketplaceTypes.ListingId) : async* () {
+    let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+    var settlement = switch (MarketplaceLib.getFixedPurchaseSettlement(marketplacePaymentState, listingId)) {
+      case null Runtime.trap("Fixed purchase settlement not found");
+      case (?value) value;
+    };
+    let escrowSub = IcpLib.marketplacePurchaseEscrowSubaccount(settlement.paymentEscrowId);
+
+    switch (settlement.paymentBlock) {
+      case null {
+        let buyerSub = IcpLib.principalToSubaccount(settlement.buyer);
+        let escrowAccount = IcpLib.accountIdentifier(canisterId, escrowSub);
+        let depositAmount = settlementPayoutDebit(settlement.price, settlement.mintlabFee, settlement.ledgerFeeE8s);
+        let paymentResult = await* IcpLib.transferOutWithFeeAt(
+          ledger,
+          ?buyerSub,
+          escrowAccount,
+          depositAmount,
+          Nat64.fromNat(settlement.listingId),
+          settlement.ledgerFeeE8s,
+          settlement.paymentCreatedAt,
+        );
+        let paymentBlock = transferBlockOrTrap(paymentResult, "Purchase escrow transfer failed");
+        settlement := {
+          settlement with
+          paymentBlock = ?paymentBlock;
+          stage = #NFTTransferPending;
+          updatedAt = Time.now();
+        };
+        MarketplaceLib.putFixedPurchaseSettlement(marketplacePaymentState, settlement);
+      };
+      case (?_) {};
     };
 
-    // Settle the listing
-    switch (MarketplaceLib.settleFixedListing(marketplaceState, listingId)) {
-      case null Runtime.trap("Failed to settle listing");
-      case (?settled) {
-        ignore settled;
-        switch (MarketplaceLib.takeEscrowedNFT(marketplaceState, listingId)) {
-          case null Runtime.trap("Escrowed NFT disappeared during settlement");
-          case (?escrowed) {
-            let deliveredLocation = await* transferEscrowedNFTToRecipient(escrowed, caller);
-            ignore MarketplaceLib.clearListingsForToken(marketplaceState, escrowed.collectionId, escrowed.tokenId);
-            ignore WalletLib.registerNFT(
-              walletState,
-              caller,
-              escrowed.collectionId,
-              escrowed.tokenId,
-              escrowed.metadata,
-              deliveredLocation,
-            );
-          };
+    switch (settlement.nftDeliveredAt) {
+      case null {
+        let deliveredLocation = await* transferEscrowedNFTToRecipient(settlement.nft, settlement.buyer);
+        ignore WalletLib.registerNFT(
+          walletState,
+          settlement.buyer,
+          settlement.nft.collectionId,
+          settlement.nft.tokenId,
+          settlement.nft.metadata,
+          deliveredLocation,
+        );
+        settlement := {
+          settlement with
+          nftDeliveredAt = ?Time.now();
+          stage = if (settlement.mintlabFee > 0) #MintlabFeePending else #SellerPaymentPending;
+          updatedAt = Time.now();
         };
+        MarketplaceLib.putFixedPurchaseSettlement(marketplacePaymentState, settlement);
+      };
+      case (?_) {};
+    };
+
+    if (settlement.mintlabFee > 0) {
+      switch (settlement.mintlabFeeBlock) {
+        case null {
+          let createdAt = switch (settlement.mintlabFeeCreatedAt) {
+            case (?timestamp) timestamp;
+            case null {
+              let timestamp = ledgerTimestampNow();
+              settlement := {
+                settlement with
+                mintlabFeeCreatedAt = ?timestamp;
+                updatedAt = Time.now();
+              };
+              MarketplaceLib.putFixedPurchaseSettlement(marketplacePaymentState, settlement);
+              timestamp;
+            };
+          };
+          let feeRecipient = switch (settlement.feeRecipient) {
+            case null Runtime.trap("Mintlab sales fee account is missing from purchase settlement");
+            case (?account) account;
+          };
+          let feeResult = await* IcpLib.transferOutWithFeeAt(
+            ledger,
+            ?escrowSub,
+            feeRecipient,
+            settlement.mintlabFee,
+            Nat64.fromNat(settlement.listingId),
+            settlement.ledgerFeeE8s,
+            createdAt,
+          );
+          let feeBlock = transferBlockOrTrap(feeResult, "Mintlab sales fee transfer failed");
+          settlement := {
+            settlement with
+            mintlabFeeBlock = ?feeBlock;
+            stage = #SellerPaymentPending;
+            updatedAt = Time.now();
+          };
+          MarketplaceLib.putFixedPurchaseSettlement(marketplacePaymentState, settlement);
+        };
+        case (?_) {};
       };
     };
-    } finally {
-      MarketplaceLib.releaseListingLock(marketplacePaymentState, listingId);
+
+    switch (settlement.sellerPaymentBlock) {
+      case null {
+        let createdAt = switch (settlement.sellerPaymentCreatedAt) {
+          case (?timestamp) timestamp;
+          case null {
+            let timestamp = ledgerTimestampNow();
+            settlement := {
+              settlement with
+              sellerPaymentCreatedAt = ?timestamp;
+              updatedAt = Time.now();
+            };
+            MarketplaceLib.putFixedPurchaseSettlement(marketplacePaymentState, settlement);
+            timestamp;
+          };
+        };
+        let sellerSub = IcpLib.principalToSubaccount(settlement.seller);
+        let sellerAccount = IcpLib.accountIdentifier(canisterId, sellerSub);
+        let sellerResult = await* IcpLib.transferOutWithFeeAt(
+          ledger,
+          ?escrowSub,
+          sellerAccount,
+          settlement.sellerProceeds,
+          Nat64.fromNat(settlement.listingId),
+          settlement.ledgerFeeE8s,
+          createdAt,
+        );
+        let sellerBlock = transferBlockOrTrap(sellerResult, "Seller ICP transfer failed");
+        settlement := {
+          settlement with
+          sellerPaymentBlock = ?sellerBlock;
+          updatedAt = Time.now();
+        };
+        MarketplaceLib.putFixedPurchaseSettlement(marketplacePaymentState, settlement);
+      };
+      case (?_) {};
     };
+
+    ignore MarketplaceLib.settleFixedListing(marketplaceState, settlement.listingId);
+    ignore MarketplaceLib.takeEscrowedNFT(marketplaceState, settlement.listingId);
+    ignore MarketplaceLib.clearListingsForToken(marketplaceState, settlement.nft.collectionId, settlement.nft.tokenId);
+    ignore MarketplaceLib.removeFixedPurchaseSettlement(marketplacePaymentState, settlement.listingId);
   };
 
   /// Place a bid on an active auction listing
@@ -280,6 +435,7 @@ mixin (
     if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
     if (amount == 0) Runtime.trap("Bid amount must be greater than zero");
     ensureMintlabFeeApplies(amount, "Bid amount");
+    ignore configuredFeeRecipientForAmount(amount);
     if (not MarketplaceLib.acquireListingLock(marketplacePaymentState, listingId)) {
       Runtime.trap("Auction is processing another payment. Try again shortly.");
     };
@@ -360,90 +516,220 @@ mixin (
     };
   };
 
-  /// Settle an auction after its end time; transfers ICP to seller, NFT registered to highest bidder
+  /// Settle an auction after its end time; NFT delivery happens before escrow payout and can be retried.
   public shared ({ caller }) func settleAuction(listingId : MarketplaceTypes.ListingId) : async () {
     if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
     if (not MarketplaceLib.acquireListingLock(marketplacePaymentState, listingId)) {
       Runtime.trap("Auction is processing another payment. Try again shortly.");
     };
     try {
-      let listing = switch (MarketplaceLib.getAuctionListing(marketplaceState, listingId)) {
-        case null Runtime.trap("Auction listing not found");
-        case (?l) l;
-      };
-      if (listing.status != #Active) Runtime.trap("Auction is not active");
-      if (Time.now() < listing.endTime) Runtime.trap("Auction has not ended yet");
-      let settledNFT = switch (MarketplaceLib.getEscrowedNFT(marketplaceState, listingId)) {
-        case null Runtime.trap("Escrowed NFT missing while finalizing auction");
-        case (?nft) nft;
-      };
-      await* ensureEscrowedNFTReady(settledNFT);
+      switch (MarketplaceLib.getAuctionSettlement(marketplacePaymentState, listingId)) {
+        case null {
+          let listing = switch (MarketplaceLib.getAuctionListing(marketplaceState, listingId)) {
+            case null Runtime.trap("Auction listing not found");
+            case (?l) l;
+          };
+          if (listing.status != #Active) Runtime.trap("Auction is not active");
+          if (Time.now() < listing.endTime) Runtime.trap("Auction has not ended yet");
+          let settledNFT = switch (MarketplaceLib.getEscrowedNFT(marketplaceState, listingId)) {
+            case null Runtime.trap("Escrowed NFT missing while finalizing auction");
+            case (?nft) nft;
+          };
+          await* ensureEscrowedNFTReady(settledNFT);
 
-      switch (listing.highestBidder) {
-        case null {};
-        case (?winner) {
-          let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
-          let ledgerFeeE8s = await* IcpLib.getTransferFee(ledger);
-
-          switch (resolveWinningEscrow(listing, winner)) {
-            case (?currentEscrow) {
-              let escrowSub = IcpLib.marketplaceEscrowSubaccount(currentEscrow.escrowId);
-              await* payAuctionProceedsFromSubaccount(
-                ledger,
-                escrowSub,
-                listing,
-                ledgerFeeE8s,
-                "Winning bid escrow",
-              );
-              ignore MarketplaceLib.removeAuctionEscrow(marketplacePaymentState, listingId);
-              ignore MarketplaceLib.removePendingRefund(marketplacePaymentState, currentEscrow.escrowId);
-            };
+          switch (listing.highestBidder) {
             case null {
-              // Recovery path for legacy auctions whose winning bid predates escrow records.
-              let winnerSub = IcpLib.principalToSubaccount(winner);
-              await* payAuctionProceedsFromSubaccount(
-                ledger,
-                winnerSub,
-                listing,
-                ledgerFeeE8s,
-                "Winning bid escrow record is missing and winner's in-app ICP account",
+              let returnedLocation = await* transferEscrowedNFTToRecipient(settledNFT, listing.seller);
+              ignore WalletLib.registerNFT(
+                walletState,
+                listing.seller,
+                settledNFT.collectionId,
+                settledNFT.tokenId,
+                settledNFT.metadata,
+                returnedLocation,
               );
+              ignore MarketplaceLib.settleAuction(marketplaceState, listingId);
+              ignore MarketplaceLib.takeEscrowedNFT(marketplaceState, listingId);
+              ignore MarketplaceLib.clearListingsForToken(marketplaceState, settledNFT.collectionId, settledNFT.tokenId);
+              return;
+            };
+            case (?winner) {
+              ignore await* startAuctionSettlement(listing, settledNFT, winner);
             };
           };
         };
+        case (?_) {};
       };
-
-      ignore MarketplaceLib.settleAuction(marketplaceState, listingId);
-      ignore MarketplaceLib.takeEscrowedNFT(marketplaceState, listingId);
-      ignore MarketplaceLib.clearListingsForToken(marketplaceState, settledNFT.collectionId, settledNFT.tokenId);
-
-      switch (listing.highestBidder) {
-        case null {
-          let returnedLocation = await* transferEscrowedNFTToRecipient(settledNFT, listing.seller);
-          ignore WalletLib.registerNFT(
-            walletState,
-            listing.seller,
-            settledNFT.collectionId,
-            settledNFT.tokenId,
-            settledNFT.metadata,
-            returnedLocation,
-          );
-        };
-        case (?winner) {
-          let deliveredLocation = await* transferEscrowedNFTToRecipient(settledNFT, winner);
-          ignore WalletLib.registerNFT(
-            walletState,
-            winner,
-            settledNFT.collectionId,
-            settledNFT.tokenId,
-            settledNFT.metadata,
-            deliveredLocation,
-          );
-        };
-      };
+      await* continueAuctionSettlement(listingId);
     } finally {
       MarketplaceLib.releaseListingLock(marketplacePaymentState, listingId);
     };
+  };
+
+  func startAuctionSettlement(
+    listing : MarketplaceTypes.AuctionListing,
+    settledNFT : WalletTypes.WalletNFT,
+    winner : Principal,
+  ) : async* MarketplaceTypes.AuctionSettlement {
+    let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+    let ledgerFeeE8s = await* IcpLib.getTransferFee(ledger);
+    let winningEscrow = switch (resolveWinningEscrow(listing, winner)) {
+      case null Runtime.trap("Winning bid escrow record is missing; cannot safely settle this auction");
+      case (?escrow) escrow;
+    };
+    let escrowSub = IcpLib.marketplaceEscrowSubaccount(winningEscrow.escrowId);
+    let escrowAccount = IcpLib.accountIdentifier(canisterId, escrowSub);
+    let mintlabFee = MarketplaceLib.mintlabFee(marketplaceFeeState, listing.highestBid);
+    let requiredDebit = settlementPayoutDebit(listing.highestBid, mintlabFee, ledgerFeeE8s);
+    let escrowBalance = await* IcpLib.getBalance(ledger, escrowAccount);
+    if (escrowBalance < requiredDebit) {
+      Runtime.trap(
+        "Winning bid escrow does not hold enough ICP to settle this auction. Required: " #
+        Nat64.toText(requiredDebit) # " e8s"
+      );
+    };
+
+    let now = Time.now();
+    let settlement : MarketplaceTypes.AuctionSettlement = {
+      listingId = listing.id;
+      seller = listing.seller;
+      winner;
+      nft = settledNFT;
+      price = listing.highestBid;
+      sellerProceeds = MarketplaceLib.sellerProceeds(marketplaceFeeState, listing.highestBid);
+      mintlabFee;
+      feeRecipient = configuredFeeRecipientForAmount(listing.highestBid);
+      ledgerFeeE8s;
+      winningEscrowId = winningEscrow.escrowId;
+      winningEscrowDepositedBlock = winningEscrow.depositedBlock;
+      nftDeliveredAt = null;
+      mintlabFeeCreatedAt = null;
+      mintlabFeeBlock = null;
+      sellerPaymentCreatedAt = null;
+      sellerPaymentBlock = null;
+      stage = #NFTTransferPending;
+      createdAt = now;
+      updatedAt = now;
+    };
+    MarketplaceLib.putAuctionSettlement(marketplacePaymentState, settlement);
+    settlement;
+  };
+
+  func continueAuctionSettlement(listingId : MarketplaceTypes.ListingId) : async* () {
+    let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+    var settlement = switch (MarketplaceLib.getAuctionSettlement(marketplacePaymentState, listingId)) {
+      case null Runtime.trap("Auction settlement not found");
+      case (?value) value;
+    };
+    let escrowSub = IcpLib.marketplaceEscrowSubaccount(settlement.winningEscrowId);
+
+    switch (settlement.nftDeliveredAt) {
+      case null {
+        let deliveredLocation = await* transferEscrowedNFTToRecipient(settlement.nft, settlement.winner);
+        ignore WalletLib.registerNFT(
+          walletState,
+          settlement.winner,
+          settlement.nft.collectionId,
+          settlement.nft.tokenId,
+          settlement.nft.metadata,
+          deliveredLocation,
+        );
+        settlement := {
+          settlement with
+          nftDeliveredAt = ?Time.now();
+          stage = if (settlement.mintlabFee > 0) #MintlabFeePending else #SellerPaymentPending;
+          updatedAt = Time.now();
+        };
+        MarketplaceLib.putAuctionSettlement(marketplacePaymentState, settlement);
+      };
+      case (?_) {};
+    };
+
+    if (settlement.mintlabFee > 0) {
+      switch (settlement.mintlabFeeBlock) {
+        case null {
+          let createdAt = switch (settlement.mintlabFeeCreatedAt) {
+            case (?timestamp) timestamp;
+            case null {
+              let timestamp = ledgerTimestampNow();
+              settlement := {
+                settlement with
+                mintlabFeeCreatedAt = ?timestamp;
+                updatedAt = Time.now();
+              };
+              MarketplaceLib.putAuctionSettlement(marketplacePaymentState, settlement);
+              timestamp;
+            };
+          };
+          let feeRecipient = switch (settlement.feeRecipient) {
+            case null Runtime.trap("Mintlab sales fee account is missing from auction settlement");
+            case (?account) account;
+          };
+          let feeResult = await* IcpLib.transferOutWithFeeAt(
+            ledger,
+            ?escrowSub,
+            feeRecipient,
+            settlement.mintlabFee,
+            Nat64.fromNat(settlement.listingId),
+            settlement.ledgerFeeE8s,
+            createdAt,
+          );
+          let feeBlock = transferBlockOrTrap(feeResult, "Mintlab sales fee transfer failed");
+          settlement := {
+            settlement with
+            mintlabFeeBlock = ?feeBlock;
+            stage = #SellerPaymentPending;
+            updatedAt = Time.now();
+          };
+          MarketplaceLib.putAuctionSettlement(marketplacePaymentState, settlement);
+        };
+        case (?_) {};
+      };
+    };
+
+    switch (settlement.sellerPaymentBlock) {
+      case null {
+        let createdAt = switch (settlement.sellerPaymentCreatedAt) {
+          case (?timestamp) timestamp;
+          case null {
+            let timestamp = ledgerTimestampNow();
+            settlement := {
+              settlement with
+              sellerPaymentCreatedAt = ?timestamp;
+              updatedAt = Time.now();
+            };
+            MarketplaceLib.putAuctionSettlement(marketplacePaymentState, settlement);
+            timestamp;
+          };
+        };
+        let sellerSub = IcpLib.principalToSubaccount(settlement.seller);
+        let sellerAccount = IcpLib.accountIdentifier(canisterId, sellerSub);
+        let sellerResult = await* IcpLib.transferOutWithFeeAt(
+          ledger,
+          ?escrowSub,
+          sellerAccount,
+          settlement.sellerProceeds,
+          Nat64.fromNat(settlement.listingId),
+          settlement.ledgerFeeE8s,
+          createdAt,
+        );
+        let sellerBlock = transferBlockOrTrap(sellerResult, "ICP transfer to seller failed");
+        settlement := {
+          settlement with
+          sellerPaymentBlock = ?sellerBlock;
+          updatedAt = Time.now();
+        };
+        MarketplaceLib.putAuctionSettlement(marketplacePaymentState, settlement);
+      };
+      case (?_) {};
+    };
+
+    ignore MarketplaceLib.removeAuctionEscrow(marketplacePaymentState, settlement.listingId);
+    ignore MarketplaceLib.removePendingRefund(marketplacePaymentState, settlement.winningEscrowId);
+    ignore MarketplaceLib.settleAuction(marketplaceState, settlement.listingId);
+    ignore MarketplaceLib.takeEscrowedNFT(marketplaceState, settlement.listingId);
+    ignore MarketplaceLib.clearListingsForToken(marketplaceState, settlement.nft.collectionId, settlement.nft.tokenId);
+    ignore MarketplaceLib.removeAuctionSettlement(marketplacePaymentState, settlement.listingId);
   };
 
   func resolveWinningEscrow(
@@ -471,64 +757,6 @@ mixin (
         };
         ?escrow;
       };
-    };
-  };
-
-  func payAuctionProceedsFromSubaccount(
-    ledger : IcpLib.Ledger,
-    fromSubaccount : Blob,
-    listing : MarketplaceTypes.AuctionListing,
-    ledgerFeeE8s : Nat64,
-    sourceLabel : Text,
-  ) : async* () {
-    let sourceAccount = IcpLib.accountIdentifier(canisterId, fromSubaccount);
-    let requiredDebit = MarketplaceLib.totalFixedBuyerDebit(marketplaceFeeState, listing.highestBid, ledgerFeeE8s);
-    let sourceBalance = await* IcpLib.getBalance(ledger, sourceAccount);
-    if (sourceBalance < requiredDebit) {
-      Runtime.trap(
-        sourceLabel # " does not hold enough ICP to settle this auction. Required: " #
-        Nat64.toText(requiredDebit) # " e8s"
-      );
-    };
-
-    let mintlabFee = MarketplaceLib.mintlabFee(marketplaceFeeState, listing.highestBid);
-    let feeRecipient = if (mintlabFee > 0) {
-      switch (marketplacePaymentState.mintlabFeeRecipient) {
-        case null Runtime.trap("Mintlab sales fee account has not been configured");
-        case (?account) account;
-      };
-    } else {
-      IcpLib.accountIdentifier(canisterId, IcpLib.zeroSubaccount());
-    };
-
-    if (mintlabFee > 0) {
-      let feeResult = await* IcpLib.transferOutWithFee(
-        ledger,
-        ?fromSubaccount,
-        feeRecipient,
-        mintlabFee,
-        Nat64.fromNat(listing.id),
-        ledgerFeeE8s,
-      );
-      switch (feeResult) {
-        case (#Err(error)) Runtime.trap("Mintlab sales fee transfer failed: " # IcpLib.transferErrorText(error));
-        case (#Ok(_)) {};
-      };
-    };
-
-    let sellerSub = IcpLib.principalToSubaccount(listing.seller);
-    let sellerAccount = IcpLib.accountIdentifier(canisterId, sellerSub);
-    let sellerResult = await* IcpLib.transferOutWithFee(
-      ledger,
-      ?fromSubaccount,
-      sellerAccount,
-      MarketplaceLib.sellerProceeds(marketplaceFeeState, listing.highestBid),
-      Nat64.fromNat(listing.id),
-      ledgerFeeE8s,
-    );
-    switch (sellerResult) {
-      case (#Err(error)) Runtime.trap("ICP transfer to seller failed: " # IcpLib.transferErrorText(error));
-      case (#Ok(_)) {};
     };
   };
 
@@ -570,6 +798,17 @@ mixin (
         if (not Principal.equal(listing.seller, caller) and not isCallerAdmin) {
           Runtime.trap("Unauthorized: must be seller or admin");
         };
+        switch (MarketplaceLib.getFixedPurchaseSettlement(marketplacePaymentState, listingId)) {
+          case null {};
+          case (?settlement) {
+            switch (settlement.paymentBlock) {
+              case null {
+                ignore MarketplaceLib.removeFixedPurchaseSettlement(marketplacePaymentState, listingId);
+              };
+              case (?_) Runtime.trap("Listing is already settling and cannot be cancelled");
+            };
+          };
+        };
         if (not MarketplaceLib.acquireListingLock(marketplacePaymentState, listingId)) {
           Runtime.trap("Listing is processing another payment. Try again shortly.");
         };
@@ -607,6 +846,10 @@ mixin (
         if (listing.status != #Active) Runtime.trap("Listing is not active");
         if (not Principal.equal(listing.seller, caller) and not isCallerAdmin) {
           Runtime.trap("Unauthorized: must be seller or admin");
+        };
+        switch (MarketplaceLib.getAuctionSettlement(marketplacePaymentState, listingId)) {
+          case null {};
+          case (?_) Runtime.trap("Auction is already settling and cannot be cancelled");
         };
         if (not MarketplaceLib.acquireListingLock(marketplacePaymentState, listingId)) {
           Runtime.trap("Auction is processing another payment. Try again shortly.");
@@ -701,6 +944,9 @@ mixin (
   ) : async* WalletTypes.WalletLocation {
     switch (nft.location) {
       case (#Minted) {
+        if (await* isMintedNFTOwnedBy(nft, to)) {
+          return #Minted;
+        };
         await* transferMintedNFT(nft, canisterId, to);
         #Minted;
       };
@@ -711,6 +957,43 @@ mixin (
       };
       case (#Registered) {
         Runtime.trap("Registered external NFTs are not escrowed by the marketplace");
+      };
+    };
+  };
+
+  func isMintedNFTOwnedBy(
+    nft : WalletTypes.WalletNFT,
+    owner : Principal,
+  ) : async* Bool {
+    let collection = mintedCollection(nft);
+    let tokenId = switch (Nat.fromText(nft.tokenId)) {
+      case null Runtime.trap("Minted token IDs must be numeric");
+      case (?value) value;
+    };
+    if (Principal.equal(collection.canisterId, canisterId)) {
+      switch (MintLib.getToken(mintState, tokenId)) {
+        case null false;
+        case (?token) {
+          MintLib.tokenBelongsToCollection(
+            token,
+            collection.id,
+            MintLib.getConfig(mintState).collectionId,
+          ) and Principal.equal(token.owner, owner);
+        };
+      };
+    } else {
+      let child : MarketplaceChildCollectionActor = actor (collection.canisterId.toText());
+      let owners = try {
+        await child.mintlab_owner_of([tokenId]);
+      } catch (error) {
+        Runtime.trap("Collection canister ownership check failed: " # Error.message(error));
+      };
+      if (owners.size() == 0) {
+        return false;
+      };
+      switch (owners[0]) {
+        case (?(account)) Principal.equal(account.owner, owner);
+        case null false;
       };
     };
   };

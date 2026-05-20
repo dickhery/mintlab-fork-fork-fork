@@ -147,12 +147,20 @@ mixin (
     };
     let canonicalTokenId = WalletLib.canonicalTokenId(collection, tokenId);
     switch (WalletLib.getPreparedDeposit(walletState, collectionId, canonicalTokenId)) {
-      case null {};
+      case null {
+        return #err("Prepare this vault deposit before claiming it.");
+      };
       case (?deposit) {
         if (not Principal.equal(deposit.user, caller)) {
           return #err("This deposit was prepared by another user");
         };
       };
+    };
+    switch (MarketplaceLib.findActiveEscrowedNFT(marketplaceState, collectionId, canonicalTokenId)) {
+      case (?_) {
+        return #err("This NFT is currently locked in a marketplace listing.");
+      };
+      case null {};
     };
     let vaultAccountId = IcpLib.accountIdentifier(canisterId, IcpLib.zeroSubaccount());
     let verification = await* WalletLib.verifyOwnedNFT(

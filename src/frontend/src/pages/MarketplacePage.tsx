@@ -1391,7 +1391,8 @@ export default function MarketplacePage() {
   const buyPrice = buyListingDetail?.listing.price ?? 0n;
   const buyMintlabFee = marketplaceFee(buyPrice, mintlabFeeBps);
   const buySellerProceeds = buyPrice - buyMintlabFee;
-  const buyLedgerFees = ledgerFeeE8s * (buyMintlabFee > 0n ? 2n : 1n);
+  const buySettlementLedgerFees = ledgerFeeE8s * (buyMintlabFee > 0n ? 2n : 1n);
+  const buyTotalLedgerFees = buySettlementLedgerFees + ledgerFeeE8s;
 
   return (
     <div className="min-h-screen bg-background" data-ocid="marketplace.page">
@@ -1615,8 +1616,9 @@ export default function MarketplacePage() {
               Confirm Purchase
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Confirm the ICP payment from your in-app account before this NFT
-              is purchased and sent to you.
+              Confirm the ICP payment from your in-app account. The purchase is
+              funded into marketplace escrow first, then the NFT and seller
+              payout are settled from there.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {buyListingDetail && (
@@ -1645,15 +1647,28 @@ export default function MarketplacePage() {
                 </span>
               </div>
               <div className="flex items-center justify-between gap-4">
-                <span className="text-muted-foreground">Ledger fees</span>
+                <span className="text-muted-foreground">
+                  Settlement ledger fees
+                  <span className="block text-[11px] leading-snug">
+                    Reserved in escrow for the seller and Mintlab payouts
+                  </span>
+                </span>
                 <span className="font-mono">
-                  {formatICPAmount(buyLedgerFees)} ICP
+                  {formatICPAmount(buySettlementLedgerFees)} ICP
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-muted-foreground">
+                  Transfer to escrow fee
+                </span>
+                <span className="font-mono">
+                  {formatICPAmount(ledgerFeeE8s)} ICP
                 </span>
               </div>
               <div className="flex items-center justify-between gap-4 border-t border-border pt-2 font-medium">
                 <span>Total debit</span>
                 <span className="font-mono">
-                  {formatICPAmount(buyPrice + buyLedgerFees)} ICP
+                  {formatICPAmount(buyPrice + buyTotalLedgerFees)} ICP
                 </span>
               </div>
             </div>
