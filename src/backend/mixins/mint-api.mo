@@ -290,7 +290,7 @@ mixin (
     };
 
     Debug.print(
-      "MINTLAB with-cycles-v6 preparing " #
+      "MINTLAB cycles-attach-v7 preparing " #
       operationLabel #
       " attachCycles=" #
       Nat.toText(amount) #
@@ -562,7 +562,13 @@ mixin (
     let childTargetCycles = collectionCreationChildTargetCycles(request);
     let createCallCycles = collectionCreationCreateCallCycles(request);
     let backendCycles = Cycles.balance();
-    let requiredBackendCycles = createCallCycles + minimumFactoryOperatingReserveCycles();
+    let requiresBackendCreateCycles =
+      request.childCanisterId == null and collectionCreationCyclesConverted(request);
+    let requiredBackendCycles = if (requiresBackendCreateCycles) {
+      createCallCycles + minimumFactoryOperatingReserveCycles();
+    } else {
+      0;
+    };
     #ok({
       request = MintLib.collectionCreationRequestView(request);
       requestedCanisterCycles = request.requestedCanisterCycles;
@@ -572,8 +578,12 @@ mixin (
       canisterCreationFeeCycles = canisterCreationFeeCycles();
       backendCycles;
       requiredBackendCycles;
-      canCreateNow = backendCycles > requiredBackendCycles;
-      buildVersion = "mintlab-collection-create-with-cycles-v6";
+      canCreateNow = if (requiresBackendCreateCycles) {
+        backendCycles > requiredBackendCycles;
+      } else {
+        request.cyclePaymentBlock != null or request.childCanisterId != null;
+      };
+      buildVersion = "mintlab-collection-create-cmc-v7";
     });
   };
 
@@ -635,6 +645,59 @@ mixin (
         case (#err(message)) return #err(message);
         case (#ok(_)) {};
       };
+      await resumeCollectionCreationInternal(caller, requestId);
+    } finally {
+      MintLib.releaseCollectionCreate(mintState, request.owner);
+    };
+  };
+
+  public shared ({ caller }) func adminAttachExistingCanisterToCreationRequest(
+    requestId : Nat,
+    childCanisterId : Principal,
+  ) : async { #ok : MintTypes.CollectionCreationReceipt; #err : Text } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("Anonymous caller not allowed");
+    };
+    if (not AuthLib.isAdmin(authState, caller)) {
+      return #err("Unauthorized: admin only");
+    };
+    if (Principal.isAnonymous(childCanisterId)) {
+      return #err("Choose a valid child canister");
+    };
+    let request = switch (MintLib.getCollectionCreationRequest(collectionCreationState, requestId)) {
+      case null return #err("Collection creation request not found");
+      case (?value) value;
+    };
+    if (request.cyclePaymentBlock == null) {
+      return #err("This setup request has no recorded ICP cycles payment block");
+    };
+    if (request.childCanisterId != null or request.collectionId != null) {
+      return #err("This setup request already has a child canister or collection record");
+    };
+    let status = switch (await collectionCanisterStatus(childCanisterId)) {
+      case null return #err("Could not read the child canister status. Make sure the app backend is a controller.");
+      case (?value) value;
+    };
+    if (not principalArrayContains(status.settings.controllers, canisterId)) {
+      return #err("The app backend must be a controller of the child canister before it can install the collection WASM.");
+    };
+    let requiredControllers = appendController(
+      appendController(status.settings.controllers, canisterId),
+      request.owner,
+    );
+    if (requiredControllers.size() != status.settings.controllers.size()) {
+      try {
+        await updateCollectionCanisterControllers(childCanisterId, requiredControllers);
+      } catch (error) {
+        return #err("Could not add the collection owner as a child canister controller: " # Error.message(error));
+      };
+    };
+    if (not MintLib.acquireCollectionCreate(mintState, request.owner)) {
+      return #err("A collection setup is already running for this creator");
+    };
+    try {
+      ignore MintLib.markCollectionCreationCyclesConverted(collectionCreationState, requestId);
+      ignore MintLib.markCollectionCreationCanisterCreated(collectionCreationState, requestId, childCanisterId);
       await resumeCollectionCreationInternal(caller, requestId);
     } finally {
       MintLib.releaseCollectionCreate(mintState, request.owner);
@@ -1129,9 +1192,9 @@ mixin (
         let cyclePaymentResult = await* IcpLib.transferOutAt(
           ledger,
           ?userSubaccount,
-          IcpLib.cmcTopUpAccount(canisterId),
+          IcpLib.cmcCreateCanisterAccount(canisterId),
           request.cycleCostE8s,
-          IcpLib.CMC_TOP_UP_MEMO,
+          IcpLib.CMC_CREATE_CANISTER_MEMO,
           request.createdAt,
         );
         let cyclePaymentBlock = switch (transferResultBlock(cyclePaymentResult)) {
@@ -1149,39 +1212,76 @@ mixin (
         case null return #err("Collection creation request not found");
         case (?value) value;
       };
-      if (not collectionCreationCyclesConverted(request)) {
+      if (request.childCanisterId == null) {
         let cyclePaymentBlock = switch (request.cyclePaymentBlock) {
           case null return #err("Collection creation request is missing its cycles payment block");
           case (?value) value;
         };
         let cmc = actor (IcpLib.CYCLES_MINTING_CANISTER_ID) : IcpLib.CyclesMintingCanister;
-        let topUpResult = await notifyTopUpWithRetries(cmc, cyclePaymentBlock, canisterId);
-        switch (topUpResult) {
-          case (#Ok(_cyclesMinted)) {
-            ignore MintLib.markCollectionCreationCyclesConverted(collectionCreationState, requestId);
-          };
-          case (#Err(error)) {
-            if (
-              notifyErrorLooksAlreadyProcessed(error) and
-              Cycles.balance() > collectionCreationCreateCallCycles(request)
-            ) {
+        if (not collectionCreationCyclesConverted(request)) {
+          Debug.print(
+            "MINTLAB CMC notify_create_canister " #
+            "requestId=" # Nat.toText(requestId) #
+            " block=" # Nat64.toText(cyclePaymentBlock) #
+            " controller=" # canisterId.toText() #
+            " owner=" # request.owner.toText()
+          );
+          let createFromPaymentResult = await notifyCreateCanisterWithRetries(
+            cmc,
+            cyclePaymentBlock,
+            request.owner,
+          );
+          switch (createFromPaymentResult) {
+            case (#Ok(childCanisterId)) {
               ignore MintLib.markCollectionCreationCyclesConverted(collectionCreationState, requestId);
-            } else {
-              let message =
-                "Cycles conversion failed for ICP block " #
-                Nat64.toText(cyclePaymentBlock) #
-                ": " #
-                notifyErrorText(error);
-              ignore MintLib.markCollectionCreationError(collectionCreationState, requestId, message);
-              return #err(message);
+              await recordCollectionCreationChildCanister(requestId, childCanisterId, "cmc notify_create_canister");
+            };
+            case (#Err(error)) {
+              if (notifyCreateErrorAllowsLegacyTopUpFallback(error)) {
+                Debug.print(
+                  "MINTLAB CMC notify_create_canister did not match this payment; trying legacy notify_top_up recovery " #
+                  "requestId=" # Nat.toText(requestId) #
+                  " block=" # Nat64.toText(cyclePaymentBlock)
+                );
+                let topUpResult = await notifyTopUpWithRetries(cmc, cyclePaymentBlock, canisterId);
+                switch (topUpResult) {
+                  case (#Ok(_cyclesMinted)) {
+                    ignore MintLib.markCollectionCreationCyclesConverted(collectionCreationState, requestId);
+                  };
+                  case (#Err(topUpError)) {
+                    if (
+                      notifyErrorLooksAlreadyProcessed(topUpError) and
+                      Cycles.balance() > collectionCreationCreateCallCycles(request)
+                    ) {
+                      ignore MintLib.markCollectionCreationCyclesConverted(collectionCreationState, requestId);
+                    } else {
+                      let message =
+                        "Cycles conversion failed for ICP block " #
+                        Nat64.toText(cyclePaymentBlock) #
+                        ": " #
+                        notifyErrorText(topUpError);
+                      ignore MintLib.markCollectionCreationError(collectionCreationState, requestId, message);
+                      return #err(message);
+                    };
+                  };
+                };
+              } else {
+                let message =
+                  "Collection canister creation payment failed for ICP block " #
+                  Nat64.toText(cyclePaymentBlock) #
+                  ": " #
+                  notifyErrorText(error);
+                ignore MintLib.markCollectionCreationError(collectionCreationState, requestId, message);
+                return #err(message);
+              };
             };
           };
         };
-      };
 
-      request := switch (MintLib.getCollectionCreationRequest(collectionCreationState, requestId)) {
-        case null return #err("Collection creation request not found");
-        case (?value) value;
+        request := switch (MintLib.getCollectionCreationRequest(collectionCreationState, requestId)) {
+          case null return #err("Collection creation request not found");
+          case (?value) value;
+        };
       };
       if (request.childCanisterId == null) {
         let createCallCycles = collectionCreationCreateCallCycles(request);
@@ -1199,7 +1299,7 @@ mixin (
           return #err(message);
         };
         Debug.print(
-          "MINTLAB CREATE COLLECTION CANISTER " #
+          "MINTLAB CMC CREATE COLLECTION CANISTER FROM BACKEND CYCLES " #
           "requestId=" # Nat.toText(requestId) #
           " attachCycles=" # Nat.toText(createCallCycles) #
           " targetChildCycles=" # Nat.toText(childTargetCycles) #
@@ -1210,23 +1310,9 @@ mixin (
           request.owner,
           createCallCycles,
         );
-        ignore MintLib.markCollectionCreationCanisterCreated(collectionCreationState, requestId, childCanisterId);
-        switch (await collectionCanisterStatus(childCanisterId)) {
-          case (?status) {
-            Debug.print(
-              "MINTLAB child canister created child=" #
-              childCanisterId.toText() #
-              " childCycles=" #
-              Nat.toText(status.cycles)
-            );
-          };
-          case null {
-            Debug.print(
-              "MINTLAB child canister created but status could not be read child=" #
-              childCanisterId.toText()
-            );
-          };
-        };
+        await recordCollectionCreationChildCanister(requestId, childCanisterId, "cmc create_canister");
+      } else if (not collectionCreationCyclesConverted(request)) {
+        ignore MintLib.markCollectionCreationCyclesConverted(collectionCreationState, requestId);
       };
 
       request := switch (MintLib.getCollectionCreationRequest(collectionCreationState, requestId)) {
@@ -3299,6 +3385,43 @@ mixin (
     };
   };
 
+  func collectionCanisterSettingsForCmc(owner : Principal) : IcpLib.CmcCanisterSettings {
+    {
+      controllers = ?[canisterId, owner];
+      compute_allocation = null;
+      memory_allocation = null;
+      freezing_threshold = ?2_592_000;
+    };
+  };
+
+  func recordCollectionCreationChildCanister(
+    requestId : Nat,
+    childCanisterId : Principal,
+    source : Text,
+  ) : async () {
+    ignore MintLib.markCollectionCreationCanisterCreated(collectionCreationState, requestId, childCanisterId);
+    switch (await collectionCanisterStatus(childCanisterId)) {
+      case (?status) {
+        Debug.print(
+          "MINTLAB child canister created via " #
+          source #
+          " child=" #
+          childCanisterId.toText() #
+          " childCycles=" #
+          Nat.toText(status.cycles)
+        );
+      };
+      case null {
+        Debug.print(
+          "MINTLAB child canister created via " #
+          source #
+          " but status could not be read child=" #
+          childCanisterId.toText()
+        );
+      };
+    };
+  };
+
   func createEmptyCollectionCanister(
     owner : Principal,
     cyclesToAttach : Nat,
@@ -3322,31 +3445,39 @@ mixin (
       );
     };
     Debug.print(
-      "MINTLAB create_canister with-cycles-v6 attaching cycles=" #
+      "MINTLAB CMC create_canister v7 attaching cycles=" #
       Nat.toText(attachCycles) #
       " backendBalanceBefore=" #
       Nat.toText(backendBalance) #
       " owner=" #
       owner.toText()
     );
-    assertCyclesForCall(attachCycles, "create collection canister");
-    let ic : ManagementCanisterActor = actor "aaaaa-aa";
-    let createResult = await (with cycles = attachCycles) ic.create_canister({
-      settings = ?{
-        controllers = ?[canisterId, owner];
-        compute_allocation = null;
-        memory_allocation = null;
-        freezing_threshold = ?2_592_000;
-      };
-      sender_canister_version = null;
+    assertCyclesForCall(attachCycles, "CMC create collection canister");
+    let cmc = actor (IcpLib.CYCLES_MINTING_CANISTER_ID) : IcpLib.CyclesMintingCanister;
+    let createResult = await (with cycles = attachCycles) cmc.create_canister({
+      settings = ?collectionCanisterSettingsForCmc(owner);
+      subnet_type = null;
+      subnet_selection = null;
     });
-    Debug.print(
-      "MINTLAB create_canister with-cycles-v6 created child=" #
-      createResult.canister_id.toText() #
-      " backendBalanceAfter=" #
-      Nat.toText(Cycles.balance())
-    );
-    createResult.canister_id;
+    switch (createResult) {
+      case (#Ok(childCanisterId)) {
+        Debug.print(
+          "MINTLAB CMC create_canister v7 created child=" #
+          childCanisterId.toText() #
+          " backendBalanceAfter=" #
+          Nat.toText(Cycles.balance())
+        );
+        childCanisterId;
+      };
+      case (#Err(#Refunded({ refund_amount; create_error }))) {
+        Runtime.trap(
+          "CMC create_canister refunded " #
+          Nat.toText(refund_amount) #
+          " cycles while creating the collection canister: " #
+          create_error
+        );
+      };
+    };
   };
 
   func installCollectionCode(
@@ -3747,13 +3878,13 @@ mixin (
           case null "";
           case (?value) " Refund block: " # Nat64.toText(value) # ".";
         };
-        "CMC refunded the top-up. " # reason # "." # blockText;
+        "CMC refunded the payment. " # reason # "." # blockText;
       };
       case (#Processing) {
-        "CMC is still processing the top-up. Do not submit another collection creation payment; contact the admin with this block.";
+        "CMC is still processing the payment. Do not submit another collection creation payment; contact the admin with this block.";
       };
       case (#TransactionTooOld(blockIndex)) {
-        "CMC says the top-up transaction is too old at block " # Nat64.toText(blockIndex);
+        "CMC says the payment transaction is too old at block " # Nat64.toText(blockIndex);
       };
       case (#InvalidTransaction(message)) {
         "CMC rejected the transaction: " # message;
@@ -3762,6 +3893,54 @@ mixin (
         "CMC error " # Nat64.toText(error_code) # ": " # error_message;
       };
     };
+  };
+
+  func notifyCreateErrorAllowsLegacyTopUpFallback(error : IcpLib.NotifyError) : Bool {
+    switch (error) {
+      case (#InvalidTransaction(message)) {
+        let lower = Text.toLower(message);
+        Text.contains(lower, #text "memo") or
+        Text.contains(lower, #text "top") or
+        Text.contains(lower, #text "processed") or
+        Text.contains(lower, #text "duplicate") or
+        Text.contains(lower, #text "already");
+      };
+      case (#Other({ error_message })) {
+        let lower = Text.toLower(error_message);
+        Text.contains(lower, #text "memo") or
+        Text.contains(lower, #text "top") or
+        Text.contains(lower, #text "processed") or
+        Text.contains(lower, #text "duplicate") or
+        Text.contains(lower, #text "already");
+      };
+      case (_) false;
+    };
+  };
+
+  func notifyCreateCanisterWithRetries(
+    cmc : IcpLib.CyclesMintingCanister,
+    blockIndex : Nat64,
+    owner : Principal,
+  ) : async IcpLib.NotifyCreateCanisterResult {
+    var attempts : Nat = 0;
+    var lastResult : IcpLib.NotifyCreateCanisterResult = #Err(#Processing);
+    while (attempts < 5) {
+      let result = await cmc.notify_create_canister({
+        block_index = blockIndex;
+        controller = canisterId;
+        subnet_type = null;
+        subnet_selection = null;
+        settings = ?collectionCanisterSettingsForCmc(owner);
+      });
+      switch (result) {
+        case (#Err(#Processing)) {
+          lastResult := result;
+          attempts += 1;
+        };
+        case (_) return result;
+      };
+    };
+    lastResult;
   };
 
   func notifyTopUpWithRetries(

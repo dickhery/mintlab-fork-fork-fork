@@ -31,6 +31,7 @@ module {
   public let LEDGER_CANISTER_ID : Text = "ryjl3-tyaaa-aaaaa-aaaba-cai";
   public let CYCLES_MINTING_CANISTER_ID : Text = "rkp4c-7iaaa-aaaaa-aaaca-cai";
   public let DEFAULT_FEE : Nat64 = 10_000; // 0.0001 ICP in e8s
+  public let CMC_CREATE_CANISTER_MEMO : Nat64 = 1_095_062_083; // "CREA" as a legacy ICP ledger memo
   public let CMC_TOP_UP_MEMO : Nat64 = 1_347_768_404; // "TPUP" as a legacy ICP ledger memo
   public let E8S_PER_ICP : Nat = 100_000_000;
   public let CYCLES_PER_XDR : Nat = 1_000_000_000_000;
@@ -49,6 +50,48 @@ module {
   public type NotifyTopUpArg = {
     block_index : Nat64;
     canister_id : Principal;
+  };
+
+  public type CmcCanisterSettings = {
+    controllers : ?[Principal];
+    compute_allocation : ?Nat;
+    memory_allocation : ?Nat;
+    freezing_threshold : ?Nat;
+  };
+
+  public type SubnetFilter = {
+    subnet_type : ?Text;
+  };
+
+  public type SubnetSelection = {
+    #Subnet : { subnet : Principal };
+    #Filter : SubnetFilter;
+  };
+
+  public type CmcCreateCanisterArg = {
+    settings : ?CmcCanisterSettings;
+    subnet_type : ?Text;
+    subnet_selection : ?SubnetSelection;
+  };
+
+  public type NotifyCreateCanisterArg = {
+    block_index : Nat64;
+    controller : Principal;
+    subnet_type : ?Text;
+    subnet_selection : ?SubnetSelection;
+    settings : ?CmcCanisterSettings;
+  };
+
+  public type CmcCreateCanisterError = {
+    #Refunded : {
+      refund_amount : Nat;
+      create_error : Text;
+    };
+  };
+
+  public type CmcCreateCanisterResult = {
+    #Ok : Principal;
+    #Err : CmcCreateCanisterError;
   };
 
   public type NotifyError = {
@@ -70,8 +113,15 @@ module {
     #Err : NotifyError;
   };
 
+  public type NotifyCreateCanisterResult = {
+    #Ok : Principal;
+    #Err : NotifyError;
+  };
+
   public type CyclesMintingCanister = actor {
+    create_canister : shared CmcCreateCanisterArg -> async CmcCreateCanisterResult;
     get_icp_xdr_conversion_rate : shared query () -> async IcpXdrConversionRateResponse;
+    notify_create_canister : shared NotifyCreateCanisterArg -> async NotifyCreateCanisterResult;
     notify_top_up : shared NotifyTopUpArg -> async NotifyTopUpResult;
   };
 
@@ -192,6 +242,14 @@ module {
     accountIdentifier(
       Principal.fromText(CYCLES_MINTING_CANISTER_ID),
       principalToSubaccount(targetCanister),
+    );
+  };
+
+  /// Account controlled by the CMC where ICP must be sent before notify_create_canister.
+  public func cmcCreateCanisterAccount(controller : Principal) : CommonTypes.AccountIdentifier {
+    accountIdentifier(
+      Principal.fromText(CYCLES_MINTING_CANISTER_ID),
+      principalToSubaccount(controller),
     );
   };
 

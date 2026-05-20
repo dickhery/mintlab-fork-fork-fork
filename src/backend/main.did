@@ -631,6 +631,12 @@ service : {
                     err: text;
                     ok: CollectionCanisterControllers;
                   });
+  adminAttachExistingCanisterToCreationRequest: (requestId: nat,
+   childCanisterId: principal) ->
+   (variant {
+      err: text;
+      ok: CollectionCreationReceipt;
+    });
   adminDeleteCollectionCreationRequest: (requestId: nat) ->
    (variant {
       err: text;
