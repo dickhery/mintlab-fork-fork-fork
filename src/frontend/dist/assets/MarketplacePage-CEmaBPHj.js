@@ -1,11 +1,11 @@
-import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, g as useComposedRefs, a as cn, b as useBackend, u as useAuth, d as useQueryClient, e as useQuery, B as Button, S as ShoppingBag, h as LoadingSpinner, m as motion, X, f as ue } from "./index-BTzSSixl.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-Ct9_GA2a.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-BCnJNT8p.js";
-import { T as Tag, P as PaymentConfirmationDialog } from "./PaymentConfirmationDialog-h3oSdum2.js";
-import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-D4Y7l92y.js";
-import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, B as Badge, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-CBn9X4Lg.js";
-import { C as Coins } from "./coins--7N4G-ob.js";
-import { I as ImageOff } from "./media-B2ovjU4-.js";
+import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, g as useComposedRefs, a as cn, b as useBackend, u as useAuth, d as useQueryClient, e as useQuery, B as Button, S as ShoppingBag, h as LoadingSpinner, m as motion, X, f as ue } from "./index-iDqf31jp.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-CLUqI3pf.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-D-YovkJA.js";
+import { T as Tag, Z as ZoomableMediaImage, P as PaymentConfirmationDialog } from "./ZoomableMediaImage-CgDemZI4.js";
+import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-Dty-LUeA.js";
+import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, B as Badge, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-nVe2Y0YO.js";
+import { C as Coins } from "./coins-BUpp9Qtt.js";
+import { I as ImageOff } from "./media-C63vb0g-.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -683,13 +683,16 @@ function ListingDetailModal({
       "data-ocid": "marketplace.nft_detail.dialog",
       children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid md:grid-cols-[minmax(0,0.9fr)_minmax(320px,1fr)]", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-muted min-h-[260px] md:min-h-0 md:h-full flex items-center justify-center p-3", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
-          MediaImage,
+          ZoomableMediaImage,
           {
             src: nft.metadata.imageUrl,
             alt: name,
             assetCanisterId: collection == null ? void 0 : collection.canisterId.toString(),
             tokenId: nft.tokenId,
+            viewerTitle: name,
+            buttonClassName: "h-full w-full rounded-lg",
             className: "max-h-[72vh] w-full h-full object-contain rounded-lg",
+            dataOcid: "marketplace.nft_detail.image_zoom_button",
             fallback: /* @__PURE__ */ jsxRuntimeExports.jsx(NFTImagePlaceholder, { name })
           }
         ) }),

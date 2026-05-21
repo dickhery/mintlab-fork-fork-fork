@@ -1,5 +1,5 @@
-import { c as createLucideIcon, b as useBackend, d as useQueryClient, r as reactExports, e as useQuery, f as ue, P as Principal, j as jsxRuntimeExports, B as Button } from "./index-BTzSSixl.js";
-import { u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, L as Label, I as Input, l as DialogFooter } from "./badge-CBn9X4Lg.js";
+import { c as createLucideIcon, b as useBackend, d as useQueryClient, r as reactExports, e as useQuery, f as ue, P as Principal, j as jsxRuntimeExports, B as Button } from "./index-iDqf31jp.js";
+import { u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, L as Label, I as Input, l as DialogFooter } from "./badge-nVe2Y0YO.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *

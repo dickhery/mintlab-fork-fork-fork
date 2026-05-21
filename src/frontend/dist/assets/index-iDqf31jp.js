@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-CRyJxVqd.js","assets/AppCanisterTopUpDialog-BqBOVdk9.js","assets/badge-CBn9X4Lg.js","assets/external-nft-transfer-Ct9_GA2a.js","assets/media-B2ovjU4-.js","assets/MediaImage-BCnJNT8p.js","assets/PaymentConfirmationDialog-h3oSdum2.js","assets/index-D4Y7l92y.js","assets/card-3G0byFap.js","assets/textarea-Biod0I8H.js","assets/skeleton-2kWOXYoM.js","assets/imageUtils-BUNASLi_.js","assets/send-DtBREuVu.js","assets/coins--7N4G-ob.js","assets/MarketplacePage-Vp_IEh-3.js","assets/AdminPage-D06DWh4e.js","assets/switch-DrXBISzc.js","assets/circle-alert-BzqxKOPI.js","assets/ICPAccountPage-BN9xqHIg.js","assets/CollectionsPage-BIJklcad.js","assets/DividendsPage-Bbn1OYJS.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-Bz67ULf3.js","assets/AppCanisterTopUpDialog-DtlD9wy-.js","assets/badge-nVe2Y0YO.js","assets/external-nft-transfer-CLUqI3pf.js","assets/media-C63vb0g-.js","assets/MediaImage-D-YovkJA.js","assets/ZoomableMediaImage-CgDemZI4.js","assets/index-Dty-LUeA.js","assets/card-DfKvoNlf.js","assets/textarea-BSDga7xL.js","assets/skeleton-D8hXyMab.js","assets/imageUtils-XTCEBJ9r.js","assets/send-CnU01IgD.js","assets/coins-BUpp9Qtt.js","assets/MarketplacePage-CEmaBPHj.js","assets/AdminPage-DL87GBKY.js","assets/switch-BApRFaBD.js","assets/circle-alert-C_I7-SWw.js","assets/ICPAccountPage-B2KapcHU.js","assets/CollectionsPage-hctdqeaq.js","assets/DividendsPage-DB_eLeNb.js"])))=>i.map(i=>d[i]);
 var __defProp = Object.defineProperty;
 var __typeError = (msg) => {
   throw TypeError(msg);
@@ -46153,13 +46153,13 @@ const Toaster = ({ ...props }) => {
     }
   );
 };
-const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-CRyJxVqd.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
-const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-Vp_IEh-3.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,13]) : void 0));
-const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-D06DWh4e.js"), true ? __vite__mapDeps([15,1,2,16,9,7,8,10,4,17]) : void 0));
-const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-BN9xqHIg.js"), true ? __vite__mapDeps([18,2,8,10,12,17]) : void 0));
-const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-DiCCN65E.js"), true ? [] : void 0));
-const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-BIJklcad.js"), true ? __vite__mapDeps([19,1,2,16,9,7,5,4,6,8,10,11]) : void 0));
-const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-Bbn1OYJS.js"), true ? __vite__mapDeps([20,1,2,5,4,8,13]) : void 0));
+const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-Bz67ULf3.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
+const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-CEmaBPHj.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,13]) : void 0));
+const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-DL87GBKY.js"), true ? __vite__mapDeps([15,1,2,16,9,7,8,10,4,17]) : void 0));
+const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-B2KapcHU.js"), true ? __vite__mapDeps([18,2,8,10,12,17]) : void 0));
+const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-puYzADws.js"), true ? [] : void 0));
+const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-hctdqeaq.js"), true ? __vite__mapDeps([19,1,2,16,9,7,5,4,6,8,10,11]) : void 0));
+const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-DB_eLeNb.js"), true ? __vite__mapDeps([20,1,2,5,4,8,13]) : void 0));
 const rootRoute = createRootRoute({
   component: () => /* @__PURE__ */ jsxRuntimeExports.jsx(Layout, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(
     reactExports.Suspense,

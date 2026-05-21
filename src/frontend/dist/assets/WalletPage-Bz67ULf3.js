@@ -1,17 +1,17 @@
-import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useQueryClient, r as reactExports, e as useQuery, f as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-BTzSSixl.js";
-import { A as AppCanisterTopUpDialog, P as Plus, i as isLowCyclesError } from "./AppCanisterTopUpDialog-BqBOVdk9.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-Ct9_GA2a.js";
-import { M as MediaImage, E as EmptyState } from "./MediaImage-BCnJNT8p.js";
-import { B as Badge, u as useMutation, L as Label, I as Input, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle } from "./badge-CBn9X4Lg.js";
-import { I as ImageOff, r as resolveImageUrl } from "./media-B2ovjU4-.js";
-import { P as PaymentConfirmationDialog, T as Tag } from "./PaymentConfirmationDialog-h3oSdum2.js";
-import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-3G0byFap.js";
-import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-Biod0I8H.js";
-import { S as Skeleton, C as Copy } from "./skeleton-2kWOXYoM.js";
-import { c as compressModerationImage, S as Sparkles } from "./imageUtils-BUNASLi_.js";
-import { C as CircleCheck, S as Send } from "./send-DtBREuVu.js";
-import { C as Coins } from "./coins--7N4G-ob.js";
-import "./index-D4Y7l92y.js";
+import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useQueryClient, r as reactExports, e as useQuery, f as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-iDqf31jp.js";
+import { A as AppCanisterTopUpDialog, P as Plus, i as isLowCyclesError } from "./AppCanisterTopUpDialog-DtlD9wy-.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-CLUqI3pf.js";
+import { M as MediaImage, E as EmptyState } from "./MediaImage-D-YovkJA.js";
+import { B as Badge, u as useMutation, L as Label, I as Input, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle } from "./badge-nVe2Y0YO.js";
+import { I as ImageOff, r as resolveImageUrl } from "./media-C63vb0g-.js";
+import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-CgDemZI4.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-DfKvoNlf.js";
+import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-BSDga7xL.js";
+import { S as Skeleton, C as Copy } from "./skeleton-D8hXyMab.js";
+import { c as compressModerationImage, S as Sparkles } from "./imageUtils-XTCEBJ9r.js";
+import { C as CircleCheck, S as Send } from "./send-CnU01IgD.js";
+import { C as Coins } from "./coins-BUpp9Qtt.js";
+import "./index-Dty-LUeA.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -485,13 +485,16 @@ function NFTDetailsModal({
       "data-ocid": "wallet.nft_details.dialog",
       children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col md:grid md:grid-cols-[minmax(0,0.9fr)_minmax(320px,1fr)]", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "bg-muted h-[min(42vh,360px)] shrink-0 md:h-auto md:min-h-0 flex items-center justify-center p-3", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
-          MediaImage,
+          ZoomableMediaImage,
           {
             src: nft.metadata.imageUrl,
             alt: nftName,
             assetCanisterId: collection == null ? void 0 : collection.canisterId.toString(),
             tokenId: nft.tokenId,
+            viewerTitle: nftName,
+            buttonClassName: "h-full w-full rounded-lg",
             className: "max-h-full w-full h-full object-contain rounded-lg",
+            dataOcid: "wallet.nft_details.image_zoom_button",
             fallback: /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "w-full h-full flex items-center justify-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx(Sparkles, { className: "w-12 h-12 text-muted-foreground/35" }) })
           }
         ) }),
