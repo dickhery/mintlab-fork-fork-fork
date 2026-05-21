@@ -1,7 +1,7 @@
-import { c as createLucideIcon, j as jsxRuntimeExports, h as LoadingSpinner, r as reactExports, a as cn, B as Button, X } from "./index-iDqf31jp.js";
-import { A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-Dty-LUeA.js";
-import { M as MediaImage } from "./MediaImage-D-YovkJA.js";
-import { D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle } from "./badge-nVe2Y0YO.js";
+import { c as createLucideIcon, j as jsxRuntimeExports, h as LoadingSpinner, r as reactExports, a as cn, B as Button, X } from "./index-CXsXzZWW.js";
+import { A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-Bhf8rHHM.js";
+import { M as MediaImage } from "./MediaImage-DlGTe4hM.js";
+import { D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle } from "./badge-a9epDDwh.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -355,6 +355,23 @@ function ZoomableMediaImage({
               onPointerUp: handlePointerUp,
               onPointerCancel: handlePointerUp,
               children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(
+                  Button,
+                  {
+                    type: "button",
+                    size: "icon",
+                    variant: "ghost",
+                    className: "absolute top-3 right-3 z-20 h-9 w-9 rounded-full border border-white/20 bg-black/70 text-white shadow-lg backdrop-blur-sm hover:bg-black/85 hover:text-white focus-visible:ring-white/70",
+                    onPointerDown: (event) => event.stopPropagation(),
+                    onClick: (event) => {
+                      event.stopPropagation();
+                      setOpen(false);
+                    },
+                    "aria-label": "Close expanded image",
+                    "data-ocid": `${dataOcid ?? "nft.image"}.viewer_close_button`,
+                    children: /* @__PURE__ */ jsxRuntimeExports.jsx(X, { className: "h-4 w-4", "aria-hidden": "true" })
+                  }
+                ),
                 /* @__PURE__ */ jsxRuntimeExports.jsx(
                   MediaImage,
                   {
