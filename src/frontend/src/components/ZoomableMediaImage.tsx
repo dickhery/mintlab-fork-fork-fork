@@ -307,6 +307,22 @@ export function ZoomableMediaImage({
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
           >
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              className="absolute top-3 right-3 z-20 h-9 w-9 rounded-full border border-white/20 bg-black/70 text-white shadow-lg backdrop-blur-sm hover:bg-black/85 hover:text-white focus-visible:ring-white/70"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={(event) => {
+                event.stopPropagation();
+                setOpen(false);
+              }}
+              aria-label="Close expanded image"
+              data-ocid={`${dataOcid ?? "nft.image"}.viewer_close_button`}
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </Button>
+
             <MediaImage
               src={src}
               alt={alt}
