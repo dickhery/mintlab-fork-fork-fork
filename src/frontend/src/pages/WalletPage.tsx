@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { MediaImage } from "@/components/MediaImage";
 import { NFTCard } from "@/components/NFTCard";
 import { PaymentConfirmationDialog } from "@/components/PaymentConfirmationDialog";
+import { ZoomableMediaImage } from "@/components/ZoomableMediaImage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -526,12 +527,15 @@ function NFTDetailsModal({
       >
         <div className="flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col md:grid md:grid-cols-[minmax(0,0.9fr)_minmax(320px,1fr)]">
           <div className="bg-muted h-[min(42vh,360px)] shrink-0 md:h-auto md:min-h-0 flex items-center justify-center p-3">
-            <MediaImage
+            <ZoomableMediaImage
               src={nft.metadata.imageUrl}
               alt={nftName}
               assetCanisterId={collection?.canisterId.toString()}
               tokenId={nft.tokenId}
+              viewerTitle={nftName}
+              buttonClassName="h-full w-full rounded-lg"
               className="max-h-full w-full h-full object-contain rounded-lg"
+              dataOcid="wallet.nft_details.image_zoom_button"
               fallback={
                 <div className="w-full h-full flex items-center justify-center">
                   <Sparkles className="w-12 h-12 text-muted-foreground/35" />

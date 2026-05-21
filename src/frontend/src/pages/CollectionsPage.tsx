@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { MediaImage } from "@/components/MediaImage";
 import { PaymentConfirmationDialog } from "@/components/PaymentConfirmationDialog";
+import { ZoomableMediaImage } from "@/components/ZoomableMediaImage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -1460,12 +1461,15 @@ function NFTDetailModal({
         <div className="flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col md:grid md:grid-cols-[minmax(0,0.95fr)_minmax(320px,1fr)]">
           {/* Image */}
           <div className="h-[min(42vh,360px)] md:h-auto md:min-h-0 w-full overflow-hidden bg-muted relative">
-            <MediaImage
+            <ZoomableMediaImage
               src={nft.metadata.imageUrl}
               alt={nftName}
               assetCanisterId={collection.canisterId.toString()}
               tokenId={nft.tokenId}
+              viewerTitle={nftName}
+              buttonClassName="h-full w-full"
               className="w-full h-full object-contain"
+              dataOcid="collections.nft_detail.image_zoom_button"
               fallback={
                 <div className="w-full h-full flex items-center justify-center">
                   <ImageOff className="w-14 h-14 text-muted-foreground/30" />
@@ -1475,7 +1479,7 @@ function NFTDetailModal({
             <button
               type="button"
               onClick={onClose}
-              className="absolute top-3 right-3 w-8 h-8 rounded-full bg-card/80 backdrop-blur-sm border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground transition-smooth"
+              className="absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-card/80 backdrop-blur-sm border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground transition-smooth"
               aria-label="Close"
               data-ocid="collections.nft_detail.close_button"
             >

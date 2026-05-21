@@ -4,6 +4,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { MediaImage } from "@/components/MediaImage";
 import { PaymentConfirmationDialog } from "@/components/PaymentConfirmationDialog";
 import { PriceDisplay } from "@/components/PriceDisplay";
+import { ZoomableMediaImage } from "@/components/ZoomableMediaImage";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -327,12 +328,15 @@ function ListingDetailModal({
       >
         <div className="grid md:grid-cols-[minmax(0,0.9fr)_minmax(320px,1fr)]">
           <div className="bg-muted min-h-[260px] md:min-h-0 md:h-full flex items-center justify-center p-3">
-            <MediaImage
+            <ZoomableMediaImage
               src={nft.metadata.imageUrl}
               alt={name}
               assetCanisterId={collection?.canisterId.toString()}
               tokenId={nft.tokenId}
+              viewerTitle={name}
+              buttonClassName="h-full w-full rounded-lg"
               className="max-h-[72vh] w-full h-full object-contain rounded-lg"
+              dataOcid="marketplace.nft_detail.image_zoom_button"
               fallback={<NFTImagePlaceholder name={name} />}
             />
           </div>
