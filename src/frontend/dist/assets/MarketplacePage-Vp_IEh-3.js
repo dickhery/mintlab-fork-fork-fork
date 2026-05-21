@@ -1,11 +1,11 @@
-import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, g as useComposedRefs, a as cn, b as useBackend, u as useAuth, d as useQueryClient, e as useQuery, B as Button, S as ShoppingBag, h as LoadingSpinner, m as motion, X, f as ue } from "./index-B4dE93b3.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-BxSzAiTm.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-Xbn4RKUo.js";
-import { T as Tag, P as PaymentConfirmationDialog } from "./PaymentConfirmationDialog-BGRL8xw8.js";
-import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-BH3DMg4O.js";
-import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, B as Badge, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-Cfscz_la.js";
-import { C as Coins } from "./coins-DXlKy9bH.js";
-import { I as ImageOff } from "./media-D1JRCSNO.js";
+import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, g as useComposedRefs, a as cn, b as useBackend, u as useAuth, d as useQueryClient, e as useQuery, B as Button, S as ShoppingBag, h as LoadingSpinner, m as motion, X, f as ue } from "./index-BTzSSixl.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-Ct9_GA2a.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-BCnJNT8p.js";
+import { T as Tag, P as PaymentConfirmationDialog } from "./PaymentConfirmationDialog-h3oSdum2.js";
+import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-D4Y7l92y.js";
+import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, B as Badge, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-CBn9X4Lg.js";
+import { C as Coins } from "./coins--7N4G-ob.js";
+import { I as ImageOff } from "./media-B2ovjU4-.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -506,8 +506,23 @@ function nftKey(collectionId, tokenId) {
 const DEFAULT_ICP_LEDGER_FEE_E8S = 10000n;
 const DEFAULT_MINTLAB_FEE_BPS = 200n;
 const BPS_DENOMINATOR = 10000n;
+const MIN_AUCTION_STARTING_BID_E8S = 1000000n;
+const MIN_AUCTION_BID_INCREMENT_E8S = 1000000n;
 function marketplaceFee(amount, feeBps) {
   return amount * feeBps / BPS_DENOMINATOR;
+}
+function nextAuctionMinimumBid(listing) {
+  if (listing.highestBid > 0n) {
+    return listing.highestBid + MIN_AUCTION_BID_INCREMENT_E8S;
+  }
+  return listing.startingBid >= MIN_AUCTION_STARTING_BID_E8S ? listing.startingBid : MIN_AUCTION_STARTING_BID_E8S;
+}
+function auctionHighBidderText(listing) {
+  return listing.highestBidder ? truncatePrincipal(listing.highestBidder.toString()) : "No bids yet";
+}
+function isViewerWinningAuction(listing, currentPrincipal, bidStatus) {
+  var _a;
+  return (bidStatus == null ? void 0 : bidStatus.isWinning) ?? ((_a = listing.highestBidder) == null ? void 0 : _a.toString()) === currentPrincipal;
 }
 function useCountdown(endTimeNs) {
   const [remaining, setRemaining] = reactExports.useState(() => {
@@ -640,11 +655,13 @@ function FixedListingCard({
 function ListingDetailModal({
   detail,
   currentPrincipal,
+  bidStatusMap,
   onClose,
   onBuy,
   onCancel,
   onBid
 }) {
+  var _a;
   if (!detail) return null;
   const { listing, nft, collection, dividendE8s } = detail;
   const name = nft.metadata.name ?? `NFT #${nft.tokenId}`;
@@ -653,6 +670,9 @@ function ListingDetailModal({
   const auction = listing.__kind__ === "Auction" ? listing.Auction : null;
   const seller = (fixed == null ? void 0 : fixed.seller) ?? (auction == null ? void 0 : auction.seller);
   const isOwner = seller != null && currentPrincipal === seller.toString();
+  const auctionBidStatus = auction ? bidStatusMap.get(auction.id.toString()) : void 0;
+  const isWinningAuction = auction ? isViewerWinningAuction(auction, currentPrincipal, auctionBidStatus) : false;
+  const hasBeenOutbid = auction != null && !!(auctionBidStatus == null ? void 0 : auctionBidStatus.hasBid) && !isWinningAuction;
   const auctionRemaining = auction ? formatRemaining(
     Math.max(0, Number(auction.endTime / 1000000n) - Date.now())
   ) : "";
@@ -705,16 +725,24 @@ function ListingDetailModal({
             canisterId && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-lg border border-border/50 bg-muted/35 px-3 py-2", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs uppercase tracking-wide text-muted-foreground", children: "Collection Canister" }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "font-mono text-sm text-foreground truncate mt-0.5", children: canisterId })
+            ] }),
+            auction && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-lg border border-border/50 bg-muted/35 px-3 py-2", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs uppercase tracking-wide text-muted-foreground", children: "Current High Bidder" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "font-mono text-sm text-foreground truncate mt-0.5", children: ((_a = auction.highestBidder) == null ? void 0 : _a.toString()) ?? "No bids yet" })
             ] })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-lg border border-border/60 bg-muted/25 p-3 flex items-center justify-between gap-3", children: [
-            fixed ? /* @__PURE__ */ jsxRuntimeExports.jsx(PriceDisplay, { e8s: fixed.price, label: "Price" }) : auction ? /* @__PURE__ */ jsxRuntimeExports.jsx(
-              PriceDisplay,
-              {
-                e8s: auction.highestBid > 0n ? auction.highestBid : auction.startingBid,
-                label: auction.highestBid > 0n ? "Top bid" : "Starting bid"
-              }
-            ) : null,
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-2", children: [
+              fixed ? /* @__PURE__ */ jsxRuntimeExports.jsx(PriceDisplay, { e8s: fixed.price, label: "Price" }) : auction ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+                PriceDisplay,
+                {
+                  e8s: auction.highestBid > 0n ? auction.highestBid : auction.startingBid,
+                  label: auction.highestBid > 0n ? "Top bid" : "Starting bid"
+                }
+              ) : null,
+              auction && isWinningAuction && /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { className: "w-fit bg-emerald-500/10 text-emerald-700 border border-emerald-500/20", children: "You're Winning" }),
+              auction && hasBeenOutbid && /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { className: "w-fit bg-amber-500/10 text-amber-700 border border-amber-500/20", children: "You've been outbid" })
+            ] }),
             auction && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-muted-foreground font-mono", children: auctionRemaining })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap justify-end gap-2 pt-2", children: [
@@ -779,6 +807,7 @@ function AuctionListingCard({
   dividendE8s = 0n,
   index,
   currentPrincipal,
+  bidStatus,
   onBid,
   onSettle,
   onCancel,
@@ -786,13 +815,13 @@ function AuctionListingCard({
   isSettling,
   isCancelling
 }) {
-  var _a;
   const remaining = useCountdown(listing.endTime);
   const ended = remaining <= 0;
   const name = (nft == null ? void 0 : nft.metadata.name) ?? `NFT #${(nft == null ? void 0 : nft.tokenId) ?? "?"}`;
   const sellerText = listing.seller.toString();
   const isOwner = currentPrincipal === sellerText;
-  const isWinner = ((_a = listing.highestBidder) == null ? void 0 : _a.toString()) === currentPrincipal;
+  const isWinner = isViewerWinningAuction(listing, currentPrincipal, bidStatus);
+  const hasBeenOutbid = !!(bidStatus == null ? void 0 : bidStatus.hasBid) && !isWinner;
   return /* @__PURE__ */ jsxRuntimeExports.jsxs(
     motion.div,
     {
@@ -848,6 +877,15 @@ function AuctionListingCard({
               }
             )
           ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-1.5 text-xs text-muted-foreground font-mono min-w-0", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Gavel, { className: "w-3 h-3 shrink-0" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "truncate", children: [
+              "High bidder: ",
+              auctionHighBidderText(listing)
+            ] })
+          ] }),
+          isWinner && /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { className: "w-fit bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[10px]", children: "You're Winning" }),
+          hasBeenOutbid && /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { className: "w-fit bg-amber-500/10 text-amber-700 border border-amber-500/20 text-[10px]", children: "You've been outbid" }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-auto pt-2 border-t border-border/60 flex items-end justify-between gap-2", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx(
               PriceDisplay,
@@ -936,14 +974,14 @@ function ListNFTModal({
   const [selectedNFT, setSelectedNFT] = reactExports.useState(null);
   const [mode, setMode] = reactExports.useState("fixed");
   const [price, setPrice] = reactExports.useState("");
-  const [startBid, setStartBid] = reactExports.useState("");
+  const [startBid, setStartBid] = reactExports.useState("0.01");
   const [durationAmount, setDurationAmount] = reactExports.useState("3");
   const [durationUnit, setDurationUnit] = reactExports.useState("days");
   const reset = reactExports.useCallback(() => {
     setSelectedNFT(null);
     setMode("fixed");
     setPrice("");
-    setStartBid("");
+    setStartBid("0.01");
     setDurationAmount("3");
     setDurationUnit("days");
   }, []);
@@ -962,6 +1000,9 @@ function ListNFTModal({
     } else {
       const bid = parseICP(startBid);
       if (!bid) return ue.error("Enter a valid starting bid");
+      if (bid < MIN_AUCTION_STARTING_BID_E8S) {
+        return ue.error("Starting bid must be at least 0.01 ICP");
+      }
       const amount = Number.parseInt(durationAmount, 10);
       if (Number.isNaN(amount) || amount < 1)
         return ue.error("Duration must be at least 1 hour");
@@ -1095,14 +1136,14 @@ function ListNFTModal({
                   id: "list-startbid",
                   type: "text",
                   inputMode: "decimal",
-                  placeholder: "e.g. 5.0",
+                  placeholder: "0.01",
                   value: startBid,
                   onChange: (e) => setStartBid(e.target.value),
                   className: "bg-background border-input font-mono",
                   "data-ocid": "marketplace.list_startbid_input"
                 }
               ),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Use any positive ICP amount with up to 8 decimals." })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Minimum starting bid is 0.01 ICP. Use up to 8 decimals." })
             ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -1209,7 +1250,7 @@ function PlaceBidModal({
     }
   }, [listing]);
   if (!listing) return null;
-  const minBid = listing.highestBid > 0n ? listing.highestBid + 1n : listing.startingBid;
+  const minBid = nextAuctionMinimumBid(listing);
   const minBidICP = formatICPAmount(minBid);
   const name = (nft == null ? void 0 : nft.metadata.name) ?? `NFT #${(nft == null ? void 0 : nft.tokenId) ?? "?"}`;
   const pendingAmount = pendingBidAmount ?? 0n;
@@ -1273,7 +1314,8 @@ function PlaceBidModal({
                   "data-ocid": "marketplace.bid_amount_input"
                 }
               ),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Enter any positive ICP amount with up to 8 decimals." })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Bids must be at least 0.01 ICP above the current top bid." }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Bids placed with less than 2 minutes remaining extend the auction by 5 minutes." })
             ] }),
             bidAmount.trim() && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground", children: [
               "If confirmed,",
@@ -1453,6 +1495,24 @@ function MarketplacePage() {
       }
     ] : []
   );
+  const auctionListingIds = auctionListings.map(({ listing }) => listing.id);
+  const auctionListingIdsKey = auctionListingIds.map((id) => id.toString()).join(",");
+  const { data: myAuctionBidStatuses = [] } = useQuery({
+    queryKey: [
+      "myAuctionBidStatuses",
+      principal == null ? void 0 : principal.toString(),
+      auctionListingIdsKey
+    ],
+    queryFn: async () => {
+      if (!actor || auctionListingIds.length === 0) return [];
+      return actor.getMyAuctionBidStatuses(auctionListingIds);
+    },
+    enabled: !!actor && !actorLoading && isAuthenticated && !!principal && auctionListingIds.length > 0,
+    refetchInterval: 3e4
+  });
+  const myAuctionBidStatusMap = new Map(
+    myAuctionBidStatuses.map((status) => [status.listingId.toString(), status])
+  );
   const listedNFTKeys = new Set(
     listingDetails.filter((detail) => {
       const seller = detail.listing.__kind__ === "Fixed" ? detail.listing.Fixed.seller : detail.listing.Auction.seller;
@@ -1476,6 +1536,7 @@ function MarketplacePage() {
     void qc.invalidateQueries({ queryKey: ["userNFTs"] });
     void qc.invalidateQueries({ queryKey: ["userStats"] });
     void qc.invalidateQueries({ queryKey: ["icp-balance"] });
+    void qc.invalidateQueries({ queryKey: ["myAuctionBidStatuses"] });
   };
   async function ensureNFTReadyForListing(nft) {
     if (!actor) throw new Error("Not connected");
@@ -1762,6 +1823,7 @@ function MarketplacePage() {
               ) ?? 0n,
               index: i,
               currentPrincipal: principalStr,
+              bidStatus: myAuctionBidStatusMap.get(listing.id.toString()),
               onBid: (l) => setBidTarget(l),
               onSettle: (id) => settleAuction(id),
               onCancel: (id) => setCancelTarget(id),
@@ -1786,6 +1848,7 @@ function MarketplacePage() {
       {
         detail: detailTarget,
         currentPrincipal: principalStr,
+        bidStatusMap: myAuctionBidStatusMap,
         onClose: () => setDetailTarget(null),
         onBuy: (id) => setBuyTarget(id),
         onCancel: (id) => setCancelTarget(id),

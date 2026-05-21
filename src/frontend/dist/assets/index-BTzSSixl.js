@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-BYMdZjPm.js","assets/AppCanisterTopUpDialog-IoVy3-UY.js","assets/badge-Cfscz_la.js","assets/external-nft-transfer-BxSzAiTm.js","assets/media-D1JRCSNO.js","assets/MediaImage-Xbn4RKUo.js","assets/PaymentConfirmationDialog-BGRL8xw8.js","assets/index-BH3DMg4O.js","assets/card-B8jCyL9t.js","assets/textarea-B2dJWUNF.js","assets/skeleton-tUYazNYs.js","assets/imageUtils-DiS5ja-w.js","assets/send-Bfz6SdXK.js","assets/coins-DXlKy9bH.js","assets/MarketplacePage-CxRfI4P3.js","assets/AdminPage-B4KFsJka.js","assets/switch-CvdQJXfu.js","assets/circle-alert-CikaGAOL.js","assets/ICPAccountPage-BJPJyKSQ.js","assets/CollectionsPage-BtnyaA0Q.js","assets/DividendsPage-imgn2mUU.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-CRyJxVqd.js","assets/AppCanisterTopUpDialog-BqBOVdk9.js","assets/badge-CBn9X4Lg.js","assets/external-nft-transfer-Ct9_GA2a.js","assets/media-B2ovjU4-.js","assets/MediaImage-BCnJNT8p.js","assets/PaymentConfirmationDialog-h3oSdum2.js","assets/index-D4Y7l92y.js","assets/card-3G0byFap.js","assets/textarea-Biod0I8H.js","assets/skeleton-2kWOXYoM.js","assets/imageUtils-BUNASLi_.js","assets/send-DtBREuVu.js","assets/coins--7N4G-ob.js","assets/MarketplacePage-Vp_IEh-3.js","assets/AdminPage-D06DWh4e.js","assets/switch-DrXBISzc.js","assets/circle-alert-BzqxKOPI.js","assets/ICPAccountPage-BN9xqHIg.js","assets/CollectionsPage-BIJklcad.js","assets/DividendsPage-Bbn1OYJS.js"])))=>i.map(i=>d[i]);
 var __defProp = Object.defineProperty;
 var __typeError = (msg) => {
   throw TypeError(msg);
@@ -30138,6 +30138,14 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "nftId": NFTId,
     "startingBid": IDL2.Nat64
   });
+  const AuctionBidStatus = IDL2.Record({
+    "listingId": ListingId,
+    "hasBid": IDL2.Bool,
+    "isWinning": IDL2.Bool,
+    "highestBidder": IDL2.Opt(UserId),
+    "highestBid": IDL2.Nat64,
+    "myHighestBid": IDL2.Opt(IDL2.Nat64)
+  });
   const FixedListing = IDL2.Record({
     "id": ListingId,
     "status": ListingStatus,
@@ -30593,6 +30601,11 @@ const idlFactory = ({ IDL: IDL2 }) => {
       ["query"]
     ),
     "getActiveListings": IDL2.Func([], [IDL2.Vec(ActiveListing)], ["query"]),
+    "getMyAuctionBidStatuses": IDL2.Func(
+      [IDL2.Vec(ListingId)],
+      [IDL2.Vec(AuctionBidStatus)],
+      ["query"]
+    ),
     "getAdminPrincipal": IDL2.Func([], [IDL2.Opt(IDL2.Principal)], ["query"]),
     "getAllCollectionCreationRequests": IDL2.Func(
       [],
@@ -31062,6 +31075,16 @@ function fromRawAuctionListing(value) {
     highestBid: value.highestBid,
     nftId: value.nftId,
     startingBid: value.startingBid
+  };
+}
+function fromRawAuctionBidStatus(value) {
+  return {
+    listingId: value.listingId,
+    hasBid: value.hasBid,
+    isWinning: value.isWinning,
+    highestBidder: fromRawOption(value.highestBidder) ?? void 0,
+    highestBid: value.highestBid,
+    myHighestBid: fromRawOption(value.myHighestBid) ?? void 0
   };
 }
 function fromRawAuctionEscrow(value) {
@@ -31659,6 +31682,12 @@ class Backend {
       () => this.actor.getActiveListings()
     );
     return result.map(fromRawActiveListing);
+  }
+  async getMyAuctionBidStatuses(listingIds) {
+    const result = await this.run(
+      () => this.actor.getMyAuctionBidStatuses(listingIds)
+    );
+    return result.map(fromRawAuctionBidStatus);
   }
   async getAdminPrincipal() {
     return fromRawOption(await this.run(() => this.actor.getAdminPrincipal()));
@@ -46124,13 +46153,13 @@ const Toaster = ({ ...props }) => {
     }
   );
 };
-const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-BYMdZjPm.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
-const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-CxRfI4P3.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,13]) : void 0));
-const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-B4KFsJka.js"), true ? __vite__mapDeps([15,1,2,16,9,7,8,10,4,17]) : void 0));
-const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-BJPJyKSQ.js"), true ? __vite__mapDeps([18,2,8,10,12,17]) : void 0));
-const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-CY5lrYsF.js"), true ? [] : void 0));
-const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-BtnyaA0Q.js"), true ? __vite__mapDeps([19,1,2,16,9,7,5,4,6,8,10,11]) : void 0));
-const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-imgn2mUU.js"), true ? __vite__mapDeps([20,1,2,5,4,8,13]) : void 0));
+const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-CRyJxVqd.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
+const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-Vp_IEh-3.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,13]) : void 0));
+const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-D06DWh4e.js"), true ? __vite__mapDeps([15,1,2,16,9,7,8,10,4,17]) : void 0));
+const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-BN9xqHIg.js"), true ? __vite__mapDeps([18,2,8,10,12,17]) : void 0));
+const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-DiCCN65E.js"), true ? [] : void 0));
+const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-BIJklcad.js"), true ? __vite__mapDeps([19,1,2,16,9,7,5,4,6,8,10,11]) : void 0));
+const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-Bbn1OYJS.js"), true ? __vite__mapDeps([20,1,2,5,4,8,13]) : void 0));
 const rootRoute = createRootRoute({
   component: () => /* @__PURE__ */ jsxRuntimeExports.jsx(Layout, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(
     reactExports.Suspense,

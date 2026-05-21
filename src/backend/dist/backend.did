@@ -572,7 +572,7 @@ type AuctionEscrow =
    ledgerFeeE8s: nat64;
    listingId: ListingId;
  };
-type AuctionBidStatus =
+type AuctionBidStatus = 
  record {
    hasBid: bool;
    highestBid: nat64;
