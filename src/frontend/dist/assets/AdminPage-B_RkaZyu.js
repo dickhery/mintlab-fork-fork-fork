@@ -1,13 +1,13 @@
-import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, a as cn, i as useNavigate, k as useAdmin, b as useBackend, d as useQueryClient, e as useQuery, l as Shield, f as ue, B as Button, P as Principal, A as Actor } from "./index-CXsXzZWW.js";
-import { L as LoaderCircle, A as AppCanisterTopUpDialog, P as Plus, F as Fuel } from "./AppCanisterTopUpDialog-DTXG5oRW.js";
-import { S as Switch, r as recommendedCollectionCreationTopUpCycles, T as Trash2, C as CollectionCreationDiagnosticsPanel } from "./switch-BxGBojWo.js";
-import { A as AlertDialog, i as AlertDialogTrigger, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-Bhf8rHHM.js";
-import { j as Primitive, u as useMutation, L as Label, I as Input, B as Badge } from "./badge-a9epDDwh.js";
-import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, R as RefreshCw, c as CardContent } from "./card-DdGAuGFX.js";
-import { L as Layers, e as ChevronDown, T as Textarea, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, E as ExternalLink, I as Info, C as Check } from "./textarea-DMV1W9B1.js";
-import { S as Skeleton, C as Copy } from "./skeleton-BAxurPBd.js";
-import { r as resolveImageUrl, I as ImageOff } from "./media-Bms5drf9.js";
-import { C as CircleAlert } from "./circle-alert-CQLqsi43.js";
+import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, a as cn, i as useNavigate, k as useAdmin, b as useBackend, d as useQueryClient, e as useQuery, l as Shield, f as ue, B as Button, P as Principal, A as Actor } from "./index-BscUpFOm.js";
+import { L as LoaderCircle, A as AppCanisterTopUpDialog, P as Plus, F as Fuel } from "./AppCanisterTopUpDialog-Cn6hzIsb.js";
+import { S as Switch, r as recommendedCollectionCreationTopUpCycles, T as Trash2, C as CollectionCreationDiagnosticsPanel } from "./switch-29_VKjAB.js";
+import { A as AlertDialog, i as AlertDialogTrigger, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-DodEH1L_.js";
+import { j as Primitive, u as useMutation, L as Label, I as Input, B as Badge } from "./badge-Bd9sJt2N.js";
+import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, R as RefreshCw, c as CardContent } from "./card-BkPlCo6q.js";
+import { L as Layers, e as ChevronDown, T as Textarea, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, E as ExternalLink, I as Info, C as Check } from "./textarea-BuyM6Wlt.js";
+import { S as Skeleton, C as Copy } from "./skeleton-DlmxPW2S.js";
+import { r as resolveImageUrl, I as ImageOff } from "./media-Def2JkOH.js";
+import { C as CircleAlert } from "./circle-alert-_gcHgVKR.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -87,6 +87,7 @@ const APP_LOW_CYCLES_THRESHOLD = 1000000000000n;
 const MIN_COLLECTION_CANISTER_CYCLES = 2000000000000n;
 const MAX_ON_CHAIN_IMAGE_CHARS = 19e5;
 const MODERATION_IMAGE_ACCEPT = "image/png,image/jpeg";
+const COLLECTION_CREATION_REPAIR_GRACE_MS = 3 * 60 * 1e3;
 const OPENAI_MODERATION_MODEL = "omni-moderation-latest";
 const DEFAULT_MODERATION_MESSAGE = "Uploads cannot include sexual content, graphic violence, self-harm content, hateful or harassing text, or dangerous illegal instructions.";
 const FRONTEND_CANISTER_ENV_KEYS = [
@@ -154,6 +155,12 @@ function collectionCreationStatusLabel(status) {
     case "Failed":
       return "Failed";
   }
+}
+function isRepairableCollectionCreationRequest(request) {
+  if (request.status === "Installed") return false;
+  if (request.status === "Failed" || request.lastError) return true;
+  const updatedAtMs = Number(request.updatedAt / 1000000n);
+  return Date.now() - updatedAtMs > COLLECTION_CREATION_REPAIR_GRACE_MS;
 }
 function isValidPrincipal(value) {
   try {
@@ -809,6 +816,10 @@ function CollectionCreationRequestsPanel() {
     refetchInterval: 2e4
   });
   const requests = (requestResult == null ? void 0 : requestResult.__kind__) === "ok" ? requestResult.ok : [];
+  const visibleRequests = reactExports.useMemo(
+    () => requests.filter(isRepairableCollectionCreationRequest),
+    [requests]
+  );
   const requestError = (requestResult == null ? void 0 : requestResult.__kind__) === "err" ? requestResult.err : null;
   const repairMutation = useMutation({
     mutationFn: async (requestId) => {
@@ -887,7 +898,7 @@ function CollectionCreationRequestsPanel() {
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsxs(CardContent, { className: "space-y-3", children: [
       requestError && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive", children: requestError }),
-      isLoading ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: [1, 2].map((item) => /* @__PURE__ */ jsxRuntimeExports.jsx(Skeleton, { className: "h-20 rounded-xl" }, item)) }) : requests.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "rounded-lg border border-border bg-muted/20 p-3 text-sm text-muted-foreground", children: "No saved collection setup requests." }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: requests.map((request) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+      isLoading ? /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: [1, 2].map((item) => /* @__PURE__ */ jsxRuntimeExports.jsx(Skeleton, { className: "h-20 rounded-xl" }, item)) }) : visibleRequests.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "rounded-lg border border-border bg-muted/20 p-3 text-sm text-muted-foreground", children: "No collection setup requests need attention." }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: visibleRequests.map((request) => /* @__PURE__ */ jsxRuntimeExports.jsx(
         CollectionCreationRequestRow,
         {
           request,

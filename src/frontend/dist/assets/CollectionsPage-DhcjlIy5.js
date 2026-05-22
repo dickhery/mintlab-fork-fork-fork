@@ -1,15 +1,15 @@
-import { Q as QueryObserver, n as infiniteQueryBehavior, o as hasPreviousPage, p as hasNextPage, q as useBaseQuery, c as createLucideIcon, r as reactExports, g as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, k as useAdmin, d as useQueryClient, e as useQuery, s as AnimatePresence, m as motion, B as Button, f as ue, C as CircleDollarSign, X, G as Grid3x3, P as Principal, h as LoadingSpinner } from "./index-CXsXzZWW.js";
-import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-DTXG5oRW.js";
-import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-BxGBojWo.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-DlGTe4hM.js";
-import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-DLgVF8iP.js";
-import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, B as Badge, I as Input, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./badge-a9epDDwh.js";
-import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent, R as RefreshCw } from "./card-DdGAuGFX.js";
-import { u as useDirection } from "./index-Bhf8rHHM.js";
-import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-DMV1W9B1.js";
-import { S as Skeleton, C as Copy } from "./skeleton-BAxurPBd.js";
-import { S as Sparkles, c as compressModerationImage } from "./imageUtils-_hRCsC5R.js";
-import { r as resolveImageUrl, I as ImageOff } from "./media-Bms5drf9.js";
+import { Q as QueryObserver, n as infiniteQueryBehavior, o as hasPreviousPage, p as hasNextPage, q as useBaseQuery, c as createLucideIcon, r as reactExports, g as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, k as useAdmin, d as useQueryClient, e as useQuery, s as AnimatePresence, m as motion, B as Button, f as ue, C as CircleDollarSign, X, G as Grid3x3, P as Principal, h as LoadingSpinner } from "./index-BscUpFOm.js";
+import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-Cn6hzIsb.js";
+import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-29_VKjAB.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-i7FN1eXf.js";
+import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-CIuvRxnb.js";
+import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, B as Badge, I as Input, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./badge-Bd9sJt2N.js";
+import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent, R as RefreshCw } from "./card-BkPlCo6q.js";
+import { u as useDirection } from "./index-DodEH1L_.js";
+import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-BuyM6Wlt.js";
+import { S as Skeleton, C as Copy } from "./skeleton-DlmxPW2S.js";
+import { S as Sparkles, c as compressModerationImage } from "./imageUtils-BBTjcv8f.js";
+import { r as resolveImageUrl, I as ImageOff } from "./media-Def2JkOH.js";
 var InfiniteQueryObserver = class extends QueryObserver {
   constructor(client, options) {
     super(client, options);
@@ -887,6 +887,7 @@ function nftKey(collectionId, tokenId) {
 const E8S = 100000000n;
 const MAX_ON_CHAIN_IMAGE_CHARS = 19e5;
 const MODERATION_IMAGE_ACCEPT = "image/png,image/jpeg";
+const COLLECTION_CREATION_REPAIR_GRACE_MS = 3 * 60 * 1e3;
 const ON_CHAIN_IMAGE_SIZE_MESSAGE = "Uploaded image is too large for on-chain storage";
 function formatICP(e8s) {
   const whole = e8s / E8S;
@@ -900,6 +901,12 @@ function formatCycles(cycles) {
   const whole = hundredths / 100n;
   const fraction = (hundredths % 100n).toString().padStart(2, "0");
   return `${whole}.${fraction}T`;
+}
+function isRepairableCollectionCreationRequest(request) {
+  if (request.status === "Installed") return false;
+  if (request.status === "Failed" || request.lastError) return true;
+  const updatedAtMs = Number(request.updatedAt / 1000000n);
+  return Date.now() - updatedAtMs > COLLECTION_CREATION_REPAIR_GRACE_MS;
 }
 function accountIdToHex(bytes) {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
@@ -3157,6 +3164,10 @@ function CollectionsPage() {
     enabled: !!actor && !isFetching && isAuthenticated,
     refetchInterval: 15e3
   });
+  const visiblePendingCreationRequests = reactExports.useMemo(
+    () => pendingCreationRequests.filter(isRepairableCollectionCreationRequest),
+    [pendingCreationRequests]
+  );
   const retryCreationMutation = useMutation({
     mutationFn: async (requestId) => {
       if (!actor) throw new Error("Backend not connected");
@@ -3320,13 +3331,13 @@ function CollectionsPage() {
                   }
                 )
               ] }),
-              isAuthenticated && pendingCreationRequests.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4", children: [
+              isAuthenticated && visiblePendingCreationRequests.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4", children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between", children: [
                   /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-medium text-foreground", children: "Collection setup pending" }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { variant: "outline", className: "w-fit", children: pendingCreationRequests.length })
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { variant: "outline", className: "w-fit", children: visiblePendingCreationRequests.length })
                 ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-1 text-xs text-muted-foreground", children: "Saved setup records continue from the last completed step and do not send the cycles payment again after an ICP block is recorded." }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-3 space-y-2", children: pendingCreationRequests.map((request) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "mt-3 space-y-2", children: visiblePendingCreationRequests.map((request) => /* @__PURE__ */ jsxRuntimeExports.jsx(
                   PendingCollectionCreationCard,
                   {
                     request,

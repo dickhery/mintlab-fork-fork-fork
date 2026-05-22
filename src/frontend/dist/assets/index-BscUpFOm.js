@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-BcEDPFGZ.js","assets/AppCanisterTopUpDialog-DTXG5oRW.js","assets/badge-a9epDDwh.js","assets/external-nft-transfer-BZkQjoJB.js","assets/media-Bms5drf9.js","assets/MediaImage-DlGTe4hM.js","assets/ZoomableMediaImage-DLgVF8iP.js","assets/index-Bhf8rHHM.js","assets/card-DdGAuGFX.js","assets/textarea-DMV1W9B1.js","assets/skeleton-BAxurPBd.js","assets/imageUtils-_hRCsC5R.js","assets/send-Dd_MuL55.js","assets/coins-BoE6lf7D.js","assets/MarketplacePage-CpZQY_7d.js","assets/AdminPage-B6W4jCCw.js","assets/switch-BxGBojWo.js","assets/circle-alert-CQLqsi43.js","assets/ICPAccountPage-abuBKIqm.js","assets/CollectionsPage-q6YCq_pb.js","assets/DividendsPage-hWCSStEN.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-CcEsO0Vu.js","assets/AppCanisterTopUpDialog-Cn6hzIsb.js","assets/badge-Bd9sJt2N.js","assets/external-nft-transfer-DGmVJY6o.js","assets/media-Def2JkOH.js","assets/MediaImage-i7FN1eXf.js","assets/ZoomableMediaImage-CIuvRxnb.js","assets/index-DodEH1L_.js","assets/card-BkPlCo6q.js","assets/textarea-BuyM6Wlt.js","assets/skeleton-DlmxPW2S.js","assets/imageUtils-BBTjcv8f.js","assets/send-ClTmWZNI.js","assets/coins-4zdSTq6m.js","assets/MarketplacePage-VMOonSVv.js","assets/AdminPage-B_RkaZyu.js","assets/switch-29_VKjAB.js","assets/circle-alert-_gcHgVKR.js","assets/ICPAccountPage-D2I1unuo.js","assets/CollectionsPage-DhcjlIy5.js","assets/DividendsPage-FOOqbcG2.js"])))=>i.map(i=>d[i]);
 var __defProp = Object.defineProperty;
 var __typeError = (msg) => {
   throw TypeError(msg);
@@ -46153,13 +46153,13 @@ const Toaster = ({ ...props }) => {
     }
   );
 };
-const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-BcEDPFGZ.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
-const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-CpZQY_7d.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,13]) : void 0));
-const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-B6W4jCCw.js"), true ? __vite__mapDeps([15,1,2,16,9,7,8,10,4,17]) : void 0));
-const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-abuBKIqm.js"), true ? __vite__mapDeps([18,2,8,10,12,17]) : void 0));
-const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-CjZ1TTiO.js"), true ? [] : void 0));
-const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-q6YCq_pb.js"), true ? __vite__mapDeps([19,1,2,16,9,7,5,4,6,8,10,11]) : void 0));
-const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-hWCSStEN.js"), true ? __vite__mapDeps([20,1,2,5,4,8,13]) : void 0));
+const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-CcEsO0Vu.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
+const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-VMOonSVv.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,13]) : void 0));
+const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-B_RkaZyu.js"), true ? __vite__mapDeps([15,1,2,16,9,7,8,10,4,17]) : void 0));
+const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-D2I1unuo.js"), true ? __vite__mapDeps([18,2,8,10,12,17]) : void 0));
+const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-DovJA0wg.js"), true ? [] : void 0));
+const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-DhcjlIy5.js"), true ? __vite__mapDeps([19,1,2,16,9,7,5,4,6,8,10,11]) : void 0));
+const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-FOOqbcG2.js"), true ? __vite__mapDeps([20,1,2,5,4,8,13]) : void 0));
 const rootRoute = createRootRoute({
   component: () => /* @__PURE__ */ jsxRuntimeExports.jsx(Layout, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(
     reactExports.Suspense,

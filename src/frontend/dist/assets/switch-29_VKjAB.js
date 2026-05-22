@@ -1,7 +1,7 @@
-import { c as createLucideIcon, j as jsxRuntimeExports, B as Button, r as reactExports, g as useComposedRefs, a as cn } from "./index-CXsXzZWW.js";
-import { B as Badge, g as useControllableState, P as Primitive, e as composeEventHandlers, f as createContextScope } from "./badge-a9epDDwh.js";
-import { L as LoaderCircle, F as Fuel } from "./AppCanisterTopUpDialog-DTXG5oRW.js";
-import { u as usePrevious, g as useSize } from "./textarea-DMV1W9B1.js";
+import { c as createLucideIcon, j as jsxRuntimeExports, B as Button, r as reactExports, g as useComposedRefs, a as cn } from "./index-BscUpFOm.js";
+import { B as Badge, g as useControllableState, P as Primitive, e as composeEventHandlers, f as createContextScope } from "./badge-Bd9sJt2N.js";
+import { L as LoaderCircle, F as Fuel } from "./AppCanisterTopUpDialog-Cn6hzIsb.js";
+import { u as usePrevious, g as useSize } from "./textarea-BuyM6Wlt.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -49,6 +49,7 @@ function CollectionCreationDiagnosticsPanel({
     ] });
   }
   if (!diagnostics) return null;
+  const isInstalled = diagnostics.request.status === "Installed";
   const recommendedTopUp = recommendedCollectionCreationTopUpCycles(diagnostics);
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-lg border border-border bg-muted/20 p-3 text-xs", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap items-center justify-between gap-2", children: [
@@ -56,9 +57,9 @@ function CollectionCreationDiagnosticsPanel({
       /* @__PURE__ */ jsxRuntimeExports.jsx(
         Badge,
         {
-          variant: diagnostics.canCreateNow ? "secondary" : "destructive",
+          variant: isInstalled || diagnostics.canCreateNow ? "secondary" : "destructive",
           className: "text-[11px]",
-          children: diagnostics.canCreateNow ? "Ready to create" : "Top up app"
+          children: isInstalled ? "Completed" : diagnostics.canCreateNow ? "Ready to create" : "Top up app"
         }
       )
     ] }),
@@ -84,7 +85,7 @@ function CollectionCreationDiagnosticsPanel({
       "Build ",
       diagnostics.buildVersion
     ] }),
-    !diagnostics.canCreateNow && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-3 flex flex-col gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 p-2 sm:flex-row sm:items-center sm:justify-between", children: [
+    !isInstalled && !diagnostics.canCreateNow && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-3 flex flex-col gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 p-2 sm:flex-row sm:items-center sm:justify-between", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-amber-800 dark:text-amber-200", children: [
         "Top up about ",
         formatCycles(recommendedTopUp),
