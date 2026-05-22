@@ -1126,6 +1126,10 @@ function PlaceBidModal({
                 Bids placed with less than 2 minutes remaining extend the
                 auction by 5 minutes.
               </p>
+              <p className="text-xs text-muted-foreground">
+                A bid counts when Mintlab starts processing it before the
+                auction ends.
+              </p>
             </div>
 
             {bidAmount.trim() && (

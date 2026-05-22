@@ -90,6 +90,12 @@ module {
     #SellerPaymentPending;
   };
 
+  public type NoBidAuctionReturnStage = {
+    #NFTReturnPending;
+    #WalletRegistrationPending;
+    #CleanupPending;
+  };
+
   public type FixedPurchaseSettlement = {
     listingId : ListingId;
     buyer : UserId;
@@ -131,6 +137,17 @@ module {
     sellerPaymentCreatedAt : ?Nat64;
     sellerPaymentBlock : ?Nat64;
     stage : SettlementStage;
+    createdAt : Timestamp;
+    updatedAt : Timestamp;
+  };
+
+  public type NoBidAuctionReturnSettlement = {
+    listingId : ListingId;
+    seller : UserId;
+    nft : WalletTypes.WalletNFT;
+    returnedAt : ?Timestamp;
+    walletRegisteredAt : ?Timestamp;
+    stage : NoBidAuctionReturnStage;
     createdAt : Timestamp;
     updatedAt : Timestamp;
   };
