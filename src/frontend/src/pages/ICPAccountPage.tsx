@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
+import { ICP_E8S, parseICPToE8s } from "@/lib/icp";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
@@ -31,12 +32,11 @@ import { toast } from "sonner";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
-const E8S = 100_000_000n;
 const TRANSFER_FEE = 10_000n;
 
 function formatICP(e8s: bigint): string {
-  const whole = e8s / E8S;
-  const frac = e8s % E8S;
+  const whole = e8s / ICP_E8S;
+  const frac = e8s % ICP_E8S;
   const fracStr = frac.toString().padStart(8, "0");
   return `${whole}.${fracStr}`;
 }
@@ -142,9 +142,9 @@ export default function ICPAccountPage() {
       ? "Must be a 64-character hex string"
       : null;
 
-  const parsedAmount = amount ? Number.parseFloat(amount) : 0;
-  const amountE8s =
-    parsedAmount > 0 ? BigInt(Math.floor(parsedAmount * 100_000_000)) : 0n;
+  const parsedAmountE8s = parseICPToE8s(amount);
+  const amountE8s = parsedAmountE8s ?? 0n;
+  const totalDebitE8s = amountE8s + TRANSFER_FEE;
 
   const {
     data: balanceE8s,
@@ -173,12 +173,14 @@ export default function ICPAccountPage() {
 
   const accountIdHex = accountIdBytes ? accountIdToHex(accountIdBytes) : null;
   const balanceNum = balanceE8s ?? 0n;
-  const amountExceedsBalance =
-    parsedAmount > 0 && amountE8s + TRANSFER_FEE > balanceNum;
+  const hasAmount = amount.trim().length > 0;
+  const amountInvalid = hasAmount && parsedAmountE8s === null;
+  const amountTooSmall = amountE8s > 0n && amountE8s <= TRANSFER_FEE;
+  const amountExceedsBalance = amountE8s > 0n && totalDebitE8s > balanceNum;
 
   const formValid =
     /^[0-9a-fA-F]{64}$/.test(recipient) &&
-    parsedAmount > 0 &&
+    amountE8s > TRANSFER_FEE &&
     !amountExceedsBalance;
 
   const transferMutation = useMutation<TransferResult, Error>({
@@ -428,8 +430,27 @@ export default function ICPAccountPage() {
                 Exceeds balance ({formatICP(balanceNum)} ICP available)
               </p>
             )}
+            {amountInvalid && !amountExceedsBalance && (
+              <p
+                className="text-xs text-destructive flex items-center gap-1.5"
+                data-ocid="icp-account.amount_field_error"
+              >
+                <AlertCircle className="h-3 w-3 shrink-0" />
+                Enter a valid ICP amount with up to 8 decimals
+              </p>
+            )}
+            {amountTooSmall && !amountExceedsBalance && (
+              <p
+                className="text-xs text-destructive flex items-center gap-1.5"
+                data-ocid="icp-account.amount_field_error"
+              >
+                <AlertCircle className="h-3 w-3 shrink-0" />
+                Amount must exceed the network fee
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
-              Network fee: 0.0001 ICP (deducted from your balance)
+              Network fee: {formatICP(TRANSFER_FEE)} ICP (deducted from your
+              balance)
             </p>
           </div>
 
@@ -533,7 +554,13 @@ export default function ICPAccountPage() {
             <div className="flex justify-between items-center text-xs">
               <span className="text-muted-foreground">Network fee</span>
               <span className="font-mono text-muted-foreground">
-                −0.00010000 ICP
+                {formatICP(TRANSFER_FEE)} ICP
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-muted-foreground">Total deducted</span>
+              <span className="font-mono text-muted-foreground">
+                {formatICP(totalDebitE8s)} ICP
               </span>
             </div>
             <div className="h-px bg-border/50" />
@@ -542,10 +569,7 @@ export default function ICPAccountPage() {
                 Recipient receives
               </span>
               <span className="font-mono font-bold text-foreground">
-                {amountE8s >= TRANSFER_FEE
-                  ? formatICP(amountE8s - TRANSFER_FEE)
-                  : "—"}{" "}
-                ICP
+                {formatICP(amountE8s)} ICP
               </span>
             </div>
             {memo && (
