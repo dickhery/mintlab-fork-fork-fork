@@ -1,9 +1,10 @@
-import { c as createLucideIcon, u as useAuth, b as useBackend, d as useQueryClient, r as reactExports, e as useQuery, j as jsxRuntimeExports, W as Wallet, B as Button, L as LogIn, f as ue } from "./index-BscUpFOm.js";
-import { u as useMutation, B as Badge, L as Label, I as Input, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./badge-Bd9sJt2N.js";
-import { C as Card, a as CardHeader, b as CardTitle, R as RefreshCw, c as CardContent } from "./card-BkPlCo6q.js";
-import { S as Skeleton, C as Copy } from "./skeleton-DlmxPW2S.js";
-import { S as Send, C as CircleCheck } from "./send-ClTmWZNI.js";
-import { C as CircleAlert } from "./circle-alert-_gcHgVKR.js";
+import { c as createLucideIcon, u as useAuth, b as useBackend, d as useQueryClient, r as reactExports, e as useQuery, j as jsxRuntimeExports, W as Wallet, B as Button, L as LogIn, f as ue } from "./index-tb5Zz-go.js";
+import { u as useMutation, B as Badge, L as Label, I as Input, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./badge-CNasqshc.js";
+import { C as Card, a as CardHeader, b as CardTitle, R as RefreshCw, c as CardContent } from "./card-D5eBbgYT.js";
+import { S as Skeleton, C as Copy } from "./skeleton-ChGy-j8C.js";
+import { p as parseICPToE8s, I as ICP_E8S } from "./icp-BXjZNIYq.js";
+import { S as Send, C as CircleCheck } from "./send-CXMHKD__.js";
+import { C as CircleAlert } from "./circle-alert-CmPIE5ef.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -15,11 +16,10 @@ const __iconNode = [
   ["path", { d: "M17 17H7V7", key: "1org7z" }]
 ];
 const ArrowDownLeft = createLucideIcon("arrow-down-left", __iconNode);
-const E8S = 100000000n;
 const TRANSFER_FEE = 10000n;
 function formatICP(e8s) {
-  const whole = e8s / E8S;
-  const frac = e8s % E8S;
+  const whole = e8s / ICP_E8S;
+  const frac = e8s % ICP_E8S;
   const fracStr = frac.toString().padStart(8, "0");
   return `${whole}.${fracStr}`;
 }
@@ -94,8 +94,9 @@ function ICPAccountPage() {
   const [memo, setMemo] = reactExports.useState("");
   const [confirmOpen, setConfirmOpen] = reactExports.useState(false);
   const recipientError = recipient.length > 0 && !/^[0-9a-fA-F]{64}$/.test(recipient) ? "Must be a 64-character hex string" : null;
-  const parsedAmount = amount ? Number.parseFloat(amount) : 0;
-  const amountE8s = parsedAmount > 0 ? BigInt(Math.floor(parsedAmount * 1e8)) : 0n;
+  const parsedAmountE8s = parseICPToE8s(amount);
+  const amountE8s = parsedAmountE8s ?? 0n;
+  const totalDebitE8s = amountE8s + TRANSFER_FEE;
   const {
     data: balanceE8s,
     isLoading: balanceLoading,
@@ -120,8 +121,11 @@ function ICPAccountPage() {
   });
   const accountIdHex = accountIdBytes ? accountIdToHex(accountIdBytes) : null;
   const balanceNum = balanceE8s ?? 0n;
-  const amountExceedsBalance = parsedAmount > 0 && amountE8s + TRANSFER_FEE > balanceNum;
-  const formValid = /^[0-9a-fA-F]{64}$/.test(recipient) && parsedAmount > 0 && !amountExceedsBalance;
+  const hasAmount = amount.trim().length > 0;
+  const amountInvalid = hasAmount && parsedAmountE8s === null;
+  const amountTooSmall = amountE8s > 0n && amountE8s <= TRANSFER_FEE;
+  const amountExceedsBalance = amountE8s > 0n && totalDebitE8s > balanceNum;
+  const formValid = /^[0-9a-fA-F]{64}$/.test(recipient) && amountE8s > TRANSFER_FEE && !amountExceedsBalance;
   const transferMutation = useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error("Not connected to backend");
@@ -370,7 +374,33 @@ function ICPAccountPage() {
                       ]
                     }
                   ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Network fee: 0.0001 ICP (deducted from your balance)" })
+                  amountInvalid && !amountExceedsBalance && /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                    "p",
+                    {
+                      className: "text-xs text-destructive flex items-center gap-1.5",
+                      "data-ocid": "icp-account.amount_field_error",
+                      children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx(CircleAlert, { className: "h-3 w-3 shrink-0" }),
+                        "Enter a valid ICP amount with up to 8 decimals"
+                      ]
+                    }
+                  ),
+                  amountTooSmall && !amountExceedsBalance && /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                    "p",
+                    {
+                      className: "text-xs text-destructive flex items-center gap-1.5",
+                      "data-ocid": "icp-account.amount_field_error",
+                      children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx(CircleAlert, { className: "h-3 w-3 shrink-0" }),
+                        "Amount must exceed the network fee"
+                      ]
+                    }
+                  ),
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-xs text-muted-foreground", children: [
+                    "Network fee: ",
+                    formatICP(TRANSFER_FEE),
+                    " ICP (deducted from your balance)"
+                  ] })
                 ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-2", children: [
                   /* @__PURE__ */ jsxRuntimeExports.jsxs(
@@ -467,15 +497,24 @@ function ICPAccountPage() {
                 ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs", children: [
                   /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-muted-foreground", children: "Network fee" }),
-                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-mono text-muted-foreground", children: "−0.00010000 ICP" })
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "font-mono text-muted-foreground", children: [
+                    formatICP(TRANSFER_FEE),
+                    " ICP"
+                  ] })
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center text-xs", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-muted-foreground", children: "Total deducted" }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "font-mono text-muted-foreground", children: [
+                    formatICP(totalDebitE8s),
+                    " ICP"
+                  ] })
                 ] }),
                 /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "h-px bg-border/50" }),
                 /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex justify-between items-center", children: [
                   /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-foreground font-semibold", children: "Recipient receives" }),
                   /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "font-mono font-bold text-foreground", children: [
-                    amountE8s >= TRANSFER_FEE ? formatICP(amountE8s - TRANSFER_FEE) : "—",
-                    " ",
-                    "ICP"
+                    formatICP(amountE8s),
+                    " ICP"
                   ] })
                 ] }),
                 memo && /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [

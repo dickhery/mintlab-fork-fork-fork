@@ -1,11 +1,12 @@
-import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, g as useComposedRefs, a as cn, b as useBackend, u as useAuth, d as useQueryClient, e as useQuery, B as Button, S as ShoppingBag, h as LoadingSpinner, m as motion, X, f as ue } from "./index-BscUpFOm.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-DGmVJY6o.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-i7FN1eXf.js";
-import { T as Tag, Z as ZoomableMediaImage, P as PaymentConfirmationDialog } from "./ZoomableMediaImage-CIuvRxnb.js";
-import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-DodEH1L_.js";
-import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, B as Badge, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-Bd9sJt2N.js";
-import { C as Coins } from "./coins-4zdSTq6m.js";
-import { I as ImageOff } from "./media-Def2JkOH.js";
+import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, g as useComposedRefs, a as cn, b as useBackend, u as useAuth, d as useQueryClient, e as useQuery, B as Button, S as ShoppingBag, h as LoadingSpinner, m as motion, X, f as ue } from "./index-tb5Zz-go.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-Cw00jt_C.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-Z8MvSaK0.js";
+import { T as Tag, Z as ZoomableMediaImage, P as PaymentConfirmationDialog } from "./ZoomableMediaImage-ee7IWveT.js";
+import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-CybV4hxu.js";
+import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, B as Badge, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-CNasqshc.js";
+import { f as formatICPAmount, p as parseICPToE8s } from "./icp-BXjZNIYq.js";
+import { C as Coins } from "./coins-4A1roT-H.js";
+import { I as ImageOff } from "./media-CWLVFFTI.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -471,27 +472,6 @@ function TabsContent({
       ...props
     }
   );
-}
-const ICP_E8S = 100000000n;
-const MAX_ICP_E8S = 18446744073709551615n;
-function formatICPAmount(e8s) {
-  const whole = e8s / ICP_E8S;
-  const frac = (e8s % ICP_E8S).toString().padStart(8, "0").replace(/0+$/, "");
-  return frac ? `${whole}.${frac}` : whole.toString();
-}
-function parseICPToE8s(value) {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  if (!/^(?:\d+|\d+\.\d{0,8}|\.\d{1,8})$/.test(trimmed)) return null;
-  const normalized = trimmed.startsWith(".") ? `0${trimmed}` : trimmed;
-  const [wholePart, fracPart = ""] = normalized.split(".");
-  const whole = BigInt(wholePart || "0");
-  const frac = BigInt(`${fracPart}00000000`.slice(0, 8));
-  const e8s = whole * ICP_E8S + frac;
-  if (e8s <= 0n || e8s > MAX_ICP_E8S) {
-    return null;
-  }
-  return e8s;
 }
 function parseICP(val) {
   return parseICPToE8s(val);
