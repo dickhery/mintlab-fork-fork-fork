@@ -50,7 +50,9 @@ persistent actor Backend {
     walletState,
     collectionsState,
     marketplaceState,
+    marketplaceListingLockState,
     mintState,
+    authState,
     Principal.fromActor(Backend),
   );
   include ICPApi(marketplaceUserPaymentLockState, Principal.fromActor(Backend));

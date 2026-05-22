@@ -916,11 +916,11 @@ mixin (
     winner : Principal,
   ) : async* MarketplaceTypes.AuctionSettlement {
     let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
-    let ledgerFeeE8s = await* IcpLib.getTransferFee(ledger);
     let winningEscrow = switch (resolveWinningEscrow(listing, winner)) {
       case null Runtime.trap("Winning bid escrow record is missing; cannot safely settle this auction");
       case (?escrow) escrow;
     };
+    let ledgerFeeE8s = winningEscrow.ledgerFeeE8s;
     let escrowSub = IcpLib.marketplaceEscrowSubaccount(winningEscrow.escrowId);
     let escrowAccount = IcpLib.accountIdentifier(canisterId, escrowSub);
     let mintlabFee = MarketplaceLib.mintlabFee(marketplaceFeeState, listing.highestBid);

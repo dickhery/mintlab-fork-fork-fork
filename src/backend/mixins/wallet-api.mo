@@ -1,6 +1,7 @@
 import Array "mo:core/Array";
 import Blob "mo:core/Blob";
 import Error "mo:core/Error";
+import AuthLib "../lib/auth";
 import CollectionLib "../lib/collections";
 import IcpLib "../lib/icp";
 import MarketplaceLib "../lib/marketplace";
@@ -16,7 +17,9 @@ mixin (
   walletState : WalletLib.WalletState,
   collectionsState : CollectionLib.CollectionsState,
   marketplaceState : MarketplaceLib.MarketplaceState,
+  marketplaceListingLockState : MarketplaceLib.MarketplaceListingLockState,
   mintState : MintLib.MintState,
+  authState : AuthLib.AdminState,
   canisterId : Principal,
 ) {
   type WalletChildTransferResult = {
@@ -295,31 +298,66 @@ mixin (
     };
     let canonicalTokenId = WalletLib.canonicalTokenId(collection, tokenId);
     let metadataFallback = switch (WalletLib.findByCollectionToken(walletState, collectionId, canonicalTokenId)) {
-      case (?knownNFT) ?knownNFT.metadata;
+      case (?knownNFT) {
+        if (
+          not Principal.equal(owner, caller) and
+          not AuthLib.isAdmin(authState, caller) and
+          (
+            not Principal.equal(knownNFT.owner, caller) or
+            knownNFT.location != #Registered
+          )
+        ) {
+          return #err("You can only sync NFTs to yourself unless you are transferring a registered NFT you own.");
+        };
+        ?knownNFT.metadata;
+      };
       case null null;
     };
-    let ownerAccountId = IcpLib.accountIdentifier(owner, IcpLib.zeroSubaccount());
-    let verification = await* WalletLib.verifyKnownOwnedNFTWithFallback(
-      collection,
-      owner,
-      ownerAccountId,
-      canonicalTokenId,
-      metadataFallback,
-    );
-    switch (verification) {
-      case (#err(message)) #err(message);
-      case (#ok(onChainMetadata)) {
-        let nft = WalletLib.registerNFT(
-          walletState,
-          owner,
-          collectionId,
-          canonicalTokenId,
-          onChainMetadata,
-          #Registered,
-        );
-        ignore MarketplaceLib.clearListingsForToken(marketplaceState, collectionId, canonicalTokenId);
-        #ok(nft);
+    if (metadataFallback == null and not Principal.equal(owner, caller) and not AuthLib.isAdmin(authState, caller)) {
+      return #err("You can only sync NFTs to your own Internet Identity.");
+    };
+    if (not MarketplaceLib.acquireListingTokenLock(marketplaceListingLockState, collectionId, canonicalTokenId)) {
+      return #err("This NFT is currently being listed. Try again shortly.");
+    };
+    try {
+      switch (MarketplaceLib.findActiveEscrowedNFT(marketplaceState, collectionId, canonicalTokenId)) {
+        case (?_) {
+          return #err("This NFT is locked in an active marketplace listing. Cancel or settle the listing first.");
+        };
+        case null {};
       };
+
+      let ownerAccountId = IcpLib.accountIdentifier(owner, IcpLib.zeroSubaccount());
+      let verification = await* WalletLib.verifyKnownOwnedNFTWithFallback(
+        collection,
+        owner,
+        ownerAccountId,
+        canonicalTokenId,
+        metadataFallback,
+      );
+      switch (verification) {
+        case (#err(message)) #err(message);
+        case (#ok(onChainMetadata)) {
+          switch (MarketplaceLib.findActiveEscrowedNFT(marketplaceState, collectionId, canonicalTokenId)) {
+            case (?_) {
+              return #err("This NFT is locked in an active marketplace listing. Cancel or settle the listing first.");
+            };
+            case null {};
+          };
+          let nft = WalletLib.registerNFT(
+            walletState,
+            owner,
+            collectionId,
+            canonicalTokenId,
+            onChainMetadata,
+            #Registered,
+          );
+          ignore MarketplaceLib.clearListingsForToken(marketplaceState, collectionId, canonicalTokenId);
+          #ok(nft);
+        };
+      };
+    } finally {
+      MarketplaceLib.releaseListingTokenLock(marketplaceListingLockState, collectionId, canonicalTokenId);
     };
   };
 
