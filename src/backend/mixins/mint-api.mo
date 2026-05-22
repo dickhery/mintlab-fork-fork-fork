@@ -513,7 +513,7 @@ mixin (
     if (Principal.isAnonymous(caller)) {
       return [];
     };
-    MintLib.activeCollectionCreationRequestsByOwner(collectionCreationState, caller);
+    MintLib.repairableCollectionCreationRequestsByOwner(collectionCreationState, caller);
   };
 
   public shared ({ caller }) func getAllCollectionCreationRequests() : async {
@@ -526,7 +526,7 @@ mixin (
     if (not AuthLib.isAdmin(authState, caller)) {
       return #err("Unauthorized: admin only");
     };
-    #ok(MintLib.allCollectionCreationRequests(collectionCreationState));
+    #ok(MintLib.repairableCollectionCreationRequests(collectionCreationState));
   };
 
   public shared ({ caller }) func recoverCollectionCreationRecord(

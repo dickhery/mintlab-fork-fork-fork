@@ -106,6 +106,7 @@ function nftKey(collectionId: bigint, tokenId: string): string {
 const E8S = 100_000_000n;
 const MAX_ON_CHAIN_IMAGE_CHARS = 1_900_000;
 const MODERATION_IMAGE_ACCEPT = "image/png,image/jpeg";
+const COLLECTION_CREATION_REPAIR_GRACE_MS = 3 * 60 * 1000;
 const ON_CHAIN_IMAGE_SIZE_MESSAGE =
   "Uploaded image is too large for on-chain storage";
 
@@ -122,6 +123,16 @@ function formatCycles(cycles: bigint): string {
   const whole = hundredths / 100n;
   const fraction = (hundredths % 100n).toString().padStart(2, "0");
   return `${whole}.${fraction}T`;
+}
+
+function isRepairableCollectionCreationRequest(
+  request: CollectionCreationRequestView,
+): boolean {
+  if (request.status === "Installed") return false;
+  if (request.status === "Failed" || request.lastError) return true;
+
+  const updatedAtMs = Number(request.updatedAt / 1_000_000n);
+  return Date.now() - updatedAtMs > COLLECTION_CREATION_REPAIR_GRACE_MS;
 }
 
 function accountIdToHex(bytes: Uint8Array): string {
@@ -2824,6 +2835,10 @@ export default function CollectionsPage() {
     enabled: !!actor && !isFetching && isAuthenticated,
     refetchInterval: 15_000,
   });
+  const visiblePendingCreationRequests = useMemo(
+    () => pendingCreationRequests.filter(isRepairableCollectionCreationRequest),
+    [pendingCreationRequests],
+  );
 
   const retryCreationMutation = useMutation({
     mutationFn: async (requestId: bigint) => {
@@ -3000,14 +3015,14 @@ export default function CollectionsPage() {
               />
             </div>
 
-            {isAuthenticated && pendingCreationRequests.length > 0 && (
+            {isAuthenticated && visiblePendingCreationRequests.length > 0 && (
               <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
                 <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
                   <p className="text-sm font-medium text-foreground">
                     Collection setup pending
                   </p>
                   <Badge variant="outline" className="w-fit">
-                    {pendingCreationRequests.length}
+                    {visiblePendingCreationRequests.length}
                   </Badge>
                 </div>
                 <p className="mt-1 text-xs text-muted-foreground">
@@ -3016,7 +3031,7 @@ export default function CollectionsPage() {
                   recorded.
                 </p>
                 <div className="mt-3 space-y-2">
-                  {pendingCreationRequests.map((request) => (
+                  {visiblePendingCreationRequests.map((request) => (
                     <PendingCollectionCreationCard
                       key={request.id.toString()}
                       request={request}

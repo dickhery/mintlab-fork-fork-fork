@@ -283,6 +283,8 @@ module {
     Nat64.fromNat(Int.abs(Time.now()));
   };
 
+  let COLLECTION_CREATION_REPAIR_GRACE_NS : Nat64 = 180_000_000_000; // 3 minutes
+
   func containsRequestId(ids : [Nat], target : Nat) : Bool {
     for (id in ids.values()) {
       if (id == target) {
@@ -689,6 +691,57 @@ module {
     };
   };
 
+  func collectionCreationHasLastError(
+    request : Types.CollectionCreationRequest
+  ) : Bool {
+    request.lastError != null;
+  };
+
+  func collectionCreationIsInstalled(
+    request : Types.CollectionCreationRequest
+  ) : Bool {
+    switch (request.status) {
+      case (#Installed) true;
+      case (_) false;
+    };
+  };
+
+  func collectionCreationIsFailed(
+    request : Types.CollectionCreationRequest
+  ) : Bool {
+    switch (request.status) {
+      case (#Failed) true;
+      case (_) false;
+    };
+  };
+
+  func collectionCreationIsStale(
+    request : Types.CollectionCreationRequest
+  ) : Bool {
+    if (collectionCreationIsInstalled(request)) {
+      return false;
+    };
+    if (collectionCreationHasLastError(request)) {
+      return false;
+    };
+    let now = nowNat64();
+    if (now <= request.updatedAt) {
+      return false;
+    };
+    (now - request.updatedAt) > COLLECTION_CREATION_REPAIR_GRACE_NS;
+  };
+
+  public func collectionCreationRequestNeedsRepair(
+    request : Types.CollectionCreationRequest
+  ) : Bool {
+    if (collectionCreationIsInstalled(request)) {
+      return false;
+    };
+    collectionCreationIsFailed(request) or
+    collectionCreationHasLastError(request) or
+    collectionCreationIsStale(request);
+  };
+
   public func activeCollectionCreationRequestsByOwner(
     state : CollectionCreationState,
     owner : Principal,
@@ -705,6 +758,25 @@ module {
     requests;
   };
 
+  public func repairableCollectionCreationRequestsByOwner(
+    state : CollectionCreationState,
+    owner : Principal,
+  ) : [Types.CollectionCreationRequestView] {
+    var requests : [Types.CollectionCreationRequestView] = [];
+    for (request in Map.values(collectionCreationRequestMap(state))) {
+      if (
+        Principal.equal(request.owner, owner) and
+        collectionCreationRequestNeedsRepair(request)
+      ) {
+        requests := Array.concat<Types.CollectionCreationRequestView>(
+          requests,
+          [collectionCreationRequestView(request)],
+        );
+      };
+    };
+    requests;
+  };
+
   public func collectionCreationRequestsByOwner(
     state : CollectionCreationState,
     owner : Principal,
@@ -712,6 +784,21 @@ module {
     var requests : [Types.CollectionCreationRequestView] = [];
     for (request in Map.values(collectionCreationRequestMap(state))) {
       if (Principal.equal(request.owner, owner)) {
+        requests := Array.concat<Types.CollectionCreationRequestView>(
+          requests,
+          [collectionCreationRequestView(request)],
+        );
+      };
+    };
+    requests;
+  };
+
+  public func repairableCollectionCreationRequests(
+    state : CollectionCreationState
+  ) : [Types.CollectionCreationRequestView] {
+    var requests : [Types.CollectionCreationRequestView] = [];
+    for (request in Map.values(collectionCreationRequestMap(state))) {
+      if (collectionCreationRequestNeedsRepair(request)) {
         requests := Array.concat<Types.CollectionCreationRequestView>(
           requests,
           [collectionCreationRequestView(request)],

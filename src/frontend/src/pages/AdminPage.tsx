@@ -81,6 +81,7 @@ const APP_LOW_CYCLES_THRESHOLD = 1_000_000_000_000n;
 const MIN_COLLECTION_CANISTER_CYCLES = 2_000_000_000_000n;
 const MAX_ON_CHAIN_IMAGE_CHARS = 1_900_000;
 const MODERATION_IMAGE_ACCEPT = "image/png,image/jpeg";
+const COLLECTION_CREATION_REPAIR_GRACE_MS = 3 * 60 * 1000;
 const OPENAI_MODERATION_MODEL = "omni-moderation-latest";
 const DEFAULT_MODERATION_MESSAGE =
   "Uploads cannot include sexual content, graphic violence, self-harm content, hateful or harassing text, or dangerous illegal instructions.";
@@ -161,6 +162,16 @@ function collectionCreationStatusLabel(
     case "Failed":
       return "Failed";
   }
+}
+
+function isRepairableCollectionCreationRequest(
+  request: CollectionCreationRequestView,
+): boolean {
+  if (request.status === "Installed") return false;
+  if (request.status === "Failed" || request.lastError) return true;
+
+  const updatedAtMs = Number(request.updatedAt / 1_000_000n);
+  return Date.now() - updatedAtMs > COLLECTION_CREATION_REPAIR_GRACE_MS;
 }
 
 function isValidPrincipal(value: string): boolean {
@@ -932,6 +943,10 @@ function CollectionCreationRequestsPanel() {
   });
 
   const requests = requestResult?.__kind__ === "ok" ? requestResult.ok : [];
+  const visibleRequests = useMemo(
+    () => requests.filter(isRepairableCollectionCreationRequest),
+    [requests],
+  );
   const requestError =
     requestResult?.__kind__ === "err" ? requestResult.err : null;
 
@@ -1030,13 +1045,13 @@ function CollectionCreationRequestsPanel() {
               <Skeleton key={item} className="h-20 rounded-xl" />
             ))}
           </div>
-        ) : requests.length === 0 ? (
+        ) : visibleRequests.length === 0 ? (
           <p className="rounded-lg border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
-            No saved collection setup requests.
+            No collection setup requests need attention.
           </p>
         ) : (
           <div className="space-y-2">
-            {requests.map((request) => (
+            {visibleRequests.map((request) => (
               <CollectionCreationRequestRow
                 key={request.id.toString()}
                 request={request}

@@ -55,6 +55,7 @@ export function CollectionCreationDiagnosticsPanel({
 
   if (!diagnostics) return null;
 
+  const isInstalled = diagnostics.request.status === "Installed";
   const recommendedTopUp =
     recommendedCollectionCreationTopUpCycles(diagnostics);
 
@@ -65,10 +66,18 @@ export function CollectionCreationDiagnosticsPanel({
           Creation diagnostics
         </span>
         <Badge
-          variant={diagnostics.canCreateNow ? "secondary" : "destructive"}
+          variant={
+            isInstalled || diagnostics.canCreateNow
+              ? "secondary"
+              : "destructive"
+          }
           className="text-[11px]"
         >
-          {diagnostics.canCreateNow ? "Ready to create" : "Top up app"}
+          {isInstalled
+            ? "Completed"
+            : diagnostics.canCreateNow
+              ? "Ready to create"
+              : "Top up app"}
         </Badge>
       </div>
       <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -100,7 +109,7 @@ export function CollectionCreationDiagnosticsPanel({
       <p className="mt-2 break-all text-[11px] text-muted-foreground">
         Build {diagnostics.buildVersion}
       </p>
-      {!diagnostics.canCreateNow && (
+      {!isInstalled && !diagnostics.canCreateNow && (
         <div className="mt-3 flex flex-col gap-2 rounded-md border border-amber-500/20 bg-amber-500/10 p-2 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-amber-800 dark:text-amber-200">
             Top up about {formatCycles(recommendedTopUp)} cycles before retrying
