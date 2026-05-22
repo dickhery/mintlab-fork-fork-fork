@@ -25,6 +25,8 @@ persistent actor Backend {
   let walletState = WalletLib.newState();
   let marketplaceState = MarketplaceLib.newState();
   let marketplacePaymentState = MarketplaceLib.newPaymentState();
+  let marketplaceRefundState = MarketplaceLib.newRefundState();
+  let marketplaceUserPaymentLockState = MarketplaceLib.newUserPaymentLockState();
   let marketplaceSettlementState = MarketplaceLib.newSettlementState();
   let marketplaceBidState = MarketplaceLib.newBidState();
   let marketplaceFeeState = MarketplaceLib.newFeeState();
@@ -40,6 +42,7 @@ persistent actor Backend {
     collectionsState,
     walletState,
     authState,
+    marketplaceUserPaymentLockState,
     Principal.fromActor(Backend),
   );
   include WalletApi(
@@ -49,10 +52,12 @@ persistent actor Backend {
     mintState,
     Principal.fromActor(Backend),
   );
-  include ICPApi(Principal.fromActor(Backend));
+  include ICPApi(marketplaceUserPaymentLockState, Principal.fromActor(Backend));
   include MarketplaceApi(
     marketplaceState,
     marketplacePaymentState,
+    marketplaceRefundState,
+    marketplaceUserPaymentLockState,
     marketplaceSettlementState,
     marketplaceBidState,
     marketplaceFeeState,

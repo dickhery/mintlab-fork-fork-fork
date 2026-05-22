@@ -21,6 +21,8 @@ import Nat64 "mo:core/Nat64";
 mixin (
   marketplaceState : MarketplaceLib.MarketplaceState,
   marketplacePaymentState : MarketplaceLib.MarketplacePaymentState,
+  marketplaceRefundState : MarketplaceLib.MarketplaceRefundState,
+  marketplaceUserPaymentLockState : MarketplaceLib.MarketplaceUserPaymentLockState,
   marketplaceSettlementState : MarketplaceLib.MarketplaceSettlementState,
   marketplaceBidState : MarketplaceLib.MarketplaceBidState,
   marketplaceFeeState : MarketplaceLib.MarketplaceFeeState,
@@ -92,6 +94,21 @@ mixin (
       case (#Ok(blockIndex)) blockIndex;
       case (#Err(#TxDuplicate({ duplicate_of }))) duplicate_of;
       case (#Err(error)) Runtime.trap(errorLabel # ": " # IcpLib.transferErrorText(error));
+    };
+  };
+
+  func acquireUserPaymentLockOrTrap(user : Principal) {
+    if (not MarketplaceLib.acquireUserPaymentLock(marketplaceUserPaymentLockState, user)) {
+      Runtime.trap("Another ICP operation is already using this account balance. Try again shortly.");
+    };
+  };
+
+  func releaseMarketplaceUserPaymentLock(lockOwner : ?Principal) {
+    switch (lockOwner) {
+      case null {};
+      case (?user) {
+        MarketplaceLib.releaseUserPaymentLock(marketplaceUserPaymentLockState, user);
+      };
     };
   };
 
@@ -265,10 +282,7 @@ mixin (
     let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
     let feeE8s = await* IcpLib.getTransferFee(ledger);
     switch (await* refundAuctionEscrow(ledger, escrow, feeE8s)) {
-      case (#ok(_)) {
-        ignore MarketplaceLib.removePendingRefund(marketplacePaymentState, escrow.escrowId);
-        true;
-      };
+      case (#ok(_)) true;
       case (#err(_)) false;
     };
   };
@@ -279,9 +293,12 @@ mixin (
     if (not MarketplaceLib.acquireListingLock(marketplacePaymentState, listingId)) {
       Runtime.trap("Listing is processing another payment. Try again shortly.");
     };
+    var paymentLockOwner : ?Principal = null;
     try {
       switch (MarketplaceLib.getFixedPurchaseSettlement(marketplaceSettlementState, listingId)) {
         case null {
+          acquireUserPaymentLockOrTrap(caller);
+          paymentLockOwner := ?caller;
           ignore await* startFixedPurchaseSettlement(listingId, caller);
         };
         case (?settlement) {
@@ -289,10 +306,15 @@ mixin (
           if (not Principal.equal(settlement.buyer, caller) and not isCallerAdmin) {
             Runtime.trap("This listing is already being settled by another buyer");
           };
+          if (settlement.paymentBlock == null) {
+            acquireUserPaymentLockOrTrap(settlement.buyer);
+            paymentLockOwner := ?settlement.buyer;
+          };
         };
       };
       await* continueFixedPurchaseSettlement(listingId);
     } finally {
+      releaseMarketplaceUserPaymentLock(paymentLockOwner);
       MarketplaceLib.releaseListingLock(marketplacePaymentState, listingId);
     };
   };
@@ -367,23 +389,37 @@ mixin (
         let buyerSub = IcpLib.principalToSubaccount(settlement.buyer);
         let escrowAccount = IcpLib.accountIdentifier(canisterId, escrowSub);
         let depositAmount = settlementPayoutDebit(settlement.price, settlement.mintlabFee, settlement.ledgerFeeE8s);
-        let paymentResult = await* IcpLib.transferOutWithFeeAt(
-          ledger,
-          ?buyerSub,
-          escrowAccount,
-          depositAmount,
-          Nat64.fromNat(settlement.listingId),
-          settlement.ledgerFeeE8s,
-          settlement.paymentCreatedAt,
-        );
-        let paymentBlock = transferBlockOrTrap(paymentResult, "Purchase escrow transfer failed");
-        settlement := {
-          settlement with
-          paymentBlock = ?paymentBlock;
-          stage = #NFTTransferPending;
-          updatedAt = Time.now();
+        var clearSettlementOnPaymentFailure = false;
+        try {
+          let paymentResult = await* IcpLib.transferOutWithFeeAt(
+            ledger,
+            ?buyerSub,
+            escrowAccount,
+            depositAmount,
+            Nat64.fromNat(settlement.listingId),
+            settlement.ledgerFeeE8s,
+            settlement.paymentCreatedAt,
+          );
+          let paymentBlock = switch (paymentResult) {
+            case (#Ok(blockIndex)) blockIndex;
+            case (#Err(#TxDuplicate({ duplicate_of }))) duplicate_of;
+            case (#Err(error)) {
+              clearSettlementOnPaymentFailure := true;
+              Runtime.trap("Purchase escrow transfer failed: " # IcpLib.transferErrorText(error));
+            };
+          };
+          settlement := {
+            settlement with
+            paymentBlock = ?paymentBlock;
+            stage = #NFTTransferPending;
+            updatedAt = Time.now();
+          };
+          MarketplaceLib.putFixedPurchaseSettlement(marketplaceSettlementState, settlement);
+        } finally {
+          if (clearSettlementOnPaymentFailure) {
+            ignore MarketplaceLib.removeFixedPurchaseSettlement(marketplaceSettlementState, listingId);
+          };
         };
-        MarketplaceLib.putFixedPurchaseSettlement(marketplaceSettlementState, settlement);
       };
       case (?_) {};
     };
@@ -507,9 +543,12 @@ mixin (
     if (not MarketplaceLib.acquireListingLock(marketplacePaymentState, listingId)) {
       Runtime.trap("Auction is processing another payment. Try again shortly.");
     };
+    var paymentLockOwner : ?Principal = null;
     try {
       switch (MarketplaceLib.getPendingBidDeposit(marketplaceBidState, listingId)) {
         case null {
+          acquireUserPaymentLockOrTrap(caller);
+          paymentLockOwner := ?caller;
           ignore await* startPendingBidDeposit(listingId, caller, amount);
         };
         case (?pending) {
@@ -520,10 +559,15 @@ mixin (
           if (pending.amount != amount and not isCallerAdmin) {
             Runtime.trap("Retry the pending bid with the same amount");
           };
+          if (pending.paymentBlock == null) {
+            acquireUserPaymentLockOrTrap(pending.bidder);
+            paymentLockOwner := ?pending.bidder;
+          };
         };
       };
       await* continuePendingBidDeposit(listingId);
     } finally {
+      releaseMarketplaceUserPaymentLock(paymentLockOwner);
       MarketplaceLib.releaseListingLock(marketplacePaymentState, listingId);
     };
   };
@@ -543,9 +587,15 @@ mixin (
     if (not MarketplaceLib.acquireListingLock(marketplacePaymentState, listingId)) {
       Runtime.trap("Auction is processing another payment. Try again shortly.");
     };
+    var paymentLockOwner : ?Principal = null;
     try {
+      if (pending.paymentBlock == null) {
+        acquireUserPaymentLockOrTrap(pending.bidder);
+        paymentLockOwner := ?pending.bidder;
+      };
       await* continuePendingBidDeposit(listingId);
     } finally {
+      releaseMarketplaceUserPaymentLock(paymentLockOwner);
       MarketplaceLib.releaseListingLock(marketplacePaymentState, listingId);
     };
   };
@@ -618,13 +668,20 @@ mixin (
 
     switch (pending.paymentBlock) {
       case null {
-        if (Time.now() >= listing.endTime) {
-          switch (pending.paymentAttemptedAt) {
-            case null {
-              ignore MarketplaceLib.removePendingBidDeposit(marketplaceBidState, listingId);
-              Runtime.trap("Auction ended before the bid escrow was funded");
+        var clearPendingAfterExpiredAuction = false;
+        try {
+          if (Time.now() >= listing.endTime) {
+            switch (pending.paymentAttemptedAt) {
+              case null {
+                clearPendingAfterExpiredAuction := true;
+                Runtime.trap("Auction ended before the bid escrow was funded");
+              };
+              case (?_) {};
             };
-            case (?_) {};
+          };
+        } finally {
+          if (clearPendingAfterExpiredAuction) {
+            ignore MarketplaceLib.removePendingBidDeposit(marketplaceBidState, listingId);
           };
         };
 
@@ -644,22 +701,36 @@ mixin (
         let bidderSub = IcpLib.principalToSubaccount(pending.bidder);
         let escrowSub = IcpLib.marketplaceEscrowSubaccount(pending.escrowId);
         let escrowAccount = IcpLib.accountIdentifier(canisterId, escrowSub);
-        let depositResult = await* IcpLib.transferOutWithFeeAt(
-          ledger,
-          ?bidderSub,
-          escrowAccount,
-          pending.escrowDeposit,
-          Nat64.fromNat(pending.listingId),
-          pending.ledgerFeeE8s,
-          pending.paymentCreatedAt,
-        );
-        let depositBlock = transferBlockOrTrap(depositResult, "Bid escrow transfer failed");
-        pending := {
-          pending with
-          paymentBlock = ?depositBlock;
-          updatedAt = Time.now();
+        var clearPendingOnPaymentFailure = false;
+        try {
+          let depositResult = await* IcpLib.transferOutWithFeeAt(
+            ledger,
+            ?bidderSub,
+            escrowAccount,
+            pending.escrowDeposit,
+            Nat64.fromNat(pending.listingId),
+            pending.ledgerFeeE8s,
+            pending.paymentCreatedAt,
+          );
+          let depositBlock = switch (depositResult) {
+            case (#Ok(blockIndex)) blockIndex;
+            case (#Err(#TxDuplicate({ duplicate_of }))) duplicate_of;
+            case (#Err(error)) {
+              clearPendingOnPaymentFailure := true;
+              Runtime.trap("Bid escrow transfer failed: " # IcpLib.transferErrorText(error));
+            };
+          };
+          pending := {
+            pending with
+            paymentBlock = ?depositBlock;
+            updatedAt = Time.now();
+          };
+          MarketplaceLib.putPendingBidDeposit(marketplaceBidState, pending);
+        } finally {
+          if (clearPendingOnPaymentFailure) {
+            ignore MarketplaceLib.removePendingBidDeposit(marketplaceBidState, listingId);
+          };
         };
-        MarketplaceLib.putPendingBidDeposit(marketplaceBidState, pending);
       };
       case (?_) {};
     };
@@ -733,9 +804,7 @@ mixin (
       case null {};
       case (?escrow) {
         switch (await* refundAuctionEscrow(ledger, escrow, pending.ledgerFeeE8s)) {
-          case (#ok(_)) {
-            ignore MarketplaceLib.removePendingRefund(marketplacePaymentState, escrow.escrowId);
-          };
+          case (#ok(_)) {};
           case (#err(_)) {};
         };
       };
@@ -954,6 +1023,7 @@ mixin (
 
     ignore MarketplaceLib.removeAuctionEscrow(marketplacePaymentState, settlement.listingId);
     ignore MarketplaceLib.removePendingRefund(marketplacePaymentState, settlement.winningEscrowId);
+    ignore MarketplaceLib.removePendingRefundJournal(marketplaceRefundState, settlement.winningEscrowId);
     ignore MarketplaceLib.settleAuction(marketplaceState, settlement.listingId);
     ignore MarketplaceLib.takeEscrowedNFT(marketplaceState, settlement.listingId);
     ignore MarketplaceLib.clearListingsForToken(marketplaceState, settlement.nft.collectionId, settlement.nft.tokenId);
@@ -1041,26 +1111,27 @@ mixin (
           Runtime.trap("Listing is processing another payment. Try again shortly.");
         };
         try {
-        switch (MarketplaceLib.cancelListing(marketplaceState, listingId)) {
-          case null Runtime.trap("Failed to cancel listing");
-          case (?#Fixed(cancelled)) {
-            let escrowedNFT = switch (MarketplaceLib.takeEscrowedNFT(marketplaceState, listingId)) {
-              case null Runtime.trap("Escrowed NFT not found for fixed listing");
-              case (?nft) nft;
-            };
-            let returnedLocation = await* transferEscrowedNFTToRecipient(escrowedNFT, cancelled.seller);
-            ignore MarketplaceLib.clearListingsForToken(marketplaceState, escrowedNFT.collectionId, escrowedNFT.tokenId);
-            ignore WalletLib.registerNFT(
-              walletState,
-              cancelled.seller,
-              escrowedNFT.collectionId,
-              escrowedNFT.tokenId,
-              escrowedNFT.metadata,
-              returnedLocation,
-            );
+          let escrowedNFT = switch (MarketplaceLib.getEscrowedNFT(marketplaceState, listingId)) {
+            case null Runtime.trap("Escrowed NFT not found for fixed listing");
+            case (?nft) nft;
           };
-          case (?_) {};
-        };
+          let returnedLocation = await* transferEscrowedNFTToRecipient(escrowedNFT, listing.seller);
+          switch (MarketplaceLib.cancelListing(marketplaceState, listingId)) {
+            case null Runtime.trap("Failed to cancel listing");
+            case (?#Fixed(cancelled)) {
+              ignore MarketplaceLib.takeEscrowedNFT(marketplaceState, listingId);
+              ignore MarketplaceLib.clearListingsForToken(marketplaceState, escrowedNFT.collectionId, escrowedNFT.tokenId);
+              ignore WalletLib.registerNFT(
+                walletState,
+                cancelled.seller,
+                escrowedNFT.collectionId,
+                escrowedNFT.tokenId,
+                escrowedNFT.metadata,
+                returnedLocation,
+              );
+            };
+            case (?_) {};
+          };
         } finally {
           MarketplaceLib.releaseListingLock(marketplacePaymentState, listingId);
         };
@@ -1083,15 +1154,16 @@ mixin (
           Runtime.trap("Auction is processing another payment. Try again shortly.");
         };
         try {
+          let escrowedNFT = switch (MarketplaceLib.getEscrowedNFT(marketplaceState, listingId)) {
+            case null Runtime.trap("Escrowed NFT not found for auction listing");
+            case (?nft) nft;
+          };
+          let returnedLocation = await* transferEscrowedNFTToRecipient(escrowedNFT, listing.seller);
           let currentEscrow = MarketplaceLib.removeAuctionEscrow(marketplacePaymentState, listingId);
           switch (MarketplaceLib.cancelListing(marketplaceState, listingId)) {
             case null Runtime.trap("Failed to cancel listing");
             case (?#Auction(cancelled)) {
-              let escrowedNFT = switch (MarketplaceLib.takeEscrowedNFT(marketplaceState, listingId)) {
-                case null Runtime.trap("Escrowed NFT not found for auction listing");
-                case (?nft) nft;
-              };
-              let returnedLocation = await* transferEscrowedNFTToRecipient(escrowedNFT, cancelled.seller);
+              ignore MarketplaceLib.takeEscrowedNFT(marketplaceState, listingId);
               ignore MarketplaceLib.clearListingsForToken(marketplaceState, escrowedNFT.collectionId, escrowedNFT.tokenId);
               ignore WalletLib.registerNFT(
                 walletState,
@@ -1111,9 +1183,7 @@ mixin (
               let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
               let feeE8s = await* IcpLib.getTransferFee(ledger);
               switch (await* refundAuctionEscrow(ledger, escrow, feeE8s)) {
-                case (#ok(_)) {
-                  ignore MarketplaceLib.removePendingRefund(marketplacePaymentState, escrow.escrowId);
-                };
+                case (#ok(_)) {};
                 case (#err(_)) {};
               };
             };
@@ -1134,20 +1204,44 @@ mixin (
     escrow : MarketplaceTypes.AuctionEscrow,
     feeE8s : Nat64,
   ) : async* { #ok : Nat64; #err : Text } {
+    let pending = MarketplaceLib.getOrCreatePendingRefundJournal(
+      marketplaceRefundState,
+      escrow,
+      feeE8s,
+    );
     let escrowSub = IcpLib.marketplaceEscrowSubaccount(escrow.escrowId);
     let bidderSub = IcpLib.principalToSubaccount(escrow.bidder);
     let bidderAccount = IcpLib.accountIdentifier(canisterId, bidderSub);
-    let refundAmount = MarketplaceLib.auctionRefundPayoutAmount(escrow, feeE8s);
-    let result = await* IcpLib.transferOutWithFee(
+    let result = await* IcpLib.transferOutWithFeeAt(
       ledger,
       ?escrowSub,
       bidderAccount,
-      refundAmount,
+      pending.refundAmount,
       Nat64.fromNat(escrow.listingId),
-      feeE8s,
+      pending.refundFeeE8s,
+      pending.refundCreatedAt,
     );
     switch (result) {
-      case (#Ok(blockIndex)) #ok(blockIndex);
+      case (#Ok(blockIndex)) {
+        MarketplaceLib.putPendingRefundJournal(marketplaceRefundState, {
+          pending with
+          refundBlock = ?blockIndex;
+          updatedAt = Time.now();
+        });
+        ignore MarketplaceLib.removePendingRefund(marketplacePaymentState, escrow.escrowId);
+        ignore MarketplaceLib.removePendingRefundJournal(marketplaceRefundState, escrow.escrowId);
+        #ok(blockIndex);
+      };
+      case (#Err(#TxDuplicate({ duplicate_of }))) {
+        MarketplaceLib.putPendingRefundJournal(marketplaceRefundState, {
+          pending with
+          refundBlock = ?duplicate_of;
+          updatedAt = Time.now();
+        });
+        ignore MarketplaceLib.removePendingRefund(marketplacePaymentState, escrow.escrowId);
+        ignore MarketplaceLib.removePendingRefundJournal(marketplaceRefundState, escrow.escrowId);
+        #ok(duplicate_of);
+      };
       case (#Err(error)) #err(IcpLib.transferErrorText(error));
     };
   };
@@ -1155,6 +1249,9 @@ mixin (
   func prepareNFTForListing(nft : WalletTypes.WalletNFT, owner : Principal) : async* () {
     switch (nft.location) {
       case (#Minted) {
+        if (await* isMintedNFTOwnedBy(nft, canisterId)) {
+          return;
+        };
         await* transferMintedNFT(nft, owner, canisterId);
       };
       case (#Vaulted) {

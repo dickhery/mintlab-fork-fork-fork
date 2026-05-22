@@ -58,6 +58,16 @@ module {
     createdAt : Timestamp;
   };
 
+  public type PendingAuctionRefund = {
+    escrow : AuctionEscrow;
+    refundAmount : Nat64;
+    refundFeeE8s : Nat64;
+    refundCreatedAt : Nat64;
+    refundBlock : ?Nat64;
+    createdAt : Timestamp;
+    updatedAt : Timestamp;
+  };
+
   public type PendingBidDeposit = {
     listingId : ListingId;
     bidder : UserId;

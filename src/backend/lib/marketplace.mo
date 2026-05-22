@@ -34,6 +34,14 @@ module {
     var mintlabFeeRecipient : ?Types.AccountIdentifier;
   };
 
+  public type MarketplaceRefundState = {
+    refundJournals : Map.Map<Nat, Types.PendingAuctionRefund>;
+  };
+
+  public type MarketplaceUserPaymentLockState = {
+    userPaymentLocks : Map.Map<Principal, Bool>;
+  };
+
   public type MarketplaceSettlementState = {
     fixedPurchaseSettlements : Map.Map<Types.ListingId, Types.FixedPurchaseSettlement>;
     auctionSettlements : Map.Map<Types.ListingId, Types.AuctionSettlement>;
@@ -64,6 +72,18 @@ module {
       listingLocks = Map.empty<Types.ListingId, Bool>();
       var nextEscrowId = 1;
       var mintlabFeeRecipient = null;
+    };
+  };
+
+  public func newRefundState() : MarketplaceRefundState {
+    {
+      refundJournals = Map.empty<Nat, Types.PendingAuctionRefund>();
+    };
+  };
+
+  public func newUserPaymentLockState() : MarketplaceUserPaymentLockState {
+    {
+      userPaymentLocks = Map.empty<Principal, Bool>();
     };
   };
 
@@ -332,6 +352,53 @@ module {
     Map.get(state.pendingRefunds, Nat.compare, escrowId);
   };
 
+  public func getPendingRefundJournal(
+    state : MarketplaceRefundState,
+    escrowId : Nat,
+  ) : ?Types.PendingAuctionRefund {
+    Map.get(state.refundJournals, Nat.compare, escrowId);
+  };
+
+  public func putPendingRefundJournal(
+    state : MarketplaceRefundState,
+    pending : Types.PendingAuctionRefund,
+  ) {
+    Map.add(state.refundJournals, Nat.compare, pending.escrow.escrowId, pending);
+  };
+
+  public func removePendingRefundJournal(
+    state : MarketplaceRefundState,
+    escrowId : Nat,
+  ) : ?Types.PendingAuctionRefund {
+    let current = Map.get(state.refundJournals, Nat.compare, escrowId);
+    Map.remove(state.refundJournals, Nat.compare, escrowId);
+    current;
+  };
+
+  public func getOrCreatePendingRefundJournal(
+    state : MarketplaceRefundState,
+    escrow : Types.AuctionEscrow,
+    feeE8s : Nat64,
+  ) : Types.PendingAuctionRefund {
+    switch (Map.get(state.refundJournals, Nat.compare, escrow.escrowId)) {
+      case (?pending) pending;
+      case null {
+        let now = Time.now();
+        let pending : Types.PendingAuctionRefund = {
+          escrow;
+          refundAmount = auctionRefundPayoutAmount(escrow, feeE8s);
+          refundFeeE8s = feeE8s;
+          refundCreatedAt = Nat64.fromNat(Int.abs(now));
+          refundBlock = null;
+          createdAt = now;
+          updatedAt = now;
+        };
+        Map.add(state.refundJournals, Nat.compare, escrow.escrowId, pending);
+        pending;
+      };
+    };
+  };
+
   public func findPendingAuctionEscrow(
     state : MarketplacePaymentState,
     listingId : Types.ListingId,
@@ -381,6 +448,26 @@ module {
     listingId : Types.ListingId,
   ) {
     Map.remove(state.listingLocks, Nat.compare, listingId);
+  };
+
+  public func acquireUserPaymentLock(
+    state : MarketplaceUserPaymentLockState,
+    user : Principal,
+  ) : Bool {
+    switch (Map.get(state.userPaymentLocks, Principal.compare, user)) {
+      case (?_) false;
+      case null {
+        Map.add(state.userPaymentLocks, Principal.compare, user, true);
+        true;
+      };
+    };
+  };
+
+  public func releaseUserPaymentLock(
+    state : MarketplaceUserPaymentLockState,
+    user : Principal,
+  ) {
+    Map.remove(state.userPaymentLocks, Principal.compare, user);
   };
 
   public func createFixedListing(

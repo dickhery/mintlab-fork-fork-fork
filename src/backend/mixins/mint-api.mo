@@ -7,6 +7,7 @@ import Int "mo:core/Int";
 import CollectionsLib "../lib/collections";
 import HttpMedia "../lib/http-media";
 import IcpLib "../lib/icp";
+import MarketplaceLib "../lib/marketplace";
 import MintLib "../lib/mint";
 import WalletLib "../lib/wallet";
 import AuthLib "../lib/auth";
@@ -33,6 +34,7 @@ mixin (
   collectionsState : CollectionsLib.CollectionsState,
   walletState : WalletLib.WalletState,
   authState : AuthLib.AdminState,
+  marketplaceUserPaymentLockState : MarketplaceLib.MarketplaceUserPaymentLockState,
   canisterId : Principal,
 ) {
   type CanisterSettings = {
@@ -251,6 +253,18 @@ mixin (
   transient let MODERATION_MAX_IMAGE_DATA_URL_CHARS : Nat = 450_000;
   transient let MODERATION_MAX_REQUEST_BODY_BYTES : Nat = 600_000;
   transient var moderationImageNonce : Nat = 0;
+
+  func acquireUserPaymentLockResult(user : Principal) : ?Text {
+    if (not MarketplaceLib.acquireUserPaymentLock(marketplaceUserPaymentLockState, user)) {
+      ?"Another ICP operation is already using this account balance. Try again shortly.";
+    } else {
+      null;
+    };
+  };
+
+  func releaseUserPaymentLock(user : Principal) {
+    MarketplaceLib.releaseUserPaymentLock(marketplaceUserPaymentLockState, user);
+  };
 
   type ManagementCanisterActor = actor {
     create_canister : shared ({
@@ -637,17 +651,25 @@ mixin (
     if (not Principal.equal(request.owner, caller) and not AuthLib.isAdmin(authState, caller)) {
       return #err("Only the collection creator or admin can retry this collection setup");
     };
-    if (not MintLib.acquireCollectionCreate(mintState, request.owner)) {
-      return #err("A collection setup is already running for this creator");
+    switch (acquireUserPaymentLockResult(request.owner)) {
+      case (?message) return #err(message);
+      case null {};
     };
     try {
-      switch (await repairCollectionCreationRequestInternal(requestId)) {
-        case (#err(message)) return #err(message);
-        case (#ok(_)) {};
+      if (not MintLib.acquireCollectionCreate(mintState, request.owner)) {
+        return #err("A collection setup is already running for this creator");
       };
-      await resumeCollectionCreationInternal(caller, requestId);
+      try {
+        switch (await repairCollectionCreationRequestInternal(requestId)) {
+          case (#err(message)) return #err(message);
+          case (#ok(_)) {};
+        };
+        await resumeCollectionCreationInternal(caller, requestId);
+      } finally {
+        MintLib.releaseCollectionCreate(mintState, request.owner);
+      };
     } finally {
-      MintLib.releaseCollectionCreate(mintState, request.owner);
+      releaseUserPaymentLock(request.owner);
     };
   };
 
@@ -692,15 +714,23 @@ mixin (
         return #err("Could not add the collection owner as a child canister controller: " # Error.message(error));
       };
     };
-    if (not MintLib.acquireCollectionCreate(mintState, request.owner)) {
-      return #err("A collection setup is already running for this creator");
+    switch (acquireUserPaymentLockResult(request.owner)) {
+      case (?message) return #err(message);
+      case null {};
     };
     try {
-      ignore MintLib.markCollectionCreationCyclesConverted(collectionCreationState, requestId);
-      ignore MintLib.markCollectionCreationCanisterCreated(collectionCreationState, requestId, childCanisterId);
-      await resumeCollectionCreationInternal(caller, requestId);
+      if (not MintLib.acquireCollectionCreate(mintState, request.owner)) {
+        return #err("A collection setup is already running for this creator");
+      };
+      try {
+        ignore MintLib.markCollectionCreationCyclesConverted(collectionCreationState, requestId);
+        ignore MintLib.markCollectionCreationCanisterCreated(collectionCreationState, requestId, childCanisterId);
+        await resumeCollectionCreationInternal(caller, requestId);
+      } finally {
+        MintLib.releaseCollectionCreate(mintState, request.owner);
+      };
     } finally {
-      MintLib.releaseCollectionCreate(mintState, request.owner);
+      releaseUserPaymentLock(request.owner);
     };
   };
 
@@ -740,24 +770,32 @@ mixin (
     } catch (error) {
       return #err("Could not fetch the ICP-to-cycles conversion rate: " # Error.message(error));
     };
-    if (not MintLib.acquireCollectionCreate(mintState, owner)) {
-      return #err("A collection setup is already running for this creator");
+    switch (acquireUserPaymentLockResult(owner)) {
+      case (?message) return #err(message);
+      case null {};
     };
     try {
-      let request = MintLib.beginRecoveredCollectionCreationRequest(
-        collectionCreationState,
-        owner,
-        cyclePaymentBlock,
-        name,
-        description,
-        symbol,
-        imageUrl,
-        dividendsEnabled,
-        quote,
-      );
-      await resumeCollectionCreationInternal(caller, request.id);
+      if (not MintLib.acquireCollectionCreate(mintState, owner)) {
+        return #err("A collection setup is already running for this creator");
+      };
+      try {
+        let request = MintLib.beginRecoveredCollectionCreationRequest(
+          collectionCreationState,
+          owner,
+          cyclePaymentBlock,
+          name,
+          description,
+          symbol,
+          imageUrl,
+          dividendsEnabled,
+          quote,
+        );
+        await resumeCollectionCreationInternal(caller, request.id);
+      } finally {
+        MintLib.releaseCollectionCreate(mintState, owner);
+      };
     } finally {
-      MintLib.releaseCollectionCreate(mintState, owner);
+      releaseUserPaymentLock(owner);
     };
   };
 
@@ -891,67 +929,75 @@ mixin (
       return #err("Could not fetch the ICP-to-cycles conversion rate: " # Error.message(error));
     };
 
+    switch (acquireUserPaymentLockResult(caller)) {
+      case (?message) return #err(message);
+      case null {};
+    };
     try {
-      let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
-      let userSubaccount = IcpLib.principalToSubaccount(caller);
-      let userAccount = IcpLib.accountIdentifier(canisterId, userSubaccount);
-      let userBalance = await* IcpLib.getBalance(ledger, userAccount);
-      if (userBalance < quote.totalUserDebitE8s) {
-        return #err(
-          "Insufficient ICP in your in-app account. Required: " #
-          Nat64.toText(quote.totalUserDebitE8s) #
-          " e8s including ledger fee. Current balance: " #
-          Nat64.toText(userBalance) #
-          " e8s"
-        );
-      };
-
-      let paymentResult = await* IcpLib.transferOut(
-        ledger,
-        ?userSubaccount,
-        IcpLib.cmcTopUpAccount(targetCanister),
-        quote.cycleCostE8s,
-        IcpLib.CMC_TOP_UP_MEMO,
-      );
-      let paymentBlock = switch (paymentResult) {
-        case (#Err(error)) {
-          return #err("Canister cycles payment failed: " # transferErrorText(error));
-        };
-        case (#Ok(value)) value;
-      };
-
-      let cmc = actor (IcpLib.CYCLES_MINTING_CANISTER_ID) : IcpLib.CyclesMintingCanister;
-      let topUpResult = await notifyTopUpWithRetries(cmc, paymentBlock, targetCanister);
-      let cyclesMinted = switch (topUpResult) {
-        case (#Err(error)) {
+      try {
+        let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+        let userSubaccount = IcpLib.principalToSubaccount(caller);
+        let userAccount = IcpLib.accountIdentifier(canisterId, userSubaccount);
+        let userBalance = await* IcpLib.getBalance(ledger, userAccount);
+        if (userBalance < quote.totalUserDebitE8s) {
           return #err(
-            "Canister cycles conversion failed for ICP block " #
-            Nat64.toText(paymentBlock) #
-            ": " #
-            notifyErrorText(error)
+            "Insufficient ICP in your in-app account. Required: " #
+            Nat64.toText(quote.totalUserDebitE8s) #
+            " e8s including ledger fee. Current balance: " #
+            Nat64.toText(userBalance) #
+            " e8s"
           );
         };
-        case (#Ok(value)) value;
-      };
-      let cycleBalance = if (Principal.equal(targetCanister, canisterId)) {
-        ?Cycles.balance();
-      } else {
-        switch (await collectionCanisterStatus(targetCanister)) {
-          case (?status) ?status.cycles;
-          case null null;
+
+        let paymentResult = await* IcpLib.transferOut(
+          ledger,
+          ?userSubaccount,
+          IcpLib.cmcTopUpAccount(targetCanister),
+          quote.cycleCostE8s,
+          IcpLib.CMC_TOP_UP_MEMO,
+        );
+        let paymentBlock = switch (paymentResult) {
+          case (#Err(error)) {
+            return #err("Canister cycles payment failed: " # transferErrorText(error));
+          };
+          case (#Ok(value)) value;
         };
+
+        let cmc = actor (IcpLib.CYCLES_MINTING_CANISTER_ID) : IcpLib.CyclesMintingCanister;
+        let topUpResult = await notifyTopUpWithRetries(cmc, paymentBlock, targetCanister);
+        let cyclesMinted = switch (topUpResult) {
+          case (#Err(error)) {
+            return #err(
+              "Canister cycles conversion failed for ICP block " #
+              Nat64.toText(paymentBlock) #
+              ": " #
+              notifyErrorText(error)
+            );
+          };
+          case (#Ok(value)) value;
+        };
+        let cycleBalance = if (Principal.equal(targetCanister, canisterId)) {
+          ?Cycles.balance();
+        } else {
+          switch (await collectionCanisterStatus(targetCanister)) {
+            case (?status) ?status.cycles;
+            case null null;
+          };
+        };
+        #ok({
+          canisterId = targetCanister;
+          cyclesRequested = normalizedCycles;
+          cyclesMinted;
+          cycleCostE8s = quote.cycleCostE8s;
+          totalUserDebitE8s = quote.totalUserDebitE8s;
+          paymentBlock;
+          cycleBalance;
+        });
+      } catch (error) {
+        #err("Canister top-up failed: " # Error.message(error));
       };
-      #ok({
-        canisterId = targetCanister;
-        cyclesRequested = normalizedCycles;
-        cyclesMinted;
-        cycleCostE8s = quote.cycleCostE8s;
-        totalUserDebitE8s = quote.totalUserDebitE8s;
-        paymentBlock;
-        cycleBalance;
-      });
-    } catch (error) {
-      #err("Canister top-up failed: " # Error.message(error));
+    } finally {
+      releaseUserPaymentLock(caller);
     };
   };
 
@@ -1120,38 +1166,46 @@ mixin (
         "The app canister needs more cycles before accepting collection creation payments. Ask the admin to top up the app canister."
       );
     };
-    let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
-    let userSubaccount = IcpLib.principalToSubaccount(caller);
-    let userAccount = IcpLib.accountIdentifier(canisterId, userSubaccount);
-    let userBalance = await* IcpLib.getBalance(ledger, userAccount);
-    if (userBalance < quote.totalUserDebitE8s) {
-      return #err(
-        "Insufficient ICP in your in-app account. Required: " #
-        Nat64.toText(quote.totalUserDebitE8s) #
-        " e8s including ledger fees. Current balance: " #
-        Nat64.toText(userBalance) #
-        " e8s"
-      );
+    switch (acquireUserPaymentLockResult(caller)) {
+      case (?message) return #err(message);
+      case null {};
     };
-    if (not MintLib.acquireCollectionCreate(mintState, caller)) {
-      return #err("A collection is already being created for your account");
-    };
-
     try {
-      let request = MintLib.beginCollectionCreationRequest(
-        collectionCreationState,
-        caller,
-        name,
-        description,
-        symbol,
-        imageUrl,
-        dividendsEnabled,
-        quote,
-        payoutAccount,
-      );
-      await resumeCollectionCreationInternal(caller, request.id);
+      let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+      let userSubaccount = IcpLib.principalToSubaccount(caller);
+      let userAccount = IcpLib.accountIdentifier(canisterId, userSubaccount);
+      let userBalance = await* IcpLib.getBalance(ledger, userAccount);
+      if (userBalance < quote.totalUserDebitE8s) {
+        return #err(
+          "Insufficient ICP in your in-app account. Required: " #
+          Nat64.toText(quote.totalUserDebitE8s) #
+          " e8s including ledger fees. Current balance: " #
+          Nat64.toText(userBalance) #
+          " e8s"
+        );
+      };
+      if (not MintLib.acquireCollectionCreate(mintState, caller)) {
+        return #err("A collection is already being created for your account");
+      };
+
+      try {
+        let request = MintLib.beginCollectionCreationRequest(
+          collectionCreationState,
+          caller,
+          name,
+          description,
+          symbol,
+          imageUrl,
+          dividendsEnabled,
+          quote,
+          payoutAccount,
+        );
+        await resumeCollectionCreationInternal(caller, request.id);
+      } finally {
+        MintLib.releaseCollectionCreate(mintState, caller);
+      };
     } finally {
-      MintLib.releaseCollectionCreate(mintState, caller);
+      releaseUserPaymentLock(caller);
     };
   };
 
@@ -1627,64 +1681,72 @@ mixin (
       return #err("Could not fetch the ICP-to-cycles conversion rate: " # Error.message(error));
     };
 
+    switch (acquireUserPaymentLockResult(caller)) {
+      case (?message) return #err(message);
+      case null {};
+    };
     try {
-      let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
-      let userSubaccount = IcpLib.principalToSubaccount(caller);
-      let userAccount = IcpLib.accountIdentifier(canisterId, userSubaccount);
-      let userBalance = await* IcpLib.getBalance(ledger, userAccount);
-      if (userBalance < quote.totalUserDebitE8s) {
-        return #err(
-          "Insufficient ICP in your in-app account. Required: " #
-          Nat64.toText(quote.totalUserDebitE8s) #
-          " e8s including ledger fee. Current balance: " #
-          Nat64.toText(userBalance) #
-          " e8s"
-        );
-      };
-
-      let paymentResult = await* IcpLib.transferOut(
-        ledger,
-        ?userSubaccount,
-        IcpLib.cmcTopUpAccount(collection.canisterId),
-        quote.cycleCostE8s,
-        IcpLib.CMC_TOP_UP_MEMO,
-      );
-      let paymentBlock = switch (paymentResult) {
-        case (#Err(error)) {
-          return #err("Cycles top-up payment failed: " # transferErrorText(error));
-        };
-        case (#Ok(value)) value;
-      };
-
-      let cmc = actor (IcpLib.CYCLES_MINTING_CANISTER_ID) : IcpLib.CyclesMintingCanister;
-      let topUpResult = await notifyTopUpWithRetries(cmc, paymentBlock, collection.canisterId);
-      let cyclesMinted = switch (topUpResult) {
-        case (#Err(error)) {
+      try {
+        let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+        let userSubaccount = IcpLib.principalToSubaccount(caller);
+        let userAccount = IcpLib.accountIdentifier(canisterId, userSubaccount);
+        let userBalance = await* IcpLib.getBalance(ledger, userAccount);
+        if (userBalance < quote.totalUserDebitE8s) {
           return #err(
-            "Cycles conversion failed for ICP block " #
-            Nat64.toText(paymentBlock) #
-            ": " #
-            notifyErrorText(error)
+            "Insufficient ICP in your in-app account. Required: " #
+            Nat64.toText(quote.totalUserDebitE8s) #
+            " e8s including ledger fee. Current balance: " #
+            Nat64.toText(userBalance) #
+            " e8s"
           );
         };
-        case (#Ok(value)) value;
+
+        let paymentResult = await* IcpLib.transferOut(
+          ledger,
+          ?userSubaccount,
+          IcpLib.cmcTopUpAccount(collection.canisterId),
+          quote.cycleCostE8s,
+          IcpLib.CMC_TOP_UP_MEMO,
+        );
+        let paymentBlock = switch (paymentResult) {
+          case (#Err(error)) {
+            return #err("Cycles top-up payment failed: " # transferErrorText(error));
+          };
+          case (#Ok(value)) value;
+        };
+
+        let cmc = actor (IcpLib.CYCLES_MINTING_CANISTER_ID) : IcpLib.CyclesMintingCanister;
+        let topUpResult = await notifyTopUpWithRetries(cmc, paymentBlock, collection.canisterId);
+        let cyclesMinted = switch (topUpResult) {
+          case (#Err(error)) {
+            return #err(
+              "Cycles conversion failed for ICP block " #
+              Nat64.toText(paymentBlock) #
+              ": " #
+              notifyErrorText(error)
+            );
+          };
+          case (#Ok(value)) value;
+        };
+        let cycleBalance = switch (await collectionCanisterStatus(collection.canisterId)) {
+          case (?status) ?status.cycles;
+          case null null;
+        };
+        #ok({
+          collectionId;
+          canisterId = collection.canisterId;
+          cyclesRequested = normalizedCycles;
+          cyclesMinted;
+          cycleCostE8s = quote.cycleCostE8s;
+          totalUserDebitE8s = quote.totalUserDebitE8s;
+          paymentBlock;
+          cycleBalance;
+        });
+      } catch (error) {
+        #err("Collection canister top-up failed: " # Error.message(error));
       };
-      let cycleBalance = switch (await collectionCanisterStatus(collection.canisterId)) {
-        case (?status) ?status.cycles;
-        case null null;
-      };
-      #ok({
-        collectionId;
-        canisterId = collection.canisterId;
-        cyclesRequested = normalizedCycles;
-        cyclesMinted;
-        cycleCostE8s = quote.cycleCostE8s;
-        totalUserDebitE8s = quote.totalUserDebitE8s;
-        paymentBlock;
-        cycleBalance;
-      });
-    } catch (error) {
-      #err("Collection canister top-up failed: " # Error.message(error));
+    } finally {
+      releaseUserPaymentLock(caller);
     };
   };
 
@@ -1724,33 +1786,41 @@ mixin (
     };
 
     let blockIndex = if (config.mainMintPriceE8s > 0) {
-      let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
-      let userSubaccount = IcpLib.principalToSubaccount(caller);
-      let paymentResult = await* IcpLib.transferOut(
-        ledger,
-        ?userSubaccount,
-        payoutAccount,
-        config.mainMintPriceE8s,
-        Nat64.fromNat(mintState.nextTokenId),
-      );
-      switch (paymentResult) {
-        case (#Err(#InsufficientFunds({ balance }))) {
-          return #err(
-            "Insufficient ICP in your in-app account. Current balance: " # Nat64.toText(balance.e8s) # " e8s"
-          );
+      switch (acquireUserPaymentLockResult(caller)) {
+        case (?message) return #err(message);
+        case null {};
+      };
+      try {
+        let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+        let userSubaccount = IcpLib.principalToSubaccount(caller);
+        let paymentResult = await* IcpLib.transferOut(
+          ledger,
+          ?userSubaccount,
+          payoutAccount,
+          config.mainMintPriceE8s,
+          Nat64.fromNat(mintState.nextTokenId),
+        );
+        switch (paymentResult) {
+          case (#Err(#InsufficientFunds({ balance }))) {
+            return #err(
+              "Insufficient ICP in your in-app account. Current balance: " # Nat64.toText(balance.e8s) # " e8s"
+            );
+          };
+          case (#Err(#BadFee({ expected_fee }))) {
+            return #err(
+              "Ledger rejected the fee. Expected fee: " # Nat64.toText(expected_fee.e8s) # " e8s"
+            );
+          };
+          case (#Err(#TxDuplicate({ duplicate_of }))) {
+            return #err("Duplicate payment detected at block " # Nat64.toText(duplicate_of));
+          };
+          case (#Err(_)) {
+            return #err("ICP payment failed");
+          };
+          case (#Ok(value)) value;
         };
-        case (#Err(#BadFee({ expected_fee }))) {
-          return #err(
-            "Ledger rejected the fee. Expected fee: " # Nat64.toText(expected_fee.e8s) # " e8s"
-          );
-        };
-        case (#Err(#TxDuplicate({ duplicate_of }))) {
-          return #err("Duplicate payment detected at block " # Nat64.toText(duplicate_of));
-        };
-        case (#Err(_)) {
-          return #err("ICP payment failed");
-        };
-        case (#Ok(value)) value;
+      } finally {
+        releaseUserPaymentLock(caller);
       };
     } else {
       0 : Nat64;
