@@ -4,6 +4,8 @@ import Map "mo:core/Map";
 import Nat "mo:core/Nat";
 import Nat64 "mo:core/Nat64";
 import Principal "mo:core/Principal";
+import Runtime "mo:core/Runtime";
+import Text "mo:core/Text";
 import Time "mo:core/Time";
 import Types "../types/marketplace";
 import WalletTypes "../types/wallet";
@@ -40,6 +42,10 @@ module {
 
   public type MarketplaceUserPaymentLockState = {
     userPaymentLocks : Map.Map<Principal, Bool>;
+  };
+
+  public type MarketplaceListingLockState = {
+    listingTokenLocks : Map.Map<Text, Bool>;
   };
 
   public type MarketplaceSettlementState = {
@@ -84,6 +90,12 @@ module {
   public func newUserPaymentLockState() : MarketplaceUserPaymentLockState {
     {
       userPaymentLocks = Map.empty<Principal, Bool>();
+    };
+  };
+
+  public func newListingLockState() : MarketplaceListingLockState {
+    {
+      listingTokenLocks = Map.empty<Text, Bool>();
     };
   };
 
@@ -470,12 +482,46 @@ module {
     Map.remove(state.userPaymentLocks, Principal.compare, user);
   };
 
+  public func listingTokenLockKey(
+    collectionId : WalletTypes.CollectionId,
+    tokenId : Text,
+  ) : Text {
+    Nat.toText(collectionId) # ":" # tokenId;
+  };
+
+  public func acquireListingTokenLock(
+    state : MarketplaceListingLockState,
+    collectionId : WalletTypes.CollectionId,
+    tokenId : Text,
+  ) : Bool {
+    let key = listingTokenLockKey(collectionId, tokenId);
+    switch (Map.get(state.listingTokenLocks, Text.compare, key)) {
+      case (?_) false;
+      case null {
+        Map.add(state.listingTokenLocks, Text.compare, key, true);
+        true;
+      };
+    };
+  };
+
+  public func releaseListingTokenLock(
+    state : MarketplaceListingLockState,
+    collectionId : WalletTypes.CollectionId,
+    tokenId : Text,
+  ) {
+    Map.remove(state.listingTokenLocks, Text.compare, listingTokenLockKey(collectionId, tokenId));
+  };
+
   public func createFixedListing(
     state : MarketplaceState,
     seller : Types.UserId,
     escrowedNFT : WalletTypes.WalletNFT,
     price : Nat64,
   ) : Types.FixedListing {
+    switch (findActiveEscrowedNFT(state, escrowedNFT.collectionId, escrowedNFT.tokenId)) {
+      case (?_) Runtime.trap("This NFT is already listed");
+      case null {};
+    };
     let id = state.nextId;
     state.nextId += 1;
     let listing : Types.FixedListing = {
@@ -498,6 +544,10 @@ module {
     startingBid : Nat64,
     endTime : Types.Timestamp,
   ) : Types.AuctionListing {
+    switch (findActiveEscrowedNFT(state, escrowedNFT.collectionId, escrowedNFT.tokenId)) {
+      case (?_) Runtime.trap("This NFT is already listed");
+      case null {};
+    };
     let id = state.nextId;
     state.nextId += 1;
     let listing : Types.AuctionListing = {

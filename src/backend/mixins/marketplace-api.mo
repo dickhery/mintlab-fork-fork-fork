@@ -23,6 +23,7 @@ mixin (
   marketplacePaymentState : MarketplaceLib.MarketplacePaymentState,
   marketplaceRefundState : MarketplaceLib.MarketplaceRefundState,
   marketplaceUserPaymentLockState : MarketplaceLib.MarketplaceUserPaymentLockState,
+  marketplaceListingLockState : MarketplaceLib.MarketplaceListingLockState,
   marketplaceSettlementState : MarketplaceLib.MarketplaceSettlementState,
   marketplaceBidState : MarketplaceLib.MarketplaceBidState,
   marketplaceFeeState : MarketplaceLib.MarketplaceFeeState,
@@ -112,6 +113,38 @@ mixin (
     };
   };
 
+  func ensureNFTListableByCaller(nft : WalletTypes.WalletNFT, caller : Principal) {
+    if (not Principal.equal(nft.owner, caller)) {
+      Runtime.trap("Unauthorized: caller does not own this NFT");
+    };
+    if (nft.location == #Registered) {
+      Runtime.trap("Only vaulted or in-app minted NFTs can be listed");
+    };
+  };
+
+  func ensureNoActiveListingForNFT(nft : WalletTypes.WalletNFT) {
+    switch (MarketplaceLib.findActiveEscrowedNFT(marketplaceState, nft.collectionId, nft.tokenId)) {
+      case (?_) Runtime.trap("This NFT is already listed");
+      case null {};
+    };
+  };
+
+  func recheckWalletNFTForListing(
+    nftId : MarketplaceTypes.NFTId,
+    expectedNFT : WalletTypes.WalletNFT,
+    caller : Principal,
+  ) : WalletTypes.WalletNFT {
+    let currentNFT = switch (WalletLib.getNFT(walletState, nftId)) {
+      case null Runtime.trap("NFT is no longer available in your wallet");
+      case (?value) value;
+    };
+    if (currentNFT.collectionId != expectedNFT.collectionId or currentNFT.tokenId != expectedNFT.tokenId) {
+      Runtime.trap("NFT changed while listing was in progress");
+    };
+    ensureNFTListableByCaller(currentNFT, caller);
+    currentNFT;
+  };
+
   func minimumAuctionDurationNanos() : Int {
     3_600_000_000_000; // 1 hour
   };
@@ -176,13 +209,20 @@ mixin (
       case null Runtime.trap("NFT not found");
       case (?n) n;
     };
-    if (not Principal.equal(nft.owner, caller)) Runtime.trap("Unauthorized: caller does not own this NFT");
-    if (nft.location == #Registered) {
-      Runtime.trap("Only vaulted or in-app minted NFTs can be listed for sale");
+    ensureNFTListableByCaller(nft, caller);
+    if (not MarketplaceLib.acquireListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId)) {
+      Runtime.trap("This NFT is already being listed. Try again shortly.");
     };
-    await* prepareNFTForListing(nft, caller);
-    WalletLib.removeNFT(walletState, nftId, caller);
-    MarketplaceLib.createFixedListing(marketplaceState, caller, nft, price);
+    try {
+      ensureNoActiveListingForNFT(nft);
+      await* prepareNFTForListing(nft, caller);
+      let currentNFT = recheckWalletNFTForListing(nftId, nft, caller);
+      ensureNoActiveListingForNFT(currentNFT);
+      WalletLib.removeNFT(walletState, nftId, caller);
+      MarketplaceLib.createFixedListing(marketplaceState, caller, currentNFT, price);
+    } finally {
+      MarketplaceLib.releaseListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId);
+    };
   };
 
   /// List an NFT for timed auction; caller must own the NFT (escrow transfer happens here)
@@ -202,13 +242,20 @@ mixin (
       case null Runtime.trap("NFT not found");
       case (?n) n;
     };
-    if (not Principal.equal(nft.owner, caller)) Runtime.trap("Unauthorized: caller does not own this NFT");
-    if (nft.location == #Registered) {
-      Runtime.trap("Only vaulted or in-app minted NFTs can be listed for auction");
+    ensureNFTListableByCaller(nft, caller);
+    if (not MarketplaceLib.acquireListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId)) {
+      Runtime.trap("This NFT is already being listed. Try again shortly.");
     };
-    await* prepareNFTForListing(nft, caller);
-    WalletLib.removeNFT(walletState, nftId, caller);
-    MarketplaceLib.createAuctionListing(marketplaceState, caller, nft, startingBid, endTime);
+    try {
+      ensureNoActiveListingForNFT(nft);
+      await* prepareNFTForListing(nft, caller);
+      let currentNFT = recheckWalletNFTForListing(nftId, nft, caller);
+      ensureNoActiveListingForNFT(currentNFT);
+      WalletLib.removeNFT(walletState, nftId, caller);
+      MarketplaceLib.createAuctionListing(marketplaceState, caller, currentNFT, startingBid, endTime);
+    } finally {
+      MarketplaceLib.releaseListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId);
+    };
   };
 
   /// Return all currently active listings (fixed + auction)
