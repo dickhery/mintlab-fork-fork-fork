@@ -96,6 +96,11 @@ module {
     #CleanupPending;
   };
 
+  public type ListingReturnReason = {
+    #FixedCancel;
+    #AuctionCancel;
+  };
+
   public type FixedPurchaseSettlement = {
     listingId : ListingId;
     buyer : UserId;
@@ -152,6 +157,19 @@ module {
     updatedAt : Timestamp;
   };
 
+  public type ListingReturnSettlement = {
+    listingId : ListingId;
+    seller : UserId;
+    nft : WalletTypes.WalletNFT;
+    reason : ListingReturnReason;
+    refundEscrow : ?AuctionEscrow;
+    returnedAt : ?Timestamp;
+    walletRegisteredAt : ?Timestamp;
+    stage : NoBidAuctionReturnStage;
+    createdAt : Timestamp;
+    updatedAt : Timestamp;
+  };
+
   public type MarketplaceFeeConfig = {
     mintlabFeeBasisPoints : Nat;
     mintlabFeeRecipient : ?AccountIdentifier;
@@ -167,5 +185,18 @@ module {
   public type ActiveListingDetail = {
     listing : ActiveListing;
     nft : WalletTypes.WalletNFT;
+  };
+
+  public type MarketplaceRecoverySnapshot = {
+    fixedSettlements : [FixedPurchaseSettlement];
+    auctionSettlements : [AuctionSettlement];
+    noBidReturns : [NoBidAuctionReturnSettlement];
+    listingReturns : [ListingReturnSettlement];
+    pendingBids : [PendingBidDeposit];
+    pendingRefunds : [AuctionEscrow];
+    refundJournals : [PendingAuctionRefund];
+    activeListingLocks : [ListingId];
+    activeUserPaymentLocks : [UserId];
+    activeListingTokenLocks : [Text];
   };
 };

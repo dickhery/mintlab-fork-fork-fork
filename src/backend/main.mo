@@ -30,6 +30,7 @@ persistent actor Backend {
   let marketplaceListingLockState = MarketplaceLib.newListingLockState();
   let marketplaceSettlementState = MarketplaceLib.newSettlementState();
   let marketplaceNoBidAuctionReturnState = MarketplaceLib.newNoBidAuctionReturnState();
+  let marketplaceListingReturnState = MarketplaceLib.newListingReturnState();
   let marketplaceBidState = MarketplaceLib.newBidState();
   let marketplaceFeeState = MarketplaceLib.newFeeState();
   let dividendsState = DividendsLib.newState();
@@ -65,6 +66,7 @@ persistent actor Backend {
     marketplaceListingLockState,
     marketplaceSettlementState,
     marketplaceNoBidAuctionReturnState,
+    marketplaceListingReturnState,
     marketplaceBidState,
     marketplaceFeeState,
     walletState,
