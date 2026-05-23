@@ -1,17 +1,17 @@
-import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useQueryClient, r as reactExports, e as useQuery, f as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-bkqbXx2-.js";
-import { A as AppCanisterTopUpDialog, P as Plus, i as isLowCyclesError } from "./AppCanisterTopUpDialog-UhNi-GAU.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-CguUsL6j.js";
-import { M as MediaImage, E as EmptyState } from "./MediaImage-Ci5poe8S.js";
-import { B as Badge, u as useMutation, L as Label, I as Input, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle } from "./badge-BoRAfUJT.js";
-import { I as ImageOff, r as resolveImageUrl } from "./media-u7nwR0_H.js";
-import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-DME8aoY8.js";
-import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-BIEqyXY0.js";
-import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-hiMGyt9S.js";
-import { S as Skeleton, C as Copy } from "./skeleton-CjjzxS9C.js";
-import { c as compressModerationImage, S as Sparkles } from "./imageUtils-D_kHccbr.js";
-import { C as CircleCheck, S as Send } from "./send-B7O-YXf8.js";
-import { C as Coins } from "./coins-DDYXsoZm.js";
-import "./index-Dx9UVbEg.js";
+import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useQueryClient, r as reactExports, e as useQuery, f as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-BDyzW518.js";
+import { A as AppCanisterTopUpDialog, P as Plus, i as isLowCyclesError } from "./AppCanisterTopUpDialog-7k0oKPJm.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-CJHv_sri.js";
+import { M as MediaImage, E as EmptyState } from "./MediaImage-CNe65dHf.js";
+import { B as Badge, u as useMutation, L as Label, I as Input, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle } from "./badge-BbAzfD9d.js";
+import { I as ImageOff, r as resolveImageUrl } from "./media-BbkeeHTe.js";
+import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-Dqb-X7AQ.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-C-gwe9zh.js";
+import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-CIR8Ul8B.js";
+import { S as Skeleton, C as Copy } from "./skeleton-Bj8lL_BC.js";
+import { c as compressModerationImage, S as Sparkles } from "./imageUtils-GkrAaDBZ.js";
+import { C as CircleCheck, S as Send } from "./send-HoBLrwjl.js";
+import { C as Coins } from "./coins-CnoC1s_r.js";
+import "./index-DXVqgkcL.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *

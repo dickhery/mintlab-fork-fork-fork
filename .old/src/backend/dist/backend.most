@@ -157,6 +157,20 @@ type Internal__8484328<K, V> =
   {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
 type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
 type ListingId__411740840 = Nat;
+type ListingReturnReason__403147709 = {#AuctionCancel; #FixedCancel};
+type ListingReturnSettlement__416608273 =
+  {
+    createdAt : Timestamp__534280185;
+    listingId : ListingId__411740840;
+    nft : WalletNFT__72979044;
+    reason : ListingReturnReason__403147709;
+    refundEscrow : ?AuctionEscrow__460860708;
+    returnedAt : ?Timestamp__534280185;
+    seller : UserId__166399690;
+    stage : NoBidAuctionReturnStage__380679664;
+    updatedAt : Timestamp__534280185;
+    walletRegisteredAt : ?Timestamp__534280185
+  };
 type ListingStatus__992681670 = {#Active; #Cancelled; #Settled; #Sold};
 type Map__158565046<K, V> = Map__297112838<K, V>;
 type Map__297112838<K, V> =
@@ -309,6 +323,12 @@ actor {
   stable marketplaceFeeState : {var mintlabFeeBasisPoints : Nat};
   stable marketplaceListingLockState :
     {listingTokenLocks : Map__605269027<Text, Bool>};
+  stable marketplaceListingReturnState :
+    {
+      returns :
+        Map__605269027<ListingId__411740840,
+                        ListingReturnSettlement__416608273>
+    };
   stable marketplaceNoBidAuctionReturnState :
     {
       returns :
