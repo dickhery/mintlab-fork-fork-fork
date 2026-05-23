@@ -77,6 +77,36 @@ type SettlementStage =
    PaymentPending;
    SellerPaymentPending;
  };
+type SettlementEscrowTopUpReceipt =
+ record {
+   amount: nat64;
+   blockIndex: nat64;
+   feeE8s: nat64;
+   listingId: ListingId;
+   quoteBefore: SettlementEscrowRepairQuote;
+ };
+type SettlementEscrowRepairQuote =
+ record {
+   escrowAccount: AccountIdentifier;
+   escrowBalance: nat64;
+   escrowId: nat;
+   kind: SettlementEscrowRepairKind;
+   ledgerFeeE8s: nat64;
+   listingId: ListingId;
+   mintlabFee: nat64;
+   requiredDebit: nat64;
+   sellerProceeds: nat64;
+   shortfall: nat64;
+   topUpFromAccount: AccountIdentifier;
+   topUpFromBalance: nat64;
+   topUpTotalDebit: nat64;
+   topUpTransferFeeE8s: nat64;
+ };
+type SettlementEscrowRepairKind =
+ variant {
+   Auction;
+   FixedPurchase;
+ };
 type PublicModerationConfig =
  record {
    apiKeyConfigured: bool;
@@ -776,6 +806,8 @@ service : {
       err: text;
       ok: bool;
     });
+  adminGetSettlementEscrowRepairQuote: (listingId: ListingId) ->
+   (SettlementEscrowRepairQuote);
   adminListMarketplaceRecoveryState: () ->
    (MarketplaceRecoverySnapshot) query;
   adminRecoverPaidCollectionCreation: (owner: principal, cyclePaymentBlock:
@@ -789,6 +821,8 @@ service : {
   adminRetryFixedPurchaseSettlement: (listingId: ListingId) -> ();
   adminRetryListingReturn: (listingId: ListingId) -> ();
   adminRetryNoBidAuctionReturn: (listingId: ListingId) -> ();
+  adminTopUpSettlementEscrow: (listingId: ListingId, amount: nat64) ->
+   (SettlementEscrowTopUpReceipt);
   balance: (request: EXTBalanceRequest) -> (EXTBalanceResponse) query;
   bootstrapAdmin: () -> ();
   buyFixedListing: (listingId: ListingId) -> ();

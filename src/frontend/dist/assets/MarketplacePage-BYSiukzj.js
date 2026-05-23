@@ -1,12 +1,23 @@
-import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, g as useComposedRefs, a as cn, b as useBackend, u as useAuth, d as useQueryClient, e as useQuery, B as Button, S as ShoppingBag, h as LoadingSpinner, m as motion, X, f as ue } from "./index-D-7qZdAS.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-D4O5EeC5.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-D_gr7p4V.js";
-import { T as Tag, Z as ZoomableMediaImage, P as PaymentConfirmationDialog } from "./ZoomableMediaImage-sgoCnyIS.js";
-import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-DPGcVIzR.js";
-import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, B as Badge, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-CXk9UQEM.js";
+import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, g as useComposedRefs, a as cn, b as useBackend, u as useAuth, d as useQueryClient, e as useQuery, B as Button, S as ShoppingBag, h as LoadingSpinner, m as motion, X, f as ue } from "./index-bkqbXx2-.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-CguUsL6j.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-Ci5poe8S.js";
+import { T as Tag, Z as ZoomableMediaImage, P as PaymentConfirmationDialog } from "./ZoomableMediaImage-DME8aoY8.js";
+import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-Dx9UVbEg.js";
+import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, B as Badge, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-BoRAfUJT.js";
 import { f as formatICPAmount, p as parseICPToE8s } from "./icp-BXjZNIYq.js";
-import { C as Coins } from "./coins-DCt9VnG-.js";
-import { I as ImageOff } from "./media-CfFRIBbC.js";
+import { C as Coins } from "./coins-DDYXsoZm.js";
+import { I as ImageOff } from "./media-u7nwR0_H.js";
+/**
+ * @license lucide-react v0.511.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+const __iconNode$2 = [
+  ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
+  ["polyline", { points: "12 6 12 12 16 14", key: "68esgv" }]
+];
+const Clock = createLucideIcon("clock", __iconNode$2);
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -14,10 +25,13 @@ import { I as ImageOff } from "./media-CfFRIBbC.js";
  * See the LICENSE file in the root directory of this source tree.
  */
 const __iconNode$1 = [
-  ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
-  ["polyline", { points: "12 6 12 12 16 14", key: "68esgv" }]
+  ["path", { d: "m14.5 12.5-8 8a2.119 2.119 0 1 1-3-3l8-8", key: "15492f" }],
+  ["path", { d: "m16 16 6-6", key: "vzrcl6" }],
+  ["path", { d: "m8 8 6-6", key: "18bi4p" }],
+  ["path", { d: "m9 7 8 8", key: "5jnvq1" }],
+  ["path", { d: "m21 11-8-8", key: "z4y7zo" }]
 ];
-const Clock = createLucideIcon("clock", __iconNode$1);
+const Gavel = createLucideIcon("gavel", __iconNode$1);
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -25,13 +39,10 @@ const Clock = createLucideIcon("clock", __iconNode$1);
  * See the LICENSE file in the root directory of this source tree.
  */
 const __iconNode = [
-  ["path", { d: "m14.5 12.5-8 8a2.119 2.119 0 1 1-3-3l8-8", key: "15492f" }],
-  ["path", { d: "m16 16 6-6", key: "vzrcl6" }],
-  ["path", { d: "m8 8 6-6", key: "18bi4p" }],
-  ["path", { d: "m9 7 8 8", key: "5jnvq1" }],
-  ["path", { d: "m21 11-8-8", key: "z4y7zo" }]
+  ["rect", { width: "18", height: "11", x: "3", y: "11", rx: "2", ry: "2", key: "1w4ew1" }],
+  ["path", { d: "M7 11V7a5 5 0 0 1 10 0v4", key: "fwvmzm" }]
 ];
-const Gavel = createLucideIcon("gavel", __iconNode);
+const Lock = createLucideIcon("lock", __iconNode);
 var ENTRY_FOCUS = "rovingFocusGroup.onEntryFocus";
 var EVENT_OPTIONS = { bubbles: false, cancelable: true };
 var GROUP_NAME = "RovingFocusGroup";
@@ -500,6 +511,9 @@ function nextAuctionMinimumBid(listing) {
 function auctionHighBidderText(listing) {
   return listing.highestBidder ? truncatePrincipal(listing.highestBidder.toString()) : "No bids yet";
 }
+function auctionHasBid(listing) {
+  return listing.highestBid > 0n || listing.highestBidder != null;
+}
 function isViewerWinningAuction(listing, currentPrincipal, bidStatus) {
   var _a;
   return (bidStatus == null ? void 0 : bidStatus.isWinning) ?? ((_a = listing.highestBidder) == null ? void 0 : _a.toString()) === currentPrincipal;
@@ -651,6 +665,7 @@ function ListingDetailModal({
   const seller = (fixed == null ? void 0 : fixed.seller) ?? (auction == null ? void 0 : auction.seller);
   const isOwner = seller != null && currentPrincipal === seller.toString();
   const auctionBidStatus = auction ? bidStatusMap.get(auction.id.toString()) : void 0;
+  const auctionHasAcceptedBid = auction ? auctionHasBid(auction) : false;
   const isWinningAuction = auction ? isViewerWinningAuction(auction, currentPrincipal, auctionBidStatus) : false;
   const hasBeenOutbid = auction != null && !!(auctionBidStatus == null ? void 0 : auctionBidStatus.hasBid) && !isWinningAuction;
   const auctionRemaining = auction ? formatRemaining(
@@ -751,18 +766,26 @@ function ListingDetailModal({
                 children: "Buy Now"
               }
             )),
-            auction && (isOwner ? /* @__PURE__ */ jsxRuntimeExports.jsx(
-              Button,
-              {
-                variant: "outline",
-                className: "text-destructive border-destructive/40 hover:bg-destructive/10",
-                onClick: () => {
-                  onCancel(auction.id);
-                  onClose();
-                },
-                children: "Cancel Auction"
-              }
-            ) : /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            auction && (isOwner ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-end gap-1.5", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                Button,
+                {
+                  variant: "outline",
+                  className: auctionHasAcceptedBid ? "border-border text-muted-foreground" : "text-destructive border-destructive/40 hover:bg-destructive/10",
+                  onClick: () => {
+                    if (auctionHasAcceptedBid) return;
+                    onCancel(auction.id);
+                    onClose();
+                  },
+                  disabled: auctionHasAcceptedBid,
+                  children: auctionHasAcceptedBid ? /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(Lock, { className: "w-4 h-4 mr-2" }),
+                    "Bid Placed"
+                  ] }) : "Cancel Auction"
+                }
+              ),
+              auctionHasAcceptedBid && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground text-right max-w-[14rem]", children: "Auctions cannot be canceled after the first bid." })
+            ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(
               Button,
               {
                 className: "bg-accent text-accent-foreground hover:bg-accent/90",
@@ -805,6 +828,7 @@ function AuctionListingCard({
   const isOwner = currentPrincipal === sellerText;
   const isWinner = isViewerWinningAuction(listing, currentPrincipal, bidStatus);
   const hasBeenOutbid = !!(bidStatus == null ? void 0 : bidStatus.hasBid) && !isWinner;
+  const hasBid = auctionHasBid(listing);
   return /* @__PURE__ */ jsxRuntimeExports.jsxs(
     motion.div,
     {
@@ -893,7 +917,7 @@ function AuctionListingCard({
                   children: isSettling ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoadingSpinner, { size: "sm" }) : "Settle"
                 }
               ),
-              !ended && /* @__PURE__ */ jsxRuntimeExports.jsx(
+              !ended && !hasBid && /* @__PURE__ */ jsxRuntimeExports.jsx(
                 Button,
                 {
                   size: "sm",
@@ -910,7 +934,24 @@ function AuctionListingCard({
                     "Cancel"
                   ] })
                 }
-              )
+              ),
+              !ended && hasBid && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col items-end gap-1", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                  Button,
+                  {
+                    size: "sm",
+                    variant: "outline",
+                    className: "border-border text-muted-foreground",
+                    disabled: true,
+                    "data-ocid": `marketplace.auction.cancel_locked_button.${index + 1}`,
+                    children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(Lock, { className: "w-3 h-3 mr-1" }),
+                      "Bid Locked"
+                    ]
+                  }
+                ),
+                /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "max-w-[8rem] text-right text-[10px] leading-snug text-muted-foreground", children: "Cannot cancel after bids" })
+              ] })
             ] }) : ended && isWinner ? /* @__PURE__ */ jsxRuntimeExports.jsx(
               Button,
               {
@@ -1176,7 +1217,8 @@ function ListNFTModal({
                   )
                 ] })
               ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Auctions can run from 1 hour up to 30 days." })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Auctions can run from 1 hour up to 30 days." }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "After the first bid is placed, the auction cannot be canceled." })
             ] })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2 pt-1", children: [
@@ -1479,6 +1521,8 @@ function MarketplacePage() {
       }
     ] : []
   );
+  const cancelAuctionDetail = cancelTarget == null ? null : auctionListings.find(({ listing }) => listing.id === cancelTarget) ?? null;
+  const cancelAuctionBlockedByBid = cancelAuctionDetail != null && auctionHasBid(cancelAuctionDetail.listing);
   const auctionListingIds = auctionListings.map(({ listing }) => listing.id);
   const auctionListingIdsKey = auctionListingIds.map((id) => id.toString()).join(",");
   const { data: myAuctionBidStatuses = [] } = useQuery({
@@ -1949,7 +1993,7 @@ function MarketplacePage() {
             children: [
               /* @__PURE__ */ jsxRuntimeExports.jsxs(AlertDialogHeader, { children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx(AlertDialogTitle, { className: "font-display", children: "Cancel Listing" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx(AlertDialogDescription, { children: "Are you sure you want to cancel this listing? Your NFT will be returned to your wallet." })
+                /* @__PURE__ */ jsxRuntimeExports.jsx(AlertDialogDescription, { children: cancelAuctionBlockedByBid ? "This auction already has a bid, so it cannot be canceled. Let the auction finish, then settle it." : "Are you sure you want to cancel this listing? Your NFT will be returned to your wallet." })
               ] }),
               /* @__PURE__ */ jsxRuntimeExports.jsxs(AlertDialogFooter, { children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -1964,7 +2008,8 @@ function MarketplacePage() {
                   AlertDialogAction,
                   {
                     className: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
-                    onClick: () => cancelTarget !== null && cancelListing(cancelTarget),
+                    onClick: () => cancelTarget !== null && !cancelAuctionBlockedByBid && cancelListing(cancelTarget),
+                    disabled: cancelAuctionBlockedByBid || isCancelling,
                     "data-ocid": "marketplace.cancel_confirm_button",
                     children: isCancelling ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoadingSpinner, { size: "sm" }) : "Cancel Listing"
                   }

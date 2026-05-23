@@ -177,6 +177,36 @@ module {
     auctionBidFeeReserveE8s : Nat64;
   };
 
+  public type SettlementEscrowRepairKind = {
+    #FixedPurchase;
+    #Auction;
+  };
+
+  public type SettlementEscrowRepairQuote = {
+    listingId : ListingId;
+    kind : SettlementEscrowRepairKind;
+    escrowId : Nat;
+    escrowAccount : AccountIdentifier;
+    escrowBalance : Nat64;
+    requiredDebit : Nat64;
+    shortfall : Nat64;
+    ledgerFeeE8s : Nat64;
+    sellerProceeds : Nat64;
+    mintlabFee : Nat64;
+    topUpFromAccount : AccountIdentifier;
+    topUpFromBalance : Nat64;
+    topUpTransferFeeE8s : Nat64;
+    topUpTotalDebit : Nat64;
+  };
+
+  public type SettlementEscrowTopUpReceipt = {
+    listingId : ListingId;
+    amount : Nat64;
+    feeE8s : Nat64;
+    blockIndex : Nat64;
+    quoteBefore : SettlementEscrowRepairQuote;
+  };
+
   public type ActiveListing = {
     #Fixed : FixedListing;
     #Auction : AuctionListing;

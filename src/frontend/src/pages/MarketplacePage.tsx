@@ -46,6 +46,7 @@ import {
   Coins,
   Gavel,
   ImageOff,
+  Lock,
   ShoppingBag,
   Tag,
   X,
@@ -93,6 +94,10 @@ function auctionHighBidderText(listing: AuctionListing): string {
   return listing.highestBidder
     ? truncatePrincipal(listing.highestBidder.toString())
     : "No bids yet";
+}
+
+function auctionHasBid(listing: AuctionListing): boolean {
+  return listing.highestBid > 0n || listing.highestBidder != null;
 }
 
 function isViewerWinningAuction(
@@ -309,6 +314,7 @@ function ListingDetailModal({
   const auctionBidStatus = auction
     ? bidStatusMap.get(auction.id.toString())
     : undefined;
+  const auctionHasAcceptedBid = auction ? auctionHasBid(auction) : false;
   const isWinningAuction = auction
     ? isViewerWinningAuction(auction, currentPrincipal, auctionBidStatus)
     : false;
@@ -466,16 +472,36 @@ function ListingDetailModal({
                 ))}
               {auction &&
                 (isOwner ? (
-                  <Button
-                    variant="outline"
-                    className="text-destructive border-destructive/40 hover:bg-destructive/10"
-                    onClick={() => {
-                      onCancel(auction.id);
-                      onClose();
-                    }}
-                  >
-                    Cancel Auction
-                  </Button>
+                  <div className="flex flex-col items-end gap-1.5">
+                    <Button
+                      variant="outline"
+                      className={
+                        auctionHasAcceptedBid
+                          ? "border-border text-muted-foreground"
+                          : "text-destructive border-destructive/40 hover:bg-destructive/10"
+                      }
+                      onClick={() => {
+                        if (auctionHasAcceptedBid) return;
+                        onCancel(auction.id);
+                        onClose();
+                      }}
+                      disabled={auctionHasAcceptedBid}
+                    >
+                      {auctionHasAcceptedBid ? (
+                        <>
+                          <Lock className="w-4 h-4 mr-2" />
+                          Bid Placed
+                        </>
+                      ) : (
+                        "Cancel Auction"
+                      )}
+                    </Button>
+                    {auctionHasAcceptedBid && (
+                      <p className="text-xs text-muted-foreground text-right max-w-[14rem]">
+                        Auctions cannot be canceled after the first bid.
+                      </p>
+                    )}
+                  </div>
                 ) : (
                   <Button
                     className="bg-accent text-accent-foreground hover:bg-accent/90"
@@ -539,6 +565,7 @@ function AuctionListingCard({
   const isOwner = currentPrincipal === sellerText;
   const isWinner = isViewerWinningAuction(listing, currentPrincipal, bidStatus);
   const hasBeenOutbid = !!bidStatus?.hasBid && !isWinner;
+  const hasBid = auctionHasBid(listing);
 
   return (
     <motion.div
@@ -640,7 +667,7 @@ function AuctionListingCard({
                   {isSettling ? <LoadingSpinner size="sm" /> : "Settle"}
                 </Button>
               )}
-              {!ended && (
+              {!ended && !hasBid && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -661,6 +688,23 @@ function AuctionListingCard({
                     </>
                   )}
                 </Button>
+              )}
+              {!ended && hasBid && (
+                <div className="flex flex-col items-end gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-border text-muted-foreground"
+                    disabled
+                    data-ocid={`marketplace.auction.cancel_locked_button.${index + 1}`}
+                  >
+                    <Lock className="w-3 h-3 mr-1" />
+                    Bid Locked
+                  </Button>
+                  <span className="max-w-[8rem] text-right text-[10px] leading-snug text-muted-foreground">
+                    Cannot cancel after bids
+                  </span>
+                </div>
               )}
             </div>
           ) : ended && isWinner ? (
@@ -982,6 +1026,9 @@ function ListNFTModal({
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Auctions can run from 1 hour up to 30 days.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  After the first bid is placed, the auction cannot be canceled.
                 </p>
               </div>
             </div>
@@ -1339,6 +1386,14 @@ export default function MarketplacePage() {
         ]
       : [],
   );
+
+  const cancelAuctionDetail =
+    cancelTarget == null
+      ? null
+      : (auctionListings.find(({ listing }) => listing.id === cancelTarget) ??
+        null);
+  const cancelAuctionBlockedByBid =
+    cancelAuctionDetail != null && auctionHasBid(cancelAuctionDetail.listing);
 
   const auctionListingIds = auctionListings.map(({ listing }) => listing.id);
   const auctionListingIdsKey = auctionListingIds
@@ -1889,8 +1944,9 @@ export default function MarketplacePage() {
               Cancel Listing
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to cancel this listing? Your NFT will be
-              returned to your wallet.
+              {cancelAuctionBlockedByBid
+                ? "This auction already has a bid, so it cannot be canceled. Let the auction finish, then settle it."
+                : "Are you sure you want to cancel this listing? Your NFT will be returned to your wallet."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1903,8 +1959,11 @@ export default function MarketplacePage() {
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={() =>
-                cancelTarget !== null && cancelListing(cancelTarget)
+                cancelTarget !== null &&
+                !cancelAuctionBlockedByBid &&
+                cancelListing(cancelTarget)
               }
+              disabled={cancelAuctionBlockedByBid || isCancelling}
               data-ocid="marketplace.cancel_confirm_button"
             >
               {isCancelling ? <LoadingSpinner size="sm" /> : "Cancel Listing"}

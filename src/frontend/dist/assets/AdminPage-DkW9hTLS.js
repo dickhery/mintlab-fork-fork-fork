@@ -1,13 +1,13 @@
-import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, a as cn, i as useNavigate, k as useAdmin, b as useBackend, d as useQueryClient, e as useQuery, l as Shield, f as ue, B as Button, P as Principal, A as Actor } from "./index-D-7qZdAS.js";
-import { L as LoaderCircle, A as AppCanisterTopUpDialog, P as Plus, F as Fuel } from "./AppCanisterTopUpDialog-CmnRgIrc.js";
-import { S as Switch, r as recommendedCollectionCreationTopUpCycles, T as Trash2, C as CollectionCreationDiagnosticsPanel } from "./switch-DAhzBafy.js";
-import { A as AlertDialog, i as AlertDialogTrigger, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-DPGcVIzR.js";
-import { j as Primitive, u as useMutation, L as Label, I as Input, B as Badge } from "./badge-CXk9UQEM.js";
-import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, R as RefreshCw, c as CardContent } from "./card-CaKVxpdZ.js";
-import { L as Layers, e as ChevronDown, T as Textarea, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, E as ExternalLink, I as Info, C as Check } from "./textarea-DbURlR1x.js";
-import { S as Skeleton, C as Copy } from "./skeleton-BAOiceHK.js";
-import { r as resolveImageUrl, I as ImageOff } from "./media-CfFRIBbC.js";
-import { C as CircleAlert } from "./circle-alert-CPCm3Yc2.js";
+import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, a as cn, i as useNavigate, k as useAdmin, b as useBackend, d as useQueryClient, e as useQuery, l as Shield, f as ue, B as Button, P as Principal, A as Actor } from "./index-bkqbXx2-.js";
+import { L as LoaderCircle, A as AppCanisterTopUpDialog, P as Plus, F as Fuel } from "./AppCanisterTopUpDialog-UhNi-GAU.js";
+import { S as Switch, r as recommendedCollectionCreationTopUpCycles, T as Trash2, C as CollectionCreationDiagnosticsPanel } from "./switch-Bk4SW8gu.js";
+import { A as AlertDialog, i as AlertDialogTrigger, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-Dx9UVbEg.js";
+import { j as Primitive, u as useMutation, L as Label, I as Input, B as Badge } from "./badge-BoRAfUJT.js";
+import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, R as RefreshCw, c as CardContent } from "./card-BIEqyXY0.js";
+import { L as Layers, e as ChevronDown, T as Textarea, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, E as ExternalLink, I as Info, C as Check } from "./textarea-hiMGyt9S.js";
+import { S as Skeleton, C as Copy } from "./skeleton-CjjzxS9C.js";
+import { r as resolveImageUrl, I as ImageOff } from "./media-u7nwR0_H.js";
+import { C as CircleAlert } from "./circle-alert-FJZQnmNT.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -384,7 +384,10 @@ function readFileAsBytes(file) {
     reader.readAsArrayBuffer(file);
   });
 }
-function CopyButton({ text }) {
+function CopyButton({
+  text,
+  ariaLabel = "Copy value"
+}) {
   const [copied, setCopied] = reactExports.useState(false);
   const copy = () => {
     void navigator.clipboard.writeText(text);
@@ -396,7 +399,7 @@ function CopyButton({ text }) {
     {
       type: "button",
       onClick: copy,
-      "aria-label": "Copy canister ID",
+      "aria-label": ariaLabel,
       className: "ml-1 text-muted-foreground hover:text-foreground transition-colors",
       "data-ocid": "admin.copy_button",
       children: copied ? /* @__PURE__ */ jsxRuntimeExports.jsx(Check, { size: 13, className: "text-primary" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Copy, { size: 13 })
@@ -527,6 +530,238 @@ function CollectionSetupGuide() {
       ]
     }
   );
+}
+function repairKindLabel(kind) {
+  return kind === "Auction" ? "Auction" : "Fixed sale";
+}
+function RepairMetric({
+  label,
+  value,
+  tone = "default"
+}) {
+  const valueClass = tone === "warning" ? "text-destructive" : tone === "success" ? "text-emerald-700" : "text-foreground";
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-lg border border-border bg-background/60 p-3", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-muted-foreground", children: label }),
+    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: `font-mono text-sm mt-1 truncate ${valueClass}`, children: value })
+  ] });
+}
+function MarketplaceEscrowRepairPanel() {
+  const { actor } = useBackend();
+  const [listingIdInput, setListingIdInput] = reactExports.useState("");
+  const [quote, setQuote] = reactExports.useState(null);
+  const quoteMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      const listingId = parseWholeBigInt(listingIdInput);
+      if (listingId === null) throw new Error("Enter a valid listing ID");
+      return actor.adminGetSettlementEscrowRepairQuote(listingId);
+    },
+    onSuccess: (result) => {
+      setQuote(result);
+      if (result.shortfall === 0n) {
+        ue.success("Settlement escrow is funded.");
+      }
+    },
+    onError: (err) => {
+      setQuote(null);
+      ue.error(extractError(err));
+    }
+  });
+  const topUpMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      if (!quote) throw new Error("Load a repair quote first");
+      return actor.adminTopUpSettlementEscrow(quote.listingId, quote.shortfall);
+    },
+    onSuccess: (receipt) => {
+      ue.success(
+        `Escrow topped up with ${formatICP(receipt.amount)} ICP at block ${receipt.blockIndex.toString()}.`
+      );
+      quoteMutation.mutate();
+    },
+    onError: (err) => {
+      ue.error(extractError(err));
+    }
+  });
+  const retrySettlementMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      if (!quote) throw new Error("Load a repair quote first");
+      if (quote.kind === "Auction") {
+        await actor.adminRetryAuctionSettlement(quote.listingId);
+      } else {
+        await actor.adminRetryFixedPurchaseSettlement(quote.listingId);
+      }
+    },
+    onSuccess: () => {
+      ue.success("Settlement retry started.");
+      quoteMutation.mutate();
+    },
+    onError: (err) => {
+      ue.error(extractError(err));
+    }
+  });
+  const shortfallText = quote ? `${formatICP(quote.shortfall)} ICP` : "No quote";
+  const topUpBlocked = !quote || quote.shortfall === 0n || quote.topUpFromBalance < quote.topUpTotalDebit || topUpMutation.isPending;
+  return /* @__PURE__ */ jsxRuntimeExports.jsxs(Card, { className: "border-amber-500/25 bg-card", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx(CardHeader, { className: "space-y-2", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start justify-between gap-3", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(CardTitle, { className: "text-base", children: "Marketplace Escrow Repair" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(CardDescription, { className: "text-xs", children: "Quote and fund settlement escrow shortfalls from the admin ICP account." })
+      ] }),
+      quote && /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { variant: quote.shortfall > 0n ? "destructive" : "secondary", children: quote.shortfall > 0n ? shortfallText : "Funded" })
+    ] }) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs(CardContent, { className: "space-y-4", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { htmlFor: "marketplace-escrow-repair-listing", children: "Listing ID" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            Input,
+            {
+              id: "marketplace-escrow-repair-listing",
+              inputMode: "numeric",
+              value: listingIdInput,
+              onChange: (event) => setListingIdInput(event.target.value),
+              placeholder: "e.g. 12",
+              "data-ocid": "admin.marketplace_repair.listing_input"
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          Button,
+          {
+            type: "button",
+            variant: "outline",
+            className: "gap-2",
+            disabled: quoteMutation.isPending,
+            onClick: () => quoteMutation.mutate(),
+            "data-ocid": "admin.marketplace_repair.quote_button",
+            children: [
+              quoteMutation.isPending ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(RefreshCw, { size: 15 }),
+              "Load Quote"
+            ]
+          }
+        )
+      ] }),
+      quote && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            RepairMetric,
+            {
+              label: "Settlement",
+              value: `${repairKindLabel(quote.kind)} #${quote.listingId.toString()}`
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            RepairMetric,
+            {
+              label: "Escrow balance",
+              value: `${formatICP(quote.escrowBalance)} ICP`
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            RepairMetric,
+            {
+              label: "Required debit",
+              value: `${formatICP(quote.requiredDebit)} ICP`
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            RepairMetric,
+            {
+              label: "Shortfall",
+              value: shortfallText,
+              tone: quote.shortfall > 0n ? "warning" : "success"
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-lg border border-border bg-background/60 p-3 min-w-0", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-muted-foreground", children: "Settlement escrow account" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "font-mono text-xs text-foreground mt-1 break-all", children: [
+              accountIdToHex(quote.escrowAccount),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                CopyButton,
+                {
+                  text: accountIdToHex(quote.escrowAccount),
+                  ariaLabel: "Copy settlement escrow account"
+                }
+              )
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-lg border border-border bg-background/60 p-3 min-w-0", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-muted-foreground", children: "Admin funding account" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "font-mono text-xs text-foreground mt-1 break-all", children: [
+              accountIdToHex(quote.topUpFromAccount),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                CopyButton,
+                {
+                  text: accountIdToHex(quote.topUpFromAccount),
+                  ariaLabel: "Copy admin funding account"
+                }
+              )
+            ] })
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-3 gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            RepairMetric,
+            {
+              label: "Admin balance",
+              value: `${formatICP(quote.topUpFromBalance)} ICP`,
+              tone: quote.shortfall > 0n && quote.topUpFromBalance < quote.topUpTotalDebit ? "warning" : "default"
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            RepairMetric,
+            {
+              label: "Top-up transfer fee",
+              value: `${formatICP(quote.topUpTransferFeeE8s)} ICP`
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            RepairMetric,
+            {
+              label: "Admin total debit",
+              value: `${formatICP(quote.topUpTotalDebit)} ICP`
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap justify-end gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            Button,
+            {
+              type: "button",
+              variant: "outline",
+              className: "gap-2",
+              disabled: !quote || retrySettlementMutation.isPending,
+              onClick: () => retrySettlementMutation.mutate(),
+              "data-ocid": "admin.marketplace_repair.retry_button",
+              children: [
+                retrySettlementMutation.isPending ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(RefreshCw, { size: 15 }),
+                "Retry Settlement"
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            Button,
+            {
+              type: "button",
+              variant: "secondary",
+              className: "gap-2",
+              disabled: topUpBlocked,
+              onClick: () => topUpMutation.mutate(),
+              "data-ocid": "admin.marketplace_repair.top_up_button",
+              children: [
+                topUpMutation.isPending ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Fuel, { size: 15 }),
+                "Top Up Shortfall"
+              ]
+            }
+          )
+        ] })
+      ] })
+    ] })
+  ] });
 }
 function CollectionRow({
   collection,
@@ -2414,6 +2649,7 @@ function AdminPage() {
         /* @__PURE__ */ jsxRuntimeExports.jsx(AddCollectionForm, { onSuccess: () => {
         } }),
         /* @__PURE__ */ jsxRuntimeExports.jsx(MintConfigForm, {}),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(MarketplaceEscrowRepairPanel, {}),
         /* @__PURE__ */ jsxRuntimeExports.jsx(CollectionCreationRequestsPanel, {}),
         /* @__PURE__ */ jsxRuntimeExports.jsx(CollectionSetupGuide, {}),
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [

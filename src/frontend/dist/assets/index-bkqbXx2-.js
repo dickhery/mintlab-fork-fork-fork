@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-DJpRGXxb.js","assets/AppCanisterTopUpDialog-CmnRgIrc.js","assets/badge-CXk9UQEM.js","assets/external-nft-transfer-D4O5EeC5.js","assets/media-CfFRIBbC.js","assets/MediaImage-D_gr7p4V.js","assets/ZoomableMediaImage-sgoCnyIS.js","assets/index-DPGcVIzR.js","assets/card-CaKVxpdZ.js","assets/textarea-DbURlR1x.js","assets/skeleton-BAOiceHK.js","assets/imageUtils-OExt1wUz.js","assets/send-DW8vxh-x.js","assets/coins-DCt9VnG-.js","assets/MarketplacePage-DQQR2cF-.js","assets/icp-BXjZNIYq.js","assets/AdminPage-Czv_q32U.js","assets/switch-DAhzBafy.js","assets/circle-alert-CPCm3Yc2.js","assets/ICPAccountPage-DNQ8vsjr.js","assets/CollectionsPage-C3MkvG35.js","assets/DividendsPage-D4XqjI21.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-DgGVxS9X.js","assets/AppCanisterTopUpDialog-UhNi-GAU.js","assets/badge-BoRAfUJT.js","assets/external-nft-transfer-CguUsL6j.js","assets/media-u7nwR0_H.js","assets/MediaImage-Ci5poe8S.js","assets/ZoomableMediaImage-DME8aoY8.js","assets/index-Dx9UVbEg.js","assets/card-BIEqyXY0.js","assets/textarea-hiMGyt9S.js","assets/skeleton-CjjzxS9C.js","assets/imageUtils-D_kHccbr.js","assets/send-B7O-YXf8.js","assets/coins-DDYXsoZm.js","assets/MarketplacePage-BYSiukzj.js","assets/icp-BXjZNIYq.js","assets/AdminPage-DkW9hTLS.js","assets/switch-Bk4SW8gu.js","assets/circle-alert-FJZQnmNT.js","assets/ICPAccountPage-nbrOHi4C.js","assets/CollectionsPage-JiWLr1S4.js","assets/DividendsPage-BBmhSM6R.js"])))=>i.map(i=>d[i]);
 var __defProp = Object.defineProperty;
 var __typeError = (msg) => {
   throw TypeError(msg);
@@ -15595,7 +15595,7 @@ function mergeLoginOptions(loginOptions, otherLoginOptions) {
   };
 }
 const ONE_HOUR_IN_NANOSECONDS = BigInt(36e11);
-const DEFAULT_IDENTITY_PROVIDER = "https://id.ai";
+const DEFAULT_IDENTITY_PROVIDER = "https://identity.internetcomputer.org/";
 const InternetIdentityReactContext = reactExports.createContext(void 0);
 async function createAuthClient(createOptions) {
   const config = await loadConfig();
@@ -30223,6 +30223,33 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "mintlabFeeBasisPoints": IDL2.Nat,
     "mintlabFeeRecipient": IDL2.Opt(AccountIdentifier)
   });
+  const SettlementEscrowRepairKind = IDL2.Variant({
+    "FixedPurchase": IDL2.Null,
+    "Auction": IDL2.Null
+  });
+  const SettlementEscrowRepairQuote = IDL2.Record({
+    "listingId": ListingId,
+    "kind": SettlementEscrowRepairKind,
+    "escrowId": IDL2.Nat,
+    "escrowAccount": AccountIdentifier,
+    "escrowBalance": IDL2.Nat64,
+    "requiredDebit": IDL2.Nat64,
+    "shortfall": IDL2.Nat64,
+    "ledgerFeeE8s": IDL2.Nat64,
+    "sellerProceeds": IDL2.Nat64,
+    "mintlabFee": IDL2.Nat64,
+    "topUpFromAccount": AccountIdentifier,
+    "topUpFromBalance": IDL2.Nat64,
+    "topUpTransferFeeE8s": IDL2.Nat64,
+    "topUpTotalDebit": IDL2.Nat64
+  });
+  const SettlementEscrowTopUpReceipt = IDL2.Record({
+    "listingId": ListingId,
+    "amount": IDL2.Nat64,
+    "feeE8s": IDL2.Nat64,
+    "blockIndex": IDL2.Nat64,
+    "quoteBefore": SettlementEscrowRepairQuote
+  });
   const CollectionBrowseCoverage = IDL2.Variant({
     "Full": IDL2.Null,
     "Partial": IDL2.Null
@@ -30519,6 +30546,18 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "adminDeleteCollectionCreationRequest": IDL2.Func(
       [IDL2.Nat],
       [IDL2.Variant({ "ok": IDL2.Bool, "err": IDL2.Text })],
+      []
+    ),
+    "adminGetSettlementEscrowRepairQuote": IDL2.Func(
+      [ListingId],
+      [SettlementEscrowRepairQuote],
+      []
+    ),
+    "adminRetryAuctionSettlement": IDL2.Func([ListingId], [], []),
+    "adminRetryFixedPurchaseSettlement": IDL2.Func([ListingId], [], []),
+    "adminTopUpSettlementEscrow": IDL2.Func(
+      [ListingId, IDL2.Nat64],
+      [SettlementEscrowTopUpReceipt],
       []
     ),
     "bootstrapAdmin": IDL2.Func([], [], []),
@@ -31107,6 +31146,36 @@ function fromRawMarketplaceFeeConfig(value) {
     mintlabFeeRecipient: fromRawOption(value.mintlabFeeRecipient)
   };
 }
+function fromRawSettlementEscrowRepairKind(value) {
+  return "FixedPurchase" in value ? "FixedPurchase" : "Auction";
+}
+function fromRawSettlementEscrowRepairQuote(value) {
+  return {
+    listingId: value.listingId,
+    kind: fromRawSettlementEscrowRepairKind(value.kind),
+    escrowId: value.escrowId,
+    escrowAccount: value.escrowAccount,
+    escrowBalance: value.escrowBalance,
+    requiredDebit: value.requiredDebit,
+    shortfall: value.shortfall,
+    ledgerFeeE8s: value.ledgerFeeE8s,
+    sellerProceeds: value.sellerProceeds,
+    mintlabFee: value.mintlabFee,
+    topUpFromAccount: value.topUpFromAccount,
+    topUpFromBalance: value.topUpFromBalance,
+    topUpTransferFeeE8s: value.topUpTransferFeeE8s,
+    topUpTotalDebit: value.topUpTotalDebit
+  };
+}
+function fromRawSettlementEscrowTopUpReceipt(value) {
+  return {
+    listingId: value.listingId,
+    amount: value.amount,
+    feeE8s: value.feeE8s,
+    blockIndex: value.blockIndex,
+    quoteBefore: fromRawSettlementEscrowRepairQuote(value.quoteBefore)
+  };
+}
 function fromRawActiveListing(value) {
   if ("Fixed" in value) {
     return { __kind__: "Fixed", Fixed: fromRawFixedListing(value.Fixed) };
@@ -31597,6 +31666,28 @@ class Backend {
     return fromBooleanResult(
       await this.run(
         () => this.actor.adminDeleteCollectionCreationRequest(requestId)
+      )
+    );
+  }
+  async adminGetSettlementEscrowRepairQuote(listingId) {
+    return fromRawSettlementEscrowRepairQuote(
+      await this.run(
+        () => this.actor.adminGetSettlementEscrowRepairQuote(listingId)
+      )
+    );
+  }
+  async adminRetryAuctionSettlement(listingId) {
+    return this.run(() => this.actor.adminRetryAuctionSettlement(listingId));
+  }
+  async adminRetryFixedPurchaseSettlement(listingId) {
+    return this.run(
+      () => this.actor.adminRetryFixedPurchaseSettlement(listingId)
+    );
+  }
+  async adminTopUpSettlementEscrow(listingId, amount) {
+    return fromRawSettlementEscrowTopUpReceipt(
+      await this.run(
+        () => this.actor.adminTopUpSettlementEscrow(listingId, amount)
       )
     );
   }
@@ -46153,13 +46244,13 @@ const Toaster = ({ ...props }) => {
     }
   );
 };
-const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-DJpRGXxb.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
-const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-DQQR2cF-.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,15,13]) : void 0));
-const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-Czv_q32U.js"), true ? __vite__mapDeps([16,1,2,17,9,7,8,10,4,18]) : void 0));
-const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-DNQ8vsjr.js"), true ? __vite__mapDeps([19,2,8,10,15,12,18]) : void 0));
-const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-Cp3KXFF0.js"), true ? [] : void 0));
-const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-C3MkvG35.js"), true ? __vite__mapDeps([20,1,2,17,9,7,5,4,6,8,10,11]) : void 0));
-const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-D4XqjI21.js"), true ? __vite__mapDeps([21,1,2,5,4,8,13]) : void 0));
+const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-DgGVxS9X.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
+const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-BYSiukzj.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,15,13]) : void 0));
+const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-DkW9hTLS.js"), true ? __vite__mapDeps([16,1,2,17,9,7,8,10,4,18]) : void 0));
+const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-nbrOHi4C.js"), true ? __vite__mapDeps([19,2,8,10,15,12,18]) : void 0));
+const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-7Y5jX8Wi.js"), true ? [] : void 0));
+const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-JiWLr1S4.js"), true ? __vite__mapDeps([20,1,2,17,9,7,5,4,6,8,10,11]) : void 0));
+const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-BBmhSM6R.js"), true ? __vite__mapDeps([21,1,2,5,4,8,13]) : void 0));
 const rootRoute = createRootRoute({
   component: () => /* @__PURE__ */ jsxRuntimeExports.jsx(Layout, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(
     reactExports.Suspense,

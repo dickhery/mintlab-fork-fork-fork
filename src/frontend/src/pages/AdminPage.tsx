@@ -47,6 +47,7 @@ import type {
   CollectionCreationRequestView,
   ModerationCategorySettings,
   NFTStandard,
+  SettlementEscrowRepairQuote,
 } from "@/types";
 import { Actor, type Agent } from "@icp-sdk/core/agent";
 import { Principal } from "@icp-sdk/core/principal";
@@ -448,7 +449,13 @@ function readFileAsBytes(file: File): Promise<Uint8Array> {
 
 // ─── CopyButton ─────────────────────────────────────────────────────────────
 
-function CopyButton({ text }: { text: string }) {
+function CopyButton({
+  text,
+  ariaLabel = "Copy value",
+}: {
+  text: string;
+  ariaLabel?: string;
+}) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
     void navigator.clipboard.writeText(text);
@@ -459,7 +466,7 @@ function CopyButton({ text }: { text: string }) {
     <button
       type="button"
       onClick={copy}
-      aria-label="Copy canister ID"
+      aria-label={ariaLabel}
       className="ml-1 text-muted-foreground hover:text-foreground transition-colors"
       data-ocid="admin.copy_button"
     >
@@ -610,6 +617,264 @@ function CollectionSetupGuide() {
         </div>
       )}
     </div>
+  );
+}
+
+function repairKindLabel(kind: SettlementEscrowRepairQuote["kind"]): string {
+  return kind === "Auction" ? "Auction" : "Fixed sale";
+}
+
+function RepairMetric({
+  label,
+  value,
+  tone = "default",
+}: {
+  label: string;
+  value: string;
+  tone?: "default" | "warning" | "success";
+}) {
+  const valueClass =
+    tone === "warning"
+      ? "text-destructive"
+      : tone === "success"
+        ? "text-emerald-700"
+        : "text-foreground";
+
+  return (
+    <div className="rounded-lg border border-border bg-background/60 p-3">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <p className={`font-mono text-sm mt-1 truncate ${valueClass}`}>{value}</p>
+    </div>
+  );
+}
+
+function MarketplaceEscrowRepairPanel() {
+  const { actor } = useBackend();
+  const [listingIdInput, setListingIdInput] = useState("");
+  const [quote, setQuote] = useState<SettlementEscrowRepairQuote | null>(null);
+
+  const quoteMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      const listingId = parseWholeBigInt(listingIdInput);
+      if (listingId === null) throw new Error("Enter a valid listing ID");
+      return actor.adminGetSettlementEscrowRepairQuote(listingId);
+    },
+    onSuccess: (result) => {
+      setQuote(result);
+      if (result.shortfall === 0n) {
+        toast.success("Settlement escrow is funded.");
+      }
+    },
+    onError: (err: unknown) => {
+      setQuote(null);
+      toast.error(extractError(err));
+    },
+  });
+
+  const topUpMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      if (!quote) throw new Error("Load a repair quote first");
+      return actor.adminTopUpSettlementEscrow(quote.listingId, quote.shortfall);
+    },
+    onSuccess: (receipt) => {
+      toast.success(
+        `Escrow topped up with ${formatICP(receipt.amount)} ICP at block ${receipt.blockIndex.toString()}.`,
+      );
+      quoteMutation.mutate();
+    },
+    onError: (err: unknown) => {
+      toast.error(extractError(err));
+    },
+  });
+
+  const retrySettlementMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      if (!quote) throw new Error("Load a repair quote first");
+      if (quote.kind === "Auction") {
+        await actor.adminRetryAuctionSettlement(quote.listingId);
+      } else {
+        await actor.adminRetryFixedPurchaseSettlement(quote.listingId);
+      }
+    },
+    onSuccess: () => {
+      toast.success("Settlement retry started.");
+      quoteMutation.mutate();
+    },
+    onError: (err: unknown) => {
+      toast.error(extractError(err));
+    },
+  });
+
+  const shortfallText = quote
+    ? `${formatICP(quote.shortfall)} ICP`
+    : "No quote";
+  const topUpBlocked =
+    !quote ||
+    quote.shortfall === 0n ||
+    quote.topUpFromBalance < quote.topUpTotalDebit ||
+    topUpMutation.isPending;
+
+  return (
+    <Card className="border-amber-500/25 bg-card">
+      <CardHeader className="space-y-2">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-base">
+              Marketplace Escrow Repair
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Quote and fund settlement escrow shortfalls from the admin ICP
+              account.
+            </CardDescription>
+          </div>
+          {quote && (
+            <Badge variant={quote.shortfall > 0n ? "destructive" : "secondary"}>
+              {quote.shortfall > 0n ? shortfallText : "Funded"}
+            </Badge>
+          )}
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
+          <div className="space-y-1.5">
+            <Label htmlFor="marketplace-escrow-repair-listing">
+              Listing ID
+            </Label>
+            <Input
+              id="marketplace-escrow-repair-listing"
+              inputMode="numeric"
+              value={listingIdInput}
+              onChange={(event) => setListingIdInput(event.target.value)}
+              placeholder="e.g. 12"
+              data-ocid="admin.marketplace_repair.listing_input"
+            />
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            disabled={quoteMutation.isPending}
+            onClick={() => quoteMutation.mutate()}
+            data-ocid="admin.marketplace_repair.quote_button"
+          >
+            {quoteMutation.isPending ? (
+              <LoaderCircle size={15} className="animate-spin" />
+            ) : (
+              <RefreshCw size={15} />
+            )}
+            Load Quote
+          </Button>
+        </div>
+
+        {quote && (
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+              <RepairMetric
+                label="Settlement"
+                value={`${repairKindLabel(quote.kind)} #${quote.listingId.toString()}`}
+              />
+              <RepairMetric
+                label="Escrow balance"
+                value={`${formatICP(quote.escrowBalance)} ICP`}
+              />
+              <RepairMetric
+                label="Required debit"
+                value={`${formatICP(quote.requiredDebit)} ICP`}
+              />
+              <RepairMetric
+                label="Shortfall"
+                value={shortfallText}
+                tone={quote.shortfall > 0n ? "warning" : "success"}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="rounded-lg border border-border bg-background/60 p-3 min-w-0">
+                <span className="text-xs text-muted-foreground">
+                  Settlement escrow account
+                </span>
+                <p className="font-mono text-xs text-foreground mt-1 break-all">
+                  {accountIdToHex(quote.escrowAccount)}
+                  <CopyButton
+                    text={accountIdToHex(quote.escrowAccount)}
+                    ariaLabel="Copy settlement escrow account"
+                  />
+                </p>
+              </div>
+              <div className="rounded-lg border border-border bg-background/60 p-3 min-w-0">
+                <span className="text-xs text-muted-foreground">
+                  Admin funding account
+                </span>
+                <p className="font-mono text-xs text-foreground mt-1 break-all">
+                  {accountIdToHex(quote.topUpFromAccount)}
+                  <CopyButton
+                    text={accountIdToHex(quote.topUpFromAccount)}
+                    ariaLabel="Copy admin funding account"
+                  />
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <RepairMetric
+                label="Admin balance"
+                value={`${formatICP(quote.topUpFromBalance)} ICP`}
+                tone={
+                  quote.shortfall > 0n &&
+                  quote.topUpFromBalance < quote.topUpTotalDebit
+                    ? "warning"
+                    : "default"
+                }
+              />
+              <RepairMetric
+                label="Top-up transfer fee"
+                value={`${formatICP(quote.topUpTransferFeeE8s)} ICP`}
+              />
+              <RepairMetric
+                label="Admin total debit"
+                value={`${formatICP(quote.topUpTotalDebit)} ICP`}
+              />
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2"
+                disabled={!quote || retrySettlementMutation.isPending}
+                onClick={() => retrySettlementMutation.mutate()}
+                data-ocid="admin.marketplace_repair.retry_button"
+              >
+                {retrySettlementMutation.isPending ? (
+                  <LoaderCircle size={15} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={15} />
+                )}
+                Retry Settlement
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="gap-2"
+                disabled={topUpBlocked}
+                onClick={() => topUpMutation.mutate()}
+                data-ocid="admin.marketplace_repair.top_up_button"
+              >
+                {topUpMutation.isPending ? (
+                  <LoaderCircle size={15} className="animate-spin" />
+                ) : (
+                  <Fuel size={15} />
+                )}
+                Top Up Shortfall
+              </Button>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -2797,6 +3062,8 @@ export default function AdminPage() {
       <AddCollectionForm onSuccess={() => {}} />
 
       <MintConfigForm />
+
+      <MarketplaceEscrowRepairPanel />
 
       <CollectionCreationRequestsPanel />
 

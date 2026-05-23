@@ -153,6 +153,33 @@ export interface MarketplaceFeeConfig {
   mintlabFeeRecipient: AccountIdentifier | null;
 }
 
+export type SettlementEscrowRepairKind = "FixedPurchase" | "Auction";
+
+export interface SettlementEscrowRepairQuote {
+  listingId: ListingId;
+  kind: SettlementEscrowRepairKind;
+  escrowId: bigint;
+  escrowAccount: AccountIdentifier;
+  escrowBalance: bigint;
+  requiredDebit: bigint;
+  shortfall: bigint;
+  ledgerFeeE8s: bigint;
+  sellerProceeds: bigint;
+  mintlabFee: bigint;
+  topUpFromAccount: AccountIdentifier;
+  topUpFromBalance: bigint;
+  topUpTransferFeeE8s: bigint;
+  topUpTotalDebit: bigint;
+}
+
+export interface SettlementEscrowTopUpReceipt {
+  listingId: ListingId;
+  amount: bigint;
+  feeE8s: bigint;
+  blockIndex: bigint;
+  quoteBefore: SettlementEscrowRepairQuote;
+}
+
 export enum ListingStatus {
   Sold = "Sold",
   Active = "Active",
@@ -501,6 +528,15 @@ export interface backendInterface {
   ): Promise<
     { __kind__: "ok"; ok: boolean } | { __kind__: "err"; err: string }
   >;
+  adminGetSettlementEscrowRepairQuote(
+    listingId: ListingId,
+  ): Promise<SettlementEscrowRepairQuote>;
+  adminRetryAuctionSettlement(listingId: ListingId): Promise<void>;
+  adminRetryFixedPurchaseSettlement(listingId: ListingId): Promise<void>;
+  adminTopUpSettlementEscrow(
+    listingId: ListingId,
+    amount: bigint,
+  ): Promise<SettlementEscrowTopUpReceipt>;
   createAuctionListing(
     nftId: NFTId,
     startingBid: bigint,
@@ -979,6 +1015,32 @@ type RawMarketplaceFeeConfig = {
   mintlabFeeBasisPoints: bigint;
   mintlabFeeRecipient: [] | [AccountIdentifier];
 };
+type RawSettlementEscrowRepairKind =
+  | { FixedPurchase: null }
+  | { Auction: null };
+type RawSettlementEscrowRepairQuote = {
+  listingId: ListingId;
+  kind: RawSettlementEscrowRepairKind;
+  escrowId: bigint;
+  escrowAccount: AccountIdentifier;
+  escrowBalance: bigint;
+  requiredDebit: bigint;
+  shortfall: bigint;
+  ledgerFeeE8s: bigint;
+  sellerProceeds: bigint;
+  mintlabFee: bigint;
+  topUpFromAccount: AccountIdentifier;
+  topUpFromBalance: bigint;
+  topUpTransferFeeE8s: bigint;
+  topUpTotalDebit: bigint;
+};
+type RawSettlementEscrowTopUpReceipt = {
+  listingId: ListingId;
+  amount: bigint;
+  feeE8s: bigint;
+  blockIndex: bigint;
+  quoteBefore: RawSettlementEscrowRepairQuote;
+};
 type RawMintReceipt = {
   nft: RawWalletNFT;
   paymentBlock: bigint;
@@ -1252,6 +1314,45 @@ function fromRawMarketplaceFeeConfig(
     ledgerFeeE8s: value.ledgerFeeE8s,
     mintlabFeeBasisPoints: value.mintlabFeeBasisPoints,
     mintlabFeeRecipient: fromRawOption(value.mintlabFeeRecipient),
+  };
+}
+
+function fromRawSettlementEscrowRepairKind(
+  value: RawSettlementEscrowRepairKind,
+): SettlementEscrowRepairKind {
+  return "FixedPurchase" in value ? "FixedPurchase" : "Auction";
+}
+
+function fromRawSettlementEscrowRepairQuote(
+  value: RawSettlementEscrowRepairQuote,
+): SettlementEscrowRepairQuote {
+  return {
+    listingId: value.listingId,
+    kind: fromRawSettlementEscrowRepairKind(value.kind),
+    escrowId: value.escrowId,
+    escrowAccount: value.escrowAccount,
+    escrowBalance: value.escrowBalance,
+    requiredDebit: value.requiredDebit,
+    shortfall: value.shortfall,
+    ledgerFeeE8s: value.ledgerFeeE8s,
+    sellerProceeds: value.sellerProceeds,
+    mintlabFee: value.mintlabFee,
+    topUpFromAccount: value.topUpFromAccount,
+    topUpFromBalance: value.topUpFromBalance,
+    topUpTransferFeeE8s: value.topUpTransferFeeE8s,
+    topUpTotalDebit: value.topUpTotalDebit,
+  };
+}
+
+function fromRawSettlementEscrowTopUpReceipt(
+  value: RawSettlementEscrowTopUpReceipt,
+): SettlementEscrowTopUpReceipt {
+  return {
+    listingId: value.listingId,
+    amount: value.amount,
+    feeE8s: value.feeE8s,
+    blockIndex: value.blockIndex,
+    quoteBefore: fromRawSettlementEscrowRepairQuote(value.quoteBefore),
   };
 }
 
@@ -1950,6 +2051,37 @@ export class Backend implements backendInterface {
     return fromBooleanResult(
       await this.run(() =>
         this.actor.adminDeleteCollectionCreationRequest(requestId),
+      ),
+    );
+  }
+
+  async adminGetSettlementEscrowRepairQuote(
+    listingId: ListingId,
+  ): Promise<SettlementEscrowRepairQuote> {
+    return fromRawSettlementEscrowRepairQuote(
+      await this.run(() =>
+        this.actor.adminGetSettlementEscrowRepairQuote(listingId),
+      ),
+    );
+  }
+
+  async adminRetryAuctionSettlement(listingId: ListingId): Promise<void> {
+    return this.run(() => this.actor.adminRetryAuctionSettlement(listingId));
+  }
+
+  async adminRetryFixedPurchaseSettlement(listingId: ListingId): Promise<void> {
+    return this.run(() =>
+      this.actor.adminRetryFixedPurchaseSettlement(listingId),
+    );
+  }
+
+  async adminTopUpSettlementEscrow(
+    listingId: ListingId,
+    amount: bigint,
+  ): Promise<SettlementEscrowTopUpReceipt> {
+    return fromRawSettlementEscrowTopUpReceipt(
+      await this.run(() =>
+        this.actor.adminTopUpSettlementEscrow(listingId, amount),
       ),
     );
   }

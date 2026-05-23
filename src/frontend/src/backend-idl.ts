@@ -169,6 +169,33 @@ export const idlFactory = ({ IDL }) => {
     'mintlabFeeBasisPoints' : IDL.Nat,
     'mintlabFeeRecipient' : IDL.Opt(AccountIdentifier),
   });
+  const SettlementEscrowRepairKind = IDL.Variant({
+    'FixedPurchase' : IDL.Null,
+    'Auction' : IDL.Null,
+  });
+  const SettlementEscrowRepairQuote = IDL.Record({
+    'listingId' : ListingId,
+    'kind' : SettlementEscrowRepairKind,
+    'escrowId' : IDL.Nat,
+    'escrowAccount' : AccountIdentifier,
+    'escrowBalance' : IDL.Nat64,
+    'requiredDebit' : IDL.Nat64,
+    'shortfall' : IDL.Nat64,
+    'ledgerFeeE8s' : IDL.Nat64,
+    'sellerProceeds' : IDL.Nat64,
+    'mintlabFee' : IDL.Nat64,
+    'topUpFromAccount' : AccountIdentifier,
+    'topUpFromBalance' : IDL.Nat64,
+    'topUpTransferFeeE8s' : IDL.Nat64,
+    'topUpTotalDebit' : IDL.Nat64,
+  });
+  const SettlementEscrowTopUpReceipt = IDL.Record({
+    'listingId' : ListingId,
+    'amount' : IDL.Nat64,
+    'feeE8s' : IDL.Nat64,
+    'blockIndex' : IDL.Nat64,
+    'quoteBefore' : SettlementEscrowRepairQuote,
+  });
   const CollectionBrowseCoverage = IDL.Variant({
     'Full' : IDL.Null,
     'Partial' : IDL.Null,
@@ -465,6 +492,18 @@ export const idlFactory = ({ IDL }) => {
     'adminDeleteCollectionCreationRequest' : IDL.Func(
         [IDL.Nat],
         [IDL.Variant({ 'ok' : IDL.Bool, 'err' : IDL.Text })],
+        [],
+      ),
+    'adminGetSettlementEscrowRepairQuote' : IDL.Func(
+        [ListingId],
+        [SettlementEscrowRepairQuote],
+        [],
+      ),
+    'adminRetryAuctionSettlement' : IDL.Func([ListingId], [], []),
+    'adminRetryFixedPurchaseSettlement' : IDL.Func([ListingId], [], []),
+    'adminTopUpSettlementEscrow' : IDL.Func(
+        [ListingId, IDL.Nat64],
+        [SettlementEscrowTopUpReceipt],
         [],
       ),
     'bootstrapAdmin' : IDL.Func([], [], []),

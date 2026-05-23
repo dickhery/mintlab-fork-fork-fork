@@ -237,9 +237,172 @@ mixin (
     };
   };
 
+  func auctionListingHasAcceptedBid(listing : MarketplaceTypes.AuctionListing) : Bool {
+    if (listing.highestBid > 0) return true;
+    switch (listing.highestBidder) {
+      case (?_) true;
+      case null false;
+    };
+  };
+
   func settlementPayoutDebit(amount : Nat64, mintlabFee : Nat64, ledgerFeeE8s : Nat64) : Nat64 {
     let transferCount : Nat = if (mintlabFee > 0) 2 else 1;
     Nat64.fromNat(Nat64.toNat(amount) + (Nat64.toNat(ledgerFeeE8s) * transferCount));
+  };
+
+  func settlementRepairShortfall(requiredDebit : Nat64, escrowBalance : Nat64) : Nat64 {
+    if (escrowBalance >= requiredDebit) 0 else requiredDebit - escrowBalance;
+  };
+
+  func settlementRepairRequiredDebit(
+    price : Nat64,
+    mintlabFee : Nat64,
+    mintlabFeeCreatedAt : ?Nat64,
+    mintlabFeeBlock : ?Nat64,
+    sellerProceeds : Nat64,
+    sellerPaymentBlock : ?Nat64,
+    currentFee : Nat64,
+  ) : Nat64 {
+    switch (sellerPaymentBlock) {
+      case (?_) 0;
+      case null {
+        let sellerDebit = sellerProceeds + currentFee;
+        if (mintlabFee > 0 and mintlabFeeBlock == null) {
+          switch (mintlabFeeCreatedAt) {
+            case (?_) Runtime.trap("Mintlab fee transfer is unresolved; retry settlement before topping up escrow");
+            case null settlementPayoutDebit(price, mintlabFee, currentFee);
+          };
+        } else {
+          sellerDebit;
+        };
+      };
+    };
+  };
+
+  func makeSettlementEscrowRepairQuote(
+    ledger : IcpLib.Ledger,
+    caller : Principal,
+    listingId : MarketplaceTypes.ListingId,
+    kind : MarketplaceTypes.SettlementEscrowRepairKind,
+    escrowId : Nat,
+    escrowAccount : MarketplaceTypes.AccountIdentifier,
+    escrowBalance : Nat64,
+    requiredDebit : Nat64,
+    currentFee : Nat64,
+    sellerProceeds : Nat64,
+    mintlabFee : Nat64,
+  ) : async* MarketplaceTypes.SettlementEscrowRepairQuote {
+    let topUpFromSub = IcpLib.principalToSubaccount(caller);
+    let topUpFromAccount = IcpLib.accountIdentifier(canisterId, topUpFromSub);
+    let topUpFromBalance = await* IcpLib.getBalance(ledger, topUpFromAccount);
+    let shortfall = settlementRepairShortfall(requiredDebit, escrowBalance);
+    let topUpTotalDebit : Nat64 = if (shortfall == 0) 0 else shortfall + currentFee;
+    {
+      listingId;
+      kind;
+      escrowId;
+      escrowAccount;
+      escrowBalance;
+      requiredDebit;
+      shortfall;
+      ledgerFeeE8s = currentFee;
+      sellerProceeds;
+      mintlabFee;
+      topUpFromAccount;
+      topUpFromBalance;
+      topUpTransferFeeE8s = currentFee;
+      topUpTotalDebit;
+    };
+  };
+
+  func fixedSettlementEscrowRepairQuote(
+    ledger : IcpLib.Ledger,
+    caller : Principal,
+    settlement : MarketplaceTypes.FixedPurchaseSettlement,
+  ) : async* MarketplaceTypes.SettlementEscrowRepairQuote {
+    switch (settlement.paymentBlock) {
+      case null Runtime.trap("Purchase escrow payment is not recorded; retry fixed purchase settlement before topping up escrow");
+      case (?_) {};
+    };
+    let currentFee = await* IcpLib.getTransferFee(ledger);
+    let escrowSub = IcpLib.marketplacePurchaseEscrowSubaccount(settlement.paymentEscrowId);
+    let escrowAccount = IcpLib.accountIdentifier(canisterId, escrowSub);
+    let escrowBalance = await* IcpLib.getBalance(ledger, escrowAccount);
+    let requiredDebit = settlementRepairRequiredDebit(
+      settlement.price,
+      settlement.mintlabFee,
+      settlement.mintlabFeeCreatedAt,
+      settlement.mintlabFeeBlock,
+      settlement.sellerProceeds,
+      settlement.sellerPaymentBlock,
+      currentFee,
+    );
+    await* makeSettlementEscrowRepairQuote(
+      ledger,
+      caller,
+      settlement.listingId,
+      #FixedPurchase,
+      settlement.paymentEscrowId,
+      escrowAccount,
+      escrowBalance,
+      requiredDebit,
+      currentFee,
+      settlement.sellerProceeds,
+      settlement.mintlabFee,
+    );
+  };
+
+  func auctionSettlementEscrowRepairQuote(
+    ledger : IcpLib.Ledger,
+    caller : Principal,
+    settlement : MarketplaceTypes.AuctionSettlement,
+  ) : async* MarketplaceTypes.SettlementEscrowRepairQuote {
+    let currentFee = await* IcpLib.getTransferFee(ledger);
+    let escrowSub = IcpLib.marketplaceEscrowSubaccount(settlement.winningEscrowId);
+    let escrowAccount = IcpLib.accountIdentifier(canisterId, escrowSub);
+    let escrowBalance = await* IcpLib.getBalance(ledger, escrowAccount);
+    let requiredDebit = settlementRepairRequiredDebit(
+      settlement.price,
+      settlement.mintlabFee,
+      settlement.mintlabFeeCreatedAt,
+      settlement.mintlabFeeBlock,
+      settlement.sellerProceeds,
+      settlement.sellerPaymentBlock,
+      currentFee,
+    );
+    await* makeSettlementEscrowRepairQuote(
+      ledger,
+      caller,
+      settlement.listingId,
+      #Auction,
+      settlement.winningEscrowId,
+      escrowAccount,
+      escrowBalance,
+      requiredDebit,
+      currentFee,
+      settlement.sellerProceeds,
+      settlement.mintlabFee,
+    );
+  };
+
+  func getSettlementEscrowRepairQuoteForCaller(
+    ledger : IcpLib.Ledger,
+    caller : Principal,
+    listingId : MarketplaceTypes.ListingId,
+  ) : async* MarketplaceTypes.SettlementEscrowRepairQuote {
+    switch (MarketplaceLib.getFixedPurchaseSettlement(marketplaceSettlementState, listingId)) {
+      case (?settlement) {
+        return await* fixedSettlementEscrowRepairQuote(ledger, caller, settlement);
+      };
+      case null {};
+    };
+    switch (MarketplaceLib.getAuctionSettlement(marketplaceSettlementState, listingId)) {
+      case (?settlement) {
+        return await* auctionSettlementEscrowRepairQuote(ledger, caller, settlement);
+      };
+      case null {};
+    };
+    Runtime.trap("Settlement not found for listing");
   };
 
   func refundRemainingEscrowBalanceToUser(
@@ -501,6 +664,85 @@ mixin (
     try {
       await* continueListingReturnSettlement(listingId);
     } finally {
+      MarketplaceLib.releaseListingLock(marketplacePaymentState, listingId);
+    };
+  };
+
+  public shared ({ caller }) func adminGetSettlementEscrowRepairQuote(
+    listingId : MarketplaceTypes.ListingId
+  ) : async MarketplaceTypes.SettlementEscrowRepairQuote {
+    requireMarketplaceAdmin(caller);
+    let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+    await* getSettlementEscrowRepairQuoteForCaller(ledger, caller, listingId);
+  };
+
+  public shared ({ caller }) func adminTopUpSettlementEscrow(
+    listingId : MarketplaceTypes.ListingId,
+    amount : Nat64,
+  ) : async MarketplaceTypes.SettlementEscrowTopUpReceipt {
+    requireMarketplaceAdmin(caller);
+    if (amount == 0) Runtime.trap("Top-up amount must be greater than zero");
+    if (not MarketplaceLib.acquireListingLock(marketplacePaymentState, listingId)) {
+      Runtime.trap("Settlement is processing another payment. Try again shortly.");
+    };
+    var paymentLockOwner : ?Principal = null;
+    try {
+      acquireUserPaymentLockOrTrap(caller);
+      paymentLockOwner := ?caller;
+      let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+      let quote = await* getSettlementEscrowRepairQuoteForCaller(ledger, caller, listingId);
+      if (quote.shortfall == 0) {
+        Runtime.trap("Settlement escrow does not need a top-up");
+      };
+      if (amount != quote.shortfall) {
+        Runtime.trap(
+          "Top-up amount must equal the current settlement escrow shortfall of " #
+          Nat64.toText(quote.shortfall) # " e8s"
+        );
+      };
+      if (quote.topUpFromBalance < quote.topUpTotalDebit) {
+        Runtime.trap(
+          "Admin in-app ICP balance is too low for the escrow top-up. Required: " #
+          Nat64.toText(quote.topUpTotalDebit) # " e8s, balance: " #
+          Nat64.toText(quote.topUpFromBalance) # " e8s"
+        );
+      };
+      let adminSub = IcpLib.principalToSubaccount(caller);
+      let topUpResult = await* IcpLib.transferOutWithFeeAt(
+        ledger,
+        ?adminSub,
+        quote.escrowAccount,
+        amount,
+        Nat64.fromNat(listingId),
+        quote.topUpTransferFeeE8s,
+        ledgerTimestampNow(),
+      );
+      let blockIndex = switch (transferBlockResult(topUpResult)) {
+        case (#ok(block)) block;
+        case (#badFee(expectedFee)) {
+          Runtime.trap(
+            "Escrow top-up failed: ledger fee changed to " #
+            Nat64.toText(expectedFee) # " e8s; refresh the repair quote"
+          );
+        };
+        case (#insufficientFunds(balance)) {
+          Runtime.trap(
+            "Escrow top-up failed: admin in-app ICP balance is " #
+            Nat64.toText(balance) # " e8s"
+          );
+        };
+        case (#tooOld) Runtime.trap("Escrow top-up timestamp expired; refresh the repair quote and retry");
+        case (#createdInFuture) Runtime.trap("Escrow top-up timestamp was in the future; retry shortly");
+      };
+      {
+        listingId;
+        amount;
+        feeE8s = quote.topUpTransferFeeE8s;
+        blockIndex;
+        quoteBefore = quote;
+      };
+    } finally {
+      releaseMarketplaceUserPaymentLock(paymentLockOwner);
       MarketplaceLib.releaseListingLock(marketplacePaymentState, listingId);
     };
   };
@@ -768,9 +1010,15 @@ mixin (
               );
             };
             case (#insufficientFunds(balance)) {
-              Runtime.trap(
+              let updated = {
+                settlement with
+                mintlabFeeCreatedAt = null;
+                updatedAt = Time.now();
+              };
+              await* persistFixedPurchaseSettlementAndTrap(
+                updated,
                 "Mintlab sales fee transfer failed: escrow balance is too low (" #
-                Nat64.toText(balance) # " e8s)"
+                Nat64.toText(balance) # " e8s); request an admin repair quote"
               );
             };
             case (#tooOld) {
@@ -886,13 +1134,19 @@ mixin (
               updated,
               "Seller ICP transfer failed: ledger fee changed; retry settlement",
             );
-          };
-          case (#insufficientFunds(balance)) {
-            Runtime.trap(
-              "Seller ICP transfer failed: settlement escrow needs top-up before payout. Balance: " #
-              Nat64.toText(balance) # " e8s"
-            );
-          };
+            };
+            case (#insufficientFunds(balance)) {
+              let updated = {
+                settlement with
+                sellerPaymentCreatedAt = null;
+                updatedAt = Time.now();
+              };
+              await* persistFixedPurchaseSettlementAndTrap(
+                updated,
+                "Seller ICP transfer failed: settlement escrow needs top-up before payout. Balance: " #
+                Nat64.toText(balance) # " e8s; request an admin repair quote"
+              );
+            };
           case (#tooOld) {
             let escrowAccount = IcpLib.accountIdentifier(canisterId, escrowSub);
             let escrowBalance = await* IcpLib.getBalance(ledger, escrowAccount);
@@ -1570,9 +1824,15 @@ mixin (
               );
             };
             case (#insufficientFunds(balance)) {
-              Runtime.trap(
+              let updated = {
+                settlement with
+                mintlabFeeCreatedAt = null;
+                updatedAt = Time.now();
+              };
+              await* persistAuctionSettlementAndTrap(
+                updated,
                 "Mintlab sales fee transfer failed: escrow balance is too low (" #
-                Nat64.toText(balance) # " e8s)"
+                Nat64.toText(balance) # " e8s); request an admin repair quote"
               );
             };
             case (#tooOld) {
@@ -1688,13 +1948,19 @@ mixin (
               updated,
               "ICP transfer to seller failed: ledger fee changed; retry settlement",
             );
-          };
-          case (#insufficientFunds(balance)) {
-            Runtime.trap(
-              "ICP transfer to seller failed: settlement escrow needs top-up before payout. Balance: " #
-              Nat64.toText(balance) # " e8s"
-            );
-          };
+            };
+            case (#insufficientFunds(balance)) {
+              let updated = {
+                settlement with
+                sellerPaymentCreatedAt = null;
+                updatedAt = Time.now();
+              };
+              await* persistAuctionSettlementAndTrap(
+                updated,
+                "ICP transfer to seller failed: settlement escrow needs top-up before payout. Balance: " #
+                Nat64.toText(balance) # " e8s; request an admin repair quote"
+              );
+            };
           case (#tooOld) {
             let escrowAccount = IcpLib.accountIdentifier(canisterId, escrowSub);
             let escrowBalance = await* IcpLib.getBalance(ledger, escrowAccount);
@@ -2026,17 +2292,23 @@ mixin (
             case null {};
             case (?_) Runtime.trap("Auction has a pending bid deposit; retry or resolve it before cancelling");
           };
+          if (auctionListingHasAcceptedBid(listing)) {
+            Runtime.trap("Auction cannot be cancelled after a bid has been placed");
+          };
+          switch (MarketplaceLib.getAuctionEscrow(marketplacePaymentState, listingId)) {
+            case null {};
+            case (?_) Runtime.trap("Auction cannot be cancelled after a bid has been placed");
+          };
           let escrowedNFT = switch (MarketplaceLib.getEscrowedNFT(marketplaceState, listingId)) {
             case null Runtime.trap("Escrowed NFT not found for auction listing");
             case (?nft) nft;
           };
-          let currentEscrow = MarketplaceLib.getAuctionEscrow(marketplacePaymentState, listingId);
           ignore startListingReturnSettlement(
             listingId,
             listing.seller,
             escrowedNFT,
             #AuctionCancel,
-            currentEscrow,
+            null,
           );
           await* continueListingReturnSettlement(listingId);
         } finally {

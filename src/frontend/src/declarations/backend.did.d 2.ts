@@ -24,6 +24,31 @@ export interface AuctionListing {
   'nftId' : NFTId,
   'startingBid' : bigint,
 }
+export type SettlementEscrowRepairKind = { 'FixedPurchase' : null } |
+  { 'Auction' : null };
+export interface SettlementEscrowRepairQuote {
+  'listingId' : ListingId,
+  'kind' : SettlementEscrowRepairKind,
+  'escrowId' : bigint,
+  'escrowAccount' : AccountIdentifier,
+  'escrowBalance' : bigint,
+  'requiredDebit' : bigint,
+  'shortfall' : bigint,
+  'ledgerFeeE8s' : bigint,
+  'sellerProceeds' : bigint,
+  'mintlabFee' : bigint,
+  'topUpFromAccount' : AccountIdentifier,
+  'topUpFromBalance' : bigint,
+  'topUpTransferFeeE8s' : bigint,
+  'topUpTotalDebit' : bigint,
+}
+export interface SettlementEscrowTopUpReceipt {
+  'listingId' : ListingId,
+  'amount' : bigint,
+  'feeE8s' : bigint,
+  'blockIndex' : bigint,
+  'quoteBefore' : SettlementEscrowRepairQuote,
+}
 export interface Collection {
   'id' : CollectionId,
   'name' : string,
@@ -85,6 +110,16 @@ export interface _SERVICE {
   'addCollection' : ActorMethod<
     [string, string, Principal, NFTStandard, string, string],
     Collection
+  >,
+  'adminGetSettlementEscrowRepairQuote' : ActorMethod<
+    [ListingId],
+    SettlementEscrowRepairQuote
+  >,
+  'adminRetryAuctionSettlement' : ActorMethod<[ListingId], undefined>,
+  'adminRetryFixedPurchaseSettlement' : ActorMethod<[ListingId], undefined>,
+  'adminTopUpSettlementEscrow' : ActorMethod<
+    [ListingId, bigint],
+    SettlementEscrowTopUpReceipt
   >,
   'bootstrapAdmin' : ActorMethod<[], undefined>,
   'buyFixedListing' : ActorMethod<[ListingId], undefined>,
