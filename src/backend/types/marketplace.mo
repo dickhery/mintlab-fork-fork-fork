@@ -207,6 +207,22 @@ module {
     quoteBefore : SettlementEscrowRepairQuote;
   };
 
+  public type MintlabFeeRecoveryQuote = {
+    listingId : ListingId;
+    kind : SettlementEscrowRepairKind;
+    escrowId : Nat;
+    escrowAccount : AccountIdentifier;
+    escrowBalance : Nat64;
+    expectedBeforeMintlabFeeDebit : Nat64;
+    expectedAfterMintlabFeeDebit : Nat64;
+    shortfallBeforeMintlabFee : Nat64;
+    sellerProceeds : Nat64;
+    mintlabFee : Nat64;
+    ledgerFeeE8s : Nat64;
+    feeRecipient : AccountIdentifier;
+    previousMintlabFeeCreatedAt : Nat64;
+  };
+
   public type ActiveListing = {
     #Fixed : FixedListing;
     #Auction : AuctionListing;

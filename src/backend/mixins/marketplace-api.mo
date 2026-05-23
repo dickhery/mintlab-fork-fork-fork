@@ -269,7 +269,7 @@ mixin (
         let sellerDebit = sellerProceeds + currentFee;
         if (mintlabFee > 0 and mintlabFeeBlock == null) {
           switch (mintlabFeeCreatedAt) {
-            case (?_) Runtime.trap("Mintlab fee transfer is unresolved; retry settlement before topping up escrow");
+            case (?_) Runtime.trap("Mintlab fee transfer is unresolved; inspect or reset Mintlab fee recovery before topping up escrow");
             case null settlementPayoutDebit(price, mintlabFee, currentFee);
           };
         } else {
@@ -399,6 +399,145 @@ mixin (
     switch (MarketplaceLib.getAuctionSettlement(marketplaceSettlementState, listingId)) {
       case (?settlement) {
         return await* auctionSettlementEscrowRepairQuote(ledger, caller, settlement);
+      };
+      case null {};
+    };
+    Runtime.trap("Settlement not found for listing");
+  };
+
+  func makeMintlabFeeRecoveryQuote(
+    listingId : MarketplaceTypes.ListingId,
+    kind : MarketplaceTypes.SettlementEscrowRepairKind,
+    escrowId : Nat,
+    escrowAccount : MarketplaceTypes.AccountIdentifier,
+    escrowBalance : Nat64,
+    price : Nat64,
+    sellerProceeds : Nat64,
+    mintlabFee : Nat64,
+    feeRecipient : MarketplaceTypes.AccountIdentifier,
+    previousMintlabFeeCreatedAt : Nat64,
+    currentFee : Nat64,
+  ) : MarketplaceTypes.MintlabFeeRecoveryQuote {
+    let expectedBeforeFee = settlementPayoutDebit(price, mintlabFee, currentFee);
+    let expectedAfterFee = sellerProceeds + currentFee;
+    {
+      listingId;
+      kind;
+      escrowId;
+      escrowAccount;
+      escrowBalance;
+      expectedBeforeMintlabFeeDebit = expectedBeforeFee;
+      expectedAfterMintlabFeeDebit = expectedAfterFee;
+      shortfallBeforeMintlabFee = settlementRepairShortfall(expectedBeforeFee, escrowBalance);
+      sellerProceeds;
+      mintlabFee;
+      ledgerFeeE8s = currentFee;
+      feeRecipient;
+      previousMintlabFeeCreatedAt;
+    };
+  };
+
+  func fixedMintlabFeeRecoveryQuote(
+    ledger : IcpLib.Ledger,
+    settlement : MarketplaceTypes.FixedPurchaseSettlement,
+  ) : async* MarketplaceTypes.MintlabFeeRecoveryQuote {
+    if (settlement.mintlabFee == 0) {
+      Runtime.trap("Settlement does not include a Mintlab fee");
+    };
+    switch (settlement.paymentBlock) {
+      case null Runtime.trap("Purchase escrow payment is not recorded; retry fixed purchase settlement first");
+      case (?_) {};
+    };
+    switch (settlement.mintlabFeeBlock) {
+      case (?_) Runtime.trap("Mintlab fee is already recorded");
+      case null {};
+    };
+    switch (settlement.sellerPaymentBlock) {
+      case (?_) Runtime.trap("Seller payment is already recorded");
+      case null {};
+    };
+    let previousCreatedAt = switch (settlement.mintlabFeeCreatedAt) {
+      case (?timestamp) timestamp;
+      case null Runtime.trap("No unresolved Mintlab fee attempt is recorded for this settlement");
+    };
+    let feeRecipient = switch (settlement.feeRecipient) {
+      case (?account) account;
+      case null Runtime.trap("Mintlab sales fee account is missing from purchase settlement");
+    };
+    let currentFee = await* IcpLib.getTransferFee(ledger);
+    let escrowSub = IcpLib.marketplacePurchaseEscrowSubaccount(settlement.paymentEscrowId);
+    let escrowAccount = IcpLib.accountIdentifier(canisterId, escrowSub);
+    let escrowBalance = await* IcpLib.getBalance(ledger, escrowAccount);
+    makeMintlabFeeRecoveryQuote(
+      settlement.listingId,
+      #FixedPurchase,
+      settlement.paymentEscrowId,
+      escrowAccount,
+      escrowBalance,
+      settlement.price,
+      settlement.sellerProceeds,
+      settlement.mintlabFee,
+      feeRecipient,
+      previousCreatedAt,
+      currentFee,
+    );
+  };
+
+  func auctionMintlabFeeRecoveryQuote(
+    ledger : IcpLib.Ledger,
+    settlement : MarketplaceTypes.AuctionSettlement,
+  ) : async* MarketplaceTypes.MintlabFeeRecoveryQuote {
+    if (settlement.mintlabFee == 0) {
+      Runtime.trap("Settlement does not include a Mintlab fee");
+    };
+    switch (settlement.mintlabFeeBlock) {
+      case (?_) Runtime.trap("Mintlab fee is already recorded");
+      case null {};
+    };
+    switch (settlement.sellerPaymentBlock) {
+      case (?_) Runtime.trap("Seller payment is already recorded");
+      case null {};
+    };
+    let previousCreatedAt = switch (settlement.mintlabFeeCreatedAt) {
+      case (?timestamp) timestamp;
+      case null Runtime.trap("No unresolved Mintlab fee attempt is recorded for this settlement");
+    };
+    let feeRecipient = switch (settlement.feeRecipient) {
+      case (?account) account;
+      case null Runtime.trap("Mintlab sales fee account is missing from auction settlement");
+    };
+    let currentFee = await* IcpLib.getTransferFee(ledger);
+    let escrowSub = IcpLib.marketplaceEscrowSubaccount(settlement.winningEscrowId);
+    let escrowAccount = IcpLib.accountIdentifier(canisterId, escrowSub);
+    let escrowBalance = await* IcpLib.getBalance(ledger, escrowAccount);
+    makeMintlabFeeRecoveryQuote(
+      settlement.listingId,
+      #Auction,
+      settlement.winningEscrowId,
+      escrowAccount,
+      escrowBalance,
+      settlement.price,
+      settlement.sellerProceeds,
+      settlement.mintlabFee,
+      feeRecipient,
+      previousCreatedAt,
+      currentFee,
+    );
+  };
+
+  func getMintlabFeeRecoveryQuote(
+    ledger : IcpLib.Ledger,
+    listingId : MarketplaceTypes.ListingId,
+  ) : async* MarketplaceTypes.MintlabFeeRecoveryQuote {
+    switch (MarketplaceLib.getFixedPurchaseSettlement(marketplaceSettlementState, listingId)) {
+      case (?settlement) {
+        return await* fixedMintlabFeeRecoveryQuote(ledger, settlement);
+      };
+      case null {};
+    };
+    switch (MarketplaceLib.getAuctionSettlement(marketplaceSettlementState, listingId)) {
+      case (?settlement) {
+        return await* auctionMintlabFeeRecoveryQuote(ledger, settlement);
       };
       case null {};
     };
@@ -674,6 +813,114 @@ mixin (
     requireMarketplaceAdmin(caller);
     let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
     await* getSettlementEscrowRepairQuoteForCaller(ledger, caller, listingId);
+  };
+
+  public shared ({ caller }) func adminGetMintlabFeeRecoveryQuote(
+    listingId : MarketplaceTypes.ListingId
+  ) : async MarketplaceTypes.MintlabFeeRecoveryQuote {
+    requireMarketplaceAdmin(caller);
+    let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+    await* getMintlabFeeRecoveryQuote(ledger, listingId);
+  };
+
+  public shared ({ caller }) func adminResetUnresolvedMintlabFeeAttempt(
+    listingId : MarketplaceTypes.ListingId
+  ) : async MarketplaceTypes.MintlabFeeRecoveryQuote {
+    requireMarketplaceAdmin(caller);
+    if (not MarketplaceLib.acquireListingLock(marketplacePaymentState, listingId)) {
+      Runtime.trap("Settlement is processing another payment. Try again shortly.");
+    };
+    try {
+      let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+      switch (MarketplaceLib.getFixedPurchaseSettlement(marketplaceSettlementState, listingId)) {
+        case (?settlement) {
+          let quote = await* fixedMintlabFeeRecoveryQuote(ledger, settlement);
+          if (quote.escrowBalance < quote.expectedBeforeMintlabFeeDebit) {
+            Runtime.trap("Escrow balance is below the before-fee debit; mark the Mintlab fee balance-verified only after confirming the fee transfer");
+          };
+          let updated = {
+            settlement with
+            ledgerFeeE8s = quote.ledgerFeeE8s;
+            mintlabFeeCreatedAt = null;
+            updatedAt = Time.now();
+          };
+          MarketplaceLib.putFixedPurchaseSettlement(marketplaceSettlementState, updated);
+          return quote;
+        };
+        case null {};
+      };
+      switch (MarketplaceLib.getAuctionSettlement(marketplaceSettlementState, listingId)) {
+        case (?settlement) {
+          let quote = await* auctionMintlabFeeRecoveryQuote(ledger, settlement);
+          if (quote.escrowBalance < quote.expectedBeforeMintlabFeeDebit) {
+            Runtime.trap("Escrow balance is below the before-fee debit; mark the Mintlab fee balance-verified only after confirming the fee transfer");
+          };
+          let updated = {
+            settlement with
+            ledgerFeeE8s = quote.ledgerFeeE8s;
+            mintlabFeeCreatedAt = null;
+            updatedAt = Time.now();
+          };
+          MarketplaceLib.putAuctionSettlement(marketplaceSettlementState, updated);
+          return quote;
+        };
+        case null {};
+      };
+      Runtime.trap("Settlement not found for listing");
+    } finally {
+      MarketplaceLib.releaseListingLock(marketplacePaymentState, listingId);
+    };
+  };
+
+  public shared ({ caller }) func adminMarkMintlabFeeBalanceVerified(
+    listingId : MarketplaceTypes.ListingId
+  ) : async MarketplaceTypes.MintlabFeeRecoveryQuote {
+    requireMarketplaceAdmin(caller);
+    if (not MarketplaceLib.acquireListingLock(marketplacePaymentState, listingId)) {
+      Runtime.trap("Settlement is processing another payment. Try again shortly.");
+    };
+    try {
+      let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+      switch (MarketplaceLib.getFixedPurchaseSettlement(marketplaceSettlementState, listingId)) {
+        case (?settlement) {
+          let quote = await* fixedMintlabFeeRecoveryQuote(ledger, settlement);
+          if (quote.escrowBalance >= quote.expectedBeforeMintlabFeeDebit) {
+            Runtime.trap("Escrow still has enough to retry the Mintlab fee transfer; reset the fee attempt instead");
+          };
+          let updated = {
+            settlement with
+            ledgerFeeE8s = quote.ledgerFeeE8s;
+            mintlabFeeBlock = ?(0 : Nat64);
+            stage = #SellerPaymentPending;
+            updatedAt = Time.now();
+          };
+          MarketplaceLib.putFixedPurchaseSettlement(marketplaceSettlementState, updated);
+          return quote;
+        };
+        case null {};
+      };
+      switch (MarketplaceLib.getAuctionSettlement(marketplaceSettlementState, listingId)) {
+        case (?settlement) {
+          let quote = await* auctionMintlabFeeRecoveryQuote(ledger, settlement);
+          if (quote.escrowBalance >= quote.expectedBeforeMintlabFeeDebit) {
+            Runtime.trap("Escrow still has enough to retry the Mintlab fee transfer; reset the fee attempt instead");
+          };
+          let updated = {
+            settlement with
+            ledgerFeeE8s = quote.ledgerFeeE8s;
+            mintlabFeeBlock = ?(0 : Nat64);
+            stage = #SellerPaymentPending;
+            updatedAt = Time.now();
+          };
+          MarketplaceLib.putAuctionSettlement(marketplaceSettlementState, updated);
+          return quote;
+        };
+        case null {};
+      };
+      Runtime.trap("Settlement not found for listing");
+    } finally {
+      MarketplaceLib.releaseListingLock(marketplacePaymentState, listingId);
+    };
   };
 
   public shared ({ caller }) func adminTopUpSettlementEscrow(

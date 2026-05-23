@@ -196,6 +196,21 @@ export const idlFactory = ({ IDL }) => {
     'blockIndex' : IDL.Nat64,
     'quoteBefore' : SettlementEscrowRepairQuote,
   });
+  const MintlabFeeRecoveryQuote = IDL.Record({
+    'listingId' : ListingId,
+    'kind' : SettlementEscrowRepairKind,
+    'escrowId' : IDL.Nat,
+    'escrowAccount' : AccountIdentifier,
+    'escrowBalance' : IDL.Nat64,
+    'expectedBeforeMintlabFeeDebit' : IDL.Nat64,
+    'expectedAfterMintlabFeeDebit' : IDL.Nat64,
+    'shortfallBeforeMintlabFee' : IDL.Nat64,
+    'sellerProceeds' : IDL.Nat64,
+    'mintlabFee' : IDL.Nat64,
+    'ledgerFeeE8s' : IDL.Nat64,
+    'feeRecipient' : AccountIdentifier,
+    'previousMintlabFeeCreatedAt' : IDL.Nat64,
+  });
   const CollectionBrowseCoverage = IDL.Variant({
     'Full' : IDL.Null,
     'Partial' : IDL.Null,
@@ -499,6 +514,23 @@ export const idlFactory = ({ IDL }) => {
         [SettlementEscrowRepairQuote],
         [],
       ),
+    'adminGetMintlabFeeRecoveryQuote' : IDL.Func(
+        [ListingId],
+        [MintlabFeeRecoveryQuote],
+        [],
+      ),
+    'adminResetUnresolvedMintlabFeeAttempt' : IDL.Func(
+        [ListingId],
+        [MintlabFeeRecoveryQuote],
+        [],
+      ),
+    'adminMarkMintlabFeeBalanceVerified' : IDL.Func(
+        [ListingId],
+        [MintlabFeeRecoveryQuote],
+        [],
+      ),
+    'adminRetryListingReturn' : IDL.Func([ListingId], [], []),
+    'adminRetryNoBidAuctionReturn' : IDL.Func([ListingId], [], []),
     'adminRetryAuctionSettlement' : IDL.Func([ListingId], [], []),
     'adminRetryFixedPurchaseSettlement' : IDL.Func([ListingId], [], []),
     'adminTopUpSettlementEscrow' : IDL.Func(

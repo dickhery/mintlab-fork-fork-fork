@@ -1,13 +1,13 @@
-import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, a as cn, i as useNavigate, k as useAdmin, b as useBackend, d as useQueryClient, e as useQuery, l as Shield, f as ue, B as Button, P as Principal, A as Actor } from "./index-BDyzW518.js";
-import { L as LoaderCircle, A as AppCanisterTopUpDialog, P as Plus, F as Fuel } from "./AppCanisterTopUpDialog-7k0oKPJm.js";
-import { S as Switch, r as recommendedCollectionCreationTopUpCycles, T as Trash2, C as CollectionCreationDiagnosticsPanel } from "./switch-F70nPsfe.js";
-import { A as AlertDialog, i as AlertDialogTrigger, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-DXVqgkcL.js";
-import { j as Primitive, u as useMutation, L as Label, I as Input, B as Badge } from "./badge-BbAzfD9d.js";
-import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, R as RefreshCw, c as CardContent } from "./card-C-gwe9zh.js";
-import { L as Layers, e as ChevronDown, T as Textarea, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, E as ExternalLink, I as Info, C as Check } from "./textarea-CIR8Ul8B.js";
-import { S as Skeleton, C as Copy } from "./skeleton-Bj8lL_BC.js";
-import { r as resolveImageUrl, I as ImageOff } from "./media-BbkeeHTe.js";
-import { C as CircleAlert } from "./circle-alert-B5rtsnZ5.js";
+import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, a as cn, i as useNavigate, k as useAdmin, b as useBackend, d as useQueryClient, e as useQuery, l as Shield, f as ue, B as Button, P as Principal, A as Actor } from "./index-BCjlXofm.js";
+import { L as LoaderCircle, A as AppCanisterTopUpDialog, P as Plus, F as Fuel } from "./AppCanisterTopUpDialog-BG6CtaTZ.js";
+import { S as Switch, r as recommendedCollectionCreationTopUpCycles, T as Trash2, C as CollectionCreationDiagnosticsPanel } from "./switch-9kmzign7.js";
+import { A as AlertDialog, i as AlertDialogTrigger, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-Dh1XG8fw.js";
+import { j as Primitive, u as useMutation, L as Label, I as Input, B as Badge } from "./badge-Be4xv2s0.js";
+import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, R as RefreshCw, c as CardContent } from "./card-CpqBX3t2.js";
+import { L as Layers, e as ChevronDown, T as Textarea, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, E as ExternalLink, C as Check, I as Info } from "./textarea-BLlmAbYs.js";
+import { S as Skeleton, C as Copy } from "./skeleton-v-OxE0UW.js";
+import { r as resolveImageUrl, I as ImageOff } from "./media-D0Z2zuf7.js";
+import { C as CircleAlert } from "./circle-alert-DO4PKCBr.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -549,6 +549,7 @@ function MarketplaceEscrowRepairPanel() {
   const { actor } = useBackend();
   const [listingIdInput, setListingIdInput] = reactExports.useState("");
   const [quote, setQuote] = reactExports.useState(null);
+  const [mintlabQuote, setMintlabQuote] = reactExports.useState(null);
   const quoteMutation = useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error("Backend not ready");
@@ -558,12 +559,61 @@ function MarketplaceEscrowRepairPanel() {
     },
     onSuccess: (result) => {
       setQuote(result);
+      setMintlabQuote(null);
       if (result.shortfall === 0n) {
         ue.success("Settlement escrow is funded.");
       }
     },
     onError: (err) => {
       setQuote(null);
+      ue.error(extractError(err));
+    }
+  });
+  const mintlabRecoveryMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      const listingId = parseWholeBigInt(listingIdInput);
+      if (listingId === null) throw new Error("Enter a valid listing ID");
+      return actor.adminGetMintlabFeeRecoveryQuote(listingId);
+    },
+    onSuccess: (result) => {
+      setMintlabQuote(result);
+      ue.success("Mintlab fee recovery quote loaded.");
+    },
+    onError: (err) => {
+      setMintlabQuote(null);
+      ue.error(extractError(err));
+    }
+  });
+  const resetMintlabFeeMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      const listingId = (mintlabQuote == null ? void 0 : mintlabQuote.listingId) ?? parseWholeBigInt(listingIdInput);
+      if (listingId === null) throw new Error("Enter a valid listing ID");
+      return actor.adminResetUnresolvedMintlabFeeAttempt(listingId);
+    },
+    onSuccess: (result) => {
+      setMintlabQuote(result);
+      ue.success("Mintlab fee attempt reset.");
+      quoteMutation.mutate();
+    },
+    onError: (err) => {
+      ue.error(extractError(err));
+    }
+  });
+  const markMintlabFeeVerifiedMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      const listingId = (mintlabQuote == null ? void 0 : mintlabQuote.listingId) ?? parseWholeBigInt(listingIdInput);
+      if (listingId === null) throw new Error("Enter a valid listing ID");
+      return actor.adminMarkMintlabFeeBalanceVerified(listingId);
+    },
+    onSuccess: (result) => {
+      setMintlabQuote(result);
+      ue.success("Mintlab fee marked balance-verified.");
+      quoteMutation.mutate();
+    },
+    onError: (err) => {
       ue.error(extractError(err));
     }
   });
@@ -601,6 +651,34 @@ function MarketplaceEscrowRepairPanel() {
       ue.error(extractError(err));
     }
   });
+  const retryNoBidReturnMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      const listingId = parseWholeBigInt(listingIdInput);
+      if (listingId === null) throw new Error("Enter a valid listing ID");
+      await actor.adminRetryNoBidAuctionReturn(listingId);
+    },
+    onSuccess: () => {
+      ue.success("No-bid return retry started.");
+    },
+    onError: (err) => {
+      ue.error(extractError(err));
+    }
+  });
+  const retryListingReturnMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      const listingId = parseWholeBigInt(listingIdInput);
+      if (listingId === null) throw new Error("Enter a valid listing ID");
+      await actor.adminRetryListingReturn(listingId);
+    },
+    onSuccess: () => {
+      ue.success("Listing return retry started.");
+    },
+    onError: (err) => {
+      ue.error(extractError(err));
+    }
+  });
   const shortfallText = quote ? `${formatICP(quote.shortfall)} ICP` : "No quote";
   const topUpBlocked = !quote || quote.shortfall === 0n || quote.topUpFromBalance < quote.topUpTotalDebit || topUpMutation.isPending;
   return /* @__PURE__ */ jsxRuntimeExports.jsxs(Card, { className: "border-amber-500/25 bg-card", children: [
@@ -627,21 +705,154 @@ function MarketplaceEscrowRepairPanel() {
             }
           )
         ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs(
-          Button,
-          {
-            type: "button",
-            variant: "outline",
-            className: "gap-2",
-            disabled: quoteMutation.isPending,
-            onClick: () => quoteMutation.mutate(),
-            "data-ocid": "admin.marketplace_repair.quote_button",
-            children: [
-              quoteMutation.isPending ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(RefreshCw, { size: 15 }),
-              "Load Quote"
-            ]
-          }
-        )
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap justify-start sm:justify-end gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            Button,
+            {
+              type: "button",
+              variant: "outline",
+              className: "gap-2",
+              disabled: quoteMutation.isPending,
+              onClick: () => quoteMutation.mutate(),
+              "data-ocid": "admin.marketplace_repair.quote_button",
+              children: [
+                quoteMutation.isPending ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(RefreshCw, { size: 15 }),
+                "Load Quote"
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            Button,
+            {
+              type: "button",
+              variant: "outline",
+              className: "gap-2",
+              disabled: mintlabRecoveryMutation.isPending,
+              onClick: () => mintlabRecoveryMutation.mutate(),
+              "data-ocid": "admin.marketplace_repair.mintlab_quote_button",
+              children: [
+                mintlabRecoveryMutation.isPending ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(CircleAlert, { size: 15 }),
+                "Mintlab Fee"
+              ]
+            }
+          )
+        ] })
+      ] }),
+      mintlabQuote && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            RepairMetric,
+            {
+              label: "Settlement",
+              value: `${repairKindLabel(mintlabQuote.kind)} #${mintlabQuote.listingId.toString()}`
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            RepairMetric,
+            {
+              label: "Escrow balance",
+              value: `${formatICP(mintlabQuote.escrowBalance)} ICP`
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            RepairMetric,
+            {
+              label: "Before fee debit",
+              value: `${formatICP(mintlabQuote.expectedBeforeMintlabFeeDebit)} ICP`
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            RepairMetric,
+            {
+              label: "Before fee shortfall",
+              value: `${formatICP(mintlabQuote.shortfallBeforeMintlabFee)} ICP`,
+              tone: mintlabQuote.shortfallBeforeMintlabFee > 0n ? "warning" : "success"
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-3 gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            RepairMetric,
+            {
+              label: "After fee debit",
+              value: `${formatICP(mintlabQuote.expectedAfterMintlabFeeDebit)} ICP`
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            RepairMetric,
+            {
+              label: "Mintlab fee",
+              value: `${formatICP(mintlabQuote.mintlabFee)} ICP`
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            RepairMetric,
+            {
+              label: "Ledger fee",
+              value: `${formatICP(mintlabQuote.ledgerFeeE8s)} ICP`
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-lg border border-border bg-background/60 p-3 min-w-0", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-muted-foreground", children: "Settlement escrow account" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "font-mono text-xs text-foreground mt-1 break-all", children: [
+              accountIdToHex(mintlabQuote.escrowAccount),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                CopyButton,
+                {
+                  text: accountIdToHex(mintlabQuote.escrowAccount),
+                  ariaLabel: "Copy settlement escrow account"
+                }
+              )
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-lg border border-border bg-background/60 p-3 min-w-0", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-xs text-muted-foreground", children: "Mintlab fee recipient" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "font-mono text-xs text-foreground mt-1 break-all", children: [
+              accountIdToHex(mintlabQuote.feeRecipient),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                CopyButton,
+                {
+                  text: accountIdToHex(mintlabQuote.feeRecipient),
+                  ariaLabel: "Copy Mintlab fee recipient"
+                }
+              )
+            ] })
+          ] })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap justify-end gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            Button,
+            {
+              type: "button",
+              variant: "secondary",
+              className: "gap-2",
+              disabled: resetMintlabFeeMutation.isPending,
+              onClick: () => resetMintlabFeeMutation.mutate(),
+              "data-ocid": "admin.marketplace_repair.mintlab_reset_button",
+              children: [
+                resetMintlabFeeMutation.isPending ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(RefreshCw, { size: 15 }),
+                "Reset Fee Attempt"
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            Button,
+            {
+              type: "button",
+              variant: "outline",
+              className: "gap-2",
+              disabled: markMintlabFeeVerifiedMutation.isPending,
+              onClick: () => markMintlabFeeVerifiedMutation.mutate(),
+              "data-ocid": "admin.marketplace_repair.mintlab_mark_verified_button",
+              children: [
+                markMintlabFeeVerifiedMutation.isPending ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Check, { size: 15 }),
+                "Mark Fee Verified"
+              ]
+            }
+          )
+        ] })
       ] }),
       quote && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2", children: [
@@ -759,6 +970,38 @@ function MarketplaceEscrowRepairPanel() {
             }
           )
         ] })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap justify-end gap-2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          Button,
+          {
+            type: "button",
+            variant: "outline",
+            className: "gap-2",
+            disabled: retryNoBidReturnMutation.isPending,
+            onClick: () => retryNoBidReturnMutation.mutate(),
+            "data-ocid": "admin.marketplace_repair.retry_no_bid_return_button",
+            children: [
+              retryNoBidReturnMutation.isPending ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(RefreshCw, { size: 15 }),
+              "Retry No-Bid Return"
+            ]
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          Button,
+          {
+            type: "button",
+            variant: "outline",
+            className: "gap-2",
+            disabled: retryListingReturnMutation.isPending,
+            onClick: () => retryListingReturnMutation.mutate(),
+            "data-ocid": "admin.marketplace_repair.retry_listing_return_button",
+            children: [
+              retryListingReturnMutation.isPending ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 15, className: "animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(RefreshCw, { size: 15 }),
+              "Retry Listing Return"
+            ]
+          }
+        )
       ] })
     ] })
   ] });

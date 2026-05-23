@@ -45,6 +45,7 @@ import type {
   CollectionBrowseInfo,
   CollectionCreationDiagnostics,
   CollectionCreationRequestView,
+  MintlabFeeRecoveryQuote,
   ModerationCategorySettings,
   NFTStandard,
   SettlementEscrowRepairQuote,
@@ -652,6 +653,8 @@ function MarketplaceEscrowRepairPanel() {
   const { actor } = useBackend();
   const [listingIdInput, setListingIdInput] = useState("");
   const [quote, setQuote] = useState<SettlementEscrowRepairQuote | null>(null);
+  const [mintlabQuote, setMintlabQuote] =
+    useState<MintlabFeeRecoveryQuote | null>(null);
 
   const quoteMutation = useMutation({
     mutationFn: async () => {
@@ -662,12 +665,66 @@ function MarketplaceEscrowRepairPanel() {
     },
     onSuccess: (result) => {
       setQuote(result);
+      setMintlabQuote(null);
       if (result.shortfall === 0n) {
         toast.success("Settlement escrow is funded.");
       }
     },
     onError: (err: unknown) => {
       setQuote(null);
+      toast.error(extractError(err));
+    },
+  });
+
+  const mintlabRecoveryMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      const listingId = parseWholeBigInt(listingIdInput);
+      if (listingId === null) throw new Error("Enter a valid listing ID");
+      return actor.adminGetMintlabFeeRecoveryQuote(listingId);
+    },
+    onSuccess: (result) => {
+      setMintlabQuote(result);
+      toast.success("Mintlab fee recovery quote loaded.");
+    },
+    onError: (err: unknown) => {
+      setMintlabQuote(null);
+      toast.error(extractError(err));
+    },
+  });
+
+  const resetMintlabFeeMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      const listingId =
+        mintlabQuote?.listingId ?? parseWholeBigInt(listingIdInput);
+      if (listingId === null) throw new Error("Enter a valid listing ID");
+      return actor.adminResetUnresolvedMintlabFeeAttempt(listingId);
+    },
+    onSuccess: (result) => {
+      setMintlabQuote(result);
+      toast.success("Mintlab fee attempt reset.");
+      quoteMutation.mutate();
+    },
+    onError: (err: unknown) => {
+      toast.error(extractError(err));
+    },
+  });
+
+  const markMintlabFeeVerifiedMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      const listingId =
+        mintlabQuote?.listingId ?? parseWholeBigInt(listingIdInput);
+      if (listingId === null) throw new Error("Enter a valid listing ID");
+      return actor.adminMarkMintlabFeeBalanceVerified(listingId);
+    },
+    onSuccess: (result) => {
+      setMintlabQuote(result);
+      toast.success("Mintlab fee marked balance-verified.");
+      quoteMutation.mutate();
+    },
+    onError: (err: unknown) => {
       toast.error(extractError(err));
     },
   });
@@ -702,6 +759,36 @@ function MarketplaceEscrowRepairPanel() {
     onSuccess: () => {
       toast.success("Settlement retry started.");
       quoteMutation.mutate();
+    },
+    onError: (err: unknown) => {
+      toast.error(extractError(err));
+    },
+  });
+
+  const retryNoBidReturnMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      const listingId = parseWholeBigInt(listingIdInput);
+      if (listingId === null) throw new Error("Enter a valid listing ID");
+      await actor.adminRetryNoBidAuctionReturn(listingId);
+    },
+    onSuccess: () => {
+      toast.success("No-bid return retry started.");
+    },
+    onError: (err: unknown) => {
+      toast.error(extractError(err));
+    },
+  });
+
+  const retryListingReturnMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      const listingId = parseWholeBigInt(listingIdInput);
+      if (listingId === null) throw new Error("Enter a valid listing ID");
+      await actor.adminRetryListingReturn(listingId);
+    },
+    onSuccess: () => {
+      toast.success("Listing return retry started.");
     },
     onError: (err: unknown) => {
       toast.error(extractError(err));
@@ -752,22 +839,142 @@ function MarketplaceEscrowRepairPanel() {
               data-ocid="admin.marketplace_repair.listing_input"
             />
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="gap-2"
-            disabled={quoteMutation.isPending}
-            onClick={() => quoteMutation.mutate()}
-            data-ocid="admin.marketplace_repair.quote_button"
-          >
-            {quoteMutation.isPending ? (
-              <LoaderCircle size={15} className="animate-spin" />
-            ) : (
-              <RefreshCw size={15} />
-            )}
-            Load Quote
-          </Button>
+          <div className="flex flex-wrap justify-start sm:justify-end gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2"
+              disabled={quoteMutation.isPending}
+              onClick={() => quoteMutation.mutate()}
+              data-ocid="admin.marketplace_repair.quote_button"
+            >
+              {quoteMutation.isPending ? (
+                <LoaderCircle size={15} className="animate-spin" />
+              ) : (
+                <RefreshCw size={15} />
+              )}
+              Load Quote
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="gap-2"
+              disabled={mintlabRecoveryMutation.isPending}
+              onClick={() => mintlabRecoveryMutation.mutate()}
+              data-ocid="admin.marketplace_repair.mintlab_quote_button"
+            >
+              {mintlabRecoveryMutation.isPending ? (
+                <LoaderCircle size={15} className="animate-spin" />
+              ) : (
+                <AlertCircle size={15} />
+              )}
+              Mintlab Fee
+            </Button>
+          </div>
         </div>
+
+        {mintlabQuote && (
+          <div className="space-y-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+              <RepairMetric
+                label="Settlement"
+                value={`${repairKindLabel(mintlabQuote.kind)} #${mintlabQuote.listingId.toString()}`}
+              />
+              <RepairMetric
+                label="Escrow balance"
+                value={`${formatICP(mintlabQuote.escrowBalance)} ICP`}
+              />
+              <RepairMetric
+                label="Before fee debit"
+                value={`${formatICP(mintlabQuote.expectedBeforeMintlabFeeDebit)} ICP`}
+              />
+              <RepairMetric
+                label="Before fee shortfall"
+                value={`${formatICP(mintlabQuote.shortfallBeforeMintlabFee)} ICP`}
+                tone={
+                  mintlabQuote.shortfallBeforeMintlabFee > 0n
+                    ? "warning"
+                    : "success"
+                }
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <RepairMetric
+                label="After fee debit"
+                value={`${formatICP(mintlabQuote.expectedAfterMintlabFeeDebit)} ICP`}
+              />
+              <RepairMetric
+                label="Mintlab fee"
+                value={`${formatICP(mintlabQuote.mintlabFee)} ICP`}
+              />
+              <RepairMetric
+                label="Ledger fee"
+                value={`${formatICP(mintlabQuote.ledgerFeeE8s)} ICP`}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="rounded-lg border border-border bg-background/60 p-3 min-w-0">
+                <span className="text-xs text-muted-foreground">
+                  Settlement escrow account
+                </span>
+                <p className="font-mono text-xs text-foreground mt-1 break-all">
+                  {accountIdToHex(mintlabQuote.escrowAccount)}
+                  <CopyButton
+                    text={accountIdToHex(mintlabQuote.escrowAccount)}
+                    ariaLabel="Copy settlement escrow account"
+                  />
+                </p>
+              </div>
+              <div className="rounded-lg border border-border bg-background/60 p-3 min-w-0">
+                <span className="text-xs text-muted-foreground">
+                  Mintlab fee recipient
+                </span>
+                <p className="font-mono text-xs text-foreground mt-1 break-all">
+                  {accountIdToHex(mintlabQuote.feeRecipient)}
+                  <CopyButton
+                    text={accountIdToHex(mintlabQuote.feeRecipient)}
+                    ariaLabel="Copy Mintlab fee recipient"
+                  />
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                className="gap-2"
+                disabled={resetMintlabFeeMutation.isPending}
+                onClick={() => resetMintlabFeeMutation.mutate()}
+                data-ocid="admin.marketplace_repair.mintlab_reset_button"
+              >
+                {resetMintlabFeeMutation.isPending ? (
+                  <LoaderCircle size={15} className="animate-spin" />
+                ) : (
+                  <RefreshCw size={15} />
+                )}
+                Reset Fee Attempt
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="gap-2"
+                disabled={markMintlabFeeVerifiedMutation.isPending}
+                onClick={() => markMintlabFeeVerifiedMutation.mutate()}
+                data-ocid="admin.marketplace_repair.mintlab_mark_verified_button"
+              >
+                {markMintlabFeeVerifiedMutation.isPending ? (
+                  <LoaderCircle size={15} className="animate-spin" />
+                ) : (
+                  <Check size={15} />
+                )}
+                Mark Fee Verified
+              </Button>
+            </div>
+          </div>
+        )}
 
         {quote && (
           <div className="space-y-3">
@@ -873,6 +1080,39 @@ function MarketplaceEscrowRepairPanel() {
             </div>
           </div>
         )}
+
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            disabled={retryNoBidReturnMutation.isPending}
+            onClick={() => retryNoBidReturnMutation.mutate()}
+            data-ocid="admin.marketplace_repair.retry_no_bid_return_button"
+          >
+            {retryNoBidReturnMutation.isPending ? (
+              <LoaderCircle size={15} className="animate-spin" />
+            ) : (
+              <RefreshCw size={15} />
+            )}
+            Retry No-Bid Return
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            disabled={retryListingReturnMutation.isPending}
+            onClick={() => retryListingReturnMutation.mutate()}
+            data-ocid="admin.marketplace_repair.retry_listing_return_button"
+          >
+            {retryListingReturnMutation.isPending ? (
+              <LoaderCircle size={15} className="animate-spin" />
+            ) : (
+              <RefreshCw size={15} />
+            )}
+            Retry Listing Return
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

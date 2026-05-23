@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-4zXthCpt.js","assets/AppCanisterTopUpDialog-7k0oKPJm.js","assets/badge-BbAzfD9d.js","assets/external-nft-transfer-CJHv_sri.js","assets/media-BbkeeHTe.js","assets/MediaImage-CNe65dHf.js","assets/ZoomableMediaImage-Dqb-X7AQ.js","assets/index-DXVqgkcL.js","assets/card-C-gwe9zh.js","assets/textarea-CIR8Ul8B.js","assets/skeleton-Bj8lL_BC.js","assets/imageUtils-GkrAaDBZ.js","assets/send-HoBLrwjl.js","assets/coins-CnoC1s_r.js","assets/MarketplacePage-DLd1MUGG.js","assets/icp-BXjZNIYq.js","assets/AdminPage-tQucIz-h.js","assets/switch-F70nPsfe.js","assets/circle-alert-B5rtsnZ5.js","assets/ICPAccountPage-BddVS4nQ.js","assets/CollectionsPage-CBJm7RuI.js","assets/DividendsPage-Db9RpgGe.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-BZ-SERl8.js","assets/AppCanisterTopUpDialog-BG6CtaTZ.js","assets/badge-Be4xv2s0.js","assets/external-nft-transfer-yVmqFfTr.js","assets/media-D0Z2zuf7.js","assets/MediaImage-DR9a16bu.js","assets/ZoomableMediaImage-QrvYnK0m.js","assets/index-Dh1XG8fw.js","assets/card-CpqBX3t2.js","assets/textarea-BLlmAbYs.js","assets/skeleton-v-OxE0UW.js","assets/imageUtils-TioeecqS.js","assets/send-BYYWTOdd.js","assets/coins-Ds0dtiKl.js","assets/MarketplacePage-D9nqKiS_.js","assets/icp-BXjZNIYq.js","assets/AdminPage-D4w4fA_A.js","assets/switch-9kmzign7.js","assets/circle-alert-DO4PKCBr.js","assets/ICPAccountPage-BXfV8BJg.js","assets/CollectionsPage-BHwvwPyd.js","assets/DividendsPage-BlbRSa6u.js"])))=>i.map(i=>d[i]);
 var __defProp = Object.defineProperty;
 var __typeError = (msg) => {
   throw TypeError(msg);
@@ -15595,7 +15595,7 @@ function mergeLoginOptions(loginOptions, otherLoginOptions) {
   };
 }
 const ONE_HOUR_IN_NANOSECONDS = BigInt(36e11);
-const DEFAULT_IDENTITY_PROVIDER = "https://id.ai";
+const DEFAULT_IDENTITY_PROVIDER = "https://identity.internetcomputer.org/";
 const InternetIdentityReactContext = reactExports.createContext(void 0);
 async function createAuthClient(createOptions) {
   const config = await loadConfig();
@@ -30250,6 +30250,21 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "blockIndex": IDL2.Nat64,
     "quoteBefore": SettlementEscrowRepairQuote
   });
+  const MintlabFeeRecoveryQuote = IDL2.Record({
+    "listingId": ListingId,
+    "kind": SettlementEscrowRepairKind,
+    "escrowId": IDL2.Nat,
+    "escrowAccount": AccountIdentifier,
+    "escrowBalance": IDL2.Nat64,
+    "expectedBeforeMintlabFeeDebit": IDL2.Nat64,
+    "expectedAfterMintlabFeeDebit": IDL2.Nat64,
+    "shortfallBeforeMintlabFee": IDL2.Nat64,
+    "sellerProceeds": IDL2.Nat64,
+    "mintlabFee": IDL2.Nat64,
+    "ledgerFeeE8s": IDL2.Nat64,
+    "feeRecipient": AccountIdentifier,
+    "previousMintlabFeeCreatedAt": IDL2.Nat64
+  });
   const CollectionBrowseCoverage = IDL2.Variant({
     "Full": IDL2.Null,
     "Partial": IDL2.Null
@@ -30553,6 +30568,23 @@ const idlFactory = ({ IDL: IDL2 }) => {
       [SettlementEscrowRepairQuote],
       []
     ),
+    "adminGetMintlabFeeRecoveryQuote": IDL2.Func(
+      [ListingId],
+      [MintlabFeeRecoveryQuote],
+      []
+    ),
+    "adminResetUnresolvedMintlabFeeAttempt": IDL2.Func(
+      [ListingId],
+      [MintlabFeeRecoveryQuote],
+      []
+    ),
+    "adminMarkMintlabFeeBalanceVerified": IDL2.Func(
+      [ListingId],
+      [MintlabFeeRecoveryQuote],
+      []
+    ),
+    "adminRetryListingReturn": IDL2.Func([ListingId], [], []),
+    "adminRetryNoBidAuctionReturn": IDL2.Func([ListingId], [], []),
     "adminRetryAuctionSettlement": IDL2.Func([ListingId], [], []),
     "adminRetryFixedPurchaseSettlement": IDL2.Func([ListingId], [], []),
     "adminTopUpSettlementEscrow": IDL2.Func(
@@ -31176,6 +31208,23 @@ function fromRawSettlementEscrowTopUpReceipt(value) {
     quoteBefore: fromRawSettlementEscrowRepairQuote(value.quoteBefore)
   };
 }
+function fromRawMintlabFeeRecoveryQuote(value) {
+  return {
+    listingId: value.listingId,
+    kind: fromRawSettlementEscrowRepairKind(value.kind),
+    escrowId: value.escrowId,
+    escrowAccount: value.escrowAccount,
+    escrowBalance: value.escrowBalance,
+    expectedBeforeMintlabFeeDebit: value.expectedBeforeMintlabFeeDebit,
+    expectedAfterMintlabFeeDebit: value.expectedAfterMintlabFeeDebit,
+    shortfallBeforeMintlabFee: value.shortfallBeforeMintlabFee,
+    sellerProceeds: value.sellerProceeds,
+    mintlabFee: value.mintlabFee,
+    ledgerFeeE8s: value.ledgerFeeE8s,
+    feeRecipient: value.feeRecipient,
+    previousMintlabFeeCreatedAt: value.previousMintlabFeeCreatedAt
+  };
+}
 function fromRawActiveListing(value) {
   if ("Fixed" in value) {
     return { __kind__: "Fixed", Fixed: fromRawFixedListing(value.Fixed) };
@@ -31675,6 +31724,33 @@ class Backend {
         () => this.actor.adminGetSettlementEscrowRepairQuote(listingId)
       )
     );
+  }
+  async adminGetMintlabFeeRecoveryQuote(listingId) {
+    return fromRawMintlabFeeRecoveryQuote(
+      await this.run(
+        () => this.actor.adminGetMintlabFeeRecoveryQuote(listingId)
+      )
+    );
+  }
+  async adminResetUnresolvedMintlabFeeAttempt(listingId) {
+    return fromRawMintlabFeeRecoveryQuote(
+      await this.run(
+        () => this.actor.adminResetUnresolvedMintlabFeeAttempt(listingId)
+      )
+    );
+  }
+  async adminMarkMintlabFeeBalanceVerified(listingId) {
+    return fromRawMintlabFeeRecoveryQuote(
+      await this.run(
+        () => this.actor.adminMarkMintlabFeeBalanceVerified(listingId)
+      )
+    );
+  }
+  async adminRetryListingReturn(listingId) {
+    return this.run(() => this.actor.adminRetryListingReturn(listingId));
+  }
+  async adminRetryNoBidAuctionReturn(listingId) {
+    return this.run(() => this.actor.adminRetryNoBidAuctionReturn(listingId));
   }
   async adminRetryAuctionSettlement(listingId) {
     return this.run(() => this.actor.adminRetryAuctionSettlement(listingId));
@@ -46244,13 +46320,13 @@ const Toaster = ({ ...props }) => {
     }
   );
 };
-const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-4zXthCpt.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
-const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-DLd1MUGG.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,15,13]) : void 0));
-const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-tQucIz-h.js"), true ? __vite__mapDeps([16,1,2,17,9,7,8,10,4,18]) : void 0));
-const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-BddVS4nQ.js"), true ? __vite__mapDeps([19,2,8,10,15,12,18]) : void 0));
-const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-31YrW9hE.js"), true ? [] : void 0));
-const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-CBJm7RuI.js"), true ? __vite__mapDeps([20,1,2,17,9,7,5,4,6,8,10,11]) : void 0));
-const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-Db9RpgGe.js"), true ? __vite__mapDeps([21,1,2,5,4,8,13]) : void 0));
+const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-BZ-SERl8.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
+const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-D9nqKiS_.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,15,13]) : void 0));
+const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-D4w4fA_A.js"), true ? __vite__mapDeps([16,1,2,17,9,7,8,10,4,18]) : void 0));
+const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-BXfV8BJg.js"), true ? __vite__mapDeps([19,2,8,10,15,12,18]) : void 0));
+const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-CtzsZ-vB.js"), true ? [] : void 0));
+const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-BHwvwPyd.js"), true ? __vite__mapDeps([20,1,2,17,9,7,5,4,6,8,10,11]) : void 0));
+const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-BlbRSa6u.js"), true ? __vite__mapDeps([21,1,2,5,4,8,13]) : void 0));
 const rootRoute = createRootRoute({
   component: () => /* @__PURE__ */ jsxRuntimeExports.jsx(Layout, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(
     reactExports.Suspense,

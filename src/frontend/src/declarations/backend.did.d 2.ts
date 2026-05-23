@@ -49,6 +49,21 @@ export interface SettlementEscrowTopUpReceipt {
   'blockIndex' : bigint,
   'quoteBefore' : SettlementEscrowRepairQuote,
 }
+export interface MintlabFeeRecoveryQuote {
+  'listingId' : ListingId,
+  'kind' : SettlementEscrowRepairKind,
+  'escrowId' : bigint,
+  'escrowAccount' : AccountIdentifier,
+  'escrowBalance' : bigint,
+  'expectedBeforeMintlabFeeDebit' : bigint,
+  'expectedAfterMintlabFeeDebit' : bigint,
+  'shortfallBeforeMintlabFee' : bigint,
+  'sellerProceeds' : bigint,
+  'mintlabFee' : bigint,
+  'ledgerFeeE8s' : bigint,
+  'feeRecipient' : AccountIdentifier,
+  'previousMintlabFeeCreatedAt' : bigint,
+}
 export interface Collection {
   'id' : CollectionId,
   'name' : string,
@@ -115,6 +130,20 @@ export interface _SERVICE {
     [ListingId],
     SettlementEscrowRepairQuote
   >,
+  'adminGetMintlabFeeRecoveryQuote' : ActorMethod<
+    [ListingId],
+    MintlabFeeRecoveryQuote
+  >,
+  'adminResetUnresolvedMintlabFeeAttempt' : ActorMethod<
+    [ListingId],
+    MintlabFeeRecoveryQuote
+  >,
+  'adminMarkMintlabFeeBalanceVerified' : ActorMethod<
+    [ListingId],
+    MintlabFeeRecoveryQuote
+  >,
+  'adminRetryListingReturn' : ActorMethod<[ListingId], undefined>,
+  'adminRetryNoBidAuctionReturn' : ActorMethod<[ListingId], undefined>,
   'adminRetryAuctionSettlement' : ActorMethod<[ListingId], undefined>,
   'adminRetryFixedPurchaseSettlement' : ActorMethod<[ListingId], undefined>,
   'adminTopUpSettlementEscrow' : ActorMethod<

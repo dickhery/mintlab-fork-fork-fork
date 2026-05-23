@@ -200,6 +200,22 @@ type ModerationCategorySettings =
    otherNsfw: bool;
    selfHarm: bool;
  };
+type MintlabFeeRecoveryQuote =
+ record {
+   escrowAccount: AccountIdentifier;
+   escrowBalance: nat64;
+   escrowId: nat;
+   expectedAfterMintlabFeeDebit: nat64;
+   expectedBeforeMintlabFeeDebit: nat64;
+   feeRecipient: AccountIdentifier;
+   kind: SettlementEscrowRepairKind;
+   ledgerFeeE8s: nat64;
+   listingId: ListingId;
+   mintlabFee: nat64;
+   previousMintlabFeeCreatedAt: nat64;
+   sellerProceeds: nat64;
+   shortfallBeforeMintlabFee: nat64;
+ };
 type MintReceipt =
  record {
    nft: WalletNFT;
@@ -806,10 +822,14 @@ service : {
       err: text;
       ok: bool;
     });
+  adminGetMintlabFeeRecoveryQuote: (listingId: ListingId) ->
+   (MintlabFeeRecoveryQuote);
   adminGetSettlementEscrowRepairQuote: (listingId: ListingId) ->
    (SettlementEscrowRepairQuote);
   adminListMarketplaceRecoveryState: () ->
    (MarketplaceRecoverySnapshot) query;
+  adminMarkMintlabFeeBalanceVerified: (listingId: ListingId) ->
+   (MintlabFeeRecoveryQuote);
   adminRecoverPaidCollectionCreation: (owner: principal, cyclePaymentBlock:
    nat64, name: text, description: text, symbol: text, imageUrl: text,
    dividendsEnabled: bool) ->
@@ -817,6 +837,8 @@ service : {
       err: text;
       ok: CollectionCreationReceipt;
     });
+  adminResetUnresolvedMintlabFeeAttempt: (listingId: ListingId) ->
+   (MintlabFeeRecoveryQuote);
   adminRetryAuctionSettlement: (listingId: ListingId) -> ();
   adminRetryFixedPurchaseSettlement: (listingId: ListingId) -> ();
   adminRetryListingReturn: (listingId: ListingId) -> ();

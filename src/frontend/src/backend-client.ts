@@ -180,6 +180,22 @@ export interface SettlementEscrowTopUpReceipt {
   quoteBefore: SettlementEscrowRepairQuote;
 }
 
+export interface MintlabFeeRecoveryQuote {
+  listingId: ListingId;
+  kind: SettlementEscrowRepairKind;
+  escrowId: bigint;
+  escrowAccount: AccountIdentifier;
+  escrowBalance: bigint;
+  expectedBeforeMintlabFeeDebit: bigint;
+  expectedAfterMintlabFeeDebit: bigint;
+  shortfallBeforeMintlabFee: bigint;
+  sellerProceeds: bigint;
+  mintlabFee: bigint;
+  ledgerFeeE8s: bigint;
+  feeRecipient: AccountIdentifier;
+  previousMintlabFeeCreatedAt: bigint;
+}
+
 export enum ListingStatus {
   Sold = "Sold",
   Active = "Active",
@@ -531,6 +547,17 @@ export interface backendInterface {
   adminGetSettlementEscrowRepairQuote(
     listingId: ListingId,
   ): Promise<SettlementEscrowRepairQuote>;
+  adminGetMintlabFeeRecoveryQuote(
+    listingId: ListingId,
+  ): Promise<MintlabFeeRecoveryQuote>;
+  adminResetUnresolvedMintlabFeeAttempt(
+    listingId: ListingId,
+  ): Promise<MintlabFeeRecoveryQuote>;
+  adminMarkMintlabFeeBalanceVerified(
+    listingId: ListingId,
+  ): Promise<MintlabFeeRecoveryQuote>;
+  adminRetryListingReturn(listingId: ListingId): Promise<void>;
+  adminRetryNoBidAuctionReturn(listingId: ListingId): Promise<void>;
   adminRetryAuctionSettlement(listingId: ListingId): Promise<void>;
   adminRetryFixedPurchaseSettlement(listingId: ListingId): Promise<void>;
   adminTopUpSettlementEscrow(
@@ -1041,6 +1068,21 @@ type RawSettlementEscrowTopUpReceipt = {
   blockIndex: bigint;
   quoteBefore: RawSettlementEscrowRepairQuote;
 };
+type RawMintlabFeeRecoveryQuote = {
+  listingId: ListingId;
+  kind: RawSettlementEscrowRepairKind;
+  escrowId: bigint;
+  escrowAccount: AccountIdentifier;
+  escrowBalance: bigint;
+  expectedBeforeMintlabFeeDebit: bigint;
+  expectedAfterMintlabFeeDebit: bigint;
+  shortfallBeforeMintlabFee: bigint;
+  sellerProceeds: bigint;
+  mintlabFee: bigint;
+  ledgerFeeE8s: bigint;
+  feeRecipient: AccountIdentifier;
+  previousMintlabFeeCreatedAt: bigint;
+};
 type RawMintReceipt = {
   nft: RawWalletNFT;
   paymentBlock: bigint;
@@ -1353,6 +1395,26 @@ function fromRawSettlementEscrowTopUpReceipt(
     feeE8s: value.feeE8s,
     blockIndex: value.blockIndex,
     quoteBefore: fromRawSettlementEscrowRepairQuote(value.quoteBefore),
+  };
+}
+
+function fromRawMintlabFeeRecoveryQuote(
+  value: RawMintlabFeeRecoveryQuote,
+): MintlabFeeRecoveryQuote {
+  return {
+    listingId: value.listingId,
+    kind: fromRawSettlementEscrowRepairKind(value.kind),
+    escrowId: value.escrowId,
+    escrowAccount: value.escrowAccount,
+    escrowBalance: value.escrowBalance,
+    expectedBeforeMintlabFeeDebit: value.expectedBeforeMintlabFeeDebit,
+    expectedAfterMintlabFeeDebit: value.expectedAfterMintlabFeeDebit,
+    shortfallBeforeMintlabFee: value.shortfallBeforeMintlabFee,
+    sellerProceeds: value.sellerProceeds,
+    mintlabFee: value.mintlabFee,
+    ledgerFeeE8s: value.ledgerFeeE8s,
+    feeRecipient: value.feeRecipient,
+    previousMintlabFeeCreatedAt: value.previousMintlabFeeCreatedAt,
   };
 }
 
@@ -2063,6 +2125,44 @@ export class Backend implements backendInterface {
         this.actor.adminGetSettlementEscrowRepairQuote(listingId),
       ),
     );
+  }
+
+  async adminGetMintlabFeeRecoveryQuote(
+    listingId: ListingId,
+  ): Promise<MintlabFeeRecoveryQuote> {
+    return fromRawMintlabFeeRecoveryQuote(
+      await this.run(() =>
+        this.actor.adminGetMintlabFeeRecoveryQuote(listingId),
+      ),
+    );
+  }
+
+  async adminResetUnresolvedMintlabFeeAttempt(
+    listingId: ListingId,
+  ): Promise<MintlabFeeRecoveryQuote> {
+    return fromRawMintlabFeeRecoveryQuote(
+      await this.run(() =>
+        this.actor.adminResetUnresolvedMintlabFeeAttempt(listingId),
+      ),
+    );
+  }
+
+  async adminMarkMintlabFeeBalanceVerified(
+    listingId: ListingId,
+  ): Promise<MintlabFeeRecoveryQuote> {
+    return fromRawMintlabFeeRecoveryQuote(
+      await this.run(() =>
+        this.actor.adminMarkMintlabFeeBalanceVerified(listingId),
+      ),
+    );
+  }
+
+  async adminRetryListingReturn(listingId: ListingId): Promise<void> {
+    return this.run(() => this.actor.adminRetryListingReturn(listingId));
+  }
+
+  async adminRetryNoBidAuctionReturn(listingId: ListingId): Promise<void> {
+    return this.run(() => this.actor.adminRetryNoBidAuctionReturn(listingId));
   }
 
   async adminRetryAuctionSettlement(listingId: ListingId): Promise<void> {

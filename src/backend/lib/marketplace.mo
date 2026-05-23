@@ -205,7 +205,13 @@ module {
     } else {
       let remaining = listing.endTime - bidObservedAt;
       if (remaining < ANTI_SNIPE_THRESHOLD_NANOS) {
-        listing.endTime + ANTI_SNIPE_EXTENSION_NANOS;
+        let extendedFromCurrentEnd = listing.endTime + ANTI_SNIPE_EXTENSION_NANOS;
+        let extendedFromAcceptance = Time.now() + ANTI_SNIPE_EXTENSION_NANOS;
+        if (extendedFromCurrentEnd >= extendedFromAcceptance) {
+          extendedFromCurrentEnd;
+        } else {
+          extendedFromAcceptance;
+        };
       } else {
         listing.endTime;
       };

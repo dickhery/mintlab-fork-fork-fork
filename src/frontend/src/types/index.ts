@@ -13,6 +13,7 @@ export type {
   SettlementEscrowRepairKind,
   SettlementEscrowRepairQuote,
   SettlementEscrowTopUpReceipt,
+  MintlabFeeRecoveryQuote,
   UserId,
   ListingId,
   Collection,
