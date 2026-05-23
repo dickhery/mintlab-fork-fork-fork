@@ -45,6 +45,8 @@ export type {
   CollectionCycleTopUpReceipt,
   AppCycleTopUpReceipt,
   DividendClaimReceipt,
+  DividendDisbursementPreview,
+  DividendDisbursementReceipt,
   DividendSyncReceipt,
   NFTDividend,
   CollectionKind,

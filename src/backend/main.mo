@@ -34,6 +34,7 @@ persistent actor Backend {
   let marketplaceBidState = MarketplaceLib.newBidState();
   let marketplaceFeeState = MarketplaceLib.newFeeState();
   let dividendsState = DividendsLib.newState();
+  let dividendFeeState = DividendsLib.newFeeState();
 
   // ── Mixin composition ─────────────────────────────────────────────────────
   include AuthApi(authState);
@@ -77,9 +78,11 @@ persistent actor Backend {
   );
   include DividendsApi(
     dividendsState,
+    dividendFeeState,
     collectionsState,
     walletState,
     marketplaceState,
+    marketplaceUserPaymentLockState,
     mintState,
     Principal.fromActor(Backend),
   );

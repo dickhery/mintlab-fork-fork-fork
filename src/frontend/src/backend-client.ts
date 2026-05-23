@@ -365,6 +365,8 @@ export interface CollectionDividendInfo {
   enabled: boolean;
   accountId: AccountIdentifier;
   balanceE8s: bigint;
+  distributableBalanceE8s: bigint;
+  feeReserveE8s: bigint;
   processedBalanceE8s: bigint;
   pendingE8s: bigint;
   nftCount: bigint;
@@ -392,6 +394,43 @@ export interface DividendClaimReceipt {
   paidE8s: bigint;
   feeE8s: bigint;
   blockIndex: bigint;
+}
+
+export interface DividendDisbursementPreview {
+  collectionId: CollectionId;
+  accountId: AccountIdentifier;
+  balanceE8s: bigint;
+  distributableBalanceE8s: bigint;
+  processedBalanceE8s: bigint;
+  pendingE8s: bigint;
+  projectedPendingE8s: bigint;
+  undistributedE8s: bigint;
+  shareE8s: bigint;
+  remainderE8s: bigint;
+  nftCount: bigint;
+  transferCount: bigint;
+  ledgerFeeE8s: bigint;
+  requiredNetworkFeeE8s: bigint;
+  feeReserveE8s: bigint;
+  feeShortfallE8s: bigint;
+  callerBalanceE8s: bigint;
+  callerFundingTransferFeeE8s: bigint;
+  callerTotalDebitE8s: bigint;
+  maxTransfersPerCall: bigint;
+}
+
+export interface DividendDisbursementReceipt {
+  collectionId: CollectionId;
+  synced: DividendSyncReceipt;
+  paidCount: bigint;
+  skippedCount: bigint;
+  remainingCount: bigint;
+  totalPaidE8s: bigint;
+  totalFeeE8s: bigint;
+  feeTopUpE8s: bigint;
+  feeTopUpBlockIndex: bigint | null;
+  feeReserveRemainingE8s: bigint;
+  failures: Array<string>;
 }
 
 export type TransferError =
@@ -612,6 +651,13 @@ export interface backendInterface {
     | { __kind__: "ok"; ok: DividendClaimReceipt }
     | { __kind__: "err"; err: string }
   >;
+  disburseCollectionDividends(
+    collectionId: CollectionId,
+    maxTransfers: bigint | null,
+  ): Promise<
+    | { __kind__: "ok"; ok: DividendDisbursementReceipt }
+    | { __kind__: "err"; err: string }
+  >;
   getActiveListingDetails(): Promise<Array<ActiveListingDetail>>;
   getActiveListings(): Promise<Array<ActiveListing>>;
   getMyAuctionBidStatuses(
@@ -710,6 +756,12 @@ export interface backendInterface {
     collectionId: CollectionId,
     tokenId: string,
   ): Promise<{ __kind__: "ok"; ok: string } | { __kind__: "err"; err: string }>;
+  previewCollectionDividendDisbursement(
+    collectionId: CollectionId,
+  ): Promise<
+    | { __kind__: "ok"; ok: DividendDisbursementPreview }
+    | { __kind__: "err"; err: string }
+  >;
   previewMyCollectionNFTs(
     collectionId: CollectionId,
   ): Promise<
@@ -1115,6 +1167,8 @@ type RawCollectionDividendInfo = {
   enabled: boolean;
   accountId: AccountIdentifier;
   balanceE8s: bigint;
+  distributableBalanceE8s: bigint;
+  feeReserveE8s: bigint;
   processedBalanceE8s: bigint;
   pendingE8s: bigint;
   nftCount: bigint;
@@ -1139,6 +1193,41 @@ type RawDividendClaimReceipt = {
   paidE8s: bigint;
   feeE8s: bigint;
   blockIndex: bigint;
+};
+type RawDividendDisbursementPreview = {
+  collectionId: CollectionId;
+  accountId: AccountIdentifier;
+  balanceE8s: bigint;
+  distributableBalanceE8s: bigint;
+  processedBalanceE8s: bigint;
+  pendingE8s: bigint;
+  projectedPendingE8s: bigint;
+  undistributedE8s: bigint;
+  shareE8s: bigint;
+  remainderE8s: bigint;
+  nftCount: bigint;
+  transferCount: bigint;
+  ledgerFeeE8s: bigint;
+  requiredNetworkFeeE8s: bigint;
+  feeReserveE8s: bigint;
+  feeShortfallE8s: bigint;
+  callerBalanceE8s: bigint;
+  callerFundingTransferFeeE8s: bigint;
+  callerTotalDebitE8s: bigint;
+  maxTransfersPerCall: bigint;
+};
+type RawDividendDisbursementReceipt = {
+  collectionId: CollectionId;
+  synced: RawDividendSyncReceipt;
+  paidCount: bigint;
+  skippedCount: bigint;
+  remainingCount: bigint;
+  totalPaidE8s: bigint;
+  totalFeeE8s: bigint;
+  feeTopUpE8s: bigint;
+  feeTopUpBlockIndex: [] | [bigint];
+  feeReserveRemainingE8s: bigint;
+  failures: Array<string>;
 };
 
 function fromRawOption<T>(value: [] | [T]): T | null {
@@ -1673,6 +1762,8 @@ function fromRawCollectionDividendInfo(
     enabled: value.enabled,
     accountId: value.accountId,
     balanceE8s: value.balanceE8s,
+    distributableBalanceE8s: value.distributableBalanceE8s,
+    feeReserveE8s: value.feeReserveE8s,
     processedBalanceE8s: value.processedBalanceE8s,
     pendingE8s: value.pendingE8s,
     nftCount: value.nftCount,
@@ -1710,6 +1801,51 @@ function fromRawDividendClaimReceipt(
     paidE8s: value.paidE8s,
     feeE8s: value.feeE8s,
     blockIndex: value.blockIndex,
+  };
+}
+
+function fromRawDividendDisbursementPreview(
+  value: RawDividendDisbursementPreview,
+): DividendDisbursementPreview {
+  return {
+    collectionId: value.collectionId,
+    accountId: value.accountId,
+    balanceE8s: value.balanceE8s,
+    distributableBalanceE8s: value.distributableBalanceE8s,
+    processedBalanceE8s: value.processedBalanceE8s,
+    pendingE8s: value.pendingE8s,
+    projectedPendingE8s: value.projectedPendingE8s,
+    undistributedE8s: value.undistributedE8s,
+    shareE8s: value.shareE8s,
+    remainderE8s: value.remainderE8s,
+    nftCount: value.nftCount,
+    transferCount: value.transferCount,
+    ledgerFeeE8s: value.ledgerFeeE8s,
+    requiredNetworkFeeE8s: value.requiredNetworkFeeE8s,
+    feeReserveE8s: value.feeReserveE8s,
+    feeShortfallE8s: value.feeShortfallE8s,
+    callerBalanceE8s: value.callerBalanceE8s,
+    callerFundingTransferFeeE8s: value.callerFundingTransferFeeE8s,
+    callerTotalDebitE8s: value.callerTotalDebitE8s,
+    maxTransfersPerCall: value.maxTransfersPerCall,
+  };
+}
+
+function fromRawDividendDisbursementReceipt(
+  value: RawDividendDisbursementReceipt,
+): DividendDisbursementReceipt {
+  return {
+    collectionId: value.collectionId,
+    synced: fromRawDividendSyncReceipt(value.synced),
+    paidCount: value.paidCount,
+    skippedCount: value.skippedCount,
+    remainingCount: value.remainingCount,
+    totalPaidE8s: value.totalPaidE8s,
+    totalFeeE8s: value.totalFeeE8s,
+    feeTopUpE8s: value.feeTopUpE8s,
+    feeTopUpBlockIndex: fromRawOption(value.feeTopUpBlockIndex),
+    feeReserveRemainingE8s: value.feeReserveRemainingE8s,
+    failures: value.failures,
   };
 }
 
@@ -1897,6 +2033,34 @@ function fromDividendClaimResult(
   | { __kind__: "err"; err: string } {
   if ("ok" in value) {
     return { __kind__: "ok", ok: fromRawDividendClaimReceipt(value.ok) };
+  }
+  return { __kind__: "err", err: value.err };
+}
+
+function fromDividendDisbursementPreviewResult(
+  value: { ok: RawDividendDisbursementPreview } | { err: string },
+):
+  | { __kind__: "ok"; ok: DividendDisbursementPreview }
+  | { __kind__: "err"; err: string } {
+  if ("ok" in value) {
+    return {
+      __kind__: "ok",
+      ok: fromRawDividendDisbursementPreview(value.ok),
+    };
+  }
+  return { __kind__: "err", err: value.err };
+}
+
+function fromDividendDisbursementResult(
+  value: { ok: RawDividendDisbursementReceipt } | { err: string },
+):
+  | { __kind__: "ok"; ok: DividendDisbursementReceipt }
+  | { __kind__: "err"; err: string } {
+  if ("ok" in value) {
+    return {
+      __kind__: "ok",
+      ok: fromRawDividendDisbursementReceipt(value.ok),
+    };
   }
   return { __kind__: "err", err: value.err };
 }
@@ -2305,6 +2469,23 @@ export class Backend implements backendInterface {
     );
   }
 
+  async disburseCollectionDividends(
+    collectionId: CollectionId,
+    maxTransfers: bigint | null = null,
+  ): Promise<
+    | { __kind__: "ok"; ok: DividendDisbursementReceipt }
+    | { __kind__: "err"; err: string }
+  > {
+    return fromDividendDisbursementResult(
+      await this.run(() =>
+        this.actor.disburseCollectionDividends(
+          collectionId,
+          toRawOption(maxTransfers),
+        ),
+      ),
+    );
+  }
+
   async getActiveListingDetails(): Promise<Array<ActiveListingDetail>> {
     const result = (await this.run(() =>
       this.actor.getActiveListingDetails(),
@@ -2635,6 +2816,19 @@ export class Backend implements backendInterface {
     return fromTextResult(
       await this.run(() =>
         this.actor.prepareVaultDeposit(collectionId, tokenId),
+      ),
+    );
+  }
+
+  async previewCollectionDividendDisbursement(
+    collectionId: CollectionId,
+  ): Promise<
+    | { __kind__: "ok"; ok: DividendDisbursementPreview }
+    | { __kind__: "err"; err: string }
+  > {
+    return fromDividendDisbursementPreviewResult(
+      await this.run(() =>
+        this.actor.previewCollectionDividendDisbursement(collectionId),
       ),
     );
   }

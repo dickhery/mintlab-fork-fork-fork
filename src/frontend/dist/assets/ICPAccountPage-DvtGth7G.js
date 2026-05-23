@@ -1,10 +1,11 @@
-import { c as createLucideIcon, u as useAuth, b as useBackend, d as useQueryClient, r as reactExports, e as useQuery, j as jsxRuntimeExports, W as Wallet, B as Button, L as LogIn, f as ue } from "./index-_u3uruCO.js";
-import { u as useMutation, B as Badge, L as Label, I as Input, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./badge-CC7I4fiL.js";
-import { C as Card, a as CardHeader, b as CardTitle, R as RefreshCw, c as CardContent } from "./card-D90VAEuf.js";
-import { S as Skeleton, C as Copy } from "./skeleton-DbEHmPWT.js";
+import { c as createLucideIcon, u as useAuth, b as useBackend, d as useQueryClient, r as reactExports, e as useQuery, j as jsxRuntimeExports, W as Wallet, B as Button, L as LogIn, f as ue } from "./index-DCVfoGCn.js";
+import { u as useMutation, B as Badge, L as Label, I as Input, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./badge-6On3keBA.js";
+import { C as Card, a as CardHeader, b as CardTitle, R as RefreshCw, c as CardContent } from "./card-DGicRl87.js";
+import { S as Skeleton, C as Copy } from "./skeleton-P_Ozb0cH.js";
 import { p as parseICPToE8s, I as ICP_E8S } from "./icp-BXjZNIYq.js";
-import { S as Send, C as CircleCheck } from "./send-DvdWt47t.js";
-import { C as CircleAlert } from "./circle-alert-DuDG3Qjy.js";
+import { S as Send } from "./send-DEF69Pfd.js";
+import { C as CircleAlert } from "./circle-alert-BM6szM0v.js";
+import { C as CircleCheck } from "./circle-check-BOZasV6H.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *

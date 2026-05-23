@@ -507,6 +507,43 @@ type DividendSyncReceipt =
    remainderE8s: nat64;
    shareE8s: nat64;
  };
+type DividendDisbursementReceipt =
+ record {
+   collectionId: CollectionId;
+   failures: vec text;
+   feeReserveRemainingE8s: nat64;
+   feeTopUpBlockIndex: opt nat64;
+   feeTopUpE8s: nat64;
+   paidCount: nat;
+   remainingCount: nat;
+   skippedCount: nat;
+   synced: DividendSyncReceipt;
+   totalFeeE8s: nat64;
+   totalPaidE8s: nat64;
+ };
+type DividendDisbursementPreview =
+ record {
+   accountId: AccountIdentifier;
+   balanceE8s: nat64;
+   callerBalanceE8s: nat64;
+   callerFundingTransferFeeE8s: nat64;
+   callerTotalDebitE8s: nat64;
+   collectionId: CollectionId;
+   distributableBalanceE8s: nat64;
+   feeReserveE8s: nat64;
+   feeShortfallE8s: nat64;
+   ledgerFeeE8s: nat64;
+   maxTransfersPerCall: nat;
+   nftCount: nat;
+   pendingE8s: nat64;
+   processedBalanceE8s: nat64;
+   projectedPendingE8s: nat64;
+   remainderE8s: nat64;
+   requiredNetworkFeeE8s: nat64;
+   shareE8s: nat64;
+   transferCount: nat;
+   undistributedE8s: nat64;
+ };
 type DividendClaimReceipt =
  record {
    blockIndex: nat64;
@@ -564,7 +601,9 @@ type CollectionDividendInfo =
    accountId: AccountIdentifier;
    balanceE8s: nat64;
    collectionId: CollectionId;
+   distributableBalanceE8s: nat64;
    enabled: bool;
+   feeReserveE8s: nat64;
    nftCount: nat;
    pendingE8s: nat64;
    processedBalanceE8s: nat64;
@@ -884,6 +923,11 @@ service : {
   dip721_owner_token_identifiers: (owner: principal) ->
    (DIP721TokensResult) query;
   dip721_token_metadata: (token_id: nat) -> (DIP721MetadataResult) query;
+  disburseCollectionDividends: (collectionId: CollectionId, maxTransfers:
+   opt nat) -> (variant {
+                  err: text;
+                  ok: DividendDisbursementReceipt;
+                });
   ext_balance: (request: EXTBalanceRequest) -> (EXTBalanceResponse) query;
   ext_bearer: (tokenIdentifier: EXTTokenIdentifier) ->
    (variant {
@@ -1019,6 +1063,11 @@ service : {
    (variant {
       err: text;
       ok: text;
+    });
+  previewCollectionDividendDisbursement: (collectionId: CollectionId) ->
+   (variant {
+      err: text;
+      ok: DividendDisbursementPreview;
     });
   previewMyCollectionNFTs: (collectionId: CollectionId) ->
    (variant {

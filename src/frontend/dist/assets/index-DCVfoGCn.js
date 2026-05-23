@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-2kSnW3lw.js","assets/AppCanisterTopUpDialog-Dwtra6BT.js","assets/badge-CC7I4fiL.js","assets/external-nft-transfer-tKHrpDWR.js","assets/media-CfZAJt6z.js","assets/MediaImage-SZBTe_qW.js","assets/ZoomableMediaImage-hPqO2wO0.js","assets/index-BF9rdsrc.js","assets/card-D90VAEuf.js","assets/textarea-QWEFxUvs.js","assets/skeleton-DbEHmPWT.js","assets/imageUtils-Gbobh_td.js","assets/send-DvdWt47t.js","assets/coins-BTMioy-b.js","assets/MarketplacePage-DxBmNKlK.js","assets/icp-BXjZNIYq.js","assets/AdminPage-DFU73NM3.js","assets/switch-D9hgKHrw.js","assets/circle-alert-DuDG3Qjy.js","assets/ICPAccountPage-STiLlD5Y.js","assets/CollectionsPage-D9ADgHd3.js","assets/DividendsPage-BJLFWZjb.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-C4q5TLlQ.js","assets/AppCanisterTopUpDialog-CT3A7zPA.js","assets/badge-6On3keBA.js","assets/external-nft-transfer-D6hzrlzf.js","assets/media-QZp5j2x7.js","assets/MediaImage-BlsQOtj4.js","assets/ZoomableMediaImage-DjX509oi.js","assets/index-BjzAQQv2.js","assets/card-DGicRl87.js","assets/textarea-BTBk73xi.js","assets/skeleton-P_Ozb0cH.js","assets/imageUtils-B08321De.js","assets/circle-check-BOZasV6H.js","assets/coins-CVvU9eES.js","assets/send-DEF69Pfd.js","assets/MarketplacePage--1E8NL-s.js","assets/icp-BXjZNIYq.js","assets/AdminPage-D6jiUS-I.js","assets/switch-CX8H5Qqn.js","assets/circle-alert-BM6szM0v.js","assets/ICPAccountPage-DvtGth7G.js","assets/CollectionsPage-DUCUADEx.js","assets/DividendsPage-BUssDONa.js"])))=>i.map(i=>d[i]);
 var __defProp = Object.defineProperty;
 var __typeError = (msg) => {
   throw TypeError(msg);
@@ -15595,7 +15595,7 @@ function mergeLoginOptions(loginOptions, otherLoginOptions) {
   };
 }
 const ONE_HOUR_IN_NANOSECONDS = BigInt(36e11);
-const DEFAULT_IDENTITY_PROVIDER = "https://id.ai";
+const DEFAULT_IDENTITY_PROVIDER = "https://identity.internetcomputer.org/";
 const InternetIdentityReactContext = reactExports.createContext(void 0);
 async function createAuthClient(createOptions) {
   const config = await loadConfig();
@@ -30282,6 +30282,8 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "nftCount": IDL2.Nat,
     "enabled": IDL2.Bool,
     "balanceE8s": IDL2.Nat64,
+    "distributableBalanceE8s": IDL2.Nat64,
+    "feeReserveE8s": IDL2.Nat64,
     "processedBalanceE8s": IDL2.Nat64,
     "pendingE8s": IDL2.Nat64
   });
@@ -30494,6 +30496,41 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "balanceE8s": IDL2.Nat64,
     "remainderE8s": IDL2.Nat64
   });
+  const DividendDisbursementPreview = IDL2.Record({
+    "accountId": AccountIdentifier,
+    "balanceE8s": IDL2.Nat64,
+    "callerBalanceE8s": IDL2.Nat64,
+    "callerFundingTransferFeeE8s": IDL2.Nat64,
+    "callerTotalDebitE8s": IDL2.Nat64,
+    "collectionId": CollectionId,
+    "distributableBalanceE8s": IDL2.Nat64,
+    "feeReserveE8s": IDL2.Nat64,
+    "feeShortfallE8s": IDL2.Nat64,
+    "ledgerFeeE8s": IDL2.Nat64,
+    "maxTransfersPerCall": IDL2.Nat,
+    "nftCount": IDL2.Nat,
+    "pendingE8s": IDL2.Nat64,
+    "processedBalanceE8s": IDL2.Nat64,
+    "projectedPendingE8s": IDL2.Nat64,
+    "remainderE8s": IDL2.Nat64,
+    "requiredNetworkFeeE8s": IDL2.Nat64,
+    "shareE8s": IDL2.Nat64,
+    "transferCount": IDL2.Nat,
+    "undistributedE8s": IDL2.Nat64
+  });
+  const DividendDisbursementReceipt = IDL2.Record({
+    "collectionId": CollectionId,
+    "failures": IDL2.Vec(IDL2.Text),
+    "feeReserveRemainingE8s": IDL2.Nat64,
+    "feeTopUpBlockIndex": IDL2.Opt(IDL2.Nat64),
+    "feeTopUpE8s": IDL2.Nat64,
+    "paidCount": IDL2.Nat,
+    "remainingCount": IDL2.Nat,
+    "skippedCount": IDL2.Nat,
+    "synced": DividendSyncReceipt,
+    "totalFeeE8s": IDL2.Nat64,
+    "totalPaidE8s": IDL2.Nat64
+  });
   const CollectionCycleTopUpReceipt = IDL2.Record({
     "cycleCostE8s": IDL2.Nat64,
     "collectionId": CollectionId,
@@ -30598,6 +30635,16 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "claimNFTDividend": IDL2.Func(
       [NFTId],
       [IDL2.Variant({ "ok": DividendClaimReceipt, "err": IDL2.Text })],
+      []
+    ),
+    "disburseCollectionDividends": IDL2.Func(
+      [CollectionId, IDL2.Opt(IDL2.Nat)],
+      [
+        IDL2.Variant({
+          "ok": DividendDisbursementReceipt,
+          "err": IDL2.Text
+        })
+      ],
       []
     ),
     "claimVaultDeposit": IDL2.Func(
@@ -30864,6 +30911,16 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "prepareVaultDeposit": IDL2.Func(
       [CollectionId, IDL2.Text],
       [IDL2.Variant({ "ok": IDL2.Text, "err": IDL2.Text })],
+      []
+    ),
+    "previewCollectionDividendDisbursement": IDL2.Func(
+      [CollectionId],
+      [
+        IDL2.Variant({
+          "ok": DividendDisbursementPreview,
+          "err": IDL2.Text
+        })
+      ],
       []
     ),
     "previewMyCollectionNFTs": IDL2.Func(
@@ -31429,6 +31486,8 @@ function fromRawCollectionDividendInfo(value) {
     enabled: value.enabled,
     accountId: value.accountId,
     balanceE8s: value.balanceE8s,
+    distributableBalanceE8s: value.distributableBalanceE8s,
+    feeReserveE8s: value.feeReserveE8s,
     processedBalanceE8s: value.processedBalanceE8s,
     pendingE8s: value.pendingE8s,
     nftCount: value.nftCount
@@ -31459,6 +31518,45 @@ function fromRawDividendClaimReceipt(value) {
     paidE8s: value.paidE8s,
     feeE8s: value.feeE8s,
     blockIndex: value.blockIndex
+  };
+}
+function fromRawDividendDisbursementPreview(value) {
+  return {
+    collectionId: value.collectionId,
+    accountId: value.accountId,
+    balanceE8s: value.balanceE8s,
+    distributableBalanceE8s: value.distributableBalanceE8s,
+    processedBalanceE8s: value.processedBalanceE8s,
+    pendingE8s: value.pendingE8s,
+    projectedPendingE8s: value.projectedPendingE8s,
+    undistributedE8s: value.undistributedE8s,
+    shareE8s: value.shareE8s,
+    remainderE8s: value.remainderE8s,
+    nftCount: value.nftCount,
+    transferCount: value.transferCount,
+    ledgerFeeE8s: value.ledgerFeeE8s,
+    requiredNetworkFeeE8s: value.requiredNetworkFeeE8s,
+    feeReserveE8s: value.feeReserveE8s,
+    feeShortfallE8s: value.feeShortfallE8s,
+    callerBalanceE8s: value.callerBalanceE8s,
+    callerFundingTransferFeeE8s: value.callerFundingTransferFeeE8s,
+    callerTotalDebitE8s: value.callerTotalDebitE8s,
+    maxTransfersPerCall: value.maxTransfersPerCall
+  };
+}
+function fromRawDividendDisbursementReceipt(value) {
+  return {
+    collectionId: value.collectionId,
+    synced: fromRawDividendSyncReceipt(value.synced),
+    paidCount: value.paidCount,
+    skippedCount: value.skippedCount,
+    remainingCount: value.remainingCount,
+    totalPaidE8s: value.totalPaidE8s,
+    totalFeeE8s: value.totalFeeE8s,
+    feeTopUpE8s: value.feeTopUpE8s,
+    feeTopUpBlockIndex: fromRawOption(value.feeTopUpBlockIndex),
+    feeReserveRemainingE8s: value.feeReserveRemainingE8s,
+    failures: value.failures
   };
 }
 function fromRawTransferError(value) {
@@ -31579,6 +31677,24 @@ function fromDividendSyncResult(value) {
 function fromDividendClaimResult(value) {
   if ("ok" in value) {
     return { __kind__: "ok", ok: fromRawDividendClaimReceipt(value.ok) };
+  }
+  return { __kind__: "err", err: value.err };
+}
+function fromDividendDisbursementPreviewResult(value) {
+  if ("ok" in value) {
+    return {
+      __kind__: "ok",
+      ok: fromRawDividendDisbursementPreview(value.ok)
+    };
+  }
+  return { __kind__: "err", err: value.err };
+}
+function fromDividendDisbursementResult(value) {
+  if ("ok" in value) {
+    return {
+      __kind__: "ok",
+      ok: fromRawDividendDisbursementReceipt(value.ok)
+    };
   }
   return { __kind__: "err", err: value.err };
 }
@@ -31838,6 +31954,16 @@ class Backend {
       await this.run(() => this.actor.claimNFTDividend(nftId))
     );
   }
+  async disburseCollectionDividends(collectionId, maxTransfers = null) {
+    return fromDividendDisbursementResult(
+      await this.run(
+        () => this.actor.disburseCollectionDividends(
+          collectionId,
+          toRawOption(maxTransfers)
+        )
+      )
+    );
+  }
   async getActiveListingDetails() {
     const result = await this.run(
       () => this.actor.getActiveListingDetails()
@@ -32058,6 +32184,13 @@ class Backend {
     return fromTextResult(
       await this.run(
         () => this.actor.prepareVaultDeposit(collectionId, tokenId)
+      )
+    );
+  }
+  async previewCollectionDividendDisbursement(collectionId) {
+    return fromDividendDisbursementPreviewResult(
+      await this.run(
+        () => this.actor.previewCollectionDividendDisbursement(collectionId)
       )
     );
   }
@@ -46320,13 +46453,13 @@ const Toaster = ({ ...props }) => {
     }
   );
 };
-const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-2kSnW3lw.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
-const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-DxBmNKlK.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,15,13]) : void 0));
-const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-DFU73NM3.js"), true ? __vite__mapDeps([16,1,2,17,9,7,8,10,4,18]) : void 0));
-const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-STiLlD5Y.js"), true ? __vite__mapDeps([19,2,8,10,15,12,18]) : void 0));
-const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-CJrrZ4mQ.js"), true ? [] : void 0));
-const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-D9ADgHd3.js"), true ? __vite__mapDeps([20,1,2,17,9,7,5,4,6,8,10,11]) : void 0));
-const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-BJLFWZjb.js"), true ? __vite__mapDeps([21,1,2,5,4,8,13]) : void 0));
+const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-C4q5TLlQ.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14]) : void 0));
+const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage--1E8NL-s.js"), true ? __vite__mapDeps([15,3,4,5,6,7,2,16,13]) : void 0));
+const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-D6jiUS-I.js"), true ? __vite__mapDeps([17,1,2,18,9,7,8,10,4,19]) : void 0));
+const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-DvtGth7G.js"), true ? __vite__mapDeps([20,2,8,10,16,14,19,12]) : void 0));
+const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-C0cZBpIy.js"), true ? [] : void 0));
+const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-DUCUADEx.js"), true ? __vite__mapDeps([21,1,2,18,9,7,5,4,6,8,10,11,14]) : void 0));
+const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-BUssDONa.js"), true ? __vite__mapDeps([22,1,2,5,4,8,13]) : void 0));
 const rootRoute = createRootRoute({
   component: () => /* @__PURE__ */ jsxRuntimeExports.jsx(Layout, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(
     reactExports.Suspense,

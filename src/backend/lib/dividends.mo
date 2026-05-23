@@ -13,11 +13,23 @@ module {
     pendingClaims : Map.Map<Text, Bool>;
   };
 
+  public type DividendFeeState = {
+    feeReserveE8s : Map.Map<CollectionTypes.CollectionId, Nat64>;
+    disbursementLocks : Map.Map<CollectionTypes.CollectionId, Bool>;
+  };
+
   public func newState() : DividendsState {
     {
       claimableE8s = Map.empty<Text, Nat64>();
       processedBalanceE8s = Map.empty<CollectionTypes.CollectionId, Nat64>();
       pendingClaims = Map.empty<Text, Bool>();
+    };
+  };
+
+  public func newFeeState() : DividendFeeState {
+    {
+      feeReserveE8s = Map.empty<CollectionTypes.CollectionId, Nat64>();
+      disbursementLocks = Map.empty<CollectionTypes.CollectionId, Bool>();
     };
   };
 
@@ -111,6 +123,43 @@ module {
     );
   };
 
+  public func feeReserve(
+    state : DividendFeeState,
+    collectionId : CollectionTypes.CollectionId,
+  ) : Nat64 {
+    switch (Map.get(state.feeReserveE8s, Nat.compare, collectionId)) {
+      case (?amount) amount;
+      case null 0;
+    };
+  };
+
+  public func addFeeReserve(
+    state : DividendFeeState,
+    collectionId : CollectionTypes.CollectionId,
+    amount : Nat64,
+  ) {
+    Map.add(
+      state.feeReserveE8s,
+      Nat.compare,
+      collectionId,
+      feeReserve(state, collectionId) + amount,
+    );
+  };
+
+  public func reduceFeeReserve(
+    state : DividendFeeState,
+    collectionId : CollectionTypes.CollectionId,
+    amount : Nat64,
+  ) {
+    let current = feeReserve(state, collectionId);
+    Map.add(
+      state.feeReserveE8s,
+      Nat.compare,
+      collectionId,
+      if (current > amount) current - amount else (0 : Nat64),
+    );
+  };
+
   public func distributeNewBalance(
     state : DividendsState,
     collectionId : CollectionTypes.CollectionId,
@@ -170,5 +219,25 @@ module {
 
   public func releaseClaim(state : DividendsState, key : Text) {
     Map.remove(state.pendingClaims, Text.compare, key);
+  };
+
+  public func acquireDisbursement(
+    state : DividendFeeState,
+    collectionId : CollectionTypes.CollectionId,
+  ) : Bool {
+    switch (Map.get(state.disbursementLocks, Nat.compare, collectionId)) {
+      case (?_) false;
+      case null {
+        Map.add(state.disbursementLocks, Nat.compare, collectionId, true);
+        true;
+      };
+    };
+  };
+
+  public func releaseDisbursement(
+    state : DividendFeeState,
+    collectionId : CollectionTypes.CollectionId,
+  ) {
+    Map.remove(state.disbursementLocks, Nat.compare, collectionId);
   };
 };

@@ -33,6 +33,7 @@ module {
   public let DEFAULT_FEE : Nat64 = 10_000; // 0.0001 ICP in e8s
   public let CMC_CREATE_CANISTER_MEMO : Nat64 = 1_095_062_083; // "CREA" as a legacy ICP ledger memo
   public let CMC_TOP_UP_MEMO : Nat64 = 1_347_768_404; // "TPUP" as a legacy ICP ledger memo
+  public let DIVIDEND_FEE_MEMO : Nat64 = 1_299_490_374; // "MFEE" as a legacy ICP ledger memo
   public let E8S_PER_ICP : Nat = 100_000_000;
   public let CYCLES_PER_XDR : Nat = 1_000_000_000_000;
 

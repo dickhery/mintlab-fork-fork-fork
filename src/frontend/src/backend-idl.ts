@@ -228,6 +228,8 @@ export const idlFactory = ({ IDL }) => {
     'nftCount' : IDL.Nat,
     'enabled' : IDL.Bool,
     'balanceE8s' : IDL.Nat64,
+    'distributableBalanceE8s' : IDL.Nat64,
+    'feeReserveE8s' : IDL.Nat64,
     'processedBalanceE8s' : IDL.Nat64,
     'pendingE8s' : IDL.Nat64,
   });
@@ -440,6 +442,41 @@ export const idlFactory = ({ IDL }) => {
     'balanceE8s' : IDL.Nat64,
     'remainderE8s' : IDL.Nat64,
   });
+  const DividendDisbursementPreview = IDL.Record({
+    'accountId' : AccountIdentifier,
+    'balanceE8s' : IDL.Nat64,
+    'callerBalanceE8s' : IDL.Nat64,
+    'callerFundingTransferFeeE8s' : IDL.Nat64,
+    'callerTotalDebitE8s' : IDL.Nat64,
+    'collectionId' : CollectionId,
+    'distributableBalanceE8s' : IDL.Nat64,
+    'feeReserveE8s' : IDL.Nat64,
+    'feeShortfallE8s' : IDL.Nat64,
+    'ledgerFeeE8s' : IDL.Nat64,
+    'maxTransfersPerCall' : IDL.Nat,
+    'nftCount' : IDL.Nat,
+    'pendingE8s' : IDL.Nat64,
+    'processedBalanceE8s' : IDL.Nat64,
+    'projectedPendingE8s' : IDL.Nat64,
+    'remainderE8s' : IDL.Nat64,
+    'requiredNetworkFeeE8s' : IDL.Nat64,
+    'shareE8s' : IDL.Nat64,
+    'transferCount' : IDL.Nat,
+    'undistributedE8s' : IDL.Nat64,
+  });
+  const DividendDisbursementReceipt = IDL.Record({
+    'collectionId' : CollectionId,
+    'failures' : IDL.Vec(IDL.Text),
+    'feeReserveRemainingE8s' : IDL.Nat64,
+    'feeTopUpBlockIndex' : IDL.Opt(IDL.Nat64),
+    'feeTopUpE8s' : IDL.Nat64,
+    'paidCount' : IDL.Nat,
+    'remainingCount' : IDL.Nat,
+    'skippedCount' : IDL.Nat,
+    'synced' : DividendSyncReceipt,
+    'totalFeeE8s' : IDL.Nat64,
+    'totalPaidE8s' : IDL.Nat64,
+  });
   const CollectionCycleTopUpReceipt = IDL.Record({
     'cycleCostE8s' : IDL.Nat64,
     'collectionId' : CollectionId,
@@ -544,6 +581,16 @@ export const idlFactory = ({ IDL }) => {
     'claimNFTDividend' : IDL.Func(
         [NFTId],
         [IDL.Variant({ 'ok' : DividendClaimReceipt, 'err' : IDL.Text })],
+        [],
+      ),
+    'disburseCollectionDividends' : IDL.Func(
+        [CollectionId, IDL.Opt(IDL.Nat)],
+        [
+          IDL.Variant({
+            'ok' : DividendDisbursementReceipt,
+            'err' : IDL.Text,
+          }),
+        ],
         [],
       ),
     'claimVaultDeposit' : IDL.Func(
@@ -810,6 +857,16 @@ export const idlFactory = ({ IDL }) => {
     'prepareVaultDeposit' : IDL.Func(
         [CollectionId, IDL.Text],
         [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
+    'previewCollectionDividendDisbursement' : IDL.Func(
+        [CollectionId],
+        [
+          IDL.Variant({
+            'ok' : DividendDisbursementPreview,
+            'err' : IDL.Text,
+          }),
+        ],
         [],
       ),
     'previewMyCollectionNFTs' : IDL.Func(
