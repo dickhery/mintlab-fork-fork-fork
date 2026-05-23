@@ -1794,6 +1794,10 @@ mixin (
       Runtime.trap("Auction is processing another payment. Try again shortly.");
     };
     try {
+      switch (MarketplaceLib.getPendingBidDeposit(marketplaceBidState, listingId)) {
+        case null {};
+        case (?_) Runtime.trap("Auction has a pending bid deposit; retry or resolve it before settling");
+      };
       switch (MarketplaceLib.getNoBidAuctionReturn(marketplaceNoBidAuctionReturnState, listingId)) {
         case (?_) {
           await* continueNoBidAuctionReturnSettlement(listingId);
