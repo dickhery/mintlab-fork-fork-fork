@@ -218,8 +218,31 @@ type NFTMetadata__480568277 =
 type NFTStandard__49470003 = {#DIP721; #EXT; #ICRC7; #Other : Text};
 type Nat__490723111 = Nat__920180692;
 type Nat__920180692 = Nat;
+type NoBidAuctionReturnSettlement__907278393 =
+  {
+    createdAt : Timestamp__534280185;
+    listingId : ListingId__411740840;
+    nft : WalletNFT__72979044;
+    returnedAt : ?Timestamp__534280185;
+    seller : UserId__166399690;
+    stage : NoBidAuctionReturnStage__380679664;
+    updatedAt : Timestamp__534280185;
+    walletRegisteredAt : ?Timestamp__534280185
+  };
+type NoBidAuctionReturnStage__380679664 =
+  {#CleanupPending; #NFTReturnPending; #WalletRegistrationPending};
 type Node__46230540<K, V> =
   {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type PendingAuctionRefund__138190742 =
+  {
+    createdAt : Timestamp__534280185;
+    escrow : AuctionEscrow__460860708;
+    refundAmount : Nat64;
+    refundBlock : ?Nat64;
+    refundCreatedAt : Nat64;
+    refundFeeE8s : Nat64;
+    updatedAt : Timestamp__534280185
+  };
 type PendingBidDeposit__499993912 =
   {
     amount : Nat64;
@@ -284,6 +307,14 @@ actor {
         Map__605269027<ListingId__411740840, PendingBidDeposit__499993912>
     };
   stable marketplaceFeeState : {var mintlabFeeBasisPoints : Nat};
+  stable marketplaceListingLockState :
+    {listingTokenLocks : Map__605269027<Text, Bool>};
+  stable marketplaceNoBidAuctionReturnState :
+    {
+      returns :
+        Map__605269027<ListingId__411740840,
+                        NoBidAuctionReturnSettlement__907278393>
+    };
   stable marketplacePaymentState :
     {
       auctionEscrows :
@@ -293,6 +324,8 @@ actor {
       var nextEscrowId : Nat;
       pendingRefunds : Map__605269027<Nat, AuctionEscrow__460860708>
     };
+  stable marketplaceRefundState :
+    {refundJournals : Map__605269027<Nat, PendingAuctionRefund__138190742>};
   stable marketplaceSettlementState :
     {
       auctionSettlements :
@@ -312,6 +345,8 @@ actor {
         Map__605269027<ListingId__411740840, FixedListing__362219521>;
       var nextId : Nat
     };
+  stable marketplaceUserPaymentLockState :
+    {userPaymentLocks : Map__605269027<Principal, Bool>};
   stable mintState :
     {
       var collectionCanisterWasm : ?Blob;

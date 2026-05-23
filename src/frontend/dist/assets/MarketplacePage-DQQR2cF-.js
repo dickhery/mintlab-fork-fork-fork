@@ -1,12 +1,12 @@
-import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, g as useComposedRefs, a as cn, b as useBackend, u as useAuth, d as useQueryClient, e as useQuery, B as Button, S as ShoppingBag, h as LoadingSpinner, m as motion, X, f as ue } from "./index-tb5Zz-go.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-Cw00jt_C.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-Z8MvSaK0.js";
-import { T as Tag, Z as ZoomableMediaImage, P as PaymentConfirmationDialog } from "./ZoomableMediaImage-ee7IWveT.js";
-import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-CybV4hxu.js";
-import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, B as Badge, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-CNasqshc.js";
+import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, g as useComposedRefs, a as cn, b as useBackend, u as useAuth, d as useQueryClient, e as useQuery, B as Button, S as ShoppingBag, h as LoadingSpinner, m as motion, X, f as ue } from "./index-D-7qZdAS.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-D4O5EeC5.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-D_gr7p4V.js";
+import { T as Tag, Z as ZoomableMediaImage, P as PaymentConfirmationDialog } from "./ZoomableMediaImage-sgoCnyIS.js";
+import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-DPGcVIzR.js";
+import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, B as Badge, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-CXk9UQEM.js";
 import { f as formatICPAmount, p as parseICPToE8s } from "./icp-BXjZNIYq.js";
-import { C as Coins } from "./coins-4A1roT-H.js";
-import { I as ImageOff } from "./media-CWLVFFTI.js";
+import { C as Coins } from "./coins-DCt9VnG-.js";
+import { I as ImageOff } from "./media-CfFRIBbC.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -1298,7 +1298,8 @@ function PlaceBidModal({
                 }
               ),
               /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Bids must be at least 0.01 ICP above the current top bid." }),
-              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Bids placed with less than 2 minutes remaining extend the auction by 5 minutes." })
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Bids placed with less than 2 minutes remaining extend the auction by 5 minutes." }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "A bid counts when Mintlab starts processing it before the auction ends." })
             ] }),
             bidAmount.trim() && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground", children: [
               "If confirmed,",
