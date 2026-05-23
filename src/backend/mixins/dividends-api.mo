@@ -50,10 +50,6 @@ mixin (
   transient let DIVIDEND_ATTRIBUTE_LIMIT : Nat = 20;
   transient let DIVIDEND_ATTRIBUTE_KEY_LIMIT : Nat = 128;
   transient let DIVIDEND_ATTRIBUTE_VALUE_LIMIT : Nat = 512;
-  transient let DEFAULT_DIVIDEND_DISBURSE_LIMIT : Nat = 50;
-  transient let MAX_DIVIDEND_DISBURSE_LIMIT : Nat = 100;
-  transient let DIVIDEND_DISBURSE_FAILURE_LIMIT : Nat = 5;
-
   public shared func getCollectionDividendInfo(
     collectionId : CollectionTypes.CollectionId
   ) : async ?DividendTypes.CollectionDividendInfo {
@@ -64,16 +60,14 @@ mixin (
     let accountId = collectionDividendAccountId(collectionId);
     let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
     let balanceE8s = await* IcpLib.getBalance(ledger, accountId);
-    let feeReserveE8s = DividendsLib.feeReserve(dividendFeeState, collectionId);
-    let distributableBalanceE8s = dividendDistributableBalance(balanceE8s, feeReserveE8s);
     let tokenIds = await* mintedTokenIds(collectionId);
     ?{
       collectionId;
       enabled = DividendsLib.collectionEnabled(collection);
       accountId;
       balanceE8s;
-      distributableBalanceE8s;
-      feeReserveE8s;
+      distributableBalanceE8s = balanceE8s;
+      feeReserveE8s = 0;
       processedBalanceE8s = DividendsLib.processedBalance(dividendsState, collectionId);
       pendingE8s = DividendsLib.totalClaimableForCollection(
         dividendsState,
@@ -423,9 +417,7 @@ mixin (
     };
     let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
     let balanceE8s = await* IcpLib.getBalance(ledger, collectionDividendAccountId(collectionId));
-    let feeReserveE8s = DividendsLib.feeReserve(dividendFeeState, collectionId);
-    let distributableBalanceE8s = dividendDistributableBalance(balanceE8s, feeReserveE8s);
-    #ok(DividendsLib.distributeNewBalance(dividendsState, collectionId, tokenIds, distributableBalanceE8s));
+    #ok(DividendsLib.distributeNewBalance(dividendsState, collectionId, tokenIds, balanceE8s));
   };
 
   public shared ({ caller }) func previewCollectionDividendDisbursement(
@@ -434,21 +426,8 @@ mixin (
     if (Principal.isAnonymous(caller)) {
       return #err("You must be logged in to preview dividend disbursement costs");
     };
-    let collection = switch (validateDividendCollection(collectionId)) {
-      case (#err(message)) return #err(message);
-      case (#ok(value)) value;
-    };
-    let tokenIds = await* mintedTokenIds(collectionId);
-    if (tokenIds.size() == 0) {
-      return #err("This collection has no minted NFTs to disburse to yet");
-    };
-    let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
-    let balanceE8s = await* IcpLib.getBalance(ledger, collectionDividendAccountId(collectionId));
-    let feeE8s = await* IcpLib.getTransferFee(ledger);
-    let callerAccount = IcpLib.accountIdentifier(canisterId, IcpLib.principalToSubaccount(caller));
-    let callerBalanceE8s = await* IcpLib.getBalance(ledger, callerAccount);
-    ignore collection;
-    #ok(disbursementPreview(collectionId, tokenIds, balanceE8s, feeE8s, callerBalanceE8s));
+    ignore collectionId;
+    #err("Batch dividend disbursement is disabled. NFT owners collect dividends individually.");
   };
 
   public shared ({ caller }) func disburseCollectionDividends(
@@ -458,153 +437,9 @@ mixin (
     if (Principal.isAnonymous(caller)) {
       return #err("You must be logged in to disburse dividends");
     };
-    let collection = switch (validateDividendCollection(collectionId)) {
-      case (#err(message)) return #err(message);
-      case (#ok(value)) value;
-    };
-    if (not DividendsLib.acquireDisbursement(dividendFeeState, collectionId)) {
-      return #err("A dividend disbursement is already processing for this collection");
-    };
-    try {
-      await* runDividendDisbursement(caller, collection, maxTransfers);
-    } finally {
-      DividendsLib.releaseDisbursement(dividendFeeState, collectionId);
-    };
-  };
-
-  func runDividendDisbursement(
-    caller : Principal,
-    collection : CollectionTypes.Collection,
-    maxTransfers : ?Nat,
-  ) : async* { #ok : DividendTypes.DividendDisbursementReceipt; #err : Text } {
-    let collectionId = collection.id;
-    let tokenIds = await* mintedTokenIds(collectionId);
-    if (tokenIds.size() == 0) {
-      return #err("This collection has no minted NFTs to disburse to yet");
-    };
-
-    let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
-    let feeE8s = await* IcpLib.getTransferFee(ledger);
-    let collectionAccount = collectionDividendAccountId(collectionId);
-    let balanceE8s = await* IcpLib.getBalance(ledger, collectionAccount);
-    let callerAccount = IcpLib.accountIdentifier(canisterId, IcpLib.principalToSubaccount(caller));
-    let callerBalanceE8s = await* IcpLib.getBalance(ledger, callerAccount);
-    let initialPreview = disbursementPreview(collectionId, tokenIds, balanceE8s, feeE8s, callerBalanceE8s);
-
-    var feeTopUpE8s : Nat64 = 0;
-    var feeTopUpBlockIndex : ?Nat64 = null;
-    if (initialPreview.feeShortfallE8s > 0) {
-      if (callerBalanceE8s < initialPreview.callerTotalDebitE8s) {
-        return #err(
-          "Your in-app ICP balance needs " #
-          Nat64.toText(initialPreview.callerTotalDebitE8s) #
-          " e8s to fund the dividend transfer fees"
-        );
-      };
-      switch (await* fundDividendFeeReserve(caller, collectionId, collectionAccount, initialPreview.feeShortfallE8s, feeE8s)) {
-        case (#err(message)) return #err(message);
-        case (#ok(blockIndex)) {
-          feeTopUpE8s := initialPreview.feeShortfallE8s;
-          feeTopUpBlockIndex := ?blockIndex;
-        };
-      };
-    };
-
-    let fundedBalanceE8s = await* IcpLib.getBalance(ledger, collectionAccount);
-    let fundedReserveE8s = DividendsLib.feeReserve(dividendFeeState, collectionId);
-    let distributableBalanceE8s = dividendDistributableBalance(fundedBalanceE8s, fundedReserveE8s);
-    let synced = DividendsLib.distributeNewBalance(dividendsState, collectionId, tokenIds, distributableBalanceE8s);
-    let transferLimit = normalizedDisbursementLimit(maxTransfers);
-
-    var paidCount : Nat = 0;
-    var skippedCount : Nat = 0;
-    var totalPaidE8s : Nat64 = 0;
-    var totalFeeE8s : Nat64 = 0;
-    var failures : [Text] = [];
-
-    label payTokens for (tokenId in tokenIds.values()) {
-      if (paidCount >= transferLimit) {
-        break payTokens;
-      };
-      let claimable = DividendsLib.claimableFor(dividendsState, collectionId, tokenId);
-      if (claimable == 0) {
-        continue payTokens;
-      };
-      if (DividendsLib.feeReserve(dividendFeeState, collectionId) < feeE8s) {
-        failures := appendFailure(failures, "Fee reserve was depleted before all dividends could be disbursed");
-        break payTokens;
-      };
-      let key = DividendsLib.nftKey(collectionId, tokenId);
-      if (not DividendsLib.acquireClaim(dividendsState, key)) {
-        skippedCount += 1;
-        continue payTokens;
-      };
-      let owner = switch (await* dividendPayoutOwner(collection, tokenId)) {
-        case null {
-          DividendsLib.releaseClaim(dividendsState, key);
-          skippedCount += 1;
-          failures := appendFailure(failures, "Could not determine the current owner for token #" # tokenId);
-          continue payTokens;
-        };
-        case (?value) value;
-      };
-
-      DividendsLib.setClaimable(dividendsState, collectionId, tokenId, 0);
-      DividendsLib.reduceFeeReserve(dividendFeeState, collectionId, feeE8s);
-      try {
-        let userAccount = IcpLib.accountIdentifier(canisterId, IcpLib.principalToSubaccount(owner));
-        let result = await* IcpLib.transferOutWithFee(
-          ledger,
-          ?IcpLib.collectionDividendSubaccount(collectionId),
-          userAccount,
-          claimable,
-          Nat64.fromNat(collectionId),
-          feeE8s,
-        );
-        switch (result) {
-          case (#Ok(_blockIndex)) {
-            DividendsLib.reduceProcessedBalance(dividendsState, collectionId, claimable);
-            DividendsLib.releaseClaim(dividendsState, key);
-            paidCount += 1;
-            totalPaidE8s += claimable;
-            totalFeeE8s += feeE8s;
-          };
-          case (#Err(error)) {
-            DividendsLib.addClaimable(dividendsState, collectionId, tokenId, claimable);
-            DividendsLib.addFeeReserve(dividendFeeState, collectionId, feeE8s);
-            DividendsLib.releaseClaim(dividendsState, key);
-            skippedCount += 1;
-            failures := appendFailure(
-              failures,
-              "Token #" # tokenId # " transfer failed: " # IcpLib.transferErrorText(error),
-            );
-          };
-        };
-      } catch (error) {
-        DividendsLib.addClaimable(dividendsState, collectionId, tokenId, claimable);
-        DividendsLib.addFeeReserve(dividendFeeState, collectionId, feeE8s);
-        DividendsLib.releaseClaim(dividendsState, key);
-        skippedCount += 1;
-        failures := appendFailure(
-          failures,
-          "Token #" # tokenId # " transfer failed: " # Error.message(error),
-        );
-      };
-    };
-
-    #ok({
-      collectionId;
-      synced;
-      paidCount;
-      skippedCount;
-      remainingCount = remainingDividendTransferCount(collectionId, tokenIds);
-      totalPaidE8s;
-      totalFeeE8s;
-      feeTopUpE8s;
-      feeTopUpBlockIndex;
-      feeReserveRemainingE8s = DividendsLib.feeReserve(dividendFeeState, collectionId);
-      failures;
-    });
+    ignore collectionId;
+    ignore maxTransfers;
+    #err("Batch dividend disbursement is disabled. NFT owners must collect dividends individually.");
   };
 
   public shared ({ caller }) func claimNFTDividend(
@@ -634,20 +469,14 @@ mixin (
     if (claimable == 0) {
       return #err("No dividends are available for this NFT yet");
     };
-    let feeReserveE8s = DividendsLib.feeReserve(dividendFeeState, nft.collectionId);
-    let usesFeeReserve = feeReserveE8s >= feeE8s;
-    if (not usesFeeReserve and claimable <= feeE8s) {
+    if (claimable <= feeE8s) {
       return #err(
         "Dividend balance must exceed the ICP transfer fee of " #
         Nat64.toText(feeE8s) #
-        " e8s before it can be collected, or the collection needs a funded dividend fee reserve"
+        " e8s before it can be collected"
       );
     };
-    let payoutE8s = if (usesFeeReserve) {
-      claimable;
-    } else {
-      claimable - feeE8s;
-    };
+    let payoutE8s = claimable - feeE8s;
 
     let key = DividendsLib.nftKey(nft.collectionId, nft.tokenId);
     if (not DividendsLib.acquireClaim(dividendsState, key)) {
@@ -655,9 +484,6 @@ mixin (
     };
 
     DividendsLib.setClaimable(dividendsState, nft.collectionId, nft.tokenId, 0);
-    if (usesFeeReserve) {
-      DividendsLib.reduceFeeReserve(dividendFeeState, nft.collectionId, feeE8s);
-    };
     try {
       let userAccount = IcpLib.accountIdentifier(canisterId, IcpLib.principalToSubaccount(caller));
       let result = await* IcpLib.transferOutWithFee(
@@ -683,258 +509,15 @@ mixin (
         case (#Err(error)) {
           ignore error;
           DividendsLib.addClaimable(dividendsState, nft.collectionId, nft.tokenId, claimable);
-          if (usesFeeReserve) {
-            DividendsLib.addFeeReserve(dividendFeeState, nft.collectionId, feeE8s);
-          };
           DividendsLib.releaseClaim(dividendsState, key);
           #err("ICP dividend transfer failed");
         };
       };
     } catch (e) {
       DividendsLib.addClaimable(dividendsState, nft.collectionId, nft.tokenId, claimable);
-      if (usesFeeReserve) {
-        DividendsLib.addFeeReserve(dividendFeeState, nft.collectionId, feeE8s);
-      };
       DividendsLib.releaseClaim(dividendsState, key);
       #err("ICP dividend transfer failed: " # Error.message(e));
     };
-  };
-
-  func validateDividendCollection(
-    collectionId : CollectionTypes.CollectionId
-  ) : { #ok : CollectionTypes.Collection; #err : Text } {
-    let collection = switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
-      case null return #err("Collection not found");
-      case (?value) value;
-    };
-    if (not DividendsLib.collectionEnabled(collection)) {
-      return #err("Dividends are not enabled for this collection");
-    };
-    if (collection.kind != #Minted) {
-      return #err("Dividends are only available for Mintlab-created collections");
-    };
-    #ok(collection);
-  };
-
-  func dividendDistributableBalance(balanceE8s : Nat64, feeReserveE8s : Nat64) : Nat64 {
-    if (balanceE8s > feeReserveE8s) {
-      balanceE8s - feeReserveE8s;
-    } else {
-      (0 : Nat64);
-    };
-  };
-
-  func disbursementPreview(
-    collectionId : CollectionTypes.CollectionId,
-    tokenIds : [Text],
-    balanceE8s : Nat64,
-    ledgerFeeE8s : Nat64,
-    callerBalanceE8s : Nat64,
-  ) : DividendTypes.DividendDisbursementPreview {
-    let feeReserveE8s = DividendsLib.feeReserve(dividendFeeState, collectionId);
-    let distributableBalanceE8s = dividendDistributableBalance(balanceE8s, feeReserveE8s);
-    let processedBalanceE8s = DividendsLib.processedBalance(dividendsState, collectionId);
-    let undistributedE8s : Nat64 = if (distributableBalanceE8s > processedBalanceE8s) {
-      distributableBalanceE8s - processedBalanceE8s;
-    } else {
-      (0 : Nat64);
-    };
-    let nftCount = tokenIds.size();
-    let nftCount64 = Nat64.fromNat(nftCount);
-    let shareE8s : Nat64 = if (nftCount64 == 0) {
-      (0 : Nat64);
-    } else {
-      undistributedE8s / nftCount64;
-    };
-    let projectedNewDividends : Nat64 = shareE8s * nftCount64;
-    let remainderE8s = undistributedE8s - projectedNewDividends;
-    let pendingE8s = DividendsLib.totalClaimableForCollection(dividendsState, collectionId, tokenIds);
-    var transferCount : Nat = 0;
-    for (tokenId in tokenIds.values()) {
-      let projectedClaimable = DividendsLib.claimableFor(dividendsState, collectionId, tokenId) + shareE8s;
-      if (projectedClaimable > (0 : Nat64)) {
-        transferCount += 1;
-      };
-    };
-    let requiredNetworkFeeE8s = nat64TimesNat(ledgerFeeE8s, transferCount);
-    let feeShortfallE8s : Nat64 = if (requiredNetworkFeeE8s > feeReserveE8s) {
-      requiredNetworkFeeE8s - feeReserveE8s;
-    } else {
-      (0 : Nat64);
-    };
-    let callerFundingTransferFeeE8s : Nat64 = if (feeShortfallE8s > (0 : Nat64)) {
-      ledgerFeeE8s;
-    } else {
-      (0 : Nat64);
-    };
-    {
-      collectionId;
-      accountId = collectionDividendAccountId(collectionId);
-      balanceE8s;
-      distributableBalanceE8s;
-      processedBalanceE8s;
-      pendingE8s;
-      projectedPendingE8s = pendingE8s + projectedNewDividends;
-      undistributedE8s;
-      shareE8s;
-      remainderE8s;
-      nftCount;
-      transferCount;
-      ledgerFeeE8s;
-      requiredNetworkFeeE8s;
-      feeReserveE8s;
-      feeShortfallE8s;
-      callerBalanceE8s;
-      callerFundingTransferFeeE8s;
-      callerTotalDebitE8s = feeShortfallE8s + callerFundingTransferFeeE8s;
-      maxTransfersPerCall = MAX_DIVIDEND_DISBURSE_LIMIT;
-    };
-  };
-
-  func fundDividendFeeReserve(
-    caller : Principal,
-    collectionId : CollectionTypes.CollectionId,
-    collectionAccount : CommonTypes.AccountIdentifier,
-    amountE8s : Nat64,
-    feeE8s : Nat64,
-  ) : async* { #ok : Nat64; #err : Text } {
-    if (not MarketplaceLib.acquireUserPaymentLock(marketplaceUserPaymentLockState, caller)) {
-      return #err("Another ICP operation is already using your balance. Try again shortly.");
-    };
-    try {
-      let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
-      let result = await* IcpLib.transferOutWithFee(
-        ledger,
-        ?IcpLib.principalToSubaccount(caller),
-        collectionAccount,
-        amountE8s,
-        IcpLib.DIVIDEND_FEE_MEMO,
-        feeE8s,
-      );
-      switch (result) {
-        case (#Ok(blockIndex)) {
-          DividendsLib.addFeeReserve(dividendFeeState, collectionId, amountE8s);
-          #ok(blockIndex);
-        };
-        case (#Err(error)) {
-          #err("Dividend fee reserve payment failed: " # IcpLib.transferErrorText(error));
-        };
-      };
-    } catch (error) {
-      #err("Dividend fee reserve payment failed: " # Error.message(error));
-    } finally {
-      MarketplaceLib.releaseUserPaymentLock(marketplaceUserPaymentLockState, caller);
-    };
-  };
-
-  func normalizedDisbursementLimit(maxTransfers : ?Nat) : Nat {
-    let requested = switch (maxTransfers) {
-      case (?value) value;
-      case null DEFAULT_DIVIDEND_DISBURSE_LIMIT;
-    };
-    if (requested == 0) {
-      1;
-    } else if (requested > MAX_DIVIDEND_DISBURSE_LIMIT) {
-      MAX_DIVIDEND_DISBURSE_LIMIT;
-    } else {
-      requested;
-    };
-  };
-
-  func remainingDividendTransferCount(
-    collectionId : CollectionTypes.CollectionId,
-    tokenIds : [Text],
-  ) : Nat {
-    var remaining : Nat = 0;
-    for (tokenId in tokenIds.values()) {
-      if (DividendsLib.claimableFor(dividendsState, collectionId, tokenId) > 0) {
-        remaining += 1;
-      };
-    };
-    remaining;
-  };
-
-  func dividendPayoutOwner(
-    collection : CollectionTypes.Collection,
-    tokenId : Text,
-  ) : async* ?Principal {
-    let tokenNat = switch (Nat.fromText(tokenId)) {
-      case null return null;
-      case (?value) value;
-    };
-
-    if (Principal.equal(collection.canisterId, canisterId)) {
-      switch (MintLib.getToken(mintState, tokenNat)) {
-        case null return activeEscrowedDividendOwner(collection.id, tokenId);
-        case (?token) {
-          if (Principal.equal(token.owner, canisterId)) {
-            return activeEscrowedDividendOwner(collection.id, tokenId);
-          };
-          if (Principal.isAnonymous(token.owner)) {
-            return null;
-          };
-          return ?token.owner;
-        };
-      };
-    };
-
-    let owners = try {
-      let child : ChildCollectionDividendActor = actor (collection.canisterId.toText());
-      await child.mintlab_owner_of([tokenNat]);
-    } catch (_error) {
-      let child : ChildCollectionOwnerActor = actor (collection.canisterId.toText());
-      try {
-        await child.icrc7_owner_of([tokenNat]);
-      } catch (_fallbackError) {
-        return activeEscrowedDividendOwner(collection.id, tokenId);
-      };
-    };
-    if (owners.size() == 0) {
-      return activeEscrowedDividendOwner(collection.id, tokenId);
-    };
-    switch (owners[0]) {
-      case null activeEscrowedDividendOwner(collection.id, tokenId);
-      case (?account) {
-        if (not isDividendDefaultSubaccount(account.subaccount)) {
-          return null;
-        };
-        if (Principal.equal(account.owner, canisterId)) {
-          activeEscrowedDividendOwner(collection.id, tokenId);
-        } else if (Principal.isAnonymous(account.owner)) {
-          null;
-        } else {
-          ?account.owner;
-        };
-      };
-    };
-  };
-
-  func activeEscrowedDividendOwner(
-    collectionId : CollectionTypes.CollectionId,
-    tokenId : Text,
-  ) : ?Principal {
-    switch (MarketplaceLib.findActiveEscrowedNFT(marketplaceState, collectionId, tokenId)) {
-      case null null;
-      case (?nft) {
-        if (Principal.isAnonymous(nft.owner)) {
-          null;
-        } else {
-          ?nft.owner;
-        };
-      };
-    };
-  };
-
-  func appendFailure(current : [Text], message : Text) : [Text] {
-    if (current.size() >= DIVIDEND_DISBURSE_FAILURE_LIMIT) {
-      current;
-    } else {
-      Array.concat<Text>(current, [message]);
-    };
-  };
-
-  func nat64TimesNat(value : Nat64, count : Nat) : Nat64 {
-    Nat64.fromNat(Nat64.toNat(value) * count);
   };
 
   func verifyDividendClaimOwner(
@@ -943,10 +526,27 @@ mixin (
     nft : WalletTypes.WalletNFT,
   ) : async* { #ok : WalletTypes.WalletNFT; #err : Text } {
     if (collection.kind != #Minted or nft.location != #Minted) {
-      if (Principal.equal(nft.owner, caller) or isActiveListingSeller(caller, nft.id)) {
+      if (isActiveListingSeller(caller, nft.id)) {
         return #ok(nft);
       };
-      return #err("You are not the current owner of this NFT");
+      if (not Principal.equal(nft.owner, caller)) {
+        return #err("You are not the current owner of this NFT");
+      };
+      if (nft.location == #Vaulted) {
+        return #ok(nft);
+      };
+      let userAccountId = IcpLib.accountIdentifier(caller, IcpLib.zeroSubaccount());
+      switch (await* WalletLib.isNFTCurrentlyOwnedBy(collection, caller, userAccountId, nft.tokenId)) {
+        case (#ok(true)) {
+          return #ok(repairDividendNFTOwner(caller, nft));
+        };
+        case (#ok(false)) {
+          return #err("You are not the current on-chain owner of this NFT");
+        };
+        case (#err(message)) {
+          return #err("Could not verify current NFT ownership: " # message);
+        };
+      };
     };
 
     let tokenNat = switch (Nat.fromText(nft.tokenId)) {

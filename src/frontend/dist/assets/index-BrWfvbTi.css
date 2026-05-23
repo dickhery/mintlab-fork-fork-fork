@@ -749,9 +749,6 @@ video {
 .z-\[70\] {
   z-index: 70;
 }
-.col-span-2 {
-  grid-column: span 2 / span 2;
-}
 .col-start-2 {
   grid-column-start: 2;
 }
@@ -1855,10 +1852,6 @@ video {
 .bg-emerald-500\/90 {
   background-color: rgb(16 185 129 / 0.9);
 }
-.bg-emerald-600 {
-  --tw-bg-opacity: 1;
-  background-color: rgb(5 150 105 / var(--tw-bg-opacity, 1));
-}
 .bg-foreground {
   background-color: oklch(var(--foreground));
 }
@@ -2824,11 +2817,6 @@ video {
 
 .hover\:bg-emerald-500\/10:hover {
   background-color: rgb(16 185 129 / 0.1);
-}
-
-.hover\:bg-emerald-700:hover {
-  --tw-bg-opacity: 1;
-  background-color: rgb(4 120 87 / var(--tw-bg-opacity, 1));
 }
 
 .hover\:bg-muted:hover {

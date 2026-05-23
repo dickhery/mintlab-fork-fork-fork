@@ -1,16 +1,15 @@
-import { Q as QueryObserver, n as infiniteQueryBehavior, o as hasPreviousPage, p as hasNextPage, q as useBaseQuery, c as createLucideIcon, r as reactExports, g as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, k as useAdmin, d as useQueryClient, e as useQuery, s as AnimatePresence, m as motion, B as Button, f as ue, C as CircleDollarSign, X, G as Grid3x3, P as Principal, h as LoadingSpinner } from "./index-RofioBrY.js";
-import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-v-GHSEaa.js";
-import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-dP3P0vqx.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-RLd2RDg6.js";
-import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-I3xjauAC.js";
-import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, B as Badge, I as Input, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./badge-wUoKmaaL.js";
-import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent, R as RefreshCw } from "./card-B4ffcBNr.js";
-import { u as useDirection } from "./index-BA0QrGtw.js";
-import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-DE9K4djJ.js";
-import { S as Skeleton, C as Copy } from "./skeleton-Bt6SkiNH.js";
-import { S as Sparkles, c as compressModerationImage } from "./imageUtils-D242lNdM.js";
-import { r as resolveImageUrl, I as ImageOff } from "./media-DhiHLvDo.js";
-import { S as Send } from "./send-CfmeSC8H.js";
+import { Q as QueryObserver, n as infiniteQueryBehavior, o as hasPreviousPage, p as hasNextPage, q as useBaseQuery, c as createLucideIcon, r as reactExports, g as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, k as useAdmin, d as useQueryClient, e as useQuery, s as AnimatePresence, m as motion, B as Button, f as ue, C as CircleDollarSign, X, G as Grid3x3, P as Principal, h as LoadingSpinner } from "./index-BhINJbkK.js";
+import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-JDtW8yH5.js";
+import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-Bm7tmfSG.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-D7C6Dy7B.js";
+import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-B1soOkFd.js";
+import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, B as Badge, I as Input, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./badge-C7pZkX9c.js";
+import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent, R as RefreshCw } from "./card-TMcqjVdr.js";
+import { u as useDirection } from "./index-Cr31kuEB.js";
+import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-DRS_IZMI.js";
+import { S as Skeleton, C as Copy } from "./skeleton-Db4RvSQN.js";
+import { S as Sparkles, c as compressModerationImage } from "./imageUtils-DxAmxDiD.js";
+import { r as resolveImageUrl, I as ImageOff } from "./media-BsBhXd-y.js";
 var InfiniteQueryObserver = class extends QueryObserver {
   constructor(client, options) {
     super(client, options);
@@ -2412,7 +2411,6 @@ function NFTBrowser({
   const [directLookupNFT, setDirectLookupNFT] = reactExports.useState(
     null
   );
-  const [confirmDisburseOpen, setConfirmDisburseOpen] = reactExports.useState(false);
   const canisterId = collection.canisterId.toString();
   const canisterUrl = `https://dashboard.internetcomputer.org/canister/${canisterId}`;
   const dividendsEnabled = ((_a = collection.dividendConfig) == null ? void 0 : _a.enabled) === true;
@@ -2469,23 +2467,6 @@ function NFTBrowser({
     refetchOnWindowFocus: true,
     refetchInterval: 3e4
   });
-  const {
-    data: disbursementPreviewResult,
-    isFetching: disbursementPreviewLoading
-  } = useQuery({
-    queryKey: [
-      "collectionDividendDisbursementPreview",
-      collection.id.toString()
-    ],
-    queryFn: async () => {
-      if (!actor) throw new Error("Backend not connected");
-      return actor.previewCollectionDividendDisbursement(collection.id);
-    },
-    enabled: !!actor && !isFetching && dividendsEnabled && confirmDisburseOpen,
-    refetchOnMount: "always"
-  });
-  const disbursementPreview = (disbursementPreviewResult == null ? void 0 : disbursementPreviewResult.__kind__) === "ok" ? disbursementPreviewResult.ok : null;
-  const disbursementPreviewError = (disbursementPreviewResult == null ? void 0 : disbursementPreviewResult.__kind__) === "err" ? disbursementPreviewResult.err : null;
   const syncDividendsMutation = useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error("Backend not connected");
@@ -2509,48 +2490,6 @@ function NFTBrowser({
       void queryClient.invalidateQueries({
         queryKey: ["marketplaceDividendBalances"]
       });
-    },
-    onError: (err) => {
-      ue.error(extractError(err));
-    }
-  });
-  const disburseDividendsMutation = useMutation({
-    mutationFn: async () => {
-      if (!actor) throw new Error("Backend not connected");
-      const result = await actor.disburseCollectionDividends(
-        collection.id,
-        (disbursementPreview == null ? void 0 : disbursementPreview.maxTransfersPerCall) ?? null
-      );
-      if (result.__kind__ === "err") {
-        throw new Error(result.err);
-      }
-      return result.ok;
-    },
-    onSuccess: (receipt) => {
-      setConfirmDisburseOpen(false);
-      ue.success(
-        receipt.paidCount > 0n ? `Disbursed ${formatICP(receipt.totalPaidE8s)} ICP` : "No dividend transfers were sent",
-        {
-          description: receipt.remainingCount > 0n ? `${receipt.remainingCount.toString()} transfers remain for another batch.` : "All currently payable dividends are handled."
-        }
-      );
-      if (receipt.failures.length > 0) {
-        ue.warning(receipt.failures[0]);
-      }
-      void queryClient.invalidateQueries({
-        queryKey: ["collectionDividendInfo", collection.id.toString()]
-      });
-      void queryClient.invalidateQueries({
-        queryKey: ["collectionDividendBalances", collection.id.toString()]
-      });
-      void queryClient.invalidateQueries({
-        queryKey: ["collectionDividendDisbursementPreview"]
-      });
-      void queryClient.invalidateQueries({ queryKey: ["myDividendNFTs"] });
-      void queryClient.invalidateQueries({
-        queryKey: ["marketplaceDividendBalances"]
-      });
-      void queryClient.invalidateQueries({ queryKey: ["icp-balance"] });
     },
     onError: (err) => {
       ue.error(extractError(err));
@@ -2642,53 +2581,6 @@ function NFTBrowser({
   const loadedCount = loadedNFTs.length;
   const fullyLoaded = BigInt(loadedCount) >= totalCount;
   const collectionImageUrl = resolveImageUrl(collection.imageUrl);
-  const disbursementLines = disbursementPreview ? [
-    {
-      label: "Dividends available",
-      value: `${formatICP(disbursementPreview.projectedPendingE8s)} ICP`,
-      helper: disbursementPreview.undistributedE8s > 0n ? `${formatICP(disbursementPreview.undistributedE8s)} ICP in new deposits is included.` : void 0
-    },
-    {
-      label: "Recipient transfers",
-      value: disbursementPreview.transferCount.toString()
-    },
-    {
-      label: "Ledger fee per transfer",
-      value: `${formatICP(disbursementPreview.ledgerFeeE8s)} ICP`
-    },
-    {
-      label: "Required network fees",
-      value: `${formatICP(disbursementPreview.requiredNetworkFeeE8s)} ICP`
-    },
-    {
-      label: "Fee reserve available",
-      value: `${formatICP(disbursementPreview.feeReserveE8s)} ICP`
-    },
-    {
-      label: "Fee shortfall",
-      value: `${formatICP(disbursementPreview.feeShortfallE8s)} ICP`
-    },
-    {
-      label: "Funding transfer fee",
-      value: `${formatICP(
-        disbursementPreview.callerFundingTransferFeeE8s
-      )} ICP`,
-      helper: disbursementPreview.feeShortfallE8s > 0n ? "Charged to move your fee top-up into the collection pool." : void 0
-    },
-    {
-      label: "Total debit now",
-      value: `${formatICP(disbursementPreview.callerTotalDebitE8s)} ICP`
-    },
-    {
-      label: "This batch",
-      value: `Up to ${disbursementPreview.maxTransfersPerCall.toString()} transfers`
-    }
-  ] : [
-    {
-      label: "Preview",
-      value: disbursementPreviewLoading ? "Loading" : disbursementPreviewError ?? "Unavailable"
-    }
-  ];
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-6", "data-ocid": "collections.nft_browser", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-3 min-w-0", children: [
@@ -2777,37 +2669,21 @@ function NFTBrowser({
               /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs uppercase tracking-widest text-emerald-700 font-mono", children: "Collection Dividends" }),
               /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-muted-foreground mt-1", children: "Send ICP to this address, then check for deposits to split the new balance evenly across minted NFTs in this collection." })
             ] }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap gap-2", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsxs(
-                Button,
-                {
-                  size: "sm",
-                  variant: "outline",
-                  className: "gap-2 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10",
-                  onClick: () => syncDividendsMutation.mutate(),
-                  disabled: syncDividendsMutation.isPending,
-                  "data-ocid": "collections.dividends.sync_button",
-                  children: [
-                    syncDividendsMutation.isPending ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { className: "w-4 h-4 animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(CircleDollarSign, { className: "w-4 h-4" }),
-                    "Check Deposits"
-                  ]
-                }
-              ),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs(
-                Button,
-                {
-                  size: "sm",
-                  className: "gap-2 bg-emerald-600 text-white hover:bg-emerald-700",
-                  onClick: () => setConfirmDisburseOpen(true),
-                  disabled: disburseDividendsMutation.isPending,
-                  "data-ocid": "collections.dividends.disburse_button",
-                  children: [
-                    disburseDividendsMutation.isPending ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { className: "w-4 h-4 animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Send, { className: "w-4 h-4" }),
-                    "Disburse Batch"
-                  ]
-                }
-              )
-            ] })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex flex-wrap gap-2", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              Button,
+              {
+                size: "sm",
+                variant: "outline",
+                className: "gap-2 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10",
+                onClick: () => syncDividendsMutation.mutate(),
+                disabled: syncDividendsMutation.isPending,
+                "data-ocid": "collections.dividends.sync_button",
+                children: [
+                  syncDividendsMutation.isPending ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { className: "w-4 h-4 animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(CircleDollarSign, { className: "w-4 h-4" }),
+                  "Check Deposits"
+                ]
+              }
+            ) })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3 items-end", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -2830,13 +2706,6 @@ function NFTBrowser({
                 /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-muted-foreground uppercase tracking-wide", children: "Pending" }),
                 /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "font-mono font-semibold text-foreground mt-0.5", children: [
                   formatICP(dividendInfo.pendingE8s),
-                  " ICP"
-                ] })
-              ] }),
-              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-lg border border-border/50 bg-card/60 px-3 py-2 col-span-2", children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-muted-foreground uppercase tracking-wide", children: "Fee Reserve" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "font-mono font-semibold text-foreground mt-0.5", children: [
-                  formatICP(dividendInfo.feeReserveE8s),
                   " ICP"
                 ] })
               ] })
@@ -3052,23 +2921,6 @@ function NFTBrowser({
         ] })
       }
     ) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx(
-      PaymentConfirmationDialog,
-      {
-        open: confirmDisburseOpen,
-        onOpenChange: setConfirmDisburseOpen,
-        title: "Fund Dividend Disbursement",
-        description: "The collection fee reserve pays the ICP ledger fee for each recipient transfer. If the reserve is short, the difference moves from your in-app ICP account before the batch starts.",
-        lines: disbursementLines,
-        confirmLabel: (disbursementPreview == null ? void 0 : disbursementPreview.feeShortfallE8s) ? "Fund and Disburse" : "Disburse Batch",
-        isPending: disbursementPreviewLoading || disburseDividendsMutation.isPending,
-        onConfirm: () => {
-          if (!disbursementPreview) return;
-          disburseDividendsMutation.mutate();
-        },
-        ocid: "collections.dividends.disburse_dialog"
-      }
-    ),
     selectedNFT && /* @__PURE__ */ jsxRuntimeExports.jsx(
       NFTDetailModal,
       {

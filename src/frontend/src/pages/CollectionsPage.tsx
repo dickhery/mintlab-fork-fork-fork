@@ -54,7 +54,6 @@ import type {
   CollectionCreationDiagnostics,
   CollectionCreationRequestView,
   CollectionCycleTopUpQuote,
-  DividendDisbursementPreview,
   MintConfig,
   NFTMetadata,
   PublicModerationConfig,
@@ -81,7 +80,6 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Send,
   ShieldCheck,
   Sparkles,
   Tag,
@@ -1973,7 +1971,6 @@ function NFTBrowser({
   const [directLookupNFT, setDirectLookupNFT] = useState<WalletNFT | null>(
     null,
   );
-  const [confirmDisburseOpen, setConfirmDisburseOpen] = useState(false);
   const canisterId = collection.canisterId.toString();
   const canisterUrl = `https://dashboard.internetcomputer.org/canister/${canisterId}`;
   const dividendsEnabled = collection.dividendConfig?.enabled === true;
@@ -2031,32 +2028,6 @@ function NFTBrowser({
     refetchOnWindowFocus: true,
     refetchInterval: 30_000,
   });
-  const {
-    data: disbursementPreviewResult,
-    isFetching: disbursementPreviewLoading,
-  } = useQuery<
-    | { __kind__: "ok"; ok: DividendDisbursementPreview }
-    | { __kind__: "err"; err: string }
-  >({
-    queryKey: [
-      "collectionDividendDisbursementPreview",
-      collection.id.toString(),
-    ],
-    queryFn: async () => {
-      if (!actor) throw new Error("Backend not connected");
-      return actor.previewCollectionDividendDisbursement(collection.id);
-    },
-    enabled: !!actor && !isFetching && dividendsEnabled && confirmDisburseOpen,
-    refetchOnMount: "always",
-  });
-  const disbursementPreview =
-    disbursementPreviewResult?.__kind__ === "ok"
-      ? disbursementPreviewResult.ok
-      : null;
-  const disbursementPreviewError =
-    disbursementPreviewResult?.__kind__ === "err"
-      ? disbursementPreviewResult.err
-      : null;
   const syncDividendsMutation = useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error("Backend not connected");
@@ -2082,53 +2053,6 @@ function NFTBrowser({
       void queryClient.invalidateQueries({
         queryKey: ["marketplaceDividendBalances"],
       });
-    },
-    onError: (err: unknown) => {
-      toast.error(extractError(err));
-    },
-  });
-  const disburseDividendsMutation = useMutation({
-    mutationFn: async () => {
-      if (!actor) throw new Error("Backend not connected");
-      const result = await actor.disburseCollectionDividends(
-        collection.id,
-        disbursementPreview?.maxTransfersPerCall ?? null,
-      );
-      if (result.__kind__ === "err") {
-        throw new Error(result.err);
-      }
-      return result.ok;
-    },
-    onSuccess: (receipt) => {
-      setConfirmDisburseOpen(false);
-      toast.success(
-        receipt.paidCount > 0n
-          ? `Disbursed ${formatICP(receipt.totalPaidE8s)} ICP`
-          : "No dividend transfers were sent",
-        {
-          description:
-            receipt.remainingCount > 0n
-              ? `${receipt.remainingCount.toString()} transfers remain for another batch.`
-              : "All currently payable dividends are handled.",
-        },
-      );
-      if (receipt.failures.length > 0) {
-        toast.warning(receipt.failures[0]);
-      }
-      void queryClient.invalidateQueries({
-        queryKey: ["collectionDividendInfo", collection.id.toString()],
-      });
-      void queryClient.invalidateQueries({
-        queryKey: ["collectionDividendBalances", collection.id.toString()],
-      });
-      void queryClient.invalidateQueries({
-        queryKey: ["collectionDividendDisbursementPreview"],
-      });
-      void queryClient.invalidateQueries({ queryKey: ["myDividendNFTs"] });
-      void queryClient.invalidateQueries({
-        queryKey: ["marketplaceDividendBalances"],
-      });
-      void queryClient.invalidateQueries({ queryKey: ["icp-balance"] });
     },
     onError: (err: unknown) => {
       toast.error(extractError(err));
@@ -2233,63 +2157,6 @@ function NFTBrowser({
   const loadedCount = loadedNFTs.length;
   const fullyLoaded = BigInt(loadedCount) >= totalCount;
   const collectionImageUrl = resolveImageUrl(collection.imageUrl);
-  const disbursementLines = disbursementPreview
-    ? [
-        {
-          label: "Dividends available",
-          value: `${formatICP(disbursementPreview.projectedPendingE8s)} ICP`,
-          helper:
-            disbursementPreview.undistributedE8s > 0n
-              ? `${formatICP(disbursementPreview.undistributedE8s)} ICP in new deposits is included.`
-              : undefined,
-        },
-        {
-          label: "Recipient transfers",
-          value: disbursementPreview.transferCount.toString(),
-        },
-        {
-          label: "Ledger fee per transfer",
-          value: `${formatICP(disbursementPreview.ledgerFeeE8s)} ICP`,
-        },
-        {
-          label: "Required network fees",
-          value: `${formatICP(disbursementPreview.requiredNetworkFeeE8s)} ICP`,
-        },
-        {
-          label: "Fee reserve available",
-          value: `${formatICP(disbursementPreview.feeReserveE8s)} ICP`,
-        },
-        {
-          label: "Fee shortfall",
-          value: `${formatICP(disbursementPreview.feeShortfallE8s)} ICP`,
-        },
-        {
-          label: "Funding transfer fee",
-          value: `${formatICP(
-            disbursementPreview.callerFundingTransferFeeE8s,
-          )} ICP`,
-          helper:
-            disbursementPreview.feeShortfallE8s > 0n
-              ? "Charged to move your fee top-up into the collection pool."
-              : undefined,
-        },
-        {
-          label: "Total debit now",
-          value: `${formatICP(disbursementPreview.callerTotalDebitE8s)} ICP`,
-        },
-        {
-          label: "This batch",
-          value: `Up to ${disbursementPreview.maxTransfersPerCall.toString()} transfers`,
-        },
-      ]
-    : [
-        {
-          label: "Preview",
-          value: disbursementPreviewLoading
-            ? "Loading"
-            : (disbursementPreviewError ?? "Unavailable"),
-        },
-      ];
 
   return (
     <div className="space-y-6" data-ocid="collections.nft_browser">
@@ -2400,20 +2267,6 @@ function NFTBrowser({
                 )}
                 Check Deposits
               </Button>
-              <Button
-                size="sm"
-                className="gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
-                onClick={() => setConfirmDisburseOpen(true)}
-                disabled={disburseDividendsMutation.isPending}
-                data-ocid="collections.dividends.disburse_button"
-              >
-                {disburseDividendsMutation.isPending ? (
-                  <LoaderCircle className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-                Disburse Batch
-              </Button>
             </div>
           </div>
 
@@ -2438,14 +2291,6 @@ function NFTBrowser({
                 </p>
                 <p className="font-mono font-semibold text-foreground mt-0.5">
                   {formatICP(dividendInfo.pendingE8s)} ICP
-                </p>
-              </div>
-              <div className="rounded-lg border border-border/50 bg-card/60 px-3 py-2 col-span-2">
-                <p className="text-muted-foreground uppercase tracking-wide">
-                  Fee Reserve
-                </p>
-                <p className="font-mono font-semibold text-foreground mt-0.5">
-                  {formatICP(dividendInfo.feeReserveE8s)} ICP
                 </p>
               </div>
             </div>
@@ -2677,27 +2522,6 @@ function NFTBrowser({
           </Button>
         </div>
       )}
-
-      <PaymentConfirmationDialog
-        open={confirmDisburseOpen}
-        onOpenChange={setConfirmDisburseOpen}
-        title="Fund Dividend Disbursement"
-        description="The collection fee reserve pays the ICP ledger fee for each recipient transfer. If the reserve is short, the difference moves from your in-app ICP account before the batch starts."
-        lines={disbursementLines}
-        confirmLabel={
-          disbursementPreview?.feeShortfallE8s
-            ? "Fund and Disburse"
-            : "Disburse Batch"
-        }
-        isPending={
-          disbursementPreviewLoading || disburseDividendsMutation.isPending
-        }
-        onConfirm={() => {
-          if (!disbursementPreview) return;
-          disburseDividendsMutation.mutate();
-        }}
-        ocid="collections.dividends.disburse_dialog"
-      />
 
       {/* NFT Detail Modal */}
       {selectedNFT && (
