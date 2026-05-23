@@ -309,6 +309,11 @@ actor {
         Map__605269027<CollectionId__674876002, Collection__211048818>;
       var nextId : Nat
     };
+  stable dividendFeeState :
+    {
+      disbursementLocks : Map__605269027<CollectionId__674876002, Bool>;
+      feeReserveE8s : Map__605269027<CollectionId__674876002, Nat64>
+    };
   stable dividendsState :
     {
       claimableE8s : Map__605269027<Text, Nat64>;
