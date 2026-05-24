@@ -1622,13 +1622,22 @@ module {
     tokenIndex : Nat32,
     collectionName : Text,
   ) : async* Types.NFTMetadata {
-    let fallback : Types.NFTMetadata = {
+    let fallback = fallbackEXTMetadata(collectionCanisterId, tokenIdentifier, tokenIndex, collectionName);
+    await* fetchEXTMetadataWithFallback(canister, collectionCanisterId, tokenIdentifier, fallback);
+  };
+
+  func fallbackEXTMetadata(
+    collectionCanisterId : Principal,
+    tokenIdentifier : Text,
+    tokenIndex : Nat32,
+    collectionName : Text,
+  ) : Types.NFTMetadata {
+    {
       name = ?(collectionName # " #" # Nat.toText(tokenIndex.toNat()));
       description = null;
       imageUrl = ?extTokenMediaUrl(collectionCanisterId, tokenIdentifier, true);
       attributes = [];
     };
-    await* fetchEXTMetadataWithFallback(canister, collectionCanisterId, tokenIdentifier, fallback);
   };
 
   func fetchEXTMetadataWithFallback(
@@ -3018,7 +3027,7 @@ module {
   };
 
   func fetchEXTCollectionPage(
-    canister : NFTStandards.EXTActor,
+    _canister : NFTStandards.EXTActor,
     collection : CollectionTypes.Collection,
     cursor : ?Text,
     limit : Nat,
@@ -3037,7 +3046,7 @@ module {
     while (current < end) {
       let tokenIndex = Nat32.fromNat(current);
       let tokenIdentifier = extTokenIdentifier(collection.canisterId, tokenIndex);
-      let metadata = await* fetchEXTMetadata(canister, collection.canisterId, tokenIdentifier, tokenIndex, collection.name);
+      let metadata = fallbackEXTMetadata(collection.canisterId, tokenIdentifier, tokenIndex, collection.name);
       previews := Array.concat<Types.WalletNFT>(
         previews,
         [
@@ -3063,12 +3072,12 @@ module {
       };
       totalCount = range.totalSupply;
       coverage = #Full;
-      note = "Mintlab can browse the full EXT collection using the imported token range.";
+      note = "Mintlab is showing fast EXT previews from the imported token range.";
     });
   };
 
   func fetchDIP721CollectionPage(
-    canister : NFTStandards.DIP721Actor,
+    _canister : NFTStandards.DIP721Actor,
     collection : CollectionTypes.Collection,
     cursor : ?Text,
     limit : Nat,
@@ -3085,7 +3094,7 @@ module {
     var current = start;
 
     while (current < end) {
-      let metadata = await* fetchDIP721Metadata(canister, current, collection.name);
+      let metadata = fallbackTextMetadata(collection.name, Nat.toText(current));
       previews := Array.concat<Types.WalletNFT>(
         previews,
         [
@@ -3111,7 +3120,7 @@ module {
       };
       totalCount = range.totalSupply;
       coverage = #Full;
-      note = "Mintlab can browse the full DIP721 collection using the imported token range.";
+      note = "Mintlab is showing fast DIP721 previews from the imported token range.";
     });
   };
 

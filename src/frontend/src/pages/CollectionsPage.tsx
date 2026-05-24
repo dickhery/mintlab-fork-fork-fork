@@ -87,7 +87,7 @@ import {
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -1981,6 +1981,9 @@ function NFTBrowser({
     isFetchingNextPage,
     hasNextPage,
     fetchNextPage,
+    isError: browsePageFailed,
+    error: browsePageError,
+    refetch: refetchBrowsePage,
   } = useInfiniteQuery({
     queryKey: ["collectionNFTPage", collection.id.toString()],
     initialPageParam: null as string | null,
@@ -1997,6 +2000,8 @@ function NFTBrowser({
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: !!actor && !isFetching,
+    retry: false,
+    staleTime: 30_000,
   });
   const { data: activeListingDetails = [] } = useQuery<ActiveListingDetail[]>({
     queryKey: ["activeListingDetails"],
@@ -2152,11 +2157,27 @@ function NFTBrowser({
     setDirectLookupNFT(null);
   }, []);
 
+  const [showSlowLoadNotice, setShowSlowLoadNotice] = useState(false);
+  useEffect(() => {
+    if (!isLoading && !isFetchingNextPage) {
+      setShowSlowLoadNotice(false);
+      return;
+    }
+    setShowSlowLoadNotice(false);
+    const timer = window.setTimeout(() => {
+      setShowSlowLoadNotice(true);
+    }, 4500);
+    return () => window.clearTimeout(timer);
+  }, [isLoading, isFetchingNextPage]);
+
   const hasActiveFilter = search.trim() !== "" || attrFilter !== null;
   const hasSearchTerm = search.trim() !== "";
   const loadedCount = loadedNFTs.length;
   const fullyLoaded = BigInt(loadedCount) >= totalCount;
   const collectionImageUrl = resolveImageUrl(collection.imageUrl);
+  const browsePageErrorMessage = browsePageFailed
+    ? extractError(browsePageError)
+    : null;
 
   return (
     <div className="space-y-6" data-ocid="collections.nft_browser">
@@ -2235,6 +2256,40 @@ function NFTBrowser({
           </span>
         )}
       </div>
+
+      {showSlowLoadNotice && (
+        <div
+          className="flex items-start gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-800"
+          data-ocid="collections.nft_browser.slow_loading_notice"
+        >
+          <LoaderCircle className="mt-0.5 h-4 w-4 shrink-0 animate-spin" />
+          <span>
+            This imported collection is still loading. Some NFT canisters answer
+            slowly, so this may take a few minutes.
+          </span>
+        </div>
+      )}
+
+      {browsePageErrorMessage && (
+        <div
+          className="flex flex-col gap-3 rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between"
+          data-ocid="collections.nft_browser.error_state"
+        >
+          <span>{browsePageErrorMessage}</span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="gap-2 border-destructive/30 text-destructive hover:bg-destructive/10"
+            onClick={() => {
+              void refetchBrowsePage();
+            }}
+            data-ocid="collections.nft_browser.retry_button"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            Retry
+          </Button>
+        </div>
+      )}
 
       {dividendsEnabled && dividendInfo && (
         <div
