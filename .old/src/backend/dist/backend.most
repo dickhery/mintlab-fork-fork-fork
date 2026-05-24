@@ -98,6 +98,16 @@ type CollectionDividendConfig__135318206 = {enabled : Bool};
 type CollectionId__413579528 = CollectionId__674876002;
 type CollectionId__519062255 = CollectionId__674876002;
 type CollectionId__674876002 = Nat;
+type CollectionIndexStatus__92330500 =
+  {
+    collectionId : CollectionId__519062255;
+    complete : Bool;
+    cursor : ?Text;
+    indexed : Nat;
+    lastError : ?Text;
+    scanned : Nat;
+    updatedAt : Timestamp__301639476
+  };
 type CollectionKind__262311898 = {#External; #Minted};
 type Collection__211048818 =
   {
@@ -153,6 +163,8 @@ type FixedPurchaseSettlement__878942942 =
     stage : SettlementStage__594654131;
     updatedAt : Timestamp__534280185
   };
+type IndexedOwner__538352907 =
+  {#AccountIdText : Text; #Principal : Principal; #Unknown};
 type Internal__8484328<K, V> =
   {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
 type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
@@ -247,6 +259,14 @@ type NoBidAuctionReturnStage__380679664 =
   {#CleanupPending; #NFTReturnPending; #WalletRegistrationPending};
 type Node__46230540<K, V> =
   {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type OwnershipIndexRecord__80260664 =
+  {
+    collectionId : CollectionId__519062255;
+    indexedAt : Timestamp__301639476;
+    metadata : NFTMetadata__480568277;
+    owner : IndexedOwner__538352907;
+    tokenId : Text
+  };
 type PendingAuctionRefund__138190742 =
   {
     createdAt : Timestamp__534280185;
@@ -382,6 +402,13 @@ actor {
       tokens : Map__605269027<Nat, MintedToken__579944743>
     };
   stable moderationState : {var config : ModerationConfig__323099261};
+  stable ownershipIndexState :
+    {
+      records : Map__605269027<Text, OwnershipIndexRecord__80260664>;
+      status :
+        Map__605269027<CollectionId__519062255,
+                        CollectionIndexStatus__92330500>
+    };
   stable walletState :
     {
       var nextId : Nat;

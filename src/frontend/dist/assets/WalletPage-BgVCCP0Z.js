@@ -1,17 +1,17 @@
-import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useQueryClient, r as reactExports, e as useQuery, f as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-DRr0Icng.js";
-import { P as Plus, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-DipjZ6FT.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-ByjpS2cb.js";
-import { M as MediaImage, E as EmptyState } from "./MediaImage-B2m2CcJm.js";
-import { B as Badge, u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-HqNWe1Nd.js";
-import { I as ImageOff, r as resolveImageUrl } from "./media-CaYUUf5R.js";
-import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-CjC7Hh60.js";
-import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-DW9PxAFg.js";
-import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-CwuqGyy1.js";
-import { S as Skeleton, C as Copy } from "./skeleton-BEvoe5lY.js";
-import { S as Sparkles, c as compressModerationImage } from "./imageUtils-C1CWznuK.js";
-import { C as CircleCheck, S as Send } from "./send-9RggaT2w.js";
-import { C as Coins } from "./coins-Dud7zBnV.js";
-import "./index-Jjzk8DdU.js";
+import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useAdmin, e as useQueryClient, r as reactExports, f as useQuery, g as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-C7nsFyt-.js";
+import { P as Plus, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-DmjNAPCR.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-C5OqKQuZ.js";
+import { M as MediaImage, E as EmptyState } from "./MediaImage-niedzvRF.js";
+import { B as Badge, u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-DYV2dwv8.js";
+import { I as ImageOff, r as resolveImageUrl } from "./media-DlECHWr1.js";
+import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-DGb9sUVC.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-DtF5mWjd.js";
+import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-qnpwxLNK.js";
+import { S as Skeleton, C as Copy } from "./skeleton-DQetUI23.js";
+import { S as Sparkles, c as compressModerationImage } from "./imageUtils-BanVxt9k.js";
+import { C as CircleCheck, S as Send } from "./send-DlO8-F0u.js";
+import { C as Coins } from "./coins-D5aOTylC.js";
+import "./index-CeO64uNr.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -205,6 +205,21 @@ function summarizeSyncErrors(errors) {
     return uniqueErrors[0];
   }
   return `${uniqueErrors.length} collections could not be checked. First issue: ${uniqueErrors[0]}`;
+}
+function summarizeSyncSkipped(skipped) {
+  if (skipped.length === 0) {
+    return "";
+  }
+  if (skipped.length === 1) {
+    return `${skipped[0].collectionName} needs indexing before auto-discovery works.`;
+  }
+  return `${skipped.length} collections need indexing before auto-discovery works.`;
+}
+function summarizeSyncAttention(errors, skipped) {
+  if (errors.length > 0) {
+    return summarizeSyncErrors(errors);
+  }
+  return summarizeSyncSkipped(skipped);
 }
 function CopyField({ label, value, ocid }) {
   const [copied, setCopied] = reactExports.useState(false);
@@ -836,6 +851,166 @@ function ImportSpecificNFTModal({
     }
   ) });
 }
+function CollectionIndexingDialog({
+  open,
+  onClose,
+  collection
+}) {
+  const { actor } = useBackend();
+  const queryClient = useQueryClient();
+  const [cursor, setCursor] = reactExports.useState(null);
+  const [lastPage, setLastPage] = reactExports.useState(
+    null
+  );
+  const [isIndexing, setIsIndexing] = reactExports.useState(false);
+  const { data: status, refetch } = useQuery({
+    queryKey: ["collectionIndexStatus", collection == null ? void 0 : collection.id.toString()],
+    queryFn: async () => {
+      if (!actor || !collection) return null;
+      return actor.getCollectionIndexStatus(collection.id);
+    },
+    enabled: open && !!actor && !!collection
+  });
+  reactExports.useEffect(() => {
+    if (!open) {
+      setCursor(null);
+      setLastPage(null);
+      setIsIndexing(false);
+      return;
+    }
+    setCursor((status == null ? void 0 : status.cursor) ?? null);
+  }, [open, status == null ? void 0 : status.cursor]);
+  async function indexOnePage(nextCursor2) {
+    if (!actor || !collection) throw new Error("No collection selected");
+    const result = await actor.indexCollectionOwnershipPage(
+      collection.id,
+      nextCursor2,
+      50n
+    );
+    if (result.__kind__ === "err") {
+      throw new Error(result.err);
+    }
+    setLastPage(result.ok);
+    setCursor(result.ok.nextCursor);
+    await queryClient.invalidateQueries({ queryKey: ["userNFTs"] });
+    await queryClient.invalidateQueries({ queryKey: ["userStats"] });
+    await queryClient.invalidateQueries({
+      queryKey: ["collectionIndexStatus", collection.id.toString()]
+    });
+    return result.ok;
+  }
+  async function handleIndexNextPage() {
+    setIsIndexing(true);
+    try {
+      const page = await indexOnePage(cursor);
+      await refetch();
+      ue.success(
+        page.complete ? "Collection indexing complete" : `Indexed ${page.indexed.toString()} ownership records`
+      );
+    } catch (err) {
+      ue.error(extractError(err));
+    } finally {
+      setIsIndexing(false);
+    }
+  }
+  async function handleRunUntilComplete() {
+    setIsIndexing(true);
+    try {
+      let nextCursor2 = cursor;
+      let pages = 0;
+      let indexed2 = 0n;
+      while (pages < 200) {
+        const page = await indexOnePage(nextCursor2);
+        indexed2 += page.indexed;
+        pages += 1;
+        nextCursor2 = page.nextCursor;
+        if (page.complete || nextCursor2 == null) {
+          ue.success("Collection indexing complete", {
+            description: `${indexed2.toString()} ownership records indexed.`
+          });
+          await refetch();
+          return;
+        }
+      }
+      ue("Indexing paused", {
+        description: "Run again to continue from the saved cursor."
+      });
+      await refetch();
+    } catch (err) {
+      ue.error(extractError(err));
+    } finally {
+      setIsIndexing(false);
+    }
+  }
+  const scanned = (status == null ? void 0 : status.scanned) ?? 0n;
+  const indexed = (status == null ? void 0 : status.indexed) ?? 0n;
+  const complete = (status == null ? void 0 : status.complete) ?? false;
+  const nextCursor = cursor ?? (status == null ? void 0 : status.cursor) ?? null;
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(Dialog, { open, onOpenChange: (v) => !v && onClose(), children: /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogContent, { className: "bg-card border-border max-w-lg", children: [
+    /* @__PURE__ */ jsxRuntimeExports.jsx(DialogHeader, { children: /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogTitle, { className: "font-display text-foreground flex items-center gap-2", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(RefreshCw, { className: "w-4 h-4 text-accent" }),
+      "Index Collection"
+    ] }) }),
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4 pt-2", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-medium text-foreground", children: (collection == null ? void 0 : collection.name) ?? "Collection" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: (collection == null ? void 0 : collection.canisterId.toString()) ?? "" })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-2 gap-3", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-lg border border-border bg-muted/20 p-3", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Scanned" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "font-display text-lg font-semibold", children: scanned.toString() })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-lg border border-border bg-muted/20 p-3", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Indexed" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "font-display text-lg font-semibold", children: indexed.toString() })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-lg border border-border bg-muted/20 p-3 text-xs text-muted-foreground", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between gap-3", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Status" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { variant: complete ? "default" : "secondary", children: complete ? "Complete" : "In progress" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-2 flex items-center justify-between gap-3", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Next cursor" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-mono text-foreground", children: nextCursor ?? "None" })
+        ] }),
+        lastPage && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mt-2 flex items-center justify-between gap-3", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Last page" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "text-foreground", children: [
+            lastPage.scanned.toString(),
+            " scanned,",
+            " ",
+            lastPage.indexed.toString(),
+            " indexed"
+          ] })
+        ] }),
+        (status == null ? void 0 : status.lastError) && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-2 text-destructive", children: status.lastError })
+      ] }),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-end gap-2 pt-2", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(Button, { variant: "ghost", onClick: onClose, disabled: isIndexing, children: "Close" }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          Button,
+          {
+            variant: "outline",
+            onClick: handleIndexNextPage,
+            disabled: !collection || isIndexing || complete,
+            children: "Index Next Page"
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          Button,
+          {
+            onClick: handleRunUntilComplete,
+            disabled: !collection || isIndexing || complete,
+            className: "bg-accent text-accent-foreground hover:bg-accent/90 transition-smooth",
+            children: isIndexing ? "Indexing..." : "Run Until Complete"
+          }
+        )
+      ] })
+    ] })
+  ] }) });
+}
 function MintComposer({
   mintConfig,
   moderationConfig,
@@ -1223,6 +1398,7 @@ function ReceivingInstructions({
   accountIdHex,
   onSync,
   onImportSpecificNFT,
+  onIndexCollection,
   syncStatus
 }) {
   const isSyncing = syncStatus.kind === "syncing";
@@ -1277,7 +1453,7 @@ function ReceivingInstructions({
                 "data-ocid": "wallet.sync.partial_state",
                 children: [
                   /* @__PURE__ */ jsxRuntimeExports.jsx(Info, { className: "w-3.5 h-3.5 shrink-0" }),
-                  syncStatus.newCount > 0 ? `${syncStatus.newCount} synced; some skipped` : "Some collections skipped"
+                  syncStatus.skipped.length > 0 ? `${syncStatus.skipped.length} need indexing` : syncStatus.newCount > 0 ? `${syncStatus.newCount} synced; some warnings` : "Some collections need attention"
                 ]
               }
             ),
@@ -1353,6 +1529,35 @@ function ReceivingInstructions({
               /* @__PURE__ */ jsxRuntimeExports.jsx(Skeleton, { className: "h-9 w-full rounded-lg" })
             ] })
           ] }),
+          syncStatus.kind === "partial" && syncStatus.skipped.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-lg border border-amber-200/70 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/20", children: /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-2", children: [
+            syncStatus.skipped.slice(0, 4).map((skip) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              "div",
+              {
+                className: "flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between",
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "truncate text-sm font-medium text-foreground", children: skip.collectionName }),
+                    /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Needs indexing for automatic sync" })
+                  ] }),
+                  onIndexCollection ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+                    Button,
+                    {
+                      size: "sm",
+                      variant: "outline",
+                      className: "h-8 shrink-0",
+                      onClick: () => onIndexCollection(skip.collectionId),
+                      children: "Index Collection"
+                    }
+                  ) : /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { variant: "secondary", className: "shrink-0", children: "Admin required" })
+                ]
+              },
+              skip.collectionId.toString()
+            )),
+            syncStatus.skipped.length > 4 && /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-xs text-muted-foreground", children: [
+              syncStatus.skipped.length - 4,
+              " more collections need indexing."
+            ] })
+          ] }) }),
           isSyncing && /* @__PURE__ */ jsxRuntimeExports.jsxs(
             motion.div,
             {
@@ -1611,12 +1816,14 @@ function WalletPage() {
     principalText
   } = useAuth();
   const { actor, isFetching } = useBackend();
+  const { isAdmin } = useAdmin();
   const queryClient = useQueryClient();
   const bootstrappedRef = reactExports.useRef(false);
   const autoSyncedPrincipalRef = reactExports.useRef(null);
   const syncInFlightRef = reactExports.useRef(null);
   const syncModeRef = reactExports.useRef(null);
   const [importSpecificOpen, setImportSpecificOpen] = reactExports.useState(false);
+  const [indexingCollectionId, setIndexingCollectionId] = reactExports.useState(null);
   reactExports.useEffect(() => {
     if (isAuthenticated && actor && !isFetching && !bootstrappedRef.current) {
       bootstrappedRef.current = true;
@@ -1717,6 +1924,7 @@ function WalletPage() {
   for (const c of collections ?? []) {
     collectionMap.set(c.id, c);
   }
+  const indexingCollection = indexingCollectionId == null ? null : collectionMap.get(indexingCollectionId) ?? null;
   const myCreatedCollectionIds = new Set(
     myCreatedCollections.map((collection) => collection.id)
   );
@@ -1742,7 +1950,10 @@ function WalletPage() {
   const [syncStatus, setSyncStatus] = reactExports.useState({ kind: "idle" });
   reactExports.useEffect(() => {
     if (syncStatus.kind === "ok" || syncStatus.kind === "upToDate" || syncStatus.kind === "partial" || syncStatus.kind === "error") {
-      const id = setTimeout(() => setSyncStatus({ kind: "idle" }), 6e3);
+      const id = setTimeout(
+        () => setSyncStatus({ kind: "idle" }),
+        syncStatus.kind === "partial" ? 15e3 : 6e3
+      );
       return () => clearTimeout(id);
     }
   }, [syncStatus]);
@@ -1760,7 +1971,7 @@ function WalletPage() {
         syncPromise = existingSync;
       } else {
         syncPromise = withTimeout(
-          actor.syncUserNFTs(),
+          actor.syncUserNFTsV2(),
           SYNC_TIMEOUT_MS,
           "Wallet sync timed out while checking imported collections. Import the specific token ID directly or try again."
         );
@@ -1792,22 +2003,42 @@ function WalletPage() {
           const syncErrors = result.ok.errors.filter(
             (message) => message.trim().length > 0
           );
+          const syncSkipped = result.ok.skipped.filter(
+            (item) => item.collectionName.trim().length > 0
+          );
           if (syncErrors.length > 0) {
-            const warningMessage = summarizeSyncErrors(syncErrors);
-            console.info("[syncUserNFTs] collection warnings:", syncErrors);
+            console.warn("[syncUserNFTs] collection errors:", syncErrors);
+          }
+          if (syncSkipped.length > 0) {
+            console.info(
+              "[syncUserNFTs] collections need indexing:",
+              syncSkipped
+            );
+          }
+          if (syncErrors.length > 0 || syncSkipped.length > 0) {
+            const warningMessage = summarizeSyncAttention(
+              syncErrors,
+              syncSkipped
+            );
             if (!silent) {
               setSyncStatus({
                 kind: "partial",
                 newCount,
-                message: warningMessage
+                message: warningMessage,
+                errors: syncErrors,
+                skipped: syncSkipped
               });
               if (newCount > 0) {
                 ue.success(
                   newCount === 1 ? "Synced - 1 new NFT found and registered" : `Synced - ${newCount} new NFTs found and registered`,
                   {
-                    description: "Some collections could not be checked."
+                    description: syncSkipped.length > 0 ? `${syncSkipped.length} collection(s) need indexing.` : "Some collections could not be checked."
                   }
                 );
+              } else if (syncErrors.length === 0 && syncSkipped.length > 0) {
+                ue("Wallet sync complete", {
+                  description: `${syncSkipped.length} collection(s) need indexing before auto-discovery works.`
+                });
               } else {
                 ue("Sync finished with collection warnings", {
                   description: warningMessage
@@ -1918,6 +2149,7 @@ function WalletPage() {
             accountIdHex,
             onSync: handleSync,
             onImportSpecificNFT: () => setImportSpecificOpen(true),
+            onIndexCollection: isAdmin ? (collectionId) => setIndexingCollectionId(collectionId) : void 0,
             syncStatus
           }
         ),
@@ -1927,6 +2159,14 @@ function WalletPage() {
             open: importSpecificOpen,
             onClose: () => setImportSpecificOpen(false),
             collections: collections ?? []
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          CollectionIndexingDialog,
+          {
+            open: indexingCollectionId != null,
+            onClose: () => setIndexingCollectionId(null),
+            collection: indexingCollection
           }
         ),
         /* @__PURE__ */ jsxRuntimeExports.jsx(

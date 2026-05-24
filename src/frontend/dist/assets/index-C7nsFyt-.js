@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-DGVuULtb.js","assets/AppCanisterTopUpDialog-DipjZ6FT.js","assets/badge-HqNWe1Nd.js","assets/external-nft-transfer-ByjpS2cb.js","assets/media-CaYUUf5R.js","assets/MediaImage-B2m2CcJm.js","assets/ZoomableMediaImage-CjC7Hh60.js","assets/index-Jjzk8DdU.js","assets/card-DW9PxAFg.js","assets/textarea-CwuqGyy1.js","assets/skeleton-BEvoe5lY.js","assets/imageUtils-C1CWznuK.js","assets/send-9RggaT2w.js","assets/coins-Dud7zBnV.js","assets/MarketplacePage-D9HbMMkn.js","assets/icp-BXjZNIYq.js","assets/AdminPage-C3M6xsja.js","assets/switch-Ksm6IpRW.js","assets/circle-alert-DfCAuGWh.js","assets/ICPAccountPage-C8LdcfQj.js","assets/CollectionsPage-C4i0et27.js","assets/DividendsPage-Bk-sIRoj.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-BgVCCP0Z.js","assets/AppCanisterTopUpDialog-DmjNAPCR.js","assets/badge-DYV2dwv8.js","assets/external-nft-transfer-C5OqKQuZ.js","assets/media-DlECHWr1.js","assets/MediaImage-niedzvRF.js","assets/ZoomableMediaImage-DGb9sUVC.js","assets/index-CeO64uNr.js","assets/card-DtF5mWjd.js","assets/textarea-qnpwxLNK.js","assets/skeleton-DQetUI23.js","assets/imageUtils-BanVxt9k.js","assets/send-DlO8-F0u.js","assets/coins-D5aOTylC.js","assets/MarketplacePage-BHLqxBe3.js","assets/icp-BXjZNIYq.js","assets/AdminPage-CBID4E46.js","assets/switch-BvoiXMxj.js","assets/circle-alert-BSqRCxSS.js","assets/ICPAccountPage-DEJ_v6LY.js","assets/CollectionsPage-1QQMWWCa.js","assets/DividendsPage-CF_oq9O3.js"])))=>i.map(i=>d[i]);
 var __defProp = Object.defineProperty;
 var __typeError = (msg) => {
   throw TypeError(msg);
@@ -30113,6 +30113,34 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "registeredAt": Timestamp,
     "location": WalletLocation
   });
+  const WalletSyncSkip = IDL2.Record({
+    "collectionId": CollectionId,
+    "collectionName": IDL2.Text,
+    "message": IDL2.Text,
+    "reason": IDL2.Text
+  });
+  const WalletSyncV2Result = IDL2.Record({
+    "errors": IDL2.Vec(IDL2.Text),
+    "newCount": IDL2.Nat,
+    "skipped": IDL2.Vec(WalletSyncSkip)
+  });
+  const CollectionIndexStatus = IDL2.Record({
+    "collectionId": CollectionId,
+    "complete": IDL2.Bool,
+    "cursor": IDL2.Opt(IDL2.Text),
+    "indexed": IDL2.Nat,
+    "lastError": IDL2.Opt(IDL2.Text),
+    "scanned": IDL2.Nat,
+    "updatedAt": Timestamp
+  });
+  const CollectionIndexPageResult = IDL2.Record({
+    "collectionId": CollectionId,
+    "complete": IDL2.Bool,
+    "error": IDL2.Opt(IDL2.Text),
+    "indexed": IDL2.Nat,
+    "nextCursor": IDL2.Opt(IDL2.Text),
+    "scanned": IDL2.Nat
+  });
   const DividendClaimReceipt = IDL2.Record({
     "nft": WalletNFT,
     "collection": Collection,
@@ -30780,6 +30808,11 @@ const idlFactory = ({ IDL: IDL2 }) => {
       [IDL2.Opt(CollectionDividendInfo)],
       []
     ),
+    "getCollectionIndexStatus": IDL2.Func(
+      [CollectionId],
+      [IDL2.Opt(CollectionIndexStatus)],
+      ["query"]
+    ),
     "getCollectionNFT": IDL2.Func(
       [CollectionId, IDL2.Text],
       [IDL2.Opt(WalletNFT)],
@@ -30889,6 +30922,16 @@ const idlFactory = ({ IDL: IDL2 }) => {
       []
     ),
     "icrc7_tx_window": IDL2.Func([], [IDL2.Opt(IDL2.Nat)], ["query"]),
+    "indexCollectionOwnershipPage": IDL2.Func(
+      [CollectionId, IDL2.Opt(IDL2.Text), IDL2.Nat],
+      [
+        IDL2.Variant({
+          "ok": CollectionIndexPageResult,
+          "err": IDL2.Text
+        })
+      ],
+      []
+    ),
     "isAdmin": IDL2.Func([], [IDL2.Bool], ["query"]),
     "isNFTInUserWallet": IDL2.Func(
       [CollectionId, IDL2.Text, UserId],
@@ -31021,6 +31064,16 @@ const idlFactory = ({ IDL: IDL2 }) => {
             "errors": IDL2.Vec(IDL2.Text),
             "newCount": IDL2.Nat
           }),
+          "err": IDL2.Text
+        })
+      ],
+      []
+    ),
+    "syncUserNFTsV2": IDL2.Func(
+      [],
+      [
+        IDL2.Variant({
+          "ok": WalletSyncV2Result,
           "err": IDL2.Text
         })
       ],
@@ -31173,6 +31226,42 @@ function fromRawCollectionNFTPage(value) {
     totalCount: value.totalCount,
     coverage: fromRawCollectionBrowseCoverage(value.coverage),
     note: value.note
+  };
+}
+function fromRawWalletSyncSkip(value) {
+  return {
+    collectionId: value.collectionId,
+    collectionName: value.collectionName,
+    reason: value.reason,
+    message: value.message
+  };
+}
+function fromRawWalletSyncV2Result(value) {
+  return {
+    errors: value.errors,
+    newCount: value.newCount,
+    skipped: value.skipped.map(fromRawWalletSyncSkip)
+  };
+}
+function fromRawCollectionIndexStatus(value) {
+  return {
+    collectionId: value.collectionId,
+    cursor: fromRawOption(value.cursor),
+    scanned: value.scanned,
+    indexed: value.indexed,
+    complete: value.complete,
+    lastError: fromRawOption(value.lastError),
+    updatedAt: value.updatedAt
+  };
+}
+function fromRawCollectionIndexPageResult(value) {
+  return {
+    collectionId: value.collectionId,
+    scanned: value.scanned,
+    indexed: value.indexed,
+    nextCursor: fromRawOption(value.nextCursor),
+    complete: value.complete,
+    error: fromRawOption(value.error)
   };
 }
 function fromRawCollectionNFTLookupResult(value) {
@@ -31710,6 +31799,18 @@ function fromSyncResult(value) {
   }
   return { __kind__: "err", err: value.err };
 }
+function fromSyncV2Result(value) {
+  if ("ok" in value) {
+    return { __kind__: "ok", ok: fromRawWalletSyncV2Result(value.ok) };
+  }
+  return { __kind__: "err", err: value.err };
+}
+function fromCollectionIndexPageResult(value) {
+  if ("ok" in value) {
+    return { __kind__: "ok", ok: fromRawCollectionIndexPageResult(value.ok) };
+  }
+  return { __kind__: "err", err: value.err };
+}
 class Backend {
   constructor(actor, _uploadFile, _downloadFile, agent, processError2) {
     this.actor = actor;
@@ -32022,6 +32123,13 @@ class Backend {
     const value = fromRawOption(result);
     return value == null ? null : fromRawCollectionDividendInfo(value);
   }
+  async getCollectionIndexStatus(collectionId) {
+    const result = await this.run(
+      () => this.actor.getCollectionIndexStatus(collectionId)
+    );
+    const value = fromRawOption(result);
+    return value == null ? null : fromRawCollectionIndexStatus(value);
+  }
   async getCollectionNFT(collectionId, tokenId) {
     const result = await this.run(
       () => this.actor.getCollectionNFT(collectionId, tokenId)
@@ -32143,6 +32251,17 @@ class Backend {
   }
   async getVaultPrincipal() {
     return this.run(() => this.actor.getVaultPrincipal());
+  }
+  async indexCollectionOwnershipPage(collectionId, cursor, limit) {
+    return fromCollectionIndexPageResult(
+      await this.run(
+        () => this.actor.indexCollectionOwnershipPage(
+          collectionId,
+          toRawOption(cursor),
+          limit
+        )
+      )
+    );
   }
   async isAdmin() {
     return this.run(() => this.actor.isAdmin());
@@ -32300,6 +32419,9 @@ class Backend {
   }
   async syncUserNFTs() {
     return fromSyncResult(await this.run(() => this.actor.syncUserNFTs()));
+  }
+  async syncUserNFTsV2() {
+    return fromSyncV2Result(await this.run(() => this.actor.syncUserNFTsV2()));
   }
   async syncCollectionDividends(collectionId) {
     return fromDividendSyncResult(
@@ -46453,13 +46575,13 @@ const Toaster = ({ ...props }) => {
     }
   );
 };
-const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-DGVuULtb.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
-const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-D9HbMMkn.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,15,13]) : void 0));
-const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-C3M6xsja.js"), true ? __vite__mapDeps([16,1,2,17,9,7,8,10,4,18]) : void 0));
-const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-C8LdcfQj.js"), true ? __vite__mapDeps([19,2,8,10,15,12,18]) : void 0));
-const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-CAJYl-2m.js"), true ? [] : void 0));
-const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-C4i0et27.js"), true ? __vite__mapDeps([20,1,2,17,9,7,5,4,6,8,10,11]) : void 0));
-const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-Bk-sIRoj.js"), true ? __vite__mapDeps([21,1,2,5,4,8,13]) : void 0));
+const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-BgVCCP0Z.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
+const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-BHLqxBe3.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,15,13]) : void 0));
+const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-CBID4E46.js"), true ? __vite__mapDeps([16,1,2,17,9,7,8,10,4,18]) : void 0));
+const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-DEJ_v6LY.js"), true ? __vite__mapDeps([19,2,8,10,15,12,18]) : void 0));
+const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-omJgmuVw.js"), true ? [] : void 0));
+const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-1QQMWWCa.js"), true ? __vite__mapDeps([20,1,2,17,9,7,5,4,6,8,10,11]) : void 0));
+const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-CF_oq9O3.js"), true ? __vite__mapDeps([21,1,2,5,4,8,13]) : void 0));
 const rootRoute = createRootRoute({
   component: () => /* @__PURE__ */ jsxRuntimeExports.jsx(Layout, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(
     reactExports.Suspense,
@@ -46552,14 +46674,14 @@ export {
   cn as a,
   useBackend as b,
   createLucideIcon as c,
-  useQueryClient as d,
-  useQuery as e,
-  ue as f,
-  useComposedRefs$1 as g,
-  LoadingSpinner as h,
-  useNavigate as i,
+  useAdmin as d,
+  useQueryClient as e,
+  useQuery as f,
+  ue as g,
+  useComposedRefs$1 as h,
+  LoadingSpinner as i,
   jsxRuntimeExports as j,
-  useAdmin as k,
+  useNavigate as k,
   Shield as l,
   motion as m,
   infiniteQueryBehavior as n,
