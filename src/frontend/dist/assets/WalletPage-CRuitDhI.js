@@ -1,17 +1,17 @@
-import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useQueryClient, r as reactExports, e as useQuery, f as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-BhINJbkK.js";
-import { A as AppCanisterTopUpDialog, P as Plus, i as isLowCyclesError } from "./AppCanisterTopUpDialog-JDtW8yH5.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-B79NKm5s.js";
-import { M as MediaImage, E as EmptyState } from "./MediaImage-D7C6Dy7B.js";
-import { B as Badge, u as useMutation, L as Label, I as Input, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle } from "./badge-C7pZkX9c.js";
-import { I as ImageOff, r as resolveImageUrl } from "./media-BsBhXd-y.js";
-import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-B1soOkFd.js";
-import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-TMcqjVdr.js";
-import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-DRS_IZMI.js";
-import { S as Skeleton, C as Copy } from "./skeleton-Db4RvSQN.js";
-import { c as compressModerationImage, S as Sparkles } from "./imageUtils-DxAmxDiD.js";
-import { C as CircleCheck, S as Send } from "./send-B4KGheJT.js";
-import { C as Coins } from "./coins-BYCYuh6J.js";
-import "./index-Cr31kuEB.js";
+import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useQueryClient, r as reactExports, e as useQuery, f as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-Diuv4ugd.js";
+import { P as Plus, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-D0vx1Bda.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-CU9sPn25.js";
+import { M as MediaImage, E as EmptyState } from "./MediaImage-C02aR-i4.js";
+import { B as Badge, u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-D_7-MREs.js";
+import { I as ImageOff, r as resolveImageUrl } from "./media-DOAKro9k.js";
+import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-BFBQch0-.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-Bym-Njau.js";
+import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-gTnK39pJ.js";
+import { S as Skeleton, C as Copy } from "./skeleton-DzmVD8Rr.js";
+import { S as Sparkles, c as compressModerationImage } from "./imageUtils-o-ieJJRg.js";
+import { C as CircleCheck, S as Send } from "./send-JXTXwqDt.js";
+import { C as Coins } from "./coins-DgLntbTP.js";
+import "./index-0YfkV2r0.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -696,6 +696,146 @@ function RegisterNFTModal({
     }
   ) });
 }
+function ImportSpecificNFTModal({
+  open,
+  onClose,
+  collections
+}) {
+  const { actor } = useBackend();
+  const { principal } = useAuth();
+  const queryClient = useQueryClient();
+  const [collectionId, setCollectionId] = reactExports.useState("");
+  const [tokenId, setTokenId] = reactExports.useState("");
+  const externalCollections = collections.filter(
+    (collection) => collection.kind === "External"
+  );
+  const selectedCollection = externalCollections.find(
+    (collection) => collection.id.toString() === collectionId
+  );
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Not connected");
+      if (!principal) throw new Error("You must be logged in to import an NFT");
+      if (!selectedCollection) throw new Error("Choose an external collection");
+      if (!tokenId.trim()) throw new Error("Token ID is required");
+      const result = await actor.syncExternalNFTOwner(
+        selectedCollection.id,
+        tokenId.trim(),
+        principal
+      );
+      if (result.__kind__ === "err") {
+        throw new Error(result.err);
+      }
+      return result.ok;
+    },
+    onSuccess: () => {
+      ue.success("NFT imported successfully");
+      queryClient.invalidateQueries({ queryKey: ["userNFTs"] });
+      queryClient.invalidateQueries({ queryKey: ["userStats"] });
+      setCollectionId("");
+      setTokenId("");
+      onClose();
+    },
+    onError: (err) => {
+      ue.error(extractError(err));
+    }
+  });
+  return /* @__PURE__ */ jsxRuntimeExports.jsx(Dialog, { open, onOpenChange: (v) => !v && onClose(), children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+    DialogContent,
+    {
+      className: "bg-card border-border max-w-md",
+      "data-ocid": "wallet.import_specific_nft.dialog",
+      children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(DialogHeader, { children: /* @__PURE__ */ jsxRuntimeExports.jsxs(DialogTitle, { className: "font-display text-foreground flex items-center gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Sparkles, { className: "w-4 h-4 text-accent" }),
+          "Import NFT by Token ID"
+        ] }) }),
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-4 pt-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              Label,
+              {
+                htmlFor: "specificCollectionId",
+                className: "text-sm text-foreground",
+                children: [
+                  "Collection ",
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-destructive", children: "*" })
+                ]
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(Select, { value: collectionId, onValueChange: setCollectionId, children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                SelectTrigger,
+                {
+                  id: "specificCollectionId",
+                  className: "w-full bg-muted/30 border-border focus:border-accent",
+                  "data-ocid": "wallet.import_specific_nft.collection_select",
+                  children: /* @__PURE__ */ jsxRuntimeExports.jsx(SelectValue, { placeholder: "Choose a collection" })
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(SelectContent, { children: externalCollections.map((collection) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+                SelectItem,
+                {
+                  value: collection.id.toString(),
+                  children: collection.name
+                },
+                collection.id.toString()
+              )) })
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              Label,
+              {
+                htmlFor: "specificTokenId",
+                className: "text-sm text-foreground",
+                children: [
+                  "Token ID ",
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-destructive", children: "*" })
+                ]
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              Input,
+              {
+                id: "specificTokenId",
+                placeholder: "e.g. 1234",
+                value: tokenId,
+                onChange: (e) => setTokenId(e.target.value),
+                className: "bg-muted/30 border-border focus:border-accent font-mono",
+                "data-ocid": "wallet.import_specific_nft.token_id.input"
+              }
+            )
+          ] }),
+          externalCollections.length === 0 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-lg border border-border bg-muted/20 p-3 text-xs text-muted-foreground", children: "No external collections have been imported yet." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-lg border border-accent/20 bg-accent/5 p-3 text-xs text-muted-foreground", children: "Mintlab verifies ownership on-chain before adding this NFT to your wallet." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-end gap-2 pt-2", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              Button,
+              {
+                variant: "ghost",
+                onClick: onClose,
+                disabled: mutation.isPending,
+                "data-ocid": "wallet.import_specific_nft.cancel_button",
+                children: "Cancel"
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(
+              Button,
+              {
+                onClick: () => mutation.mutate(),
+                disabled: !selectedCollection || !tokenId.trim() || mutation.isPending,
+                className: "bg-accent text-accent-foreground hover:bg-accent/90 transition-smooth",
+                "data-ocid": "wallet.import_specific_nft.submit_button",
+                children: mutation.isPending ? "Importing…" : "Verify & Import"
+              }
+            )
+          ] })
+        ] })
+      ]
+    }
+  ) });
+}
 function MintComposer({
   mintConfig,
   moderationConfig,
@@ -1082,6 +1222,7 @@ function ReceivingInstructions({
   principalText,
   accountIdHex,
   onSync,
+  onImportSpecificNFT,
   syncStatus
 }) {
   const isSyncing = syncStatus.kind === "syncing";
@@ -1094,12 +1235,12 @@ function ReceivingInstructions({
       className: "bg-card border border-border rounded-2xl overflow-hidden",
       "data-ocid": "wallet.receiving_instructions",
       children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between gap-3 px-5 py-3 border-b border-border bg-accent/5", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-3 px-5 py-3 border-b border-border bg-accent/5 sm:flex-row sm:items-center sm:justify-between", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx(ArrowUpRight, { className: "w-4 h-4 text-accent" }),
             /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-display font-semibold text-sm text-foreground", children: "Receive NFTs & ICP" })
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap items-center justify-end gap-2", children: [
             syncStatus.kind === "ok" && /* @__PURE__ */ jsxRuntimeExports.jsxs(
               motion.span,
               {
@@ -1149,6 +1290,22 @@ function ReceivingInstructions({
                 title: syncStatus.message,
                 "data-ocid": "wallet.sync.error_state",
                 children: syncStatus.message
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              Button,
+              {
+                size: "sm",
+                variant: "ghost",
+                className: "h-7 px-2 gap-1.5 text-xs text-muted-foreground hover:text-foreground",
+                onClick: onImportSpecificNFT,
+                "data-ocid": "wallet.import_specific_nft_button",
+                "aria-label": "Import NFT by token ID",
+                title: "Import NFT by token ID",
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(Plus, { className: "w-3 h-3" }),
+                  "Import NFT"
+                ]
               }
             ),
             /* @__PURE__ */ jsxRuntimeExports.jsxs(
@@ -1458,6 +1615,8 @@ function WalletPage() {
   const bootstrappedRef = reactExports.useRef(false);
   const autoSyncedPrincipalRef = reactExports.useRef(null);
   const syncInFlightRef = reactExports.useRef(null);
+  const syncModeRef = reactExports.useRef(null);
+  const [importSpecificOpen, setImportSpecificOpen] = reactExports.useState(false);
   reactExports.useEffect(() => {
     if (isAuthenticated && actor && !isFetching && !bootstrappedRef.current) {
       bootstrappedRef.current = true;
@@ -1591,12 +1750,22 @@ function WalletPage() {
     async (options = {}) => {
       if (!actor) return;
       const silent = options.silent === true;
+      const requestedMode = silent ? "silent" : "manual";
       if (!silent) setSyncStatus({ kind: "syncing" });
-      let syncPromise = syncInFlightRef.current;
-      const startedNewSync = syncPromise === null;
-      if (!syncPromise) {
-        syncPromise = actor.syncUserNFTs();
+      const existingSync = syncInFlightRef.current;
+      const canReuseExistingSync = existingSync !== null && (silent || syncModeRef.current === "manual");
+      const startedNewSync = !canReuseExistingSync;
+      let syncPromise;
+      if (canReuseExistingSync) {
+        syncPromise = existingSync;
+      } else {
+        syncPromise = withTimeout(
+          actor.syncUserNFTs(),
+          SYNC_TIMEOUT_MS,
+          "Wallet sync timed out while checking imported collections. Import the specific token ID directly or try again."
+        );
         syncInFlightRef.current = syncPromise;
+        syncModeRef.current = requestedMode;
       }
       let slowNoticeId;
       let refreshId;
@@ -1676,6 +1845,7 @@ function WalletPage() {
         }
         if (syncInFlightRef.current === syncPromise) {
           syncInFlightRef.current = null;
+          syncModeRef.current = null;
         }
         void refetchNFTs();
         void queryClient.invalidateQueries({ queryKey: ["userStats"] });
@@ -1747,7 +1917,16 @@ function WalletPage() {
             principalText,
             accountIdHex,
             onSync: handleSync,
+            onImportSpecificNFT: () => setImportSpecificOpen(true),
             syncStatus
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          ImportSpecificNFTModal,
+          {
+            open: importSpecificOpen,
+            onClose: () => setImportSpecificOpen(false),
+            collections: collections ?? []
           }
         ),
         /* @__PURE__ */ jsxRuntimeExports.jsx(

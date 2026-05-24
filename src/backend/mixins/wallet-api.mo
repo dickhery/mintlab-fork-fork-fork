@@ -417,13 +417,6 @@ mixin (
           switch (preview) {
             case (#err(message)) {
               errors := Array.concat<Text>(errors, [message]);
-              await* removeStaleOnChainNFTs(
-                caller,
-                collection,
-                userAccountId,
-                #Registered,
-                [],
-              );
             };
             case (#ok(nfts)) {
               var previewTokenIds : [Text] = [];
@@ -476,13 +469,6 @@ mixin (
       );
       switch (preview) {
         case (#err(message)) {
-          await* removeStaleOnChainNFTs(
-            caller,
-            collection,
-            userAccountId,
-            #Minted,
-            [],
-          );
           return #err(message);
         };
         case (#ok(nfts)) {

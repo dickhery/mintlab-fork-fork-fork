@@ -758,6 +758,156 @@ function RegisterNFTModal({
   );
 }
 
+interface ImportSpecificNFTModalProps {
+  open: boolean;
+  onClose: () => void;
+  collections: Collection[];
+}
+
+function ImportSpecificNFTModal({
+  open,
+  onClose,
+  collections,
+}: ImportSpecificNFTModalProps) {
+  const { actor } = useBackend();
+  const { principal } = useAuth();
+  const queryClient = useQueryClient();
+  const [collectionId, setCollectionId] = useState("");
+  const [tokenId, setTokenId] = useState("");
+
+  const externalCollections = collections.filter(
+    (collection) => collection.kind === "External",
+  );
+  const selectedCollection = externalCollections.find(
+    (collection) => collection.id.toString() === collectionId,
+  );
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Not connected");
+      if (!principal) throw new Error("You must be logged in to import an NFT");
+      if (!selectedCollection) throw new Error("Choose an external collection");
+      if (!tokenId.trim()) throw new Error("Token ID is required");
+
+      const result = await actor.syncExternalNFTOwner(
+        selectedCollection.id,
+        tokenId.trim(),
+        principal,
+      );
+      if (result.__kind__ === "err") {
+        throw new Error(result.err);
+      }
+      return result.ok;
+    },
+    onSuccess: () => {
+      toast.success("NFT imported successfully");
+      queryClient.invalidateQueries({ queryKey: ["userNFTs"] });
+      queryClient.invalidateQueries({ queryKey: ["userStats"] });
+      setCollectionId("");
+      setTokenId("");
+      onClose();
+    },
+    onError: (err: unknown) => {
+      toast.error(extractError(err));
+    },
+  });
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent
+        className="bg-card border-border max-w-md"
+        data-ocid="wallet.import_specific_nft.dialog"
+      >
+        <DialogHeader>
+          <DialogTitle className="font-display text-foreground flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-accent" />
+            Import NFT by Token ID
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 pt-2">
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="specificCollectionId"
+              className="text-sm text-foreground"
+            >
+              Collection <span className="text-destructive">*</span>
+            </Label>
+            <Select value={collectionId} onValueChange={setCollectionId}>
+              <SelectTrigger
+                id="specificCollectionId"
+                className="w-full bg-muted/30 border-border focus:border-accent"
+                data-ocid="wallet.import_specific_nft.collection_select"
+              >
+                <SelectValue placeholder="Choose a collection" />
+              </SelectTrigger>
+              <SelectContent>
+                {externalCollections.map((collection) => (
+                  <SelectItem
+                    key={collection.id.toString()}
+                    value={collection.id.toString()}
+                  >
+                    {collection.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label
+              htmlFor="specificTokenId"
+              className="text-sm text-foreground"
+            >
+              Token ID <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="specificTokenId"
+              placeholder="e.g. 1234"
+              value={tokenId}
+              onChange={(e) => setTokenId(e.target.value)}
+              className="bg-muted/30 border-border focus:border-accent font-mono"
+              data-ocid="wallet.import_specific_nft.token_id.input"
+            />
+          </div>
+
+          {externalCollections.length === 0 && (
+            <div className="rounded-lg border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+              No external collections have been imported yet.
+            </div>
+          )}
+
+          <div className="rounded-lg border border-accent/20 bg-accent/5 p-3 text-xs text-muted-foreground">
+            Mintlab verifies ownership on-chain before adding this NFT to your
+            wallet.
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button
+              variant="ghost"
+              onClick={onClose}
+              disabled={mutation.isPending}
+              data-ocid="wallet.import_specific_nft.cancel_button"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => mutation.mutate()}
+              disabled={
+                !selectedCollection || !tokenId.trim() || mutation.isPending
+              }
+              className="bg-accent text-accent-foreground hover:bg-accent/90 transition-smooth"
+              data-ocid="wallet.import_specific_nft.submit_button"
+            >
+              {mutation.isPending ? "Importing…" : "Verify & Import"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function MintComposer({
   mintConfig,
   moderationConfig,
@@ -1207,6 +1357,8 @@ type SyncStatus =
   | { kind: "partial"; newCount: number; message: string }
   | { kind: "error"; message: string };
 
+type SyncMode = "silent" | "manual";
+
 type SyncResult =
   | { __kind__: "ok"; ok: { errors: Array<string>; newCount: bigint } }
   | { __kind__: "err"; err: string };
@@ -1215,6 +1367,7 @@ interface ReceivingInstructionsProps {
   principalText: string | null;
   accountIdHex: string | null;
   onSync: () => void;
+  onImportSpecificNFT: () => void;
   syncStatus: SyncStatus;
 }
 
@@ -1222,6 +1375,7 @@ function ReceivingInstructions({
   principalText,
   accountIdHex,
   onSync,
+  onImportSpecificNFT,
   syncStatus,
 }: ReceivingInstructionsProps) {
   const isSyncing = syncStatus.kind === "syncing";
@@ -1235,14 +1389,14 @@ function ReceivingInstructions({
       data-ocid="wallet.receiving_instructions"
     >
       {/* Header bar */}
-      <div className="flex items-center justify-between gap-3 px-5 py-3 border-b border-border bg-accent/5">
+      <div className="flex flex-col gap-3 px-5 py-3 border-b border-border bg-accent/5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
           <ArrowUpRight className="w-4 h-4 text-accent" />
           <span className="font-display font-semibold text-sm text-foreground">
             Receive NFTs &amp; ICP
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           {/* Sync status inline indicator */}
           {syncStatus.kind === "ok" && (
             <motion.span
@@ -1293,6 +1447,18 @@ function ReceivingInstructions({
               {syncStatus.message}
             </motion.span>
           )}
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            onClick={onImportSpecificNFT}
+            data-ocid="wallet.import_specific_nft_button"
+            aria-label="Import NFT by token ID"
+            title="Import NFT by token ID"
+          >
+            <Plus className="w-3 h-3" />
+            Import NFT
+          </Button>
           <Button
             size="sm"
             variant="ghost"
@@ -1623,6 +1789,8 @@ export default function WalletPage() {
   const bootstrappedRef = useRef(false);
   const autoSyncedPrincipalRef = useRef<string | null>(null);
   const syncInFlightRef = useRef<Promise<SyncResult> | null>(null);
+  const syncModeRef = useRef<SyncMode | null>(null);
+  const [importSpecificOpen, setImportSpecificOpen] = useState(false);
 
   // Bootstrap admin on first login
   useEffect(() => {
@@ -1799,13 +1967,24 @@ export default function WalletPage() {
     async (options: { silent?: boolean } = {}) => {
       if (!actor) return;
       const silent = options.silent === true;
+      const requestedMode: SyncMode = silent ? "silent" : "manual";
       if (!silent) setSyncStatus({ kind: "syncing" });
 
-      let syncPromise = syncInFlightRef.current;
-      const startedNewSync = syncPromise === null;
-      if (!syncPromise) {
-        syncPromise = actor.syncUserNFTs();
+      const existingSync = syncInFlightRef.current;
+      const canReuseExistingSync =
+        existingSync !== null && (silent || syncModeRef.current === "manual");
+      const startedNewSync = !canReuseExistingSync;
+      let syncPromise: Promise<SyncResult>;
+      if (canReuseExistingSync) {
+        syncPromise = existingSync;
+      } else {
+        syncPromise = withTimeout(
+          actor.syncUserNFTs(),
+          SYNC_TIMEOUT_MS,
+          "Wallet sync timed out while checking imported collections. Import the specific token ID directly or try again.",
+        );
         syncInFlightRef.current = syncPromise;
+        syncModeRef.current = requestedMode;
       }
 
       let slowNoticeId: number | undefined;
@@ -1892,6 +2071,7 @@ export default function WalletPage() {
         }
         if (syncInFlightRef.current === syncPromise) {
           syncInFlightRef.current = null;
+          syncModeRef.current = null;
         }
         // Always refresh the local list after sync settles
         void refetchNFTs();
@@ -1987,7 +2167,14 @@ export default function WalletPage() {
         principalText={principalText}
         accountIdHex={accountIdHex}
         onSync={handleSync}
+        onImportSpecificNFT={() => setImportSpecificOpen(true)}
         syncStatus={syncStatus}
+      />
+
+      <ImportSpecificNFTModal
+        open={importSpecificOpen}
+        onClose={() => setImportSpecificOpen(false)}
+        collections={collections ?? []}
       />
 
       <MintComposer
