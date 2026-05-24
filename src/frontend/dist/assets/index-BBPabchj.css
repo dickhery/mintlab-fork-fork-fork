@@ -1721,6 +1721,9 @@ video {
 .border-destructive\/20 {
   border-color: oklch(var(--destructive) / 0.2);
 }
+.border-destructive\/25 {
+  border-color: oklch(var(--destructive) / 0.25);
+}
 .border-destructive\/30 {
   border-color: oklch(var(--destructive) / 0.3);
 }

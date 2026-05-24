@@ -1,10 +1,10 @@
-import { b as useBackend, u as useAuth, e as useQueryClient, r as reactExports, f as useQuery, j as jsxRuntimeExports, C as CircleDollarSign, B as Button, L as LogIn, i as LoadingSpinner, g as ue } from "./index-DMZo2J1b.js";
-import { L as LoaderCircle, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-BNeVPtnD.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-BS5zGZmj.js";
-import { u as useMutation, B as Badge } from "./badge-D-pn76y5.js";
-import { R as RefreshCw, C as Card, c as CardContent } from "./card-Dven27kb.js";
-import { C as Coins } from "./coins-C-hL8yP7.js";
-import { I as ImageOff } from "./media-B4jd9NBy.js";
+import { b as useBackend, u as useAuth, e as useQueryClient, r as reactExports, f as useQuery, j as jsxRuntimeExports, C as CircleDollarSign, B as Button, L as LogIn, i as LoadingSpinner, g as ue } from "./index-CtiMvMn7.js";
+import { L as LoaderCircle, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-B64rsl3B.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-VYauyIcl.js";
+import { u as useMutation, B as Badge } from "./badge-C5lHJ171.js";
+import { R as RefreshCw, C as Card, c as CardContent } from "./card-BoW9Rghx.js";
+import { C as Coins } from "./coins-B4lPSfxB.js";
+import { I as ImageOff } from "./media-CwL-LlCK.js";
 const E8S = 100000000n;
 const ICP_FEE = 10000n;
 function formatICP(e8s) {

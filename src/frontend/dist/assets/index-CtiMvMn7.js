@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-rwGya_hN.js","assets/AppCanisterTopUpDialog-BNeVPtnD.js","assets/badge-D-pn76y5.js","assets/external-nft-transfer-BFk0Ayvf.js","assets/media-B4jd9NBy.js","assets/MediaImage-BS5zGZmj.js","assets/ZoomableMediaImage-bvFWT3Fv.js","assets/index-CXcU_p1m.js","assets/card-Dven27kb.js","assets/textarea-Cob3xrcc.js","assets/skeleton-DzBsn7U4.js","assets/imageUtils-OsQpf51T.js","assets/send-DybXnMTK.js","assets/coins-C-hL8yP7.js","assets/MarketplacePage-DcaSrGf8.js","assets/icp-BXjZNIYq.js","assets/AdminPage-bt8P_FRr.js","assets/switch-DZhbEeUp.js","assets/circle-alert-DrV6UBc8.js","assets/ICPAccountPage-GTjTFNbo.js","assets/CollectionsPage-Ds2RQuYD.js","assets/DividendsPage-BKjIzE_3.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-CLeG_B3-.js","assets/AppCanisterTopUpDialog-B64rsl3B.js","assets/badge-C5lHJ171.js","assets/external-nft-transfer-BGwyGpdw.js","assets/media-CwL-LlCK.js","assets/MediaImage-VYauyIcl.js","assets/ZoomableMediaImage-BrythtH2.js","assets/index-BapO8db_.js","assets/card-BoW9Rghx.js","assets/textarea-2W0efyWb.js","assets/skeleton-D1D97gY-.js","assets/imageUtils-vhRE8bl-.js","assets/send-D3Jj-dw4.js","assets/coins-B4lPSfxB.js","assets/MarketplacePage-D7huheIE.js","assets/icp-BXjZNIYq.js","assets/AdminPage-CACr567E.js","assets/switch-CLn2Az5E.js","assets/circle-alert-BjFBt0Am.js","assets/ICPAccountPage-BPFTk9nN.js","assets/CollectionsPage-BaR-929m.js","assets/DividendsPage-DvBFhoC3.js"])))=>i.map(i=>d[i]);
 var __defProp = Object.defineProperty;
 var __typeError = (msg) => {
   throw TypeError(msg);
@@ -46614,13 +46614,13 @@ const Toaster = ({ ...props }) => {
     }
   );
 };
-const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-rwGya_hN.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
-const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-DcaSrGf8.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,15,13]) : void 0));
-const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-bt8P_FRr.js"), true ? __vite__mapDeps([16,1,2,17,9,7,8,10,4,18]) : void 0));
-const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-GTjTFNbo.js"), true ? __vite__mapDeps([19,2,8,10,15,12,18]) : void 0));
-const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-Dj62RO0s.js"), true ? [] : void 0));
-const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-Ds2RQuYD.js"), true ? __vite__mapDeps([20,1,2,17,9,7,5,4,6,8,10,11]) : void 0));
-const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-BKjIzE_3.js"), true ? __vite__mapDeps([21,1,2,5,4,8,13]) : void 0));
+const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-CLeG_B3-.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
+const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-D7huheIE.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,15,13]) : void 0));
+const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-CACr567E.js"), true ? __vite__mapDeps([16,1,2,17,9,7,8,10,4,18]) : void 0));
+const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-BPFTk9nN.js"), true ? __vite__mapDeps([19,2,8,10,15,12,18]) : void 0));
+const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-C4gkwiP5.js"), true ? [] : void 0));
+const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-BaR-929m.js"), true ? __vite__mapDeps([20,1,2,17,9,7,5,4,6,8,10,11]) : void 0));
+const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-DvBFhoC3.js"), true ? __vite__mapDeps([21,1,2,5,4,8,13]) : void 0));
 const rootRoute = createRootRoute({
   component: () => /* @__PURE__ */ jsxRuntimeExports.jsx(Layout, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(
     reactExports.Suspense,

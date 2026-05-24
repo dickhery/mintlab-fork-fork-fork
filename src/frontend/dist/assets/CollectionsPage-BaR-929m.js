@@ -1,15 +1,15 @@
-import { Q as QueryObserver, n as infiniteQueryBehavior, o as hasPreviousPage, p as hasNextPage, q as useBaseQuery, c as createLucideIcon, r as reactExports, h as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, d as useAdmin, e as useQueryClient, f as useQuery, s as AnimatePresence, m as motion, B as Button, g as ue, C as CircleDollarSign, X, G as Grid3x3, P as Principal, i as LoadingSpinner } from "./index-DMZo2J1b.js";
-import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-BNeVPtnD.js";
-import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-DZhbEeUp.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-BS5zGZmj.js";
-import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-bvFWT3Fv.js";
-import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, B as Badge, I as Input, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./badge-D-pn76y5.js";
-import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent, R as RefreshCw } from "./card-Dven27kb.js";
-import { u as useDirection } from "./index-CXcU_p1m.js";
-import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-Cob3xrcc.js";
-import { S as Skeleton, C as Copy } from "./skeleton-DzBsn7U4.js";
-import { S as Sparkles, c as compressModerationImage } from "./imageUtils-OsQpf51T.js";
-import { r as resolveImageUrl, I as ImageOff } from "./media-B4jd9NBy.js";
+import { Q as QueryObserver, n as infiniteQueryBehavior, o as hasPreviousPage, p as hasNextPage, q as useBaseQuery, c as createLucideIcon, r as reactExports, h as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, d as useAdmin, e as useQueryClient, f as useQuery, s as AnimatePresence, m as motion, B as Button, g as ue, C as CircleDollarSign, X, G as Grid3x3, P as Principal, i as LoadingSpinner } from "./index-CtiMvMn7.js";
+import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-B64rsl3B.js";
+import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-CLn2Az5E.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-VYauyIcl.js";
+import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-BrythtH2.js";
+import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, B as Badge, I as Input, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./badge-C5lHJ171.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent } from "./card-BoW9Rghx.js";
+import { u as useDirection } from "./index-BapO8db_.js";
+import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-2W0efyWb.js";
+import { S as Skeleton, C as Copy } from "./skeleton-D1D97gY-.js";
+import { S as Sparkles, c as compressModerationImage } from "./imageUtils-vhRE8bl-.js";
+import { r as resolveImageUrl, I as ImageOff } from "./media-CwL-LlCK.js";
 var InfiniteQueryObserver = class extends QueryObserver {
   constructor(client, options) {
     super(client, options);
@@ -2419,7 +2419,10 @@ function NFTBrowser({
     isLoading,
     isFetchingNextPage,
     hasNextPage: hasNextPage2,
-    fetchNextPage
+    fetchNextPage,
+    isError: browsePageFailed,
+    error: browsePageError,
+    refetch: refetchBrowsePage
   } = useInfiniteQuery({
     queryKey: ["collectionNFTPage", collection.id.toString()],
     initialPageParam: null,
@@ -2435,7 +2438,9 @@ function NFTBrowser({
       return actor.getCollectionNFTPage(collection.id, pageParam, 24n);
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? void 0,
-    enabled: !!actor && !isFetching
+    enabled: !!actor && !isFetching,
+    retry: false,
+    staleTime: 3e4
   });
   const { data: activeListingDetails = [] } = useQuery({
     queryKey: ["activeListingDetails"],
@@ -2576,11 +2581,24 @@ function NFTBrowser({
     setAttrFilter(null);
     setDirectLookupNFT(null);
   }, []);
+  const [showSlowLoadNotice, setShowSlowLoadNotice] = reactExports.useState(false);
+  reactExports.useEffect(() => {
+    if (!isLoading && !isFetchingNextPage) {
+      setShowSlowLoadNotice(false);
+      return;
+    }
+    setShowSlowLoadNotice(false);
+    const timer = window.setTimeout(() => {
+      setShowSlowLoadNotice(true);
+    }, 4500);
+    return () => window.clearTimeout(timer);
+  }, [isLoading, isFetchingNextPage]);
   const hasActiveFilter = search.trim() !== "" || attrFilter !== null;
   const hasSearchTerm = search.trim() !== "";
   const loadedCount = loadedNFTs.length;
   const fullyLoaded = BigInt(loadedCount) >= totalCount;
   const collectionImageUrl = resolveImageUrl(collection.imageUrl);
+  const browsePageErrorMessage = browsePageFailed ? extractError(browsePageError) : null;
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-6", "data-ocid": "collections.nft_browser", children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between", children: [
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-3 min-w-0", children: [
@@ -2658,6 +2676,43 @@ function NFTBrowser({
       browseNote,
       coverage === "Full" && !fullyLoaded && /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "block mt-1", children: "Load more to keep browsing the rest of the collection." })
     ] }),
+    showSlowLoadNotice && /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "div",
+      {
+        className: "flex items-start gap-2 rounded-xl border border-amber-500/25 bg-amber-500/10 px-3 py-2.5 text-sm text-amber-800",
+        "data-ocid": "collections.nft_browser.slow_loading_notice",
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { className: "mt-0.5 h-4 w-4 shrink-0 animate-spin" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "This imported collection is still loading. Some NFT canisters answer slowly, so this may take a few minutes." })
+        ]
+      }
+    ),
+    browsePageErrorMessage && /* @__PURE__ */ jsxRuntimeExports.jsxs(
+      "div",
+      {
+        className: "flex flex-col gap-3 rounded-xl border border-destructive/25 bg-destructive/10 px-3 py-3 text-sm text-destructive sm:flex-row sm:items-center sm:justify-between",
+        "data-ocid": "collections.nft_browser.error_state",
+        children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: browsePageErrorMessage }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            Button,
+            {
+              variant: "outline",
+              size: "sm",
+              className: "gap-2 border-destructive/30 text-destructive hover:bg-destructive/10",
+              onClick: () => {
+                void refetchBrowsePage();
+              },
+              "data-ocid": "collections.nft_browser.retry_button",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(RefreshCw, { className: "h-3.5 w-3.5" }),
+                "Retry"
+              ]
+            }
+          )
+        ]
+      }
+    ),
     dividendsEnabled && dividendInfo && /* @__PURE__ */ jsxRuntimeExports.jsxs(
       "div",
       {
