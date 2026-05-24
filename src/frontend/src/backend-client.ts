@@ -105,6 +105,12 @@ export interface WalletSyncV2Result {
   skipped: Array<WalletSyncSkip>;
 }
 
+export interface WalletSyncPageResult extends WalletSyncV2Result {
+  nextCursor: bigint | null;
+  complete: boolean;
+  checkedCollections: bigint;
+}
+
 export interface CollectionIndexStatus {
   collectionId: CollectionId;
   cursor: string | null;
@@ -894,6 +900,13 @@ export interface backendInterface {
     | { __kind__: "ok"; ok: WalletSyncV2Result }
     | { __kind__: "err"; err: string }
   >;
+  syncUserNFTsPage(
+    cursor: bigint | null,
+    maxCollections: bigint,
+  ): Promise<
+    | { __kind__: "ok"; ok: WalletSyncPageResult }
+    | { __kind__: "err"; err: string }
+  >;
   syncCollectionDividends(
     collectionId: CollectionId,
   ): Promise<
@@ -964,6 +977,11 @@ type RawWalletSyncV2Result = {
   errors: Array<string>;
   newCount: bigint;
   skipped: Array<RawWalletSyncSkip>;
+};
+type RawWalletSyncPageResult = RawWalletSyncV2Result & {
+  nextCursor: [] | [bigint];
+  complete: boolean;
+  checkedCollections: bigint;
 };
 type RawCollectionIndexStatus = {
   collectionId: CollectionId;
@@ -1469,6 +1487,17 @@ function fromRawWalletSyncV2Result(
     errors: value.errors,
     newCount: value.newCount,
     skipped: value.skipped.map(fromRawWalletSyncSkip),
+  };
+}
+
+function fromRawWalletSyncPageResult(
+  value: RawWalletSyncPageResult,
+): WalletSyncPageResult {
+  return {
+    ...fromRawWalletSyncV2Result(value),
+    nextCursor: fromRawOption(value.nextCursor),
+    complete: value.complete,
+    checkedCollections: value.checkedCollections,
   };
 }
 
@@ -2213,6 +2242,17 @@ function fromSyncV2Result(
   | { __kind__: "err"; err: string } {
   if ("ok" in value) {
     return { __kind__: "ok", ok: fromRawWalletSyncV2Result(value.ok) };
+  }
+  return { __kind__: "err", err: value.err };
+}
+
+function fromSyncPageResult(
+  value: { ok: RawWalletSyncPageResult } | { err: string },
+):
+  | { __kind__: "ok"; ok: WalletSyncPageResult }
+  | { __kind__: "err"; err: string } {
+  if ("ok" in value) {
+    return { __kind__: "ok", ok: fromRawWalletSyncPageResult(value.ok) };
   }
   return { __kind__: "err", err: value.err };
 }
@@ -3204,6 +3244,20 @@ export class Backend implements backendInterface {
     | { __kind__: "err"; err: string }
   > {
     return fromSyncV2Result(await this.run(() => this.actor.syncUserNFTsV2()));
+  }
+
+  async syncUserNFTsPage(
+    cursor: bigint | null,
+    maxCollections: bigint,
+  ): Promise<
+    | { __kind__: "ok"; ok: WalletSyncPageResult }
+    | { __kind__: "err"; err: string }
+  > {
+    return fromSyncPageResult(
+      await this.run(() =>
+        this.actor.syncUserNFTsPage(toRawOption(cursor), maxCollections),
+      ),
+    );
   }
 
   async syncCollectionDividends(

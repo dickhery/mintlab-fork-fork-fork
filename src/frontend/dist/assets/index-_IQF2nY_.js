@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-BgVCCP0Z.js","assets/AppCanisterTopUpDialog-DmjNAPCR.js","assets/badge-DYV2dwv8.js","assets/external-nft-transfer-C5OqKQuZ.js","assets/media-DlECHWr1.js","assets/MediaImage-niedzvRF.js","assets/ZoomableMediaImage-DGb9sUVC.js","assets/index-CeO64uNr.js","assets/card-DtF5mWjd.js","assets/textarea-qnpwxLNK.js","assets/skeleton-DQetUI23.js","assets/imageUtils-BanVxt9k.js","assets/send-DlO8-F0u.js","assets/coins-D5aOTylC.js","assets/MarketplacePage-BHLqxBe3.js","assets/icp-BXjZNIYq.js","assets/AdminPage-CBID4E46.js","assets/switch-BvoiXMxj.js","assets/circle-alert-BSqRCxSS.js","assets/ICPAccountPage-DEJ_v6LY.js","assets/CollectionsPage-1QQMWWCa.js","assets/DividendsPage-CF_oq9O3.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-B9EBc6yo.js","assets/AppCanisterTopUpDialog-DCvnh03m.js","assets/badge-9ExyUoUk.js","assets/external-nft-transfer-BI1jPc_V.js","assets/media-C-Q6pY5M.js","assets/MediaImage-DI6RClny.js","assets/ZoomableMediaImage-OwBMRAk-.js","assets/index-Bnyg_VPR.js","assets/card-DRCkgGmZ.js","assets/textarea-DNnKTlGU.js","assets/skeleton-BIzFVf2J.js","assets/imageUtils-BCr4FPvZ.js","assets/send-BhcYGO9N.js","assets/coins-BmNHjTvu.js","assets/MarketplacePage-fvTYD5SU.js","assets/icp-BXjZNIYq.js","assets/AdminPage-BFhF0rJ1.js","assets/switch-Br_gBRTK.js","assets/circle-alert-CewpveFR.js","assets/ICPAccountPage-BPN4nDNX.js","assets/CollectionsPage-DBNQx_9f.js","assets/DividendsPage-3MS5HsFI.js"])))=>i.map(i=>d[i]);
 var __defProp = Object.defineProperty;
 var __typeError = (msg) => {
   throw TypeError(msg);
@@ -15595,7 +15595,7 @@ function mergeLoginOptions(loginOptions, otherLoginOptions) {
   };
 }
 const ONE_HOUR_IN_NANOSECONDS = BigInt(36e11);
-const DEFAULT_IDENTITY_PROVIDER = "https://id.ai";
+const DEFAULT_IDENTITY_PROVIDER = "https://identity.internetcomputer.org/";
 const InternetIdentityReactContext = reactExports.createContext(void 0);
 async function createAuthClient(createOptions) {
   const config = await loadConfig();
@@ -30124,6 +30124,14 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "newCount": IDL2.Nat,
     "skipped": IDL2.Vec(WalletSyncSkip)
   });
+  const WalletSyncPageResult = IDL2.Record({
+    "errors": IDL2.Vec(IDL2.Text),
+    "newCount": IDL2.Nat,
+    "skipped": IDL2.Vec(WalletSyncSkip),
+    "nextCursor": IDL2.Opt(IDL2.Nat),
+    "complete": IDL2.Bool,
+    "checkedCollections": IDL2.Nat
+  });
   const CollectionIndexStatus = IDL2.Record({
     "collectionId": CollectionId,
     "complete": IDL2.Bool,
@@ -31079,6 +31087,16 @@ const idlFactory = ({ IDL: IDL2 }) => {
       ],
       []
     ),
+    "syncUserNFTsPage": IDL2.Func(
+      [IDL2.Opt(IDL2.Nat), IDL2.Nat],
+      [
+        IDL2.Variant({
+          "ok": WalletSyncPageResult,
+          "err": IDL2.Text
+        })
+      ],
+      []
+    ),
     "topUpCollectionCanisterCycles": IDL2.Func(
       [CollectionId, IDL2.Nat],
       [IDL2.Variant({ "ok": CollectionCycleTopUpReceipt, "err": IDL2.Text })],
@@ -31241,6 +31259,14 @@ function fromRawWalletSyncV2Result(value) {
     errors: value.errors,
     newCount: value.newCount,
     skipped: value.skipped.map(fromRawWalletSyncSkip)
+  };
+}
+function fromRawWalletSyncPageResult(value) {
+  return {
+    ...fromRawWalletSyncV2Result(value),
+    nextCursor: fromRawOption(value.nextCursor),
+    complete: value.complete,
+    checkedCollections: value.checkedCollections
   };
 }
 function fromRawCollectionIndexStatus(value) {
@@ -31802,6 +31828,12 @@ function fromSyncResult(value) {
 function fromSyncV2Result(value) {
   if ("ok" in value) {
     return { __kind__: "ok", ok: fromRawWalletSyncV2Result(value.ok) };
+  }
+  return { __kind__: "err", err: value.err };
+}
+function fromSyncPageResult(value) {
+  if ("ok" in value) {
+    return { __kind__: "ok", ok: fromRawWalletSyncPageResult(value.ok) };
   }
   return { __kind__: "err", err: value.err };
 }
@@ -32422,6 +32454,13 @@ class Backend {
   }
   async syncUserNFTsV2() {
     return fromSyncV2Result(await this.run(() => this.actor.syncUserNFTsV2()));
+  }
+  async syncUserNFTsPage(cursor, maxCollections) {
+    return fromSyncPageResult(
+      await this.run(
+        () => this.actor.syncUserNFTsPage(toRawOption(cursor), maxCollections)
+      )
+    );
   }
   async syncCollectionDividends(collectionId) {
     return fromDividendSyncResult(
@@ -46575,13 +46614,13 @@ const Toaster = ({ ...props }) => {
     }
   );
 };
-const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-BgVCCP0Z.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
-const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-BHLqxBe3.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,15,13]) : void 0));
-const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-CBID4E46.js"), true ? __vite__mapDeps([16,1,2,17,9,7,8,10,4,18]) : void 0));
-const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-DEJ_v6LY.js"), true ? __vite__mapDeps([19,2,8,10,15,12,18]) : void 0));
-const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-omJgmuVw.js"), true ? [] : void 0));
-const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-1QQMWWCa.js"), true ? __vite__mapDeps([20,1,2,17,9,7,5,4,6,8,10,11]) : void 0));
-const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-CF_oq9O3.js"), true ? __vite__mapDeps([21,1,2,5,4,8,13]) : void 0));
+const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-B9EBc6yo.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
+const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-fvTYD5SU.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,15,13]) : void 0));
+const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-BFhF0rJ1.js"), true ? __vite__mapDeps([16,1,2,17,9,7,8,10,4,18]) : void 0));
+const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-BPN4nDNX.js"), true ? __vite__mapDeps([19,2,8,10,15,12,18]) : void 0));
+const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-D0ifT9QB.js"), true ? [] : void 0));
+const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-DBNQx_9f.js"), true ? __vite__mapDeps([20,1,2,17,9,7,5,4,6,8,10,11]) : void 0));
+const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-3MS5HsFI.js"), true ? __vite__mapDeps([21,1,2,5,4,8,13]) : void 0));
 const rootRoute = createRootRoute({
   component: () => /* @__PURE__ */ jsxRuntimeExports.jsx(Layout, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(
     reactExports.Suspense,

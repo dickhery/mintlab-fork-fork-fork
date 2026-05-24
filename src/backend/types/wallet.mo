@@ -83,4 +83,13 @@ module {
     errors : [Text];
     skipped : [WalletSyncSkip];
   };
+
+  public type WalletSyncPageResult = {
+    newCount : Nat;
+    errors : [Text];
+    skipped : [WalletSyncSkip];
+    nextCursor : ?Nat;
+    complete : Bool;
+    checkedCollections : Nat;
+  };
 };

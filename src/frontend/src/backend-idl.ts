@@ -70,6 +70,14 @@ export const idlFactory = ({ IDL }) => {
     'newCount' : IDL.Nat,
     'skipped' : IDL.Vec(WalletSyncSkip),
   });
+  const WalletSyncPageResult = IDL.Record({
+    'errors' : IDL.Vec(IDL.Text),
+    'newCount' : IDL.Nat,
+    'skipped' : IDL.Vec(WalletSyncSkip),
+    'nextCursor' : IDL.Opt(IDL.Nat),
+    'complete' : IDL.Bool,
+    'checkedCollections' : IDL.Nat,
+  });
   const CollectionIndexStatus = IDL.Record({
     'collectionId' : CollectionId,
     'complete' : IDL.Bool,
@@ -1020,6 +1028,16 @@ export const idlFactory = ({ IDL }) => {
         [
           IDL.Variant({
             'ok' : WalletSyncV2Result,
+            'err' : IDL.Text,
+          }),
+        ],
+        [],
+      ),
+    'syncUserNFTsPage' : IDL.Func(
+        [IDL.Opt(IDL.Nat), IDL.Nat],
+        [
+          IDL.Variant({
+            'ok' : WalletSyncPageResult,
             'err' : IDL.Text,
           }),
         ],

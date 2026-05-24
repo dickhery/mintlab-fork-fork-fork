@@ -2166,6 +2166,17 @@ module {
       };
     };
 
+    if (tokenIndices.size() > 0 or sawAvailableMethod) {
+      return #ok(tokenIndices);
+    };
+
+    if (not allowRegistryFallback) {
+      switch (lastError) {
+        case (?message) return #err("Collection '" # collectionName # "': " # message);
+        case null return #err("Collection '" # collectionName # "': EXT token ownership method not available");
+      };
+    };
+
     switch (await* fetchEXTTokenIndicesForAccount(canister, principalText)) {
       case (#ok(values)) {
         sawAvailableMethod := true;

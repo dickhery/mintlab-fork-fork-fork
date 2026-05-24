@@ -30,6 +30,7 @@ export type {
   CollectionIndexPageResult,
   WalletSyncSkip,
   WalletSyncV2Result,
+  WalletSyncPageResult,
   NFTStats,
   NFTMetadata,
   MintConfig,

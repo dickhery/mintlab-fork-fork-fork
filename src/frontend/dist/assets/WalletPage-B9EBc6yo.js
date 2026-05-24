@@ -1,17 +1,17 @@
-import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useAdmin, e as useQueryClient, r as reactExports, f as useQuery, g as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-C7nsFyt-.js";
-import { P as Plus, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-DmjNAPCR.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-C5OqKQuZ.js";
-import { M as MediaImage, E as EmptyState } from "./MediaImage-niedzvRF.js";
-import { B as Badge, u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-DYV2dwv8.js";
-import { I as ImageOff, r as resolveImageUrl } from "./media-DlECHWr1.js";
-import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-DGb9sUVC.js";
-import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-DtF5mWjd.js";
-import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-qnpwxLNK.js";
-import { S as Skeleton, C as Copy } from "./skeleton-DQetUI23.js";
-import { S as Sparkles, c as compressModerationImage } from "./imageUtils-BanVxt9k.js";
-import { C as CircleCheck, S as Send } from "./send-DlO8-F0u.js";
-import { C as Coins } from "./coins-D5aOTylC.js";
-import "./index-CeO64uNr.js";
+import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useAdmin, e as useQueryClient, r as reactExports, f as useQuery, g as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-_IQF2nY_.js";
+import { P as Plus, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-DCvnh03m.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-BI1jPc_V.js";
+import { M as MediaImage, E as EmptyState } from "./MediaImage-DI6RClny.js";
+import { B as Badge, u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-9ExyUoUk.js";
+import { I as ImageOff, r as resolveImageUrl } from "./media-C-Q6pY5M.js";
+import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-OwBMRAk-.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-DRCkgGmZ.js";
+import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-DNnKTlGU.js";
+import { S as Skeleton, C as Copy } from "./skeleton-BIzFVf2J.js";
+import { S as Sparkles, c as compressModerationImage } from "./imageUtils-BCr4FPvZ.js";
+import { C as CircleCheck, S as Send } from "./send-BhcYGO9N.js";
+import { C as Coins } from "./coins-BmNHjTvu.js";
+import "./index-Bnyg_VPR.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -152,6 +152,8 @@ function isSupportedModerationImageFile(file) {
 const E8S = 100000000n;
 const ICP_LEDGER_FEE_E8S = 10000n;
 const SYNC_TIMEOUT_MS = 45e3;
+const SYNC_STILL_RUNNING_MESSAGE = "Wallet sync is still checking imported collections. New NFTs found during sync will appear here shortly.";
+const SYNC_PAGE_COLLECTION_LIMIT = 3n;
 const SYNC_SLOW_NOTICE_MS = 15e3;
 const SYNC_REFRESH_INTERVAL_MS = 6e3;
 function formatICP(e8s) {
@@ -627,12 +629,26 @@ function RegisterNFTModal({
   collection
 }) {
   const { actor } = useBackend();
+  const { principal } = useAuth();
   const queryClient = useQueryClient();
   const [tokenId, setTokenId] = reactExports.useState("");
   const mutation = useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error("Not connected");
       if (!tokenId.trim()) throw new Error("Token ID is required");
+      if (collection.kind === "External") {
+        if (!principal)
+          throw new Error("You must be logged in to import an NFT");
+        const result2 = await actor.syncExternalNFTOwner(
+          collection.id,
+          tokenId.trim(),
+          principal
+        );
+        if (result2.__kind__ === "err") {
+          throw new Error(result2.err);
+        }
+        return result2.ok;
+      }
       const result = await actor.registerNFT(collection.id, tokenId.trim(), {
         attributes: []
       });
@@ -1963,23 +1979,135 @@ function WalletPage() {
       const silent = options.silent === true;
       const requestedMode = silent ? "silent" : "manual";
       if (!silent) setSyncStatus({ kind: "syncing" });
+      const runWalletSync = async () => {
+        if (typeof actor.syncUserNFTsPage !== "function") {
+          return actor.syncUserNFTsV2();
+        }
+        let cursor = null;
+        let newCount = 0n;
+        let errors = [];
+        let skipped = [];
+        while (true) {
+          const page = await actor.syncUserNFTsPage(
+            cursor,
+            SYNC_PAGE_COLLECTION_LIMIT
+          );
+          if (page.__kind__ === "err") {
+            if (newCount > 0n || errors.length > 0 || skipped.length > 0) {
+              return {
+                __kind__: "ok",
+                ok: {
+                  newCount,
+                  errors: [...errors, page.err],
+                  skipped
+                }
+              };
+            }
+            return page;
+          }
+          newCount += page.ok.newCount;
+          errors = [...errors, ...page.ok.errors];
+          skipped = [...skipped, ...page.ok.skipped];
+          void refetchNFTs();
+          void queryClient.invalidateQueries({ queryKey: ["userStats"] });
+          if (page.ok.complete || page.ok.nextCursor === null) {
+            break;
+          }
+          cursor = page.ok.nextCursor;
+        }
+        return {
+          __kind__: "ok",
+          ok: { newCount, errors, skipped }
+        };
+      };
+      const applySyncResult = (result) => {
+        if (result.__kind__ === "err") {
+          if (!silent) {
+            setSyncStatus({ kind: "error", message: result.err });
+            ue.error(`Sync failed: ${result.err}`);
+          }
+          return;
+        }
+        const newCount = Number(result.ok.newCount);
+        const syncErrors = result.ok.errors.filter(
+          (message) => message.trim().length > 0
+        );
+        const syncSkipped = result.ok.skipped.filter(
+          (item) => item.collectionName.trim().length > 0
+        );
+        if (syncErrors.length > 0) {
+          console.warn("[syncUserNFTs] collection errors:", syncErrors);
+        }
+        if (syncSkipped.length > 0) {
+          console.info(
+            "[syncUserNFTs] collections need indexing:",
+            syncSkipped
+          );
+        }
+        if (syncErrors.length > 0 || syncSkipped.length > 0) {
+          const warningMessage = summarizeSyncAttention(
+            syncErrors,
+            syncSkipped
+          );
+          if (!silent) {
+            setSyncStatus({
+              kind: "partial",
+              newCount,
+              message: warningMessage,
+              errors: syncErrors,
+              skipped: syncSkipped
+            });
+            if (newCount > 0) {
+              ue.success(
+                newCount === 1 ? "Synced - 1 new NFT found and registered" : `Synced - ${newCount} new NFTs found and registered`,
+                {
+                  description: syncSkipped.length > 0 ? `${syncSkipped.length} collection(s) need indexing.` : "Some collections could not be checked."
+                }
+              );
+            } else if (syncErrors.length === 0 && syncSkipped.length > 0) {
+              ue("Wallet sync complete", {
+                description: `${syncSkipped.length} collection(s) need indexing before auto-discovery works.`
+              });
+            } else {
+              ue("Sync finished with collection warnings", {
+                description: warningMessage
+              });
+            }
+          }
+          return;
+        }
+        if (newCount > 0) {
+          if (!silent) {
+            setSyncStatus({ kind: "ok", newCount });
+            ue.success(
+              newCount === 1 ? "Synced - 1 new NFT found and registered!" : `Synced - ${newCount} new NFTs found and registered!`
+            );
+          }
+        } else if (!silent) {
+          setSyncStatus({ kind: "upToDate" });
+          ue.success("Wallet is up to date");
+        }
+      };
       const existingSync = syncInFlightRef.current;
-      const canReuseExistingSync = existingSync !== null && (silent || syncModeRef.current === "manual");
+      const canReuseExistingSync = existingSync !== null;
       const startedNewSync = !canReuseExistingSync;
+      let rawSyncPromise;
       let syncPromise;
       if (canReuseExistingSync) {
-        syncPromise = existingSync;
+        rawSyncPromise = existingSync;
       } else {
-        syncPromise = withTimeout(
-          actor.syncUserNFTsV2(),
-          SYNC_TIMEOUT_MS,
-          "Wallet sync timed out while checking imported collections. Import the specific token ID directly or try again."
-        );
-        syncInFlightRef.current = syncPromise;
+        rawSyncPromise = runWalletSync();
+        syncInFlightRef.current = rawSyncPromise;
         syncModeRef.current = requestedMode;
       }
+      syncPromise = withTimeout(
+        rawSyncPromise,
+        SYNC_TIMEOUT_MS,
+        SYNC_STILL_RUNNING_MESSAGE
+      );
       let slowNoticeId;
       let refreshId;
+      let keepRefreshUntilRawSettles = false;
       if (!silent) {
         slowNoticeId = window.setTimeout(() => {
           setSyncStatus({ kind: "syncing", slow: true });
@@ -1993,76 +2121,37 @@ function WalletPage() {
       }
       try {
         const result = await syncPromise;
-        if (result.__kind__ === "err") {
-          if (!silent) {
-            setSyncStatus({ kind: "error", message: result.err });
-            ue.error(`Sync failed: ${result.err}`);
-          }
-        } else {
-          const newCount = Number(result.ok.newCount);
-          const syncErrors = result.ok.errors.filter(
-            (message) => message.trim().length > 0
-          );
-          const syncSkipped = result.ok.skipped.filter(
-            (item) => item.collectionName.trim().length > 0
-          );
-          if (syncErrors.length > 0) {
-            console.warn("[syncUserNFTs] collection errors:", syncErrors);
-          }
-          if (syncSkipped.length > 0) {
-            console.info(
-              "[syncUserNFTs] collections need indexing:",
-              syncSkipped
-            );
-          }
-          if (syncErrors.length > 0 || syncSkipped.length > 0) {
-            const warningMessage = summarizeSyncAttention(
-              syncErrors,
-              syncSkipped
-            );
-            if (!silent) {
-              setSyncStatus({
-                kind: "partial",
-                newCount,
-                message: warningMessage,
-                errors: syncErrors,
-                skipped: syncSkipped
-              });
-              if (newCount > 0) {
-                ue.success(
-                  newCount === 1 ? "Synced - 1 new NFT found and registered" : `Synced - ${newCount} new NFTs found and registered`,
-                  {
-                    description: syncSkipped.length > 0 ? `${syncSkipped.length} collection(s) need indexing.` : "Some collections could not be checked."
-                  }
-                );
-              } else if (syncErrors.length === 0 && syncSkipped.length > 0) {
-                ue("Wallet sync complete", {
-                  description: `${syncSkipped.length} collection(s) need indexing before auto-discovery works.`
-                });
-              } else {
-                ue("Sync finished with collection warnings", {
-                  description: warningMessage
-                });
-              }
-            }
-            return;
-          }
-          if (newCount > 0) {
-            if (!silent) {
-              setSyncStatus({ kind: "ok", newCount });
-              ue.success(
-                newCount === 1 ? "Synced - 1 new NFT found and registered!" : `Synced - ${newCount} new NFTs found and registered!`
-              );
-            }
-          } else {
-            if (!silent) {
-              setSyncStatus({ kind: "upToDate" });
-              ue.success("Wallet is up to date");
-            }
-          }
-        }
+        applySyncResult(result);
       } catch (err) {
         const msg = extractError(err);
+        if (msg === SYNC_STILL_RUNNING_MESSAGE) {
+          keepRefreshUntilRawSettles = true;
+          if (!silent) {
+            setSyncStatus({ kind: "syncing", slow: true });
+            ue("Wallet sync is still running", {
+              description: "Mintlab will keep refreshing your wallet. For older EXT collections, importing a known token ID is the fastest path."
+            });
+          }
+          rawSyncPromise.then((result) => applySyncResult(result)).catch((lateError) => {
+            const lateMessage = extractError(lateError);
+            console.warn("[syncUserNFTs] late sync failed:", lateError);
+            if (!silent) {
+              setSyncStatus({ kind: "error", message: lateMessage });
+              ue.error(`Sync failed: ${lateMessage}`);
+            }
+          }).finally(() => {
+            if (refreshId !== void 0) {
+              window.clearInterval(refreshId);
+            }
+            if (syncInFlightRef.current === rawSyncPromise) {
+              syncInFlightRef.current = null;
+              syncModeRef.current = null;
+            }
+            void refetchNFTs();
+            void queryClient.invalidateQueries({ queryKey: ["userStats"] });
+          });
+          return;
+        }
         if (!silent) {
           setSyncStatus({ kind: "error", message: msg });
           ue.error(`Sync error: ${msg}`);
@@ -2071,15 +2160,17 @@ function WalletPage() {
         if (slowNoticeId !== void 0) {
           window.clearTimeout(slowNoticeId);
         }
-        if (refreshId !== void 0) {
+        if (refreshId !== void 0 && !keepRefreshUntilRawSettles) {
           window.clearInterval(refreshId);
         }
-        if (syncInFlightRef.current === syncPromise) {
+        if (!keepRefreshUntilRawSettles && syncInFlightRef.current === rawSyncPromise) {
           syncInFlightRef.current = null;
           syncModeRef.current = null;
         }
-        void refetchNFTs();
-        void queryClient.invalidateQueries({ queryKey: ["userStats"] });
+        if (!keepRefreshUntilRawSettles) {
+          void refetchNFTs();
+          void queryClient.invalidateQueries({ queryKey: ["userStats"] });
+        }
       }
     },
     [actor, queryClient, refetchNFTs]

@@ -41,6 +41,12 @@ mixin (
     mintlab_nfts_of : (Principal, ?Nat, ?Nat) -> async [WalletChildMintlabNFT];
   };
 
+  type WalletCollectionSyncResult = {
+    newCount : Nat;
+    errors : [Text];
+    skipped : [WalletTypes.WalletSyncSkip];
+  };
+
   public shared ({ caller }) func registerNFT(
     collectionId : WalletTypes.CollectionId,
     tokenId : Text,
@@ -434,6 +440,70 @@ mixin (
     await* syncUserNFTsInternal(caller);
   };
 
+  public shared ({ caller }) func syncUserNFTsPage(
+    cursor : ?Nat,
+    maxCollections : Nat,
+  ) : async {
+    #ok : WalletTypes.WalletSyncPageResult;
+    #err : Text;
+  } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("You must be logged in to sync your wallet");
+    };
+
+    let collections = CollectionLib.getCollections(collectionsState);
+    let start = switch (cursor) {
+      case (?value) value;
+      case null 0;
+    };
+    if (start >= collections.size()) {
+      return #ok({
+        newCount = 0;
+        errors = [];
+        skipped = [];
+        nextCursor = null;
+        complete = true;
+        checkedCollections = 0;
+      });
+    };
+
+    let pageSize = normalizeSyncPageSize(maxCollections);
+    let userAccountId = IcpLib.accountIdentifier(caller, IcpLib.zeroSubaccount());
+    let userAccountIdHex = WalletLib.blobToHexPublic(userAccountId);
+    var position = start;
+    var checkedCollections : Nat = 0;
+    var newCount : Nat = 0;
+    var errors : [Text] = [];
+    var skipped : [WalletTypes.WalletSyncSkip] = [];
+
+    while (position < collections.size() and checkedCollections < pageSize) {
+      let result = await* syncOneWalletCollection(
+        caller,
+        collections[position],
+        userAccountId,
+        userAccountIdHex,
+      );
+      newCount += result.newCount;
+      errors := Array.concat<Text>(errors, result.errors);
+      skipped := Array.concat<WalletTypes.WalletSyncSkip>(skipped, result.skipped);
+      checkedCollections += 1;
+      position += 1;
+    };
+
+    #ok({
+      newCount;
+      errors;
+      skipped;
+      nextCursor = if (position < collections.size()) {
+        ?position;
+      } else {
+        null;
+      };
+      complete = position >= collections.size();
+      checkedCollections;
+    });
+  };
+
   public shared ({ caller }) func syncUserNFTs() : async {
     #ok : { newCount : Nat; errors : [Text] };
     #err : Text;
@@ -459,73 +529,106 @@ mixin (
     var skipped : [WalletTypes.WalletSyncSkip] = [];
 
     for (collection in collections.values()) {
-      switch (collection.kind) {
-        case (#Minted) {
-          let synced = await* syncMintedCollection(caller, collection, userAccountId);
-          switch (synced) {
-            case (#err(message)) {
-              errors := Array.concat<Text>(errors, [message]);
-            };
-            case (#ok(count)) {
-              newCount += count;
-            };
+      let result = await* syncOneWalletCollection(
+        caller,
+        collection,
+        userAccountId,
+        userAccountIdHex,
+      );
+      newCount += result.newCount;
+      errors := Array.concat<Text>(errors, result.errors);
+      skipped := Array.concat<WalletTypes.WalletSyncSkip>(skipped, result.skipped);
+    };
+
+    #ok({ newCount; errors; skipped });
+  };
+
+  func normalizeSyncPageSize(maxCollections : Nat) : Nat {
+    if (maxCollections == 0) {
+      1;
+    } else if (maxCollections > 5) {
+      5;
+    } else {
+      maxCollections;
+    };
+  };
+
+  func syncOneWalletCollection(
+    caller : Principal,
+    collection : CollectionTypes.Collection,
+    userAccountId : Blob,
+    userAccountIdHex : Text,
+  ) : async* WalletCollectionSyncResult {
+    var newCount : Nat = 0;
+    var errors : [Text] = [];
+    var skipped : [WalletTypes.WalletSyncSkip] = [];
+
+    switch (collection.kind) {
+      case (#Minted) {
+        let synced = await* syncMintedCollection(caller, collection, userAccountId);
+        switch (synced) {
+          case (#err(message)) {
+            errors := Array.concat<Text>(errors, [message]);
+          };
+          case (#ok(count)) {
+            newCount += count;
           };
         };
-        case (#External) {
-          let indexedNFTs = WalletLib.indexedNFTsForOwner(
-            ownershipIndexState,
-            collection.id,
-            caller,
-            userAccountIdHex,
-          );
-          let preview = await* WalletLib.previewUserOwnedNFTsFromOwnerIndex(
-            collection,
-            caller,
-            userAccountId,
-          );
-          switch (preview) {
-            case (#err(message)) {
-              if (indexedNFTs.size() > 0) {
-                let registered = registerPreviewNFTs(caller, collection, indexedNFTs, #Registered);
-                newCount += registered.newCount;
-              } else if (WalletLib.isOwnerIndexMissingMessage(message)) {
-                skipped := Array.concat<WalletTypes.WalletSyncSkip>(
-                  skipped,
-                  [
-                    {
-                      collectionId = collection.id;
-                      collectionName = collection.name;
-                      reason = "INDEX_REQUIRED";
-                      message = "This collection does not expose an owner index. Run collection indexing or import the token ID directly.";
-                    }
-                  ],
-                );
-              } else {
-                errors := Array.concat<Text>(errors, [message]);
-              };
-            };
-            case (#ok(nfts)) {
-              let nftsToRegister = if (nfts.size() == 0 and indexedNFTs.size() > 0) {
-                indexedNFTs;
-              } else {
-                nfts;
-              };
-              let registered = registerPreviewNFTs(caller, collection, nftsToRegister, #Registered);
+      };
+      case (#External) {
+        let indexedNFTs = WalletLib.indexedNFTsForOwner(
+          ownershipIndexState,
+          collection.id,
+          caller,
+          userAccountIdHex,
+        );
+        let preview = await* WalletLib.previewUserOwnedNFTsFromOwnerIndex(
+          collection,
+          caller,
+          userAccountId,
+        );
+        switch (preview) {
+          case (#err(message)) {
+            if (indexedNFTs.size() > 0) {
+              let registered = registerPreviewNFTs(caller, collection, indexedNFTs, #Registered);
               newCount += registered.newCount;
-              await* removeStaleOnChainNFTs(
-                caller,
-                collection,
-                userAccountId,
-                #Registered,
-                registered.tokenIds,
+            } else if (WalletLib.isOwnerIndexMissingMessage(message)) {
+              skipped := Array.concat<WalletTypes.WalletSyncSkip>(
+                skipped,
+                [
+                  {
+                    collectionId = collection.id;
+                    collectionName = collection.name;
+                    reason = "INDEX_REQUIRED";
+                    message = "This collection does not expose an owner index. Run collection indexing or import the token ID directly.";
+                  }
+                ],
               );
+            } else {
+              errors := Array.concat<Text>(errors, [message]);
             };
+          };
+          case (#ok(nfts)) {
+            let nftsToRegister = if (nfts.size() == 0 and indexedNFTs.size() > 0) {
+              indexedNFTs;
+            } else {
+              nfts;
+            };
+            let registered = registerPreviewNFTs(caller, collection, nftsToRegister, #Registered);
+            newCount += registered.newCount;
+            await* removeStaleOnChainNFTs(
+              caller,
+              collection,
+              userAccountId,
+              #Registered,
+              registered.tokenIds,
+            );
           };
         };
       };
     };
 
-    #ok({ newCount; errors; skipped });
+    { newCount; errors; skipped };
   };
 
   func syncMintedCollection(

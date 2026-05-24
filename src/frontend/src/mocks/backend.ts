@@ -1105,4 +1105,15 @@ export const mockBackend: backendInterface = {
     __kind__: "ok" as const,
     ok: { newCount: 0n, errors: [] as string[], skipped: [] },
   }),
+  syncUserNFTsPage: async () => ({
+    __kind__: "ok" as const,
+    ok: {
+      newCount: 0n,
+      errors: [] as string[],
+      skipped: [],
+      nextCursor: null,
+      complete: true,
+      checkedCollections: 0n,
+    },
+  }),
 };

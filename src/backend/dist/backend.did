@@ -11,6 +11,15 @@ type WalletSyncSkip =
    message: text;
    reason: text;
  };
+type WalletSyncPageResult = 
+ record {
+   checkedCollections: nat;
+   complete: bool;
+   errors: vec text;
+   newCount: nat;
+   nextCursor: opt nat;
+   skipped: vec WalletSyncSkip;
+ };
 type WalletNFT = 
  record {
    collectionId: CollectionId;
@@ -1189,6 +1198,11 @@ service : {
             errors: vec text;
             newCount: nat;
           };
+    });
+  syncUserNFTsPage: (cursor: opt nat, maxCollections: nat) ->
+   (variant {
+      err: text;
+      ok: WalletSyncPageResult;
     });
   syncUserNFTsV2: () -> (variant {
                            err: text;
