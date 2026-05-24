@@ -1697,6 +1697,9 @@ video {
 .border-accent\/40 {
   border-color: oklch(var(--accent) / 0.4);
 }
+.border-amber-200\/60 {
+  border-color: rgb(253 230 138 / 0.6);
+}
 .border-amber-200\/70 {
   border-color: rgb(253 230 138 / 0.7);
 }
@@ -4087,6 +4090,10 @@ video {
 
 .peer\/menu-button[data-active="true"] ~ .peer-data-\[active\=true\]\/menu-button\:text-sidebar-accent-foreground {
   color: oklch(var(--sidebar-accent-foreground));
+}
+
+.dark\:border-amber-900\/40:is(.dark *) {
+  border-color: rgb(120 53 15 / 0.4);
 }
 
 .dark\:border-amber-900\/50:is(.dark *) {

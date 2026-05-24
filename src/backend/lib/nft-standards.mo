@@ -127,22 +127,28 @@ module {
   public type EXTActor = actor {
     transfer : (ExtTransferRequest) -> async ExtTransferResponse;
     ext_transfer : (ExtTransferRequest) -> async ExtTransferResponse;
-    balance : (ExtBalanceRequest) -> async ExtBalanceResponse;
-    ext_balance : (ExtBalanceRequest) -> async ExtBalanceResponse;
+    balance : shared query (ExtBalanceRequest) -> async ExtBalanceResponse;
+    ext_balance : shared query (ExtBalanceRequest) -> async ExtBalanceResponse;
     // Query all token indices owned by an account identifier. Real EXT canisters
     // on ICP expect a hex-encoded Text (64 lowercase chars).
-    tokens : (accountId : EXTAccountIdentifier) -> async { #ok : [TokenIndex]; #err : CommonError };
-    tokens_ext : (accountId : EXTAccountIdentifier) -> async ExtTokensExtResult;
+    tokens : shared query (accountId : EXTAccountIdentifier) -> async {
+      #ok : [TokenIndex];
+      #err : CommonError;
+    };
+    tokens_ext : shared query (accountId : EXTAccountIdentifier) -> async ExtTokensExtResult;
     // Query collection-wide token ownership. Older EXT canisters such as
     // Motoko Ghosts expose this even when account-specific lookups are not
     // usable for wallet sync.
-    getRegistry : () -> async [(TokenIndex, EXTAccountIdentifier)];
+    getRegistry : shared query () -> async [(TokenIndex, EXTAccountIdentifier)];
     // Query metadata for a single token (some collections use this)
-    metadata : (tokenId : TokenIdentifier) -> async { #ok : ExtMetadata; #err : CommonError };
+    metadata : shared query (tokenId : TokenIdentifier) -> async {
+      #ok : ExtMetadata;
+      #err : CommonError;
+    };
     // Rich EXT metadata used by newer EXT-compatible collections.
-    ext_metadata : (tokenId : TokenIdentifier) -> async ExtRichMetadataResult;
-    bearer : (tokenId : TokenIdentifier) -> async ExtBearerResult;
-    ext_bearer : (tokenId : TokenIdentifier) -> async ExtBearerResult;
+    ext_metadata : shared query (tokenId : TokenIdentifier) -> async ExtRichMetadataResult;
+    bearer : shared query (tokenId : TokenIdentifier) -> async ExtBearerResult;
+    ext_bearer : shared query (tokenId : TokenIdentifier) -> async ExtBearerResult;
   };
 
   // ── DIP721 Standard ───────────────────────────────────────────────────────
@@ -212,13 +218,23 @@ module {
     transfer : (to : Principal, tokenId : Nat) -> async DIP721NatResult;
     dip721_transfer : (to : Principal, tokenId : Nat) -> async DIP721NatResult;
     // Query all token IDs owned by a principal
-    dip721_owner_token_identifiers : (owner : Principal) -> async DIP721TokensResult;
-    ownerTokenIdentifiers : (owner : Principal) -> async DIP721TokensResult;
+    dip721_owner_token_identifiers : shared query (
+      owner : Principal
+    ) -> async DIP721TokensResult;
+    ownerTokenIdentifiers : shared query (owner : Principal) -> async DIP721TokensResult;
     // Query metadata for a single token
-    dip721_token_metadata : (token_id : Nat) -> async DIP721MetadataResult;
-    tokenMetadata : (token_id : Nat) -> async DIP721MetadataResult;
-    dip721_owner_of : (token_id : Nat) -> async { #Ok : ?Principal; #Err : DIP721Error };
-    ownerOf : (token_id : Nat) -> async { #Ok : ?Principal; #Err : DIP721Error };
+    dip721_token_metadata : shared query (
+      token_id : Nat
+    ) -> async DIP721MetadataResult;
+    tokenMetadata : shared query (token_id : Nat) -> async DIP721MetadataResult;
+    dip721_owner_of : shared query (token_id : Nat) -> async {
+      #Ok : ?Principal;
+      #Err : DIP721Error;
+    };
+    ownerOf : shared query (token_id : Nat) -> async {
+      #Ok : ?Principal;
+      #Err : DIP721Error;
+    };
   };
 
   // ── ICRC-7 Standard ───────────────────────────────────────────────────────
@@ -271,27 +287,33 @@ module {
   };
 
   public type ICRC7Actor = actor {
-    icrc7_collection_metadata : () -> async [(Text, ICRC7Value)];
-    icrc7_symbol : () -> async Text;
-    icrc7_name : () -> async Text;
-    icrc7_description : () -> async ?Text;
-    icrc7_logo : () -> async ?Text;
-    icrc7_total_supply : () -> async Nat;
-    icrc7_supply_cap : () -> async ?Nat;
-    icrc7_max_query_batch_size : () -> async ?Nat;
-    icrc7_max_update_batch_size : () -> async ?Nat;
-    icrc7_default_take_value : () -> async ?Nat;
-    icrc7_max_take_value : () -> async ?Nat;
-    icrc7_max_memo_size : () -> async ?Nat;
-    icrc7_atomic_batch_transfers : () -> async ?Bool;
-    icrc7_tx_window : () -> async ?Nat;
-    icrc7_permitted_drift : () -> async ?Nat;
-    icrc7_token_metadata : (token_ids : [Nat]) -> async [?ICRC7TokenMetadata];
-    icrc7_owner_of : (token_ids : [Nat]) -> async [?ICRC7Account];
-    icrc7_balance_of : ([ICRC7Account]) -> async [Nat];
-    icrc7_tokens : (prev : ?Nat, take : ?Nat) -> async [Nat];
-    icrc7_tokens_of : (account : ICRC7Account, prev : ?Nat, take : ?Nat) -> async [Nat];
+    icrc7_collection_metadata : shared query () -> async [(Text, ICRC7Value)];
+    icrc7_symbol : shared query () -> async Text;
+    icrc7_name : shared query () -> async Text;
+    icrc7_description : shared query () -> async ?Text;
+    icrc7_logo : shared query () -> async ?Text;
+    icrc7_total_supply : shared query () -> async Nat;
+    icrc7_supply_cap : shared query () -> async ?Nat;
+    icrc7_max_query_batch_size : shared query () -> async ?Nat;
+    icrc7_max_update_batch_size : shared query () -> async ?Nat;
+    icrc7_default_take_value : shared query () -> async ?Nat;
+    icrc7_max_take_value : shared query () -> async ?Nat;
+    icrc7_max_memo_size : shared query () -> async ?Nat;
+    icrc7_atomic_batch_transfers : shared query () -> async ?Bool;
+    icrc7_tx_window : shared query () -> async ?Nat;
+    icrc7_permitted_drift : shared query () -> async ?Nat;
+    icrc7_token_metadata : shared query (
+      token_ids : [Nat]
+    ) -> async [?ICRC7TokenMetadata];
+    icrc7_owner_of : shared query (token_ids : [Nat]) -> async [?ICRC7Account];
+    icrc7_balance_of : shared query ([ICRC7Account]) -> async [Nat];
+    icrc7_tokens : shared query (prev : ?Nat, take : ?Nat) -> async [Nat];
+    icrc7_tokens_of : shared query (
+      account : ICRC7Account,
+      prev : ?Nat,
+      take : ?Nat,
+    ) -> async [Nat];
     icrc7_transfer : ([ICRC7TransferArg]) -> async [?ICRC7TransferResult];
-    icrc10_supported_standards : () -> async [SupportedStandard];
+    icrc10_supported_standards : shared query () -> async [SupportedStandard];
   };
 };

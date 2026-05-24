@@ -187,9 +187,9 @@ function summarizeSyncSkipped(skipped: WalletSyncSkip[]): string {
     return "";
   }
   if (skipped.length === 1) {
-    return `${skipped[0].collectionName} needs indexing before auto-discovery works.`;
+    return `${skipped[0].collectionName} needs an ownership index before automatic discovery can find new NFTs.`;
   }
-  return `${skipped.length} collections need indexing before auto-discovery works.`;
+  return `${skipped.length} imported collections need ownership indexing before automatic discovery can find new NFTs.`;
 }
 
 function summarizeSyncAttention(
@@ -1014,9 +1014,12 @@ function CollectionIndexingDialog({
       const page = await indexOnePage(cursor);
       await refetch();
       toast.success(
-        page.complete
-          ? "Collection indexing complete"
-          : `Indexed ${page.indexed.toString()} ownership records`,
+        page.complete ? "Collection indexing complete" : "Indexed next page",
+        {
+          description: page.complete
+            ? `${page.indexed.toString()} owner records saved on the final page. Run Sync again to refresh wallets.`
+            : `${page.scanned.toString()} tokens checked and ${page.indexed.toString()} owner records saved. Continue indexing to cover more of the collection.`,
+        },
       );
     } catch (err) {
       toast.error(extractError(err));
@@ -1045,7 +1048,7 @@ function CollectionIndexingDialog({
         }
       }
       toast("Indexing paused", {
-        description: "Run again to continue from the saved cursor.",
+        description: `${indexed.toString()} owner records saved across ${pages.toString()} pages. Continue indexing to cover the rest.`,
       });
       await refetch();
     } catch (err) {
@@ -1066,7 +1069,7 @@ function CollectionIndexingDialog({
         <DialogHeader>
           <DialogTitle className="font-display text-foreground flex items-center gap-2">
             <RefreshCw className="w-4 h-4 text-accent" />
-            Index Collection
+            Ownership Indexing
           </DialogTitle>
         </DialogHeader>
 
@@ -1077,6 +1080,17 @@ function CollectionIndexingDialog({
             </p>
             <p className="text-xs text-muted-foreground">
               {collection?.canisterId.toString() ?? ""}
+            </p>
+          </div>
+
+          <div className="rounded-lg border border-accent/20 bg-accent/5 p-3 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">
+              Automatic discovery setup
+            </p>
+            <p className="mt-1 leading-relaxed">
+              Indexing reads ownership in small pages so wallet Sync can find
+              NFTs from older imported collections. Direct token ID import still
+              works for a known NFT.
             </p>
           </div>
 
@@ -1103,19 +1117,16 @@ function CollectionIndexingDialog({
               </Badge>
             </div>
             <div className="mt-2 flex items-center justify-between gap-3">
-              <span>Next cursor</span>
+              <span>Resume cursor</span>
               <span className="font-mono text-foreground">
                 {nextCursor ?? "None"}
               </span>
             </div>
             {lastPage && (
-              <div className="mt-2 flex items-center justify-between gap-3">
-                <span>Last page</span>
-                <span className="text-foreground">
-                  {lastPage.scanned.toString()} scanned,{" "}
-                  {lastPage.indexed.toString()} indexed
-                </span>
-              </div>
+              <p className="mt-2 text-foreground">
+                Last page: {lastPage.scanned.toString()} tokens checked,{" "}
+                {lastPage.indexed.toString()} owner records saved.
+              </p>
             )}
             {status?.lastError && (
               <p className="mt-2 text-destructive">{status.lastError}</p>
@@ -1131,14 +1142,14 @@ function CollectionIndexingDialog({
               onClick={handleIndexNextPage}
               disabled={!collection || isIndexing || complete}
             >
-              Index Next Page
+              Index Next 50
             </Button>
             <Button
               onClick={handleRunUntilComplete}
               disabled={!collection || isIndexing || complete}
               className="bg-accent text-accent-foreground hover:bg-accent/90 transition-smooth"
             >
-              {isIndexing ? "Indexing..." : "Run Until Complete"}
+              {isIndexing ? "Indexing..." : "Continue Until Complete"}
             </Button>
           </div>
         </div>
@@ -1679,7 +1690,7 @@ function ReceivingInstructions({
             >
               <Info className="w-3.5 h-3.5 shrink-0" />
               {syncStatus.skipped.length > 0
-                ? `${syncStatus.skipped.length} need indexing`
+                ? `${syncStatus.skipped.length} need index setup`
                 : syncStatus.newCount > 0
                   ? `${syncStatus.newCount} synced; some warnings`
                   : "Some collections need attention"}
@@ -1753,17 +1764,32 @@ function ReceivingInstructions({
         {syncStatus.kind === "partial" && syncStatus.skipped.length > 0 && (
           <div className="rounded-lg border border-amber-200/70 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
             <div className="flex flex-col gap-2">
+              <div className="flex items-start gap-2">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">
+                    Automatic discovery needs ownership indexing
+                  </p>
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    Sync finished its fast checks. These imported collections
+                    need an admin index pass before new NFTs can be found
+                    automatically; known token IDs can still be imported
+                    directly.
+                  </p>
+                </div>
+              </div>
               {syncStatus.skipped.slice(0, 4).map((skip) => (
                 <div
                   key={skip.collectionId.toString()}
-                  className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-2 border-t border-amber-200/60 pt-2 sm:flex-row sm:items-center sm:justify-between dark:border-amber-900/40"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-foreground">
                       {skip.collectionName}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      Needs indexing for automatic sync
+                      {skip.message ||
+                        "Needs ownership indexing for automatic discovery."}
                     </p>
                   </div>
                   {onIndexCollection ? (
@@ -1773,11 +1799,11 @@ function ReceivingInstructions({
                       className="h-8 shrink-0"
                       onClick={() => onIndexCollection(skip.collectionId)}
                     >
-                      Index Collection
+                      Open Indexing
                     </Button>
                   ) : (
                     <Badge variant="secondary" className="shrink-0">
-                      Admin required
+                      Admin can index
                     </Badge>
                   )}
                 </div>
@@ -1785,7 +1811,7 @@ function ReceivingInstructions({
               {syncStatus.skipped.length > 4 && (
                 <p className="text-xs text-muted-foreground">
                   {syncStatus.skipped.length - 4} more collections need
-                  indexing.
+                  ownership indexing.
                 </p>
               )}
             </div>
@@ -2339,9 +2365,9 @@ export default function WalletPage() {
         if (syncErrors.length > 0) {
           console.warn("[syncUserNFTs] collection errors:", syncErrors);
         }
-        if (syncSkipped.length > 0) {
-          console.info(
-            "[syncUserNFTs] collections need indexing:",
+        if (import.meta.env.DEV && syncSkipped.length > 0) {
+          console.debug(
+            "[syncUserNFTs] collections need ownership indexing for automatic discovery:",
             syncSkipped,
           );
         }
@@ -2366,13 +2392,13 @@ export default function WalletPage() {
                 {
                   description:
                     syncSkipped.length > 0
-                      ? `${syncSkipped.length} collection(s) need indexing.`
+                      ? `${syncSkipped.length} collection(s) need ownership indexing for automatic discovery.`
                       : "Some collections could not be checked.",
                 },
               );
             } else if (syncErrors.length === 0 && syncSkipped.length > 0) {
               toast("Wallet sync complete", {
-                description: `${syncSkipped.length} collection(s) need indexing before auto-discovery works.`,
+                description: `${syncSkipped.length} collection(s) need ownership indexing before automatic discovery can find new NFTs.`,
               });
             } else {
               toast("Sync finished with collection warnings", {

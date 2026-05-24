@@ -600,7 +600,8 @@ mixin (
                     collectionId = collection.id;
                     collectionName = collection.name;
                     reason = "INDEX_REQUIRED";
-                    message = "This collection does not expose an owner index. Run collection indexing or import the token ID directly.";
+                    message = "This imported collection needs ownership indexing before automatic discovery can find new NFTs. " #
+                    "An admin can index it in pages, or you can import a known token ID directly.";
                   }
                 ],
               );

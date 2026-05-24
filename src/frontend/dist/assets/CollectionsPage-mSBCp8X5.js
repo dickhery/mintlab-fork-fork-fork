@@ -1,15 +1,15 @@
-import { Q as QueryObserver, n as infiniteQueryBehavior, o as hasPreviousPage, p as hasNextPage, q as useBaseQuery, c as createLucideIcon, r as reactExports, h as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, d as useAdmin, e as useQueryClient, f as useQuery, s as AnimatePresence, m as motion, B as Button, g as ue, C as CircleDollarSign, X, G as Grid3x3, P as Principal, i as LoadingSpinner } from "./index-ma9FGphY.js";
-import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-A6RG1q8o.js";
-import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-JnUQYfBR.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-CNwue4Qb.js";
-import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-CF7QZiXH.js";
-import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, B as Badge, I as Input, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./badge-Csd8asoR.js";
-import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent, R as RefreshCw } from "./card-C4lT3S8t.js";
-import { u as useDirection } from "./index-CpqxulWQ.js";
-import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-CYKXrhIz.js";
-import { S as Skeleton, C as Copy } from "./skeleton-CmNvho-A.js";
-import { S as Sparkles, c as compressModerationImage } from "./imageUtils-DQggpI5W.js";
-import { r as resolveImageUrl, I as ImageOff } from "./media-RlbZzx2c.js";
+import { Q as QueryObserver, n as infiniteQueryBehavior, o as hasPreviousPage, p as hasNextPage, q as useBaseQuery, c as createLucideIcon, r as reactExports, h as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, d as useAdmin, e as useQueryClient, f as useQuery, s as AnimatePresence, m as motion, B as Button, g as ue, C as CircleDollarSign, X, G as Grid3x3, P as Principal, i as LoadingSpinner } from "./index-BboRxiuP.js";
+import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-CwBGBM5-.js";
+import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-PDP9s7Rx.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-B8gjon8F.js";
+import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-CJv0KXE7.js";
+import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, B as Badge, I as Input, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./badge-BkNsEQNB.js";
+import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent, R as RefreshCw } from "./card-BsCIum50.js";
+import { u as useDirection } from "./index-DpyHJ5vg.js";
+import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-zT6CsXuf.js";
+import { S as Skeleton, C as Copy } from "./skeleton-BqeZgG7G.js";
+import { S as Sparkles, c as compressModerationImage } from "./imageUtils-DH6c5A-A.js";
+import { r as resolveImageUrl, I as ImageOff } from "./media-C-gXZw1y.js";
 var InfiniteQueryObserver = class extends QueryObserver {
   constructor(client, options) {
     super(client, options);
