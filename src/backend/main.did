@@ -1,3 +1,16 @@
+type WalletSyncV2Result =
+ record {
+   errors: vec text;
+   newCount: nat;
+   skipped: vec WalletSyncSkip;
+ };
+type WalletSyncSkip =
+ record {
+   collectionId: CollectionId;
+   collectionName: text;
+   message: text;
+   reason: text;
+ };
 type WalletNFT =
  record {
    collectionId: CollectionId;
@@ -595,6 +608,25 @@ type CollectionKind =
    External;
    Minted;
  };
+type CollectionIndexStatus =
+ record {
+   collectionId: CollectionId;
+   complete: bool;
+   cursor: opt text;
+   indexed: nat;
+   lastError: opt text;
+   scanned: nat;
+   updatedAt: Timestamp;
+ };
+type CollectionIndexPageResult =
+ record {
+   collectionId: CollectionId;
+   complete: bool;
+   error: opt text;
+   indexed: nat;
+   nextCursor: opt text;
+   scanned: nat;
+ };
 type CollectionId = nat;
 type CollectionDividendInfo =
  record {
@@ -980,6 +1012,8 @@ service : {
         }) query;
   getCollectionDividendInfo: (collectionId: CollectionId) ->
    (opt CollectionDividendInfo);
+  getCollectionIndexStatus: (collectionId: CollectionId) ->
+   (opt CollectionIndexStatus) query;
   getCollectionNFT: (collectionId: CollectionId, tokenId: text) ->
    (opt WalletNFT) query;
   getCollectionNFTPage: (collectionId: CollectionId, cursor: opt text, limit:
@@ -1039,6 +1073,12 @@ service : {
   icrc7_transfer: (args: vec ICRC7TransferArg) ->
    (vec opt ICRC7TransferResult);
   icrc7_tx_window: () -> (opt nat) query;
+  indexCollectionOwnershipPage: (collectionId: CollectionId, cursor:
+   opt text, limit: nat) ->
+   (variant {
+      err: text;
+      ok: CollectionIndexPageResult;
+    });
   isAdmin: () -> (bool) query;
   isNFTInUserWallet: (collectionId: CollectionId, tokenId: text, user:
    UserId) -> (bool) query;
@@ -1150,6 +1190,10 @@ service : {
             newCount: nat;
           };
     });
+  syncUserNFTsV2: () -> (variant {
+                           err: text;
+                           ok: WalletSyncV2Result;
+                         });
   tokens_ext: (account: EXTAccountIdentifier) -> (EXTTokensExtResult) query;
   topUpAppCanisterCycles: (cyclesToTopUp: nat) ->
    (variant {

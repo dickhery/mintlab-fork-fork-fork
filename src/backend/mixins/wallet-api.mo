@@ -15,6 +15,7 @@ import Principal "mo:core/Principal";
 
 mixin (
   walletState : WalletLib.WalletState,
+  ownershipIndexState : WalletLib.OwnershipIndexState,
   collectionsState : CollectionLib.CollectionsState,
   marketplaceState : MarketplaceLib.MarketplaceState,
   marketplaceListingLockState : MarketplaceLib.MarketplaceListingLockState,
@@ -29,6 +30,15 @@ mixin (
 
   type WalletChildCollectionActor = actor {
     mintlab_transfer_from : (Principal, Principal, Nat) -> async WalletChildTransferResult;
+  };
+
+  type WalletChildMintlabNFT = {
+    tokenId : Nat;
+    metadata : WalletTypes.NFTMetadata;
+  };
+
+  type WalletChildCollectionSyncActor = actor {
+    mintlab_nfts_of : (Principal, ?Nat, ?Nat) -> async [WalletChildMintlabNFT];
   };
 
   public shared ({ caller }) func registerNFT(
@@ -387,8 +397,55 @@ mixin (
     IcpLib.accountIdentifier(canisterId, IcpLib.zeroSubaccount());
   };
 
+  public query func getCollectionIndexStatus(
+    collectionId : WalletTypes.CollectionId
+  ) : async ?WalletTypes.CollectionIndexStatus {
+    WalletLib.getOwnershipIndexStatus(ownershipIndexState, collectionId);
+  };
+
+  public shared ({ caller }) func indexCollectionOwnershipPage(
+    collectionId : WalletTypes.CollectionId,
+    cursor : ?Text,
+    limit : Nat,
+  ) : async {
+    #ok : WalletTypes.CollectionIndexPageResult;
+    #err : Text;
+  } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("You must be logged in to index a collection");
+    };
+    if (not AuthLib.isAdmin(authState, caller)) {
+      return #err("Unauthorized: admin only");
+    };
+    let collection = switch (CollectionLib.getCollection(collectionsState, collectionId)) {
+      case null return #err("Collection not found");
+      case (?value) value;
+    };
+    if (collection.kind != #External) {
+      return #err("Only imported external collections need ownership indexing");
+    };
+    await* WalletLib.indexCollectionOwnershipPage(ownershipIndexState, collection, cursor, limit);
+  };
+
+  public shared ({ caller }) func syncUserNFTsV2() : async {
+    #ok : WalletTypes.WalletSyncV2Result;
+    #err : Text;
+  } {
+    await* syncUserNFTsInternal(caller);
+  };
+
   public shared ({ caller }) func syncUserNFTs() : async {
     #ok : { newCount : Nat; errors : [Text] };
+    #err : Text;
+  } {
+    switch (await* syncUserNFTsInternal(caller)) {
+      case (#err(message)) #err(message);
+      case (#ok(result)) #ok({ newCount = result.newCount; errors = result.errors });
+    };
+  };
+
+  func syncUserNFTsInternal(caller : Principal) : async* {
+    #ok : WalletTypes.WalletSyncV2Result;
     #err : Text;
   } {
     if (Principal.isAnonymous(caller)) {
@@ -396,8 +453,10 @@ mixin (
     };
     let collections = CollectionLib.getCollections(collectionsState);
     let userAccountId = IcpLib.accountIdentifier(caller, IcpLib.zeroSubaccount());
+    let userAccountIdHex = WalletLib.blobToHexPublic(userAccountId);
     var newCount : Nat = 0;
     var errors : [Text] = [];
+    var skipped : [WalletTypes.WalletSyncSkip] = [];
 
     for (collection in collections.values()) {
       switch (collection.kind) {
@@ -416,36 +475,40 @@ mixin (
           let preview = await* WalletLib.previewUserOwnedNFTs(collection, caller, userAccountId);
           switch (preview) {
             case (#err(message)) {
-              errors := Array.concat<Text>(errors, [message]);
+              let indexedNFTs = WalletLib.indexedNFTsForOwner(
+                ownershipIndexState,
+                collection.id,
+                caller,
+                userAccountIdHex,
+              );
+              if (indexedNFTs.size() > 0) {
+                let registered = registerPreviewNFTs(caller, collection, indexedNFTs, #Registered);
+                newCount += registered.newCount;
+              } else if (WalletLib.isOwnerIndexMissingMessage(message)) {
+                skipped := Array.concat<WalletTypes.WalletSyncSkip>(
+                  skipped,
+                  [
+                    {
+                      collectionId = collection.id;
+                      collectionName = collection.name;
+                      reason = "INDEX_REQUIRED";
+                      message = "This collection does not expose an owner index. Run collection indexing or import the token ID directly.";
+                    }
+                  ],
+                );
+              } else {
+                errors := Array.concat<Text>(errors, [message]);
+              };
             };
             case (#ok(nfts)) {
-              var previewTokenIds : [Text] = [];
-              for (previewNFT in nfts.values()) {
-                previewTokenIds := Array.concat<Text>(previewTokenIds, [previewNFT.tokenId]);
-                let existing = WalletLib.findByCollectionToken(
-                  walletState,
-                  collection.id,
-                  previewNFT.tokenId,
-                );
-                if (countsAsNewWalletNFT(existing, caller)) {
-                  newCount += 1;
-                };
-                ignore WalletLib.registerNFT(
-                  walletState,
-                  caller,
-                  collection.id,
-                  previewNFT.tokenId,
-                  previewNFT.metadata,
-                  #Registered,
-                );
-                ignore MarketplaceLib.clearListingsForToken(marketplaceState, collection.id, previewNFT.tokenId);
-              };
+              let registered = registerPreviewNFTs(caller, collection, nfts, #Registered);
+              newCount += registered.newCount;
               await* removeStaleOnChainNFTs(
                 caller,
                 collection,
                 userAccountId,
                 #Registered,
-                previewTokenIds,
+                registered.tokenIds,
               );
             };
           };
@@ -453,7 +516,7 @@ mixin (
       };
     };
 
-    #ok({ newCount; errors });
+    #ok({ newCount; errors; skipped });
   };
 
   func syncMintedCollection(
@@ -462,46 +525,30 @@ mixin (
     userAccountId : Blob,
   ) : async* { #ok : Nat; #err : Text } {
     if (not Principal.equal(collection.canisterId, canisterId)) {
-      let preview = await* WalletLib.previewUserOwnedNFTs(
-        collection,
-        caller,
-        userAccountId,
-      );
-      switch (preview) {
-        case (#err(message)) {
-          return #err(message);
-        };
-        case (#ok(nfts)) {
-          var newCount : Nat = 0;
-          var previewTokenIds : [Text] = [];
-          for (previewNFT in nfts.values()) {
-            previewTokenIds := Array.concat<Text>(previewTokenIds, [previewNFT.tokenId]);
-            let existing = WalletLib.findByCollectionToken(
-              walletState,
-              collection.id,
-              previewNFT.tokenId,
-            );
-            if (countsAsNewWalletNFT(existing, caller)) {
-              newCount += 1;
-            };
-            ignore WalletLib.registerNFT(
-              walletState,
-              caller,
-              collection.id,
-              previewNFT.tokenId,
-              previewNFT.metadata,
-              #Minted,
-            );
-            ignore MarketplaceLib.clearListingsForToken(marketplaceState, collection.id, previewNFT.tokenId);
-          };
-          await* removeStaleOnChainNFTs(
-            caller,
+      switch (await* syncMintlabChildCollection(caller, collection)) {
+        case (#ok(count)) return #ok(count);
+        case (#err(childMessage)) {
+          let preview = await* WalletLib.previewUserOwnedNFTs(
             collection,
+            caller,
             userAccountId,
-            #Minted,
-            previewTokenIds,
           );
-          return #ok(newCount);
+          switch (preview) {
+            case (#err(message)) {
+              return #err(childMessage # ". Generic fallback also failed: " # message);
+            };
+            case (#ok(nfts)) {
+              let registered = registerPreviewNFTs(caller, collection, nfts, #Minted);
+              await* removeStaleOnChainNFTs(
+                caller,
+                collection,
+                userAccountId,
+                #Minted,
+                registered.tokenIds,
+              );
+              return #ok(registered.newCount);
+            };
+          };
         };
       };
     };
@@ -545,6 +592,100 @@ mixin (
     };
 
     #ok(newCount);
+  };
+
+  func syncMintlabChildCollection(
+    caller : Principal,
+    collection : CollectionTypes.Collection,
+  ) : async* { #ok : Nat; #err : Text } {
+    let child : WalletChildCollectionSyncActor = actor (collection.canisterId.toText());
+    let pageSize : Nat = 100;
+    var prev : ?Nat = null;
+    var newCount : Nat = 0;
+    var ownedTokenIds : [Text] = [];
+
+    label paginate loop {
+      let page = try {
+        await child.mintlab_nfts_of(caller, prev, ?pageSize);
+      } catch (error) {
+        return #err(
+          "Collection '" #
+          collection.name #
+          "': mintlab_nfts_of remote call failed: " #
+          Error.message(error)
+        );
+      };
+
+      if (page.size() == 0) {
+        break paginate;
+      };
+
+      for (item in page.values()) {
+        let tokenId = Nat.toText(item.tokenId);
+        ownedTokenIds := Array.concat<Text>(ownedTokenIds, [tokenId]);
+        let existing = WalletLib.findByCollectionToken(walletState, collection.id, tokenId);
+        if (countsAsNewWalletNFT(existing, caller)) {
+          newCount += 1;
+        };
+        ignore WalletLib.registerNFT(
+          walletState,
+          caller,
+          collection.id,
+          tokenId,
+          item.metadata,
+          #Minted,
+        );
+        ignore MarketplaceLib.clearListingsForToken(marketplaceState, collection.id, tokenId);
+      };
+
+      if (page.size() < pageSize) {
+        break paginate;
+      };
+      prev := ?page[page.size() - 1].tokenId;
+    };
+
+    for (existing in WalletLib.getUserNFTs(walletState, caller).values()) {
+      if (
+        existing.collectionId == collection.id and
+        existing.location == #Minted and
+        not containsText(ownedTokenIds, existing.tokenId)
+      ) {
+        WalletLib.deleteNFT(walletState, existing.id);
+      };
+    };
+
+    #ok(newCount);
+  };
+
+  func registerPreviewNFTs(
+    caller : Principal,
+    collection : CollectionTypes.Collection,
+    nfts : [WalletTypes.WalletNFT],
+    location : WalletTypes.WalletLocation,
+  ) : { newCount : Nat; tokenIds : [Text] } {
+    var newCount : Nat = 0;
+    var tokenIds : [Text] = [];
+    for (previewNFT in nfts.values()) {
+      tokenIds := Array.concat<Text>(tokenIds, [previewNFT.tokenId]);
+      let existing = WalletLib.findByCollectionToken(
+        walletState,
+        collection.id,
+        previewNFT.tokenId,
+      );
+      if (countsAsNewWalletNFT(existing, caller)) {
+        newCount += 1;
+      };
+      ignore WalletLib.registerNFT(
+        walletState,
+        caller,
+        collection.id,
+        previewNFT.tokenId,
+        previewNFT.metadata,
+        location,
+      );
+      ignore MarketplaceLib.clearListingsForToken(marketplaceState, collection.id, previewNFT.tokenId);
+    };
+    { newCount; tokenIds };
   };
 
   func removeStaleOnChainNFTs(

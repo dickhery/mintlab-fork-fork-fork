@@ -92,6 +92,38 @@ export interface CollectionNFTPage {
   note: string;
 }
 
+export interface WalletSyncSkip {
+  collectionId: CollectionId;
+  collectionName: string;
+  reason: string;
+  message: string;
+}
+
+export interface WalletSyncV2Result {
+  errors: Array<string>;
+  newCount: bigint;
+  skipped: Array<WalletSyncSkip>;
+}
+
+export interface CollectionIndexStatus {
+  collectionId: CollectionId;
+  cursor: string | null;
+  scanned: bigint;
+  indexed: bigint;
+  complete: boolean;
+  lastError: string | null;
+  updatedAt: Timestamp;
+}
+
+export interface CollectionIndexPageResult {
+  collectionId: CollectionId;
+  scanned: bigint;
+  indexed: bigint;
+  nextCursor: string | null;
+  complete: boolean;
+  error: string | null;
+}
+
 export type CollectionNFTLookupResult =
   | { __kind__: "ok"; ok: WalletNFT | null }
   | { __kind__: "err"; err: string };
@@ -681,6 +713,9 @@ export interface backendInterface {
   getCollectionDividendInfo(
     collectionId: CollectionId,
   ): Promise<CollectionDividendInfo | null>;
+  getCollectionIndexStatus(
+    collectionId: CollectionId,
+  ): Promise<CollectionIndexStatus | null>;
   getMyCollectionCanisterStatuses(): Promise<Array<CollectionCanisterStatus>>;
   getCollectionCanisterControllers(
     collectionId: CollectionId,
@@ -732,6 +767,14 @@ export interface backendInterface {
   getUserNFTs(user: Principal): Promise<Array<WalletNFT>>;
   getVaultAccountId(): Promise<AccountIdentifier>;
   getVaultPrincipal(): Promise<Principal>;
+  indexCollectionOwnershipPage(
+    collectionId: CollectionId,
+    cursor: string | null,
+    limit: bigint,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionIndexPageResult }
+    | { __kind__: "err"; err: string }
+  >;
   isAdmin(): Promise<boolean>;
   isNFTInUserWallet(
     collectionId: CollectionId,
@@ -847,6 +890,10 @@ export interface backendInterface {
     | { __kind__: "ok"; ok: { errors: Array<string>; newCount: bigint } }
     | { __kind__: "err"; err: string }
   >;
+  syncUserNFTsV2(): Promise<
+    | { __kind__: "ok"; ok: WalletSyncV2Result }
+    | { __kind__: "err"; err: string }
+  >;
   syncCollectionDividends(
     collectionId: CollectionId,
   ): Promise<
@@ -906,6 +953,34 @@ type RawCollectionNFTPage = {
   totalCount: bigint;
   coverage: RawCollectionBrowseCoverage;
   note: string;
+};
+type RawWalletSyncSkip = {
+  collectionId: CollectionId;
+  collectionName: string;
+  message: string;
+  reason: string;
+};
+type RawWalletSyncV2Result = {
+  errors: Array<string>;
+  newCount: bigint;
+  skipped: Array<RawWalletSyncSkip>;
+};
+type RawCollectionIndexStatus = {
+  collectionId: CollectionId;
+  complete: boolean;
+  cursor: [] | [string];
+  indexed: bigint;
+  lastError: [] | [string];
+  scanned: bigint;
+  updatedAt: Timestamp;
+};
+type RawCollectionIndexPageResult = {
+  collectionId: CollectionId;
+  complete: boolean;
+  error: [] | [string];
+  indexed: bigint;
+  nextCursor: [] | [string];
+  scanned: bigint;
 };
 type RawCollectionNFTLookupResult =
   | { ok: [] | [RawWalletNFT] }
@@ -1375,6 +1450,52 @@ function fromRawCollectionNFTPage(
     totalCount: value.totalCount,
     coverage: fromRawCollectionBrowseCoverage(value.coverage),
     note: value.note,
+  };
+}
+
+function fromRawWalletSyncSkip(value: RawWalletSyncSkip): WalletSyncSkip {
+  return {
+    collectionId: value.collectionId,
+    collectionName: value.collectionName,
+    reason: value.reason,
+    message: value.message,
+  };
+}
+
+function fromRawWalletSyncV2Result(
+  value: RawWalletSyncV2Result,
+): WalletSyncV2Result {
+  return {
+    errors: value.errors,
+    newCount: value.newCount,
+    skipped: value.skipped.map(fromRawWalletSyncSkip),
+  };
+}
+
+function fromRawCollectionIndexStatus(
+  value: RawCollectionIndexStatus,
+): CollectionIndexStatus {
+  return {
+    collectionId: value.collectionId,
+    cursor: fromRawOption(value.cursor),
+    scanned: value.scanned,
+    indexed: value.indexed,
+    complete: value.complete,
+    lastError: fromRawOption(value.lastError),
+    updatedAt: value.updatedAt,
+  };
+}
+
+function fromRawCollectionIndexPageResult(
+  value: RawCollectionIndexPageResult,
+): CollectionIndexPageResult {
+  return {
+    collectionId: value.collectionId,
+    scanned: value.scanned,
+    indexed: value.indexed,
+    nextCursor: fromRawOption(value.nextCursor),
+    complete: value.complete,
+    error: fromRawOption(value.error),
   };
 }
 
@@ -2085,6 +2206,28 @@ function fromSyncResult(
   return { __kind__: "err", err: value.err };
 }
 
+function fromSyncV2Result(
+  value: { ok: RawWalletSyncV2Result } | { err: string },
+):
+  | { __kind__: "ok"; ok: WalletSyncV2Result }
+  | { __kind__: "err"; err: string } {
+  if ("ok" in value) {
+    return { __kind__: "ok", ok: fromRawWalletSyncV2Result(value.ok) };
+  }
+  return { __kind__: "err", err: value.err };
+}
+
+function fromCollectionIndexPageResult(
+  value: { ok: RawCollectionIndexPageResult } | { err: string },
+):
+  | { __kind__: "ok"; ok: CollectionIndexPageResult }
+  | { __kind__: "err"; err: string } {
+  if ("ok" in value) {
+    return { __kind__: "ok", ok: fromRawCollectionIndexPageResult(value.ok) };
+  }
+  return { __kind__: "err", err: value.err };
+}
+
 export class Backend implements backendInterface {
   constructor(
     private readonly actor: ActorSubclass<any>,
@@ -2571,6 +2714,16 @@ export class Backend implements backendInterface {
     return value == null ? null : fromRawCollectionDividendInfo(value);
   }
 
+  async getCollectionIndexStatus(
+    collectionId: CollectionId,
+  ): Promise<CollectionIndexStatus | null> {
+    const result = (await this.run(() =>
+      this.actor.getCollectionIndexStatus(collectionId),
+    )) as [] | [RawCollectionIndexStatus];
+    const value = fromRawOption(result);
+    return value == null ? null : fromRawCollectionIndexStatus(value);
+  }
+
   async getCollectionNFT(
     collectionId: CollectionId,
     tokenId: string,
@@ -2746,6 +2899,25 @@ export class Backend implements backendInterface {
 
   async getVaultPrincipal(): Promise<Principal> {
     return this.run(() => this.actor.getVaultPrincipal());
+  }
+
+  async indexCollectionOwnershipPage(
+    collectionId: CollectionId,
+    cursor: string | null,
+    limit: bigint,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionIndexPageResult }
+    | { __kind__: "err"; err: string }
+  > {
+    return fromCollectionIndexPageResult(
+      await this.run(() =>
+        this.actor.indexCollectionOwnershipPage(
+          collectionId,
+          toRawOption(cursor),
+          limit,
+        ),
+      ),
+    );
   }
 
   async isAdmin(): Promise<boolean> {
@@ -3025,6 +3197,13 @@ export class Backend implements backendInterface {
     | { __kind__: "err"; err: string }
   > {
     return fromSyncResult(await this.run(() => this.actor.syncUserNFTs()));
+  }
+
+  async syncUserNFTsV2(): Promise<
+    | { __kind__: "ok"; ok: WalletSyncV2Result }
+    | { __kind__: "err"; err: string }
+  > {
+    return fromSyncV2Result(await this.run(() => this.actor.syncUserNFTsV2()));
   }
 
   async syncCollectionDividends(

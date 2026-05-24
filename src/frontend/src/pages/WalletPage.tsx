@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { useAdmin } from "@/hooks/use-admin";
 import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import { isLowCyclesError } from "@/lib/cycles";
@@ -34,12 +35,16 @@ import { resolveImageUrl } from "@/lib/media";
 import type {
   ActiveListingDetail,
   Collection,
+  CollectionIndexPageResult,
+  CollectionIndexStatus,
   MintConfig,
   NFTDividend,
   NFTMetadata,
   NFTStats,
   PublicModerationConfig,
   WalletNFT,
+  WalletSyncSkip,
+  WalletSyncV2Result,
 } from "@/types";
 import { Principal } from "@icp-sdk/core/principal";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -172,6 +177,26 @@ function summarizeSyncErrors(errors: string[]): string {
     return uniqueErrors[0];
   }
   return `${uniqueErrors.length} collections could not be checked. First issue: ${uniqueErrors[0]}`;
+}
+
+function summarizeSyncSkipped(skipped: WalletSyncSkip[]): string {
+  if (skipped.length === 0) {
+    return "";
+  }
+  if (skipped.length === 1) {
+    return `${skipped[0].collectionName} needs indexing before auto-discovery works.`;
+  }
+  return `${skipped.length} collections need indexing before auto-discovery works.`;
+}
+
+function summarizeSyncAttention(
+  errors: string[],
+  skipped: WalletSyncSkip[],
+): string {
+  if (errors.length > 0) {
+    return summarizeSyncErrors(errors);
+  }
+  return summarizeSyncSkipped(skipped);
 }
 
 // ── CopyField ─────────────────────────────────────────────────────────────
@@ -908,6 +933,203 @@ function ImportSpecificNFTModal({
   );
 }
 
+interface CollectionIndexingDialogProps {
+  open: boolean;
+  onClose: () => void;
+  collection: Collection | null;
+}
+
+function CollectionIndexingDialog({
+  open,
+  onClose,
+  collection,
+}: CollectionIndexingDialogProps) {
+  const { actor } = useBackend();
+  const queryClient = useQueryClient();
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [lastPage, setLastPage] = useState<CollectionIndexPageResult | null>(
+    null,
+  );
+  const [isIndexing, setIsIndexing] = useState(false);
+
+  const { data: status, refetch } = useQuery<CollectionIndexStatus | null>({
+    queryKey: ["collectionIndexStatus", collection?.id.toString()],
+    queryFn: async () => {
+      if (!actor || !collection) return null;
+      return actor.getCollectionIndexStatus(collection.id);
+    },
+    enabled: open && !!actor && !!collection,
+  });
+
+  useEffect(() => {
+    if (!open) {
+      setCursor(null);
+      setLastPage(null);
+      setIsIndexing(false);
+      return;
+    }
+    setCursor(status?.cursor ?? null);
+  }, [open, status?.cursor]);
+
+  async function indexOnePage(nextCursor: string | null) {
+    if (!actor || !collection) throw new Error("No collection selected");
+    const result = await actor.indexCollectionOwnershipPage(
+      collection.id,
+      nextCursor,
+      50n,
+    );
+    if (result.__kind__ === "err") {
+      throw new Error(result.err);
+    }
+    setLastPage(result.ok);
+    setCursor(result.ok.nextCursor);
+    await queryClient.invalidateQueries({ queryKey: ["userNFTs"] });
+    await queryClient.invalidateQueries({ queryKey: ["userStats"] });
+    await queryClient.invalidateQueries({
+      queryKey: ["collectionIndexStatus", collection.id.toString()],
+    });
+    return result.ok;
+  }
+
+  async function handleIndexNextPage() {
+    setIsIndexing(true);
+    try {
+      const page = await indexOnePage(cursor);
+      await refetch();
+      toast.success(
+        page.complete
+          ? "Collection indexing complete"
+          : `Indexed ${page.indexed.toString()} ownership records`,
+      );
+    } catch (err) {
+      toast.error(extractError(err));
+    } finally {
+      setIsIndexing(false);
+    }
+  }
+
+  async function handleRunUntilComplete() {
+    setIsIndexing(true);
+    try {
+      let nextCursor = cursor;
+      let pages = 0;
+      let indexed = 0n;
+      while (pages < 200) {
+        const page = await indexOnePage(nextCursor);
+        indexed += page.indexed;
+        pages += 1;
+        nextCursor = page.nextCursor;
+        if (page.complete || nextCursor == null) {
+          toast.success("Collection indexing complete", {
+            description: `${indexed.toString()} ownership records indexed.`,
+          });
+          await refetch();
+          return;
+        }
+      }
+      toast("Indexing paused", {
+        description: "Run again to continue from the saved cursor.",
+      });
+      await refetch();
+    } catch (err) {
+      toast.error(extractError(err));
+    } finally {
+      setIsIndexing(false);
+    }
+  }
+
+  const scanned = status?.scanned ?? 0n;
+  const indexed = status?.indexed ?? 0n;
+  const complete = status?.complete ?? false;
+  const nextCursor = cursor ?? status?.cursor ?? null;
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="bg-card border-border max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="font-display text-foreground flex items-center gap-2">
+            <RefreshCw className="w-4 h-4 text-accent" />
+            Index Collection
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 pt-2">
+          <div className="space-y-1">
+            <p className="text-sm font-medium text-foreground">
+              {collection?.name ?? "Collection"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {collection?.canisterId.toString() ?? ""}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <p className="text-xs text-muted-foreground">Scanned</p>
+              <p className="font-display text-lg font-semibold">
+                {scanned.toString()}
+              </p>
+            </div>
+            <div className="rounded-lg border border-border bg-muted/20 p-3">
+              <p className="text-xs text-muted-foreground">Indexed</p>
+              <p className="font-display text-lg font-semibold">
+                {indexed.toString()}
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+            <div className="flex items-center justify-between gap-3">
+              <span>Status</span>
+              <Badge variant={complete ? "default" : "secondary"}>
+                {complete ? "Complete" : "In progress"}
+              </Badge>
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-3">
+              <span>Next cursor</span>
+              <span className="font-mono text-foreground">
+                {nextCursor ?? "None"}
+              </span>
+            </div>
+            {lastPage && (
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <span>Last page</span>
+                <span className="text-foreground">
+                  {lastPage.scanned.toString()} scanned,{" "}
+                  {lastPage.indexed.toString()} indexed
+                </span>
+              </div>
+            )}
+            {status?.lastError && (
+              <p className="mt-2 text-destructive">{status.lastError}</p>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <Button variant="ghost" onClick={onClose} disabled={isIndexing}>
+              Close
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleIndexNextPage}
+              disabled={!collection || isIndexing || complete}
+            >
+              Index Next Page
+            </Button>
+            <Button
+              onClick={handleRunUntilComplete}
+              disabled={!collection || isIndexing || complete}
+              className="bg-accent text-accent-foreground hover:bg-accent/90 transition-smooth"
+            >
+              {isIndexing ? "Indexing..." : "Run Until Complete"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function MintComposer({
   mintConfig,
   moderationConfig,
@@ -1354,13 +1576,19 @@ type SyncStatus =
   | { kind: "syncing"; slow?: boolean }
   | { kind: "ok"; newCount: number }
   | { kind: "upToDate" }
-  | { kind: "partial"; newCount: number; message: string }
+  | {
+      kind: "partial";
+      newCount: number;
+      message: string;
+      errors: string[];
+      skipped: WalletSyncSkip[];
+    }
   | { kind: "error"; message: string };
 
 type SyncMode = "silent" | "manual";
 
 type SyncResult =
-  | { __kind__: "ok"; ok: { errors: Array<string>; newCount: bigint } }
+  | { __kind__: "ok"; ok: WalletSyncV2Result }
   | { __kind__: "err"; err: string };
 
 interface ReceivingInstructionsProps {
@@ -1368,6 +1596,7 @@ interface ReceivingInstructionsProps {
   accountIdHex: string | null;
   onSync: () => void;
   onImportSpecificNFT: () => void;
+  onIndexCollection?: (collectionId: bigint) => void;
   syncStatus: SyncStatus;
 }
 
@@ -1376,6 +1605,7 @@ function ReceivingInstructions({
   accountIdHex,
   onSync,
   onImportSpecificNFT,
+  onIndexCollection,
   syncStatus,
 }: ReceivingInstructionsProps) {
   const isSyncing = syncStatus.kind === "syncing";
@@ -1431,9 +1661,11 @@ function ReceivingInstructions({
               data-ocid="wallet.sync.partial_state"
             >
               <Info className="w-3.5 h-3.5 shrink-0" />
-              {syncStatus.newCount > 0
-                ? `${syncStatus.newCount} synced; some skipped`
-                : "Some collections skipped"}
+              {syncStatus.skipped.length > 0
+                ? `${syncStatus.skipped.length} need indexing`
+                : syncStatus.newCount > 0
+                  ? `${syncStatus.newCount} synced; some warnings`
+                  : "Some collections need attention"}
             </motion.span>
           )}
           {syncStatus.kind === "error" && (
@@ -1500,6 +1732,48 @@ function ReceivingInstructions({
             </div>
           )}
         </div>
+
+        {syncStatus.kind === "partial" && syncStatus.skipped.length > 0 && (
+          <div className="rounded-lg border border-amber-200/70 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
+            <div className="flex flex-col gap-2">
+              {syncStatus.skipped.slice(0, 4).map((skip) => (
+                <div
+                  key={skip.collectionId.toString()}
+                  className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {skip.collectionName}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Needs indexing for automatic sync
+                    </p>
+                  </div>
+                  {onIndexCollection ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 shrink-0"
+                      onClick={() => onIndexCollection(skip.collectionId)}
+                    >
+                      Index Collection
+                    </Button>
+                  ) : (
+                    <Badge variant="secondary" className="shrink-0">
+                      Admin required
+                    </Badge>
+                  )}
+                </div>
+              ))}
+              {syncStatus.skipped.length > 4 && (
+                <p className="text-xs text-muted-foreground">
+                  {syncStatus.skipped.length - 4} more collections need
+                  indexing.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {isSyncing && (
           <motion.div
@@ -1785,12 +2059,16 @@ export default function WalletPage() {
     principalText,
   } = useAuth();
   const { actor, isFetching } = useBackend();
+  const { isAdmin } = useAdmin();
   const queryClient = useQueryClient();
   const bootstrappedRef = useRef(false);
   const autoSyncedPrincipalRef = useRef<string | null>(null);
   const syncInFlightRef = useRef<Promise<SyncResult> | null>(null);
   const syncModeRef = useRef<SyncMode | null>(null);
   const [importSpecificOpen, setImportSpecificOpen] = useState(false);
+  const [indexingCollectionId, setIndexingCollectionId] = useState<
+    bigint | null
+  >(null);
 
   // Bootstrap admin on first login
   useEffect(() => {
@@ -1917,6 +2195,10 @@ export default function WalletPage() {
   for (const c of collections ?? []) {
     collectionMap.set(c.id, c);
   }
+  const indexingCollection =
+    indexingCollectionId == null
+      ? null
+      : (collectionMap.get(indexingCollectionId) ?? null);
   const myCreatedCollectionIds = new Set(
     myCreatedCollections.map((collection) => collection.id),
   );
@@ -1958,7 +2240,10 @@ export default function WalletPage() {
       syncStatus.kind === "partial" ||
       syncStatus.kind === "error"
     ) {
-      const id = setTimeout(() => setSyncStatus({ kind: "idle" }), 6000);
+      const id = setTimeout(
+        () => setSyncStatus({ kind: "idle" }),
+        syncStatus.kind === "partial" ? 15_000 : 6000,
+      );
       return () => clearTimeout(id);
     }
   }, [syncStatus]);
@@ -1979,7 +2264,7 @@ export default function WalletPage() {
         syncPromise = existingSync;
       } else {
         syncPromise = withTimeout(
-          actor.syncUserNFTs(),
+          actor.syncUserNFTsV2(),
           SYNC_TIMEOUT_MS,
           "Wallet sync timed out while checking imported collections. Import the specific token ID directly or try again.",
         );
@@ -2014,14 +2299,30 @@ export default function WalletPage() {
           const syncErrors = result.ok.errors.filter(
             (message) => message.trim().length > 0,
           );
+          const syncSkipped = result.ok.skipped.filter(
+            (item) => item.collectionName.trim().length > 0,
+          );
           if (syncErrors.length > 0) {
-            const warningMessage = summarizeSyncErrors(syncErrors);
-            console.info("[syncUserNFTs] collection warnings:", syncErrors);
+            console.warn("[syncUserNFTs] collection errors:", syncErrors);
+          }
+          if (syncSkipped.length > 0) {
+            console.info(
+              "[syncUserNFTs] collections need indexing:",
+              syncSkipped,
+            );
+          }
+          if (syncErrors.length > 0 || syncSkipped.length > 0) {
+            const warningMessage = summarizeSyncAttention(
+              syncErrors,
+              syncSkipped,
+            );
             if (!silent) {
               setSyncStatus({
                 kind: "partial",
                 newCount,
                 message: warningMessage,
+                errors: syncErrors,
+                skipped: syncSkipped,
               });
               if (newCount > 0) {
                 toast.success(
@@ -2029,9 +2330,16 @@ export default function WalletPage() {
                     ? "Synced - 1 new NFT found and registered"
                     : `Synced - ${newCount} new NFTs found and registered`,
                   {
-                    description: "Some collections could not be checked.",
+                    description:
+                      syncSkipped.length > 0
+                        ? `${syncSkipped.length} collection(s) need indexing.`
+                        : "Some collections could not be checked.",
                   },
                 );
+              } else if (syncErrors.length === 0 && syncSkipped.length > 0) {
+                toast("Wallet sync complete", {
+                  description: `${syncSkipped.length} collection(s) need indexing before auto-discovery works.`,
+                });
               } else {
                 toast("Sync finished with collection warnings", {
                   description: warningMessage,
@@ -2168,6 +2476,11 @@ export default function WalletPage() {
         accountIdHex={accountIdHex}
         onSync={handleSync}
         onImportSpecificNFT={() => setImportSpecificOpen(true)}
+        onIndexCollection={
+          isAdmin
+            ? (collectionId) => setIndexingCollectionId(collectionId)
+            : undefined
+        }
         syncStatus={syncStatus}
       />
 
@@ -2175,6 +2488,12 @@ export default function WalletPage() {
         open={importSpecificOpen}
         onClose={() => setImportSpecificOpen(false)}
         collections={collections ?? []}
+      />
+
+      <CollectionIndexingDialog
+        open={indexingCollectionId != null}
+        onClose={() => setIndexingCollectionId(null)}
+        collection={indexingCollection}
       />
 
       <MintComposer

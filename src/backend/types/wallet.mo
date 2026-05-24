@@ -37,4 +37,50 @@ module {
     tokenId : Text;
     preparedAt : CommonTypes.Timestamp;
   };
+
+  public type IndexedOwner = {
+    #Principal : Principal;
+    #AccountIdText : Text;
+    #Unknown;
+  };
+
+  public type OwnershipIndexRecord = {
+    collectionId : CollectionId;
+    tokenId : Text;
+    owner : IndexedOwner;
+    metadata : NFTMetadata;
+    indexedAt : CommonTypes.Timestamp;
+  };
+
+  public type CollectionIndexStatus = {
+    collectionId : CollectionId;
+    cursor : ?Text;
+    scanned : Nat;
+    indexed : Nat;
+    complete : Bool;
+    lastError : ?Text;
+    updatedAt : CommonTypes.Timestamp;
+  };
+
+  public type CollectionIndexPageResult = {
+    collectionId : CollectionId;
+    scanned : Nat;
+    indexed : Nat;
+    nextCursor : ?Text;
+    complete : Bool;
+    error : ?Text;
+  };
+
+  public type WalletSyncSkip = {
+    collectionId : CollectionId;
+    collectionName : Text;
+    reason : Text;
+    message : Text;
+  };
+
+  public type WalletSyncV2Result = {
+    newCount : Nat;
+    errors : [Text];
+    skipped : [WalletSyncSkip];
+  };
 };

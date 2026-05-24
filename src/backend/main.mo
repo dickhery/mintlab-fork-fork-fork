@@ -23,6 +23,7 @@ persistent actor Backend {
   let collectionCreationState = MintLib.newCollectionCreationState();
   let moderationState = MintLib.newModerationState();
   let walletState = WalletLib.newState();
+  let ownershipIndexState = WalletLib.newOwnershipIndexState();
   let marketplaceState = MarketplaceLib.newState();
   let marketplacePaymentState = MarketplaceLib.newPaymentState();
   let marketplaceRefundState = MarketplaceLib.newRefundState();
@@ -51,6 +52,7 @@ persistent actor Backend {
   );
   include WalletApi(
     walletState,
+    ownershipIndexState,
     collectionsState,
     marketplaceState,
     marketplaceListingLockState,

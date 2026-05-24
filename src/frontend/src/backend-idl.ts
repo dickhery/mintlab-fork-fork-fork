@@ -59,6 +59,34 @@ export const idlFactory = ({ IDL }) => {
     'registeredAt' : Timestamp,
     'location' : WalletLocation,
   });
+  const WalletSyncSkip = IDL.Record({
+    'collectionId' : CollectionId,
+    'collectionName' : IDL.Text,
+    'message' : IDL.Text,
+    'reason' : IDL.Text,
+  });
+  const WalletSyncV2Result = IDL.Record({
+    'errors' : IDL.Vec(IDL.Text),
+    'newCount' : IDL.Nat,
+    'skipped' : IDL.Vec(WalletSyncSkip),
+  });
+  const CollectionIndexStatus = IDL.Record({
+    'collectionId' : CollectionId,
+    'complete' : IDL.Bool,
+    'cursor' : IDL.Opt(IDL.Text),
+    'indexed' : IDL.Nat,
+    'lastError' : IDL.Opt(IDL.Text),
+    'scanned' : IDL.Nat,
+    'updatedAt' : Timestamp,
+  });
+  const CollectionIndexPageResult = IDL.Record({
+    'collectionId' : CollectionId,
+    'complete' : IDL.Bool,
+    'error' : IDL.Opt(IDL.Text),
+    'indexed' : IDL.Nat,
+    'nextCursor' : IDL.Opt(IDL.Text),
+    'scanned' : IDL.Nat,
+  });
   const DividendClaimReceipt = IDL.Record({
     'nft' : WalletNFT,
     'collection' : Collection,
@@ -726,6 +754,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(CollectionDividendInfo)],
         [],
       ),
+    'getCollectionIndexStatus' : IDL.Func(
+        [CollectionId],
+        [IDL.Opt(CollectionIndexStatus)],
+        ['query'],
+      ),
     'getCollectionNFT' : IDL.Func(
         [CollectionId, IDL.Text],
         [IDL.Opt(WalletNFT)],
@@ -835,6 +868,16 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'icrc7_tx_window' : IDL.Func([], [IDL.Opt(IDL.Nat)], ['query']),
+    'indexCollectionOwnershipPage' : IDL.Func(
+        [CollectionId, IDL.Opt(IDL.Text), IDL.Nat],
+        [
+          IDL.Variant({
+            'ok' : CollectionIndexPageResult,
+            'err' : IDL.Text,
+          }),
+        ],
+        [],
+      ),
     'isAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'isNFTInUserWallet' : IDL.Func(
         [CollectionId, IDL.Text, UserId],
@@ -967,6 +1010,16 @@ export const idlFactory = ({ IDL }) => {
               'errors' : IDL.Vec(IDL.Text),
               'newCount' : IDL.Nat,
             }),
+            'err' : IDL.Text,
+          }),
+        ],
+        [],
+      ),
+    'syncUserNFTsV2' : IDL.Func(
+        [],
+        [
+          IDL.Variant({
+            'ok' : WalletSyncV2Result,
             'err' : IDL.Text,
           }),
         ],

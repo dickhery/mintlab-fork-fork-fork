@@ -27,6 +27,11 @@ module {
     var nextId : Nat;
   };
 
+  public type OwnershipIndexState = {
+    records : Map.Map<Text, Types.OwnershipIndexRecord>;
+    status : Map.Map<Types.CollectionId, Types.CollectionIndexStatus>;
+  };
+
   public func newState() : WalletState {
     {
       nfts = Map.empty<Types.NFTId, Types.WalletNFT>();
@@ -34,6 +39,13 @@ module {
       tokenIndex = Map.empty<Text, Types.NFTId>();
       pendingDeposits = Map.empty<Text, Types.DepositPreparation>();
       var nextId = 1;
+    };
+  };
+
+  public func newOwnershipIndexState() : OwnershipIndexState {
+    {
+      records = Map.empty<Text, Types.OwnershipIndexRecord>();
+      status = Map.empty<Types.CollectionId, Types.CollectionIndexStatus>();
     };
   };
 
@@ -300,6 +312,91 @@ module {
       };
     };
     collectionIds;
+  };
+
+  public func getOwnershipIndexStatus(
+    state : OwnershipIndexState,
+    collectionId : Types.CollectionId,
+  ) : ?Types.CollectionIndexStatus {
+    Map.get(state.status, Nat.compare, collectionId);
+  };
+
+  public func putOwnershipIndexRecord(
+    state : OwnershipIndexState,
+    record : Types.OwnershipIndexRecord,
+  ) {
+    Map.add(
+      state.records,
+      Text.compare,
+      ownershipIndexKey(record.collectionId, record.tokenId),
+      record,
+    );
+  };
+
+  public func indexedNFTsForOwner(
+    state : OwnershipIndexState,
+    collectionId : Types.CollectionId,
+    owner : Principal,
+    accountIdHex : Text,
+  ) : [Types.WalletNFT] {
+    var results : [Types.WalletNFT] = [];
+    for (record in Map.values(state.records)) {
+      if (record.collectionId == collectionId) {
+        let matches = switch (record.owner) {
+          case (#Principal(value)) Principal.equal(value, owner);
+          case (#AccountIdText(value)) {
+            value == accountIdHex or value == owner.toText() or value == blobToHex(owner.toBlob());
+          };
+          case (#Unknown) false;
+        };
+        if (matches) {
+          results := Array.concat<Types.WalletNFT>(
+            results,
+            [
+              {
+                id = 0;
+                owner;
+                collectionId = record.collectionId;
+                tokenId = record.tokenId;
+                metadata = record.metadata;
+                location = #Registered;
+                registeredAt = record.indexedAt;
+              }
+            ],
+          );
+        };
+      };
+    };
+    results;
+  };
+
+  public func indexCollectionOwnershipPage(
+    state : OwnershipIndexState,
+    collection : CollectionTypes.Collection,
+    cursor : ?Text,
+    limit : Nat,
+  ) : async* { #ok : Types.CollectionIndexPageResult; #err : Text } {
+    let pageLimit = normalizeIndexLimit(limit);
+    switch (collection.standard) {
+      case (#ICRC7) await* indexICRC7OwnershipPage(state, collection, cursor, pageLimit);
+      case (#DIP721) await* indexDIP721OwnershipPage(state, collection, cursor, pageLimit);
+      case (#EXT) await* indexEXTOwnershipPage(state, collection, cursor, pageLimit);
+      case (#Other(name)) {
+        let message = "Ownership indexing is not supported for '" # name # "' collections";
+        recordIndexFailure(state, collection.id, cursor, message);
+        #err(message);
+      };
+    };
+  };
+
+  public func isOwnerIndexMissingMessage(message : Text) : Bool {
+    Text.contains(message, #text "did not provide an owner index") or
+    Text.contains(message, #text "ownership sync stopped after scanning") or
+    Text.contains(message, #text "token ownership method not available");
+  };
+
+  public func blobToHexPublic(blob : Blob) : Text {
+    blobToHex(blob);
   };
 
   public func previewUserOwnedNFTs(
@@ -876,6 +973,387 @@ module {
       40;
     } else {
       limit;
+    };
+  };
+
+  func normalizeIndexLimit(limit : Nat) : Nat {
+    if (limit == 0) {
+      25;
+    } else if (limit > 100) {
+      100;
+    } else {
+      limit;
+    };
+  };
+
+  func ownershipIndexKey(collectionId : Types.CollectionId, tokenId : Text) : Text {
+    Nat.toText(collectionId) # "#" # tokenId;
+  };
+
+  func updateIndexStatus(
+    state : OwnershipIndexState,
+    collectionId : Types.CollectionId,
+    cursor : ?Text,
+    scanned : Nat,
+    indexed : Nat,
+    complete : Bool,
+    error : ?Text,
+  ) {
+    let previous = Map.get(state.status, Nat.compare, collectionId);
+    let totalScanned = switch (previous) {
+      case (?status) status.scanned + scanned;
+      case null scanned;
+    };
+    let totalIndexed = switch (previous) {
+      case (?status) status.indexed + indexed;
+      case null indexed;
+    };
+    Map.add(
+      state.status,
+      Nat.compare,
+      collectionId,
+      {
+        collectionId;
+        cursor;
+        scanned = totalScanned;
+        indexed = totalIndexed;
+        complete;
+        lastError = error;
+        updatedAt = Time.now();
+      },
+    );
+  };
+
+  func recordIndexFailure(
+    state : OwnershipIndexState,
+    collectionId : Types.CollectionId,
+    cursor : ?Text,
+    message : Text,
+  ) {
+    updateIndexStatus(state, collectionId, cursor, 0, 0, false, ?message);
+  };
+
+  func indexPageResult(
+    state : OwnershipIndexState,
+    collectionId : Types.CollectionId,
+    scanned : Nat,
+    indexed : Nat,
+    nextCursor : ?Text,
+    complete : Bool,
+  ) : { #ok : Types.CollectionIndexPageResult; #err : Text } {
+    updateIndexStatus(state, collectionId, nextCursor, scanned, indexed, complete, null);
+    #ok({
+      collectionId;
+      scanned;
+      indexed;
+      nextCursor;
+      complete;
+      error = null;
+    });
+  };
+
+  func indexICRC7OwnershipPage(
+    state : OwnershipIndexState,
+    collection : CollectionTypes.Collection,
+    cursor : ?Text,
+    limit : Nat,
+  ) : async* { #ok : Types.CollectionIndexPageResult; #err : Text } {
+    let canister : NFTStandards.ICRC7Actor = actor (collection.canisterId.toText());
+    var rangeMode = false;
+    var rangeComplete = false;
+    var tokenIds : [Nat] = [];
+    var nextCursor : ?Text = null;
+
+    let directTokenIds = try {
+      ?(await canister.icrc7_tokens(cursorToNat(cursor), ?limit));
+    } catch (_) {
+      null;
+    };
+    switch (directTokenIds) {
+      case (?values) {
+        tokenIds := values;
+        if (values.size() == 0) {
+          switch (cursor) {
+            case (?_) return indexPageResult(state, collection.id, 0, 0, null, true);
+            case null {
+              switch (collectionTokenRange(collection)) {
+                case (?range) {
+                  rangeMode := true;
+                  let page = rangeTokenIdPage(range, cursor, limit);
+                  tokenIds := page.tokenIds;
+                  nextCursor := page.nextCursor;
+                  rangeComplete := page.complete;
+                };
+                case null {
+                  return indexPageResult(state, collection.id, 0, 0, null, true);
+                };
+              };
+            };
+          };
+        };
+      };
+      case null {
+        switch (collectionTokenRange(collection)) {
+          case (?range) {
+            rangeMode := true;
+            let page = rangeTokenIdPage(range, cursor, limit);
+            tokenIds := page.tokenIds;
+            nextCursor := page.nextCursor;
+            rangeComplete := page.complete;
+          };
+          case null {
+            let message = "Collection '" # collection.name # "': icrc7_tokens failed and no browse range is configured";
+            recordIndexFailure(state, collection.id, cursor, message);
+            return #err(message);
+          };
+        };
+      };
+    };
+
+    if (tokenIds.size() == 0) {
+      return indexPageResult(state, collection.id, 0, 0, null, true);
+    };
+
+    let owners = try {
+      await canister.icrc7_owner_of(tokenIds);
+    } catch (error) {
+      let message = "Collection '" # collection.name # "': icrc7_owner_of failed: " # Error.message(error);
+      recordIndexFailure(state, collection.id, cursor, message);
+      return #err(message);
+    };
+
+    let metadatas = try {
+      await canister.icrc7_token_metadata(tokenIds);
+    } catch (_) {
+      Array.tabulate<?NFTStandards.ICRC7TokenMetadata>(
+        tokenIds.size(),
+        func(_) { null },
+      );
+    };
+
+    var indexed : Nat = 0;
+    var index : Nat = 0;
+    let indexedAt = Time.now();
+    for (tokenId in tokenIds.values()) {
+      if (index < owners.size()) {
+        switch (owners[index]) {
+          case (?account) {
+            let metadata = if (index < metadatas.size()) {
+              metadataFromICRC7(metadatas[index], collection.name, tokenId);
+            } else {
+              fallbackICRC7Metadata(collection.name, tokenId);
+            };
+            putOwnershipIndexRecord(
+              state,
+              {
+                collectionId = collection.id;
+                tokenId = Nat.toText(tokenId);
+                owner = #Principal(account.owner);
+                metadata;
+                indexedAt;
+              },
+            );
+            indexed += 1;
+          };
+          case null {};
+        };
+      };
+      index += 1;
+    };
+
+    if (not rangeMode) {
+      let complete = tokenIds.size() < limit;
+      nextCursor := if (complete) {
+        null;
+      } else {
+        ?Nat.toText(tokenIds[tokenIds.size() - 1]);
+      };
+      rangeComplete := complete;
+    };
+
+    indexPageResult(state, collection.id, tokenIds.size(), indexed, nextCursor, rangeComplete);
+  };
+
+  func indexDIP721OwnershipPage(
+    state : OwnershipIndexState,
+    collection : CollectionTypes.Collection,
+    cursor : ?Text,
+    limit : Nat,
+  ) : async* { #ok : Types.CollectionIndexPageResult; #err : Text } {
+    let range = switch (collectionTokenRange(collection)) {
+      case (?value) value;
+      case null {
+        let message = "Collection '" # collection.name # "': DIP721 ownership indexing needs collection browse info";
+        recordIndexFailure(state, collection.id, cursor, message);
+        return #err(message);
+      };
+    };
+    let canister : NFTStandards.DIP721Actor = actor (collection.canisterId.toText());
+    let page = rangeTokenIdPage(range, cursor, limit);
+    var indexed : Nat = 0;
+    let indexedAt = Time.now();
+
+    for (tokenId in page.tokenIds.values()) {
+      switch (await* fetchDIP721Owner(canister, tokenId, collection.name)) {
+        case (#ok(?owner)) {
+          let metadata = await* fetchDIP721Metadata(canister, tokenId, collection.name);
+          putOwnershipIndexRecord(
+            state,
+            {
+              collectionId = collection.id;
+              tokenId = Nat.toText(tokenId);
+              owner = #Principal(owner);
+              metadata;
+              indexedAt;
+            },
+          );
+          indexed += 1;
+        };
+        case (#ok(null)) {};
+        case (#err(_)) {};
+      };
+    };
+
+    indexPageResult(state, collection.id, page.tokenIds.size(), indexed, page.nextCursor, page.complete);
+  };
+
+  func indexEXTOwnershipPage(
+    state : OwnershipIndexState,
+    collection : CollectionTypes.Collection,
+    cursor : ?Text,
+    limit : Nat,
+  ) : async* { #ok : Types.CollectionIndexPageResult; #err : Text } {
+    let canister : NFTStandards.EXTActor = actor (collection.canisterId.toText());
+    switch (collectionTokenRange(collection)) {
+      case (?range) {
+        await* indexEXTByRangePage(state, canister, collection, cursor, limit, range);
+      };
+      case null {
+        await* indexEXTByRegistryPage(state, canister, collection, cursor, limit);
+      };
+    };
+  };
+
+  func indexEXTByRangePage(
+    state : OwnershipIndexState,
+    canister : NFTStandards.EXTActor,
+    collection : CollectionTypes.Collection,
+    cursor : ?Text,
+    limit : Nat,
+    range : { totalSupply : Nat; tokenIndexOffset : Nat },
+  ) : async* { #ok : Types.CollectionIndexPageResult; #err : Text } {
+    let page = rangeTokenIdPage(range, cursor, limit);
+    var indexed : Nat = 0;
+    let indexedAt = Time.now();
+
+    for (tokenId in page.tokenIds.values()) {
+      if (tokenId > 4_294_967_295) {
+        let message = "Collection '" # collection.name # "': EXT token index exceeds Nat32";
+        recordIndexFailure(state, collection.id, cursor, message);
+        return #err(message);
+      };
+      let tokenIndex = Nat32.fromNat(tokenId);
+      let tokenIdentifier = extTokenIdentifier(collection.canisterId, tokenIndex);
+      switch (await* fetchEXTOwnerAccountId(canister, tokenIdentifier)) {
+        case (#ok(ownerAccountId)) {
+          let metadata = await* fetchEXTMetadata(canister, collection.canisterId, tokenIdentifier, tokenIndex, collection.name);
+          putOwnershipIndexRecord(
+            state,
+            {
+              collectionId = collection.id;
+              tokenId = tokenIdentifier;
+              owner = #AccountIdText(ownerAccountId);
+              metadata;
+              indexedAt;
+            },
+          );
+          indexed += 1;
+        };
+        case (#err(_)) {};
+      };
+    };
+
+    indexPageResult(state, collection.id, page.tokenIds.size(), indexed, page.nextCursor, page.complete);
+  };
+
+  func indexEXTByRegistryPage(
+    state : OwnershipIndexState,
+    canister : NFTStandards.EXTActor,
+    collection : CollectionTypes.Collection,
+    cursor : ?Text,
+    limit : Nat,
+  ) : async* { #ok : Types.CollectionIndexPageResult; #err : Text } {
+    let registry = try {
+      await canister.getRegistry();
+    } catch (error) {
+      let message = "Collection '" # collection.name # "': getRegistry failed and no browse range is configured: " # Error.message(error);
+      recordIndexFailure(state, collection.id, cursor, message);
+      return #err(message);
+    };
+
+    let start = switch (cursorToNat(cursor)) {
+      case (?value) value;
+      case null 0;
+    };
+    var position = start;
+    var scanned : Nat = 0;
+    var indexed : Nat = 0;
+    let indexedAt = Time.now();
+
+    while (position < registry.size() and scanned < limit) {
+      let (tokenIndex, ownerAccountId) = registry[position];
+      let tokenIdentifier = extTokenIdentifier(collection.canisterId, tokenIndex);
+      let metadata = await* fetchEXTMetadata(canister, collection.canisterId, tokenIdentifier, tokenIndex, collection.name);
+      putOwnershipIndexRecord(
+        state,
+        {
+          collectionId = collection.id;
+          tokenId = tokenIdentifier;
+          owner = #AccountIdText(ownerAccountId);
+          metadata;
+          indexedAt;
+        },
+      );
+      indexed += 1;
+      scanned += 1;
+      position += 1;
+    };
+
+    let complete = position >= registry.size();
+    let nextCursor = if (complete) {
+      null;
+    } else {
+      ?Nat.toText(position);
+    };
+    indexPageResult(state, collection.id, scanned, indexed, nextCursor, complete);
+  };
+
+  func rangeTokenIdPage(
+    range : { totalSupply : Nat; tokenIndexOffset : Nat },
+    cursor : ?Text,
+    limit : Nat,
+  ) : { tokenIds : [Nat]; nextCursor : ?Text; complete : Bool } {
+    let start = switch (cursorToNat(cursor)) {
+      case (?value) value;
+      case null range.tokenIndexOffset;
+    };
+    let collectionEnd = range.tokenIndexOffset + range.totalSupply;
+    let end = Nat.min(start + limit, collectionEnd);
+    var tokenIds : [Nat] = [];
+    var current = start;
+    while (current < end) {
+      tokenIds := Array.concat<Nat>(tokenIds, [current]);
+      current += 1;
+    };
+    let complete = end >= collectionEnd;
+    {
+      tokenIds;
+      nextCursor = if (complete) {
+        null;
+      } else {
+        ?Nat.toText(end);
+      };
+      complete;
     };
   };
 

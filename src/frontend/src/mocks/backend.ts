@@ -1052,6 +1052,26 @@ export const mockBackend: backendInterface = {
       balanceE8s: 100_000_000n,
     },
   }),
+  getCollectionIndexStatus: async (collectionId) => ({
+    collectionId,
+    cursor: null,
+    scanned: 0n,
+    indexed: 0n,
+    complete: false,
+    lastError: null,
+    updatedAt: BigInt(Date.now()) * BigInt(1_000_000),
+  }),
+  indexCollectionOwnershipPage: async (collectionId, cursor, limit) => ({
+    __kind__: "ok" as const,
+    ok: {
+      collectionId,
+      scanned: limit,
+      indexed: limit,
+      nextCursor: cursor == null ? "100" : null,
+      complete: cursor != null,
+      error: null,
+    },
+  }),
   transferICPOut: async () => ({ __kind__: "Ok", Ok: BigInt(1) }),
   getCollectionNFTs: async (collectionId) => sampleCollectionNFTs(collectionId),
   getCollectionNFT: async (collectionId, tokenId) =>
@@ -1081,4 +1101,8 @@ export const mockBackend: backendInterface = {
   },
   isNFTInUserWallet: async () => false,
   syncUserNFTs: async () => ({ __kind__: "ok" as const, ok: { newCount: 0n, errors: [] as string[] } }),
+  syncUserNFTsV2: async () => ({
+    __kind__: "ok" as const,
+    ok: { newCount: 0n, errors: [] as string[], skipped: [] },
+  }),
 };
