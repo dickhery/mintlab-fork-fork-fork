@@ -391,6 +391,7 @@ module {
 
   public func isOwnerIndexMissingMessage(message : Text) : Bool {
     Text.contains(message, #text "did not provide an owner index") or
+    Text.contains(message, #text "needs collection indexing") or
     Text.contains(message, #text "ownership sync stopped after scanning") or
     Text.contains(message, #text "token ownership method not available");
   };
@@ -404,7 +405,15 @@ module {
     owner : Principal,
     accountId : Blob,
   ) : async* { #ok : [Types.WalletNFT]; #err : Text } {
-    await* previewOwnedNFTsWithLocation(collection, owner, accountId, #Registered);
+    await* previewOwnedNFTsWithLocation(collection, owner, accountId, #Registered, true);
+  };
+
+  public func previewUserOwnedNFTsFromOwnerIndex(
+    collection : CollectionTypes.Collection,
+    owner : Principal,
+    accountId : Blob,
+  ) : async* { #ok : [Types.WalletNFT]; #err : Text } {
+    await* previewOwnedNFTsWithLocation(collection, owner, accountId, #Registered, false);
   };
 
   public func previewCollectionNFTs(
@@ -570,7 +579,7 @@ module {
     location : Types.WalletLocation,
   ) : async* { #ok : Types.NFTMetadata; #err : Text } {
     var previewError : ?Text = null;
-    let previewResult = await* previewOwnedNFTsWithLocation(collection, owner, accountId, location);
+    let previewResult = await* previewOwnedNFTsWithLocation(collection, owner, accountId, location, true);
     switch (previewResult) {
       case (#err(message)) previewError := ?message;
       case (#ok(nfts)) {
@@ -1378,12 +1387,16 @@ module {
     owner : Principal,
     accountId : Blob,
     location : Types.WalletLocation,
+    allowOwnerScan : Bool,
   ) : async* { #ok : [Types.WalletNFT]; #err : Text } {
     switch (collection.standard) {
       case (#DIP721) {
         let canister : NFTStandards.DIP721Actor = actor (collection.canisterId.toText());
         switch (await* fetchDIP721OwnerTokenIdentifiers(canister, owner, collection.name)) {
           case (#err(message)) {
+            if (not allowOwnerScan) {
+              return #err(ownerIndexRequiredMessage(collection.name));
+            };
             switch (collectionTokenRange(collection)) {
               case (?range) {
                 switch (ownerRangeScanAllowed(collection.name, range, ?OWNER_SYNC_SCAN_LIMIT)) {
@@ -1424,8 +1437,11 @@ module {
         let accountIdHex = blobToHex(accountId);
         let principalText = owner.toText();
         let principalHex = blobToHex(owner.toBlob());
-        switch (await* fetchEXTTokenIndices(canister, accountIdHex, principalText, principalHex, collection.name)) {
+        switch (await* fetchEXTTokenIndices(canister, accountIdHex, principalText, principalHex, collection.name, allowOwnerScan)) {
           case (#err(message)) {
+            if (not allowOwnerScan) {
+              return #err(ownerIndexRequiredMessage(collection.name));
+            };
             switch (collectionTokenRange(collection)) {
               case (?range) {
                 switch (ownerRangeScanAllowed(collection.name, range, ?OWNER_SYNC_SCAN_LIMIT)) {
@@ -1461,7 +1477,7 @@ module {
       };
       case (#ICRC7) {
         let canister : NFTStandards.ICRC7Actor = actor (collection.canisterId.toText());
-        await* fetchICRC7Previews(canister, collection, owner, location);
+        await* fetchICRC7Previews(canister, collection, owner, location, allowOwnerScan);
       };
       case (#Other(standardName)) #err("On-chain preview is not supported for '" # standardName # "' collections");
     };
@@ -2120,6 +2136,7 @@ module {
     principalText : Text,
     principalHex : Text,
     collectionName : Text,
+    allowRegistryFallback : Bool,
   ) : async* { #ok : [NFTStandards.TokenIndex]; #err : Text } {
     var tokenIndices : [NFTStandards.TokenIndex] = [];
     var sawAvailableMethod = false;
@@ -2197,7 +2214,7 @@ module {
       };
     };
 
-    if (tokenIndices.size() == 0 and not sawAvailableMethod) {
+    if (tokenIndices.size() == 0 and not sawAvailableMethod and allowRegistryFallback) {
       switch (
         await* fetchEXTTokenIndicesFromRegistry(
           canister,
@@ -2423,6 +2440,7 @@ module {
     collection : CollectionTypes.Collection,
     owner : Principal,
     location : Types.WalletLocation,
+    allowOwnerScan : Bool,
   ) : async* { #ok : [Types.WalletNFT]; #err : Text } {
     let account : NFTStandards.ICRC7Account = {
       owner;
@@ -2441,17 +2459,22 @@ module {
       let tokenIds = switch (tokenIdsResult) {
         case (#ok(value)) value;
         case (#err(_)) {
+          if (not allowOwnerScan) {
+            return #err(ownerIndexRequiredMessage(collection.name));
+          };
           return await* fetchICRC7PreviewsByOwnerScan(canister, collection, owner, location, ?OWNER_SYNC_SCAN_LIMIT);
         };
       };
       if (tokenIds.size() == 0) {
-        let balances = try {
-          await canister.icrc7_balance_of([account]);
-        } catch (_) {
-          [];
-        };
-        if (balances.size() > 0 and balances[0] > 0) {
-          return await* fetchICRC7PreviewsByOwnerScan(canister, collection, owner, location, ?OWNER_SYNC_SCAN_LIMIT);
+        if (allowOwnerScan) {
+          let balances = try {
+            await canister.icrc7_balance_of([account]);
+          } catch (_) {
+            [];
+          };
+          if (balances.size() > 0 and balances[0] > 0) {
+            return await* fetchICRC7PreviewsByOwnerScan(canister, collection, owner, location, ?OWNER_SYNC_SCAN_LIMIT);
+          };
         };
         break paginate;
       };
@@ -2742,6 +2765,12 @@ module {
     "Collection '" # collectionName # "': ownership sync stopped after scanning " #
     Nat.toText(limit) #
     " tokens because the collection did not provide an owner index. Import a specific token ID to verify it directly."
+  };
+
+  func ownerIndexRequiredMessage(collectionName : Text) : Text {
+    "Collection '" #
+    collectionName #
+    "': needs collection indexing because the collection did not provide an owner index. Import a specific token ID to verify it directly."
   };
 
   func ownerRangeScanAllowed(

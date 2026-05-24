@@ -472,15 +472,19 @@ mixin (
           };
         };
         case (#External) {
-          let preview = await* WalletLib.previewUserOwnedNFTs(collection, caller, userAccountId);
+          let indexedNFTs = WalletLib.indexedNFTsForOwner(
+            ownershipIndexState,
+            collection.id,
+            caller,
+            userAccountIdHex,
+          );
+          let preview = await* WalletLib.previewUserOwnedNFTsFromOwnerIndex(
+            collection,
+            caller,
+            userAccountId,
+          );
           switch (preview) {
             case (#err(message)) {
-              let indexedNFTs = WalletLib.indexedNFTsForOwner(
-                ownershipIndexState,
-                collection.id,
-                caller,
-                userAccountIdHex,
-              );
               if (indexedNFTs.size() > 0) {
                 let registered = registerPreviewNFTs(caller, collection, indexedNFTs, #Registered);
                 newCount += registered.newCount;
@@ -501,7 +505,12 @@ mixin (
               };
             };
             case (#ok(nfts)) {
-              let registered = registerPreviewNFTs(caller, collection, nfts, #Registered);
+              let nftsToRegister = if (nfts.size() == 0 and indexedNFTs.size() > 0) {
+                indexedNFTs;
+              } else {
+                nfts;
+              };
+              let registered = registerPreviewNFTs(caller, collection, nftsToRegister, #Registered);
               newCount += registered.newCount;
               await* removeStaleOnChainNFTs(
                 caller,
@@ -528,7 +537,7 @@ mixin (
       switch (await* syncMintlabChildCollection(caller, collection)) {
         case (#ok(count)) return #ok(count);
         case (#err(childMessage)) {
-          let preview = await* WalletLib.previewUserOwnedNFTs(
+          let preview = await* WalletLib.previewUserOwnedNFTsFromOwnerIndex(
             collection,
             caller,
             userAccountId,
