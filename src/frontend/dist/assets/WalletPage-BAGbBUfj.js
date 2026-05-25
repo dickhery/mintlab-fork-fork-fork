@@ -1,21 +1,21 @@
-import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useAdmin, e as useQueryClient, r as reactExports, f as useQuery, g as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-BV6vOOQ4.js";
-import { P as Plus, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-Bc98ZLSv.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-Dd4No4BX.js";
-import { M as MediaImage, E as EmptyState } from "./MediaImage-CSlSoW4O.js";
-import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-DDnQB-le.js";
-import { B as Badge, I as Input } from "./badge-0B2q4azx.js";
-import { I as ImageOff, r as resolveImageUrl } from "./media-C1oc3md2.js";
-import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-g2-DSBXH.js";
-import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-qzm-EJPF.js";
-import { u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label } from "./index-DXJ7DCYq.js";
-import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-DTE0vguZ.js";
-import { S as Skeleton, C as Copy } from "./skeleton-D1m05Wcj.js";
-import { S as Sparkles, c as compressModerationImage } from "./imageUtils-BTj1_jn2.js";
-import { C as CircleCheck } from "./circle-check-D5ubsvTu.js";
-import { C as Coins } from "./coins-Dj3kLSKd.js";
-import { S as Send } from "./send-BMyH9wfT.js";
-import "./arrow-right-D3qhvKcX.js";
-import "./index-ClSX3_xn.js";
+import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useAdmin, e as useQueryClient, r as reactExports, f as useQuery, g as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-w5is4GTk.js";
+import { P as Plus, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-CCOAszSl.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-C66WdXiR.js";
+import { M as MediaImage, E as EmptyState } from "./MediaImage-DHJX8jbV.js";
+import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-erhQfTUW.js";
+import { B as Badge, I as Input } from "./badge-BWm-YNrs.js";
+import { I as ImageOff, r as resolveImageUrl } from "./media-CBkTiic7.js";
+import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-BDHa9d8O.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-D7xL_CUB.js";
+import { u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label } from "./index-1ib54JF4.js";
+import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-CXAHgpPV.js";
+import { S as Skeleton, C as Copy } from "./skeleton-DSkhreLM.js";
+import { S as Sparkles, c as compressModerationImage } from "./imageUtils-iG5FTfSh.js";
+import { C as CircleCheck } from "./circle-check-9JetrRso.js";
+import { C as Coins } from "./coins-6bsArvd0.js";
+import { S as Send } from "./send-D5qfFA6m.js";
+import "./arrow-right-Cj47z9RK.js";
+import "./index-BJlB3XV2.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -157,7 +157,7 @@ const E8S = 100000000n;
 const ICP_LEDGER_FEE_E8S = 10000n;
 const SYNC_TIMEOUT_MS = 45e3;
 const SYNC_STILL_RUNNING_MESSAGE = "Wallet sync is still checking imported collections. New NFTs found during sync will appear here shortly.";
-const SYNC_PAGE_COLLECTION_LIMIT = 3n;
+const SYNC_PAGE_COLLECTION_LIMIT = 1n;
 const SYNC_SLOW_NOTICE_MS = 15e3;
 const SYNC_REFRESH_INTERVAL_MS = 6e3;
 function formatICP(e8s) {
@@ -234,6 +234,12 @@ function summarizeSyncAttention(errors, skipped) {
 }
 function isAutoIndexingSkip(skip) {
   return skip.reason === "INDEXING_IN_PROGRESS";
+}
+function isSyncAlreadyRunningMessage(message) {
+  return message.toLowerCase().includes("wallet sync is already running");
+}
+function isAgentProcessingTimeoutMessage(message) {
+  return message.includes("Request timed out") && message.includes("Request status: processing");
 }
 function CopyField({ label, value, ocid }) {
   const [copied, setCopied] = reactExports.useState(false);
@@ -321,9 +327,6 @@ function SendNFTModal({ open, onClose, nft, collection }) {
         } catch (syncError) {
           console.warn("[sendNFT] recipient wallet sync failed:", syncError);
         }
-        void actor.syncUserNFTs().catch((syncError) => {
-          console.warn("[sendNFT] sender wallet sync failed:", syncError);
-        });
         return message;
       }
       const result = await actor.sendNFT(nft.id, recipientPrincipal);
@@ -2074,6 +2077,15 @@ function WalletPage() {
       };
       const applySyncResult = (result) => {
         if (result.__kind__ === "err") {
+          if (isSyncAlreadyRunningMessage(result.err)) {
+            if (!silent) {
+              setSyncStatus({ kind: "syncing", slow: true });
+              ue("Wallet sync is already running", {
+                description: "Mintlab is still checking your wallet. New NFTs found during that sync will appear shortly."
+              });
+            }
+            return;
+          }
           if (!silent) {
             setSyncStatus({ kind: "error", message: result.err });
             ue.error(`Sync failed: ${result.err}`);
@@ -2188,6 +2200,21 @@ function WalletPage() {
           }
           rawSyncPromise.then((result) => applySyncResult(result)).catch((lateError) => {
             const lateMessage = extractError(lateError);
+            if (isAgentProcessingTimeoutMessage(lateMessage)) {
+              if (!silent) {
+                setSyncStatus({
+                  kind: "partial",
+                  newCount: 0,
+                  message: "Wallet sync is still processing on-chain. Mintlab refreshed your wallet and you can try Sync again shortly.",
+                  errors: [],
+                  skipped: []
+                });
+                ue("Wallet sync is still processing on-chain", {
+                  description: "Mintlab refreshed your wallet. New NFTs may appear after the backend finishes the in-progress check."
+                });
+              }
+              return;
+            }
             console.warn("[syncUserNFTs] late sync failed:", lateError);
             if (!silent) {
               setSyncStatus({ kind: "error", message: lateMessage });

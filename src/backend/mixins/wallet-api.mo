@@ -1,6 +1,7 @@
 import Array "mo:core/Array";
 import Blob "mo:core/Blob";
 import Error "mo:core/Error";
+import Map "mo:core/Map";
 import AuthLib "../lib/auth";
 import CollectionLib "../lib/collections";
 import IcpLib "../lib/icp";
@@ -53,8 +54,26 @@ mixin (
     skip : ?WalletTypes.WalletSyncSkip;
   };
 
+  // Kept as stable fields for upgrade compatibility; sync uses the transient safe limits below.
   let AUTO_INDEX_PAGE_LIMIT : Nat = 40;
   let AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat = 2;
+  transient let SAFE_AUTO_INDEX_PAGE_LIMIT : Nat = 20;
+  transient let SAFE_AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat = 1;
+  transient let walletSyncLocks = Map.empty<Principal, Bool>();
+
+  func acquireWalletSyncLock(caller : Principal) : Bool {
+    switch (Map.get(walletSyncLocks, Principal.compare, caller)) {
+      case (?_) false;
+      case null {
+        Map.add(walletSyncLocks, Principal.compare, caller, true);
+        true;
+      };
+    };
+  };
+
+  func releaseWalletSyncLock(caller : Principal) {
+    Map.remove(walletSyncLocks, Principal.compare, caller);
+  };
 
   public shared ({ caller }) func registerNFT(
     collectionId : WalletTypes.CollectionId,
@@ -446,7 +465,17 @@ mixin (
     #ok : WalletTypes.WalletSyncV2Result;
     #err : Text;
   } {
-    await* syncUserNFTsInternal(caller);
+    if (Principal.isAnonymous(caller)) {
+      return #err("You must be logged in to sync your wallet");
+    };
+    if (not acquireWalletSyncLock(caller)) {
+      return #err("Wallet sync is already running. Wait for the current sync to finish.");
+    };
+    try {
+      await* syncUserNFTsInternal(caller);
+    } finally {
+      releaseWalletSyncLock(caller);
+    };
   };
 
   public shared ({ caller }) func syncUserNFTsPage(
@@ -459,7 +488,24 @@ mixin (
     if (Principal.isAnonymous(caller)) {
       return #err("You must be logged in to sync your wallet");
     };
+    if (not acquireWalletSyncLock(caller)) {
+      return #err("Wallet sync is already running. Wait for the current sync to finish.");
+    };
+    try {
+      await* syncUserNFTsPageUnlocked(caller, cursor, maxCollections);
+    } finally {
+      releaseWalletSyncLock(caller);
+    };
+  };
 
+  func syncUserNFTsPageUnlocked(
+    caller : Principal,
+    cursor : ?Nat,
+    maxCollections : Nat,
+  ) : async* {
+    #ok : WalletTypes.WalletSyncPageResult;
+    #err : Text;
+  } {
     let collections = CollectionLib.getCollections(collectionsState);
     let start = switch (cursor) {
       case (?value) value;
@@ -517,9 +563,19 @@ mixin (
     #ok : { newCount : Nat; errors : [Text] };
     #err : Text;
   } {
-    switch (await* syncUserNFTsInternal(caller)) {
-      case (#err(message)) #err(message);
-      case (#ok(result)) #ok({ newCount = result.newCount; errors = result.errors });
+    if (Principal.isAnonymous(caller)) {
+      return #err("You must be logged in to sync your wallet");
+    };
+    if (not acquireWalletSyncLock(caller)) {
+      return #err("Wallet sync is already running. Wait for the current sync to finish.");
+    };
+    try {
+      switch (await* syncUserNFTsInternal(caller)) {
+        case (#err(message)) #err(message);
+        case (#ok(result)) #ok({ newCount = result.newCount; errors = result.errors });
+      };
+    } finally {
+      releaseWalletSyncLock(caller);
     };
   };
 
@@ -552,14 +608,8 @@ mixin (
     #ok({ newCount; errors; skipped });
   };
 
-  func normalizeSyncPageSize(maxCollections : Nat) : Nat {
-    if (maxCollections == 0) {
-      1;
-    } else if (maxCollections > 5) {
-      5;
-    } else {
-      maxCollections;
-    };
+  func normalizeSyncPageSize(_maxCollections : Nat) : Nat {
+    1;
   };
 
   func syncOneWalletCollection(
@@ -629,13 +679,6 @@ mixin (
             };
             let registered = registerPreviewNFTs(caller, collection, nftsToRegister, #Registered);
             newCount += registered.newCount;
-            await* removeStaleOnChainNFTs(
-              caller,
-              collection,
-              userAccountId,
-              #Registered,
-              registered.tokenIds,
-            );
           };
         };
       };
@@ -649,6 +692,20 @@ mixin (
     caller : Principal,
     userAccountIdHex : Text,
   ) : async* WalletAutoIndexResult {
+    if (collectionNeedsSafeIndexSetup(collection)) {
+      return {
+        nfts = [];
+        errors = [];
+        skip = ?{
+          collectionId = collection.id;
+          collectionName = collection.name;
+          reason = "INDEX_REQUIRED";
+          message = "This collection needs token range setup before automatic wallet sync can scan it safely. " #
+          "Add total supply and token offset in the collection import settings, or import a known token ID directly.";
+        };
+      };
+    };
+
     var pages : Nat = 0;
     var scanned : Nat = 0;
     var indexed : Nat = 0;
@@ -662,7 +719,7 @@ mixin (
     );
 
     label autoIndex loop {
-      if (pages >= AUTO_INDEX_MAX_PAGES_PER_SYNC) {
+      if (pages >= SAFE_AUTO_INDEX_MAX_PAGES_PER_SYNC) {
         break autoIndex;
       };
       let status = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id);
@@ -684,7 +741,7 @@ mixin (
           ownershipIndexState,
           collection,
           cursor,
-          AUTO_INDEX_PAGE_LIMIT,
+          SAFE_AUTO_INDEX_PAGE_LIMIT,
         )
       ) {
         case (#err(message)) {
@@ -779,13 +836,6 @@ mixin (
             };
             case (#ok(nfts)) {
               let registered = registerPreviewNFTs(caller, collection, nfts, #Minted);
-              await* removeStaleOnChainNFTs(
-                caller,
-                collection,
-                userAccountId,
-                #Minted,
-                registered.tokenIds,
-              );
               return #ok(registered.newCount);
             };
           };
@@ -895,6 +945,26 @@ mixin (
     };
 
     #ok(newCount);
+  };
+
+  func collectionNeedsSafeIndexSetup(collection : CollectionTypes.Collection) : Bool {
+    switch (collection.standard) {
+      case (#EXT) not collectionHasBrowseRange(collection);
+      case (#DIP721) not collectionHasBrowseRange(collection);
+      case (_) false;
+    };
+  };
+
+  func collectionHasBrowseRange(collection : CollectionTypes.Collection) : Bool {
+    switch (collection.browseInfo) {
+      case null false;
+      case (?browseInfo) {
+        switch (browseInfo.totalSupply) {
+          case null false;
+          case (?_) true;
+        };
+      };
+    };
   };
 
   func registerPreviewNFTs(

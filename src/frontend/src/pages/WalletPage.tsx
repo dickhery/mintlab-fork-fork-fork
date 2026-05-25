@@ -117,7 +117,7 @@ const ICP_LEDGER_FEE_E8S = 10_000n;
 const SYNC_TIMEOUT_MS = 45_000;
 const SYNC_STILL_RUNNING_MESSAGE =
   "Wallet sync is still checking imported collections. New NFTs found during sync will appear here shortly.";
-const SYNC_PAGE_COLLECTION_LIMIT = 3n;
+const SYNC_PAGE_COLLECTION_LIMIT = 1n;
 const SYNC_SLOW_NOTICE_MS = 15_000;
 const SYNC_REFRESH_INTERVAL_MS = 6_000;
 
@@ -212,6 +212,17 @@ function summarizeSyncAttention(
 
 function isAutoIndexingSkip(skip: WalletSyncSkip): boolean {
   return skip.reason === "INDEXING_IN_PROGRESS";
+}
+
+function isSyncAlreadyRunningMessage(message: string): boolean {
+  return message.toLowerCase().includes("wallet sync is already running");
+}
+
+function isAgentProcessingTimeoutMessage(message: string): boolean {
+  return (
+    message.includes("Request timed out") &&
+    message.includes("Request status: processing")
+  );
 }
 
 // ── CopyField ─────────────────────────────────────────────────────────────
@@ -331,9 +342,6 @@ function SendNFTModal({ open, onClose, nft, collection }: SendNFTModalProps) {
         } catch (syncError) {
           console.warn("[sendNFT] recipient wallet sync failed:", syncError);
         }
-        void actor.syncUserNFTs().catch((syncError: unknown) => {
-          console.warn("[sendNFT] sender wallet sync failed:", syncError);
-        });
         return message;
       }
       const result = await actor.sendNFT(nft.id, recipientPrincipal);
@@ -2390,6 +2398,16 @@ export default function WalletPage() {
 
       const applySyncResult = (result: SyncResult) => {
         if (result.__kind__ === "err") {
+          if (isSyncAlreadyRunningMessage(result.err)) {
+            if (!silent) {
+              setSyncStatus({ kind: "syncing", slow: true });
+              toast("Wallet sync is already running", {
+                description:
+                  "Mintlab is still checking your wallet. New NFTs found during that sync will appear shortly.",
+              });
+            }
+            return;
+          }
           if (!silent) {
             setSyncStatus({ kind: "error", message: result.err });
             toast.error(`Sync failed: ${result.err}`);
@@ -2532,6 +2550,29 @@ export default function WalletPage() {
             .then((result) => applySyncResult(result))
             .catch((lateError: unknown) => {
               const lateMessage = extractError(lateError);
+              if (isAgentProcessingTimeoutMessage(lateMessage)) {
+                if (import.meta.env.DEV) {
+                  console.debug(
+                    "[syncUserNFTs] backend call still processing after agent timeout:",
+                    lateError,
+                  );
+                }
+                if (!silent) {
+                  setSyncStatus({
+                    kind: "partial",
+                    newCount: 0,
+                    message:
+                      "Wallet sync is still processing on-chain. Mintlab refreshed your wallet and you can try Sync again shortly.",
+                    errors: [],
+                    skipped: [],
+                  });
+                  toast("Wallet sync is still processing on-chain", {
+                    description:
+                      "Mintlab refreshed your wallet. New NFTs may appear after the backend finishes the in-progress check.",
+                  });
+                }
+                return;
+              }
               console.warn("[syncUserNFTs] late sync failed:", lateError);
               if (!silent) {
                 setSyncStatus({ kind: "error", message: lateMessage });
