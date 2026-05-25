@@ -1,12 +1,14 @@
 import Array "mo:core/Array";
 import Blob "mo:core/Blob";
 import Error "mo:core/Error";
+import Int "mo:core/Int";
 import Map "mo:core/Map";
 import AuthLib "../lib/auth";
 import CollectionLib "../lib/collections";
 import IcpLib "../lib/icp";
 import MarketplaceLib "../lib/marketplace";
 import MintLib "../lib/mint";
+import NFTStandards "../lib/nft-standards";
 import WalletLib "../lib/wallet";
 import CollectionTypes "../types/collections";
 import CommonTypes "../types/common";
@@ -39,7 +41,9 @@ mixin (
   };
 
   type WalletChildCollectionSyncActor = actor {
+    mintlab_token_ids : (?Nat, ?Nat) -> async [Nat];
     mintlab_nfts_of : (Principal, ?Nat, ?Nat) -> async [WalletChildMintlabNFT];
+    mintlab_owner_of : ([Nat]) -> async [?NFTStandards.ICRC7Account];
   };
 
   type WalletCollectionSyncResult = {
@@ -59,6 +63,8 @@ mixin (
   let AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat = 2;
   transient let SAFE_AUTO_INDEX_PAGE_LIMIT : Nat = 20;
   transient let SAFE_AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat = 1;
+  transient let CHILD_NFT_SYNC_PAGE_SIZE : Nat = 1;
+  transient let CHILD_TOKEN_SYNC_PAGE_SIZE : Nat = 25;
   transient let walletSyncLocks = Map.empty<Principal, Bool>();
 
   func acquireWalletSyncLock(caller : Principal) : Bool {
@@ -824,22 +830,7 @@ mixin (
     if (not Principal.equal(collection.canisterId, canisterId)) {
       switch (await* syncMintlabChildCollection(caller, collection)) {
         case (#ok(count)) return #ok(count);
-        case (#err(childMessage)) {
-          let preview = await* WalletLib.previewUserOwnedNFTsFromOwnerIndex(
-            collection,
-            caller,
-            userAccountId,
-          );
-          switch (preview) {
-            case (#err(message)) {
-              return #err(childMessage # ". Generic fallback also failed: " # message);
-            };
-            case (#ok(nfts)) {
-              let registered = registerPreviewNFTs(caller, collection, nfts, #Minted);
-              return #ok(registered.newCount);
-            };
-          };
-        };
+        case (#err(childMessage)) return #err(childMessage);
       };
     };
 
@@ -889,7 +880,7 @@ mixin (
     collection : CollectionTypes.Collection,
   ) : async* { #ok : Nat; #err : Text } {
     let child : WalletChildCollectionSyncActor = actor (collection.canisterId.toText());
-    let pageSize : Nat = 100;
+    let pageSize : Nat = CHILD_NFT_SYNC_PAGE_SIZE;
     var prev : ?Nat = null;
     var newCount : Nat = 0;
     var ownedTokenIds : [Text] = [];
@@ -898,11 +889,13 @@ mixin (
       let page = try {
         await child.mintlab_nfts_of(caller, prev, ?pageSize);
       } catch (error) {
-        return #err(
+        return await* syncMintlabChildCollectionByOwnerLookup(
+          caller,
+          collection,
           "Collection '" #
           collection.name #
           "': mintlab_nfts_of remote call failed: " #
-          Error.message(error)
+          Error.message(error),
         );
       };
 
@@ -945,6 +938,110 @@ mixin (
     };
 
     #ok(newCount);
+  };
+
+  func syncMintlabChildCollectionByOwnerLookup(
+    caller : Principal,
+    collection : CollectionTypes.Collection,
+    originalMessage : Text,
+  ) : async* { #ok : Nat; #err : Text } {
+    let child : WalletChildCollectionSyncActor = actor (collection.canisterId.toText());
+    var prev : ?Nat = null;
+    var newCount : Nat = 0;
+
+    label paginate loop {
+      let tokenIds = try {
+        await child.mintlab_token_ids(prev, ?CHILD_TOKEN_SYNC_PAGE_SIZE);
+      } catch (error) {
+        return #err(originalMessage # ". Token ID fallback also failed: " # Error.message(error));
+      };
+      if (tokenIds.size() == 0) {
+        break paginate;
+      };
+
+      let owners = try {
+        await child.mintlab_owner_of(tokenIds);
+      } catch (error) {
+        return #err(originalMessage # ". Owner lookup fallback also failed: " # Error.message(error));
+      };
+
+      var index : Nat = 0;
+      for (tokenId in tokenIds.values()) {
+        if (index < owners.size()) {
+          switch (owners[index]) {
+            case (?account) {
+              if (Principal.equal(account.owner, caller)) {
+                let metadata = await* childMetadataForOwnedToken(
+                  child,
+                  caller,
+                  collection,
+                  tokenId,
+                );
+                let tokenIdText = Nat.toText(tokenId);
+                let existing = WalletLib.findByCollectionToken(walletState, collection.id, tokenIdText);
+                if (countsAsNewWalletNFT(existing, caller)) {
+                  newCount += 1;
+                };
+                ignore WalletLib.registerNFT(
+                  walletState,
+                  caller,
+                  collection.id,
+                  tokenIdText,
+                  metadata,
+                  #Minted,
+                );
+                ignore MarketplaceLib.clearListingsForToken(marketplaceState, collection.id, tokenIdText);
+              };
+            };
+            case null {};
+          };
+        };
+        index += 1;
+      };
+
+      if (tokenIds.size() < CHILD_TOKEN_SYNC_PAGE_SIZE) {
+        break paginate;
+      };
+      prev := ?tokenIds[tokenIds.size() - 1];
+    };
+
+    #ok(newCount);
+  };
+
+  func childMetadataForOwnedToken(
+    child : WalletChildCollectionSyncActor,
+    caller : Principal,
+    collection : CollectionTypes.Collection,
+    tokenId : Nat,
+  ) : async* WalletTypes.NFTMetadata {
+    let prev = if (tokenId == 0) {
+      null;
+    } else {
+      ?Int.abs(Nat.toInt(tokenId) - 1);
+    };
+    let page = try {
+      await child.mintlab_nfts_of(caller, prev, ?1);
+    } catch (_) {
+      [];
+    };
+    for (item in page.values()) {
+      if (item.tokenId == tokenId) {
+        return item.metadata;
+      };
+    };
+    fallbackChildNFTMetadata(collection, tokenId);
+  };
+
+  func fallbackChildNFTMetadata(
+    collection : CollectionTypes.Collection,
+    tokenId : Nat,
+  ) : WalletTypes.NFTMetadata {
+    {
+      name = ?(collection.name # " #" # Nat.toText(tokenId));
+      description = if (collection.description == "") { null } else { ?collection.description };
+      imageUrl = if (collection.imageUrl == "") { null } else { ?collection.imageUrl };
+      attributes = [];
+    };
   };
 
   func collectionNeedsSafeIndexSetup(collection : CollectionTypes.Collection) : Bool {

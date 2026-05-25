@@ -3328,11 +3328,6 @@ export function createActor(
     HttpAgent.createSync({
       ...options.agentOptions,
     });
-  if (options.agent && options.agentOptions) {
-    console.warn(
-      "Detected both agent and agentOptions passed to createActor. Ignoring agentOptions and proceeding with the provided agent.",
-    );
-  }
   const actor = Actor.createActor<any>(idlFactory, {
     agent,
     canisterId,
