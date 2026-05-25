@@ -392,6 +392,8 @@ module {
   public func isOwnerIndexMissingMessage(message : Text) : Bool {
     Text.contains(message, #text "did not provide an owner index") or
     Text.contains(message, #text "needs collection indexing") or
+    Text.contains(message, #text "ownership indexing needs collection browse info") or
+    Text.contains(message, #text "no browse range is configured") or
     Text.contains(message, #text "ownership sync stopped after scanning") or
     Text.contains(message, #text "token ownership method not available");
   };

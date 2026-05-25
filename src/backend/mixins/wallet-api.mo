@@ -47,6 +47,15 @@ mixin (
     skipped : [WalletTypes.WalletSyncSkip];
   };
 
+  type WalletAutoIndexResult = {
+    nfts : [WalletTypes.WalletNFT];
+    errors : [Text];
+    skip : ?WalletTypes.WalletSyncSkip;
+  };
+
+  let AUTO_INDEX_PAGE_LIMIT : Nat = 40;
+  let AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat = 2;
+
   public shared ({ caller }) func registerNFT(
     collectionId : WalletTypes.CollectionId,
     tokenId : Text,
@@ -593,18 +602,21 @@ mixin (
               let registered = registerPreviewNFTs(caller, collection, indexedNFTs, #Registered);
               newCount += registered.newCount;
             } else if (WalletLib.isOwnerIndexMissingMessage(message)) {
-              skipped := Array.concat<WalletTypes.WalletSyncSkip>(
-                skipped,
-                [
-                  {
-                    collectionId = collection.id;
-                    collectionName = collection.name;
-                    reason = "INDEX_REQUIRED";
-                    message = "This imported collection needs ownership indexing before automatic discovery can find new NFTs. " #
-                    "An admin can index it in pages, or you can import a known token ID directly.";
-                  }
-                ],
+              let autoIndexed = await* autoIndexCollectionForWalletSync(
+                collection,
+                caller,
+                userAccountIdHex,
               );
+              if (autoIndexed.nfts.size() > 0) {
+                let registered = registerPreviewNFTs(caller, collection, autoIndexed.nfts, #Registered);
+                newCount += registered.newCount;
+              } else {
+                errors := Array.concat<Text>(errors, autoIndexed.errors);
+                switch (autoIndexed.skip) {
+                  case (?skip) skipped := Array.concat<WalletTypes.WalletSyncSkip>(skipped, [skip]);
+                  case null {};
+                };
+              };
             } else {
               errors := Array.concat<Text>(errors, [message]);
             };
@@ -630,6 +642,121 @@ mixin (
     };
 
     { newCount; errors; skipped };
+  };
+
+  func autoIndexCollectionForWalletSync(
+    collection : CollectionTypes.Collection,
+    caller : Principal,
+    userAccountIdHex : Text,
+  ) : async* WalletAutoIndexResult {
+    var pages : Nat = 0;
+    var scanned : Nat = 0;
+    var indexed : Nat = 0;
+    var complete = false;
+    var lastError : ?Text = null;
+    var found = WalletLib.indexedNFTsForOwner(
+      ownershipIndexState,
+      collection.id,
+      caller,
+      userAccountIdHex,
+    );
+
+    label autoIndex loop {
+      if (pages >= AUTO_INDEX_MAX_PAGES_PER_SYNC) {
+        break autoIndex;
+      };
+      let status = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id);
+      switch (status) {
+        case (?value) {
+          if (value.complete) {
+            complete := true;
+            break autoIndex;
+          };
+        };
+        case null {};
+      };
+      let cursor = switch (status) {
+        case (?value) value.cursor;
+        case null null;
+      };
+      switch (
+        await* WalletLib.indexCollectionOwnershipPage(
+          ownershipIndexState,
+          collection,
+          cursor,
+          AUTO_INDEX_PAGE_LIMIT,
+        )
+      ) {
+        case (#err(message)) {
+          lastError := ?message;
+          break autoIndex;
+        };
+        case (#ok(page)) {
+          pages += 1;
+          scanned += page.scanned;
+          indexed += page.indexed;
+          complete := page.complete;
+          found := WalletLib.indexedNFTsForOwner(
+            ownershipIndexState,
+            collection.id,
+            caller,
+            userAccountIdHex,
+          );
+          if (found.size() > 0 or page.complete or page.nextCursor == null) {
+            break autoIndex;
+          };
+        };
+      };
+    };
+
+    if (found.size() > 0 or complete) {
+      return {
+        nfts = found;
+        errors = [];
+        skip = null;
+      };
+    };
+
+    switch (lastError) {
+      case (?message) {
+        {
+          nfts = [];
+          errors = [];
+          skip = ?{
+            collectionId = collection.id;
+            collectionName = collection.name;
+            reason = "INDEX_REQUIRED";
+            message = "Mintlab tried automatic ownership indexing, but this collection needs extra setup before new NFTs can be discovered automatically. " #
+            "Known token IDs can still be imported directly. Details: " #
+            message;
+          };
+        };
+      };
+      case null {
+        if (pages > 0) {
+          {
+            nfts = [];
+            errors = [];
+            skip = ?{
+              collectionId = collection.id;
+              collectionName = collection.name;
+              reason = "INDEXING_IN_PROGRESS";
+              message = "Mintlab indexed " #
+              Nat.toText(scanned) #
+              " tokens and saved " #
+              Nat.toText(indexed) #
+              " owner records automatically. Click Sync again shortly to continue checking this collection.";
+            };
+          };
+        } else {
+          {
+            nfts = [];
+            errors = [];
+            skip = null;
+          };
+        };
+      };
+    };
   };
 
   func syncMintedCollection(

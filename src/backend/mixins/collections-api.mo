@@ -1,5 +1,6 @@
 import CollectionsLib "../lib/collections";
 import AuthLib "../lib/auth";
+import WalletLib "../lib/wallet";
 import CollectionTypes "../types/collections";
 import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
@@ -7,7 +8,9 @@ import Runtime "mo:core/Runtime";
 mixin (
   collectionsState : CollectionsLib.CollectionsState,
   authState : AuthLib.AdminState,
+  ownershipIndexState : WalletLib.OwnershipIndexState,
 ) {
+  let IMPORT_INDEX_WARM_PAGE_LIMIT : Nat = 25;
 
   /// Public: import a supported external NFT collection into the shared app directory
   public shared ({ caller }) func addCollection(
@@ -28,13 +31,13 @@ mixin (
       case (#Other(_)) Runtime.trap("Only EXT, DIP721, and ICRC-7 collections are supported");
       case (_) {};
     };
-    switch (CollectionsLib.findExternalCollectionByCanister(collectionsState, canisterId, standard)) {
+    let (collection, shouldWarmIndex) = switch (CollectionsLib.findExternalCollectionByCanister(collectionsState, canisterId, standard)) {
       case (?existing) {
         let mergedBrowseInfo = mergeBrowseInfo(existing.browseInfo, browseInfo);
         if (mergedBrowseInfo == existing.browseInfo) {
-          existing;
+          (existing, false);
         } else {
-          switch (
+          let updatedCollection = switch (
             CollectionsLib.updateCollection(
               collectionsState,
               existing.id,
@@ -51,23 +54,31 @@ mixin (
             case (?updated) updated;
             case null existing;
           };
+          (updatedCollection, true);
         };
       };
       case null {
-        CollectionsLib.addCollection(
-          collectionsState,
-          name,
-          description,
-          canisterId,
-          standard,
-          imageUrl,
-          symbol,
-          #External,
-          browseInfo,
-          null,
+        (
+          CollectionsLib.addCollection(
+            collectionsState,
+            name,
+            description,
+            canisterId,
+            standard,
+            imageUrl,
+            symbol,
+            #External,
+            browseInfo,
+            null,
+          ),
+          true,
         );
       };
     };
+    if (shouldWarmIndex) {
+      await* warmImportedCollectionIndex(collection);
+    };
+    collection;
   };
 
   /// Return all registered collections
@@ -119,6 +130,27 @@ mixin (
   public shared ({ caller }) func removeCollection(id : CollectionTypes.CollectionId) : async Bool {
     if (not AuthLib.isAdmin(authState, caller)) Runtime.trap("Unauthorized: admin only");
     CollectionsLib.removeCollection(collectionsState, id);
+  };
+
+  func warmImportedCollectionIndex(collection : CollectionTypes.Collection) : async* () {
+    if (collection.kind != #External) {
+      return;
+    };
+    let cursor = switch (WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id)) {
+      case (?status) {
+        if (status.complete) {
+          return;
+        };
+        status.cursor;
+      };
+      case null null;
+    };
+    ignore await* WalletLib.indexCollectionOwnershipPage(
+      ownershipIndexState,
+      collection,
+      cursor,
+      IMPORT_INDEX_WARM_PAGE_LIMIT,
+    );
   };
 
   func validateBrowseInfo(browseInfo : ?CollectionTypes.CollectionBrowseInfo) {

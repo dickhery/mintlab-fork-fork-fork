@@ -302,7 +302,7 @@ export const faqItems: FaqItem[] = [
   {
     question: "Why is my NFT not showing after a transfer?",
     answer:
-      "Use Wallet Sync first. If the collection needs ownership indexing or you know the token ID, use Import NFT to register that exact token.",
+      "Use Wallet Sync first. Mintlab indexes imported collections automatically in small batches. If you know the token ID, use Import NFT to register that exact token immediately.",
   },
   {
     question: "What happens if I remove Mintlab as a controller?",

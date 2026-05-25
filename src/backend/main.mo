@@ -40,7 +40,7 @@ persistent actor Backend {
 
   // ── Mixin composition ─────────────────────────────────────────────────────
   include AuthApi(authState);
-  include CollectionsApi(collectionsState, authState);
+  include CollectionsApi(collectionsState, authState, ownershipIndexState);
   include MintApi(
     mintState,
     collectionCreationState,

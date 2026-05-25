@@ -187,10 +187,17 @@ function summarizeSyncSkipped(skipped: WalletSyncSkip[]): string {
   if (skipped.length === 0) {
     return "";
   }
-  if (skipped.length === 1) {
-    return `${skipped[0].collectionName} needs an ownership index before automatic discovery can find new NFTs.`;
+  const indexing = skipped.filter(isAutoIndexingSkip);
+  const needsSetup = skipped.filter((skip) => !isAutoIndexingSkip(skip));
+  if (needsSetup.length === 0) {
+    return indexing.length === 1
+      ? `${indexing[0].collectionName} is still indexing automatically.`
+      : `${indexing.length} imported collections are still indexing automatically.`;
   }
-  return `${skipped.length} imported collections need ownership indexing before automatic discovery can find new NFTs.`;
+  if (needsSetup.length === 1) {
+    return `${needsSetup[0].collectionName} needs extra setup before automatic discovery can find new NFTs.`;
+  }
+  return `${needsSetup.length} imported collections need extra setup before automatic discovery can find new NFTs.`;
 }
 
 function summarizeSyncAttention(
@@ -201,6 +208,10 @@ function summarizeSyncAttention(
     return summarizeSyncErrors(errors);
   }
   return summarizeSyncSkipped(skipped);
+}
+
+function isAutoIndexingSkip(skip: WalletSyncSkip): boolean {
+  return skip.reason === "INDEXING_IN_PROGRESS";
 }
 
 // ── CopyField ─────────────────────────────────────────────────────────────
@@ -1659,6 +1670,10 @@ function ReceivingInstructions({
   syncStatus,
 }: ReceivingInstructionsProps) {
   const isSyncing = syncStatus.kind === "syncing";
+  const skipped = syncStatus.kind === "partial" ? syncStatus.skipped : [];
+  const indexingSkips = skipped.filter(isAutoIndexingSkip);
+  const setupSkips = skipped.filter((skip) => !isAutoIndexingSkip(skip));
+  const onlyAutoIndexing = skipped.length > 0 && setupSkips.length === 0;
 
   return (
     <motion.div
@@ -1712,7 +1727,9 @@ function ReceivingInstructions({
             >
               <Info className="w-3.5 h-3.5 shrink-0" />
               {syncStatus.skipped.length > 0
-                ? `${syncStatus.skipped.length} need index setup`
+                ? onlyAutoIndexing
+                  ? `${indexingSkips.length} indexing`
+                  : `${setupSkips.length} need setup`
                 : syncStatus.newCount > 0
                   ? `${syncStatus.newCount} synced; some warnings`
                   : "Some collections need attention"}
@@ -1790,13 +1807,14 @@ function ReceivingInstructions({
                 <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-foreground">
-                    Automatic discovery needs ownership indexing
+                    {onlyAutoIndexing
+                      ? "Automatic discovery is indexing"
+                      : "Some collections need discovery setup"}
                   </p>
                   <p className="text-xs leading-relaxed text-muted-foreground">
-                    Sync finished its fast checks. These imported collections
-                    need an admin index pass before new NFTs can be found
-                    automatically; known token IDs can still be imported
-                    directly.
+                    {onlyAutoIndexing
+                      ? "Sync started automatic ownership indexing for these imported collections. Click Sync again shortly to continue; known token IDs can still be imported directly."
+                      : "Sync tried automatic ownership indexing, but these imported collections need extra setup before new NFTs can be found automatically. Known token IDs can still be imported directly."}
                   </p>
                 </div>
               </div>
@@ -1811,10 +1829,10 @@ function ReceivingInstructions({
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {skip.message ||
-                        "Needs ownership indexing for automatic discovery."}
+                        "Automatic discovery is still catching up for this collection."}
                     </p>
                   </div>
-                  {onIndexCollection ? (
+                  {!isAutoIndexingSkip(skip) && onIndexCollection ? (
                     <Button
                       size="sm"
                       variant="outline"
@@ -1825,15 +1843,17 @@ function ReceivingInstructions({
                     </Button>
                   ) : (
                     <Badge variant="secondary" className="shrink-0">
-                      Admin can index
+                      {isAutoIndexingSkip(skip) ? "Indexing" : "Needs setup"}
                     </Badge>
                   )}
                 </div>
               ))}
               {syncStatus.skipped.length > 4 && (
                 <p className="text-xs text-muted-foreground">
-                  {syncStatus.skipped.length - 4} more collections need
-                  ownership indexing.
+                  {syncStatus.skipped.length - 4} more collections{" "}
+                  {onlyAutoIndexing
+                    ? "are indexing automatically."
+                    : "need discovery setup."}
                 </p>
               )}
             </div>
@@ -2384,12 +2404,18 @@ export default function WalletPage() {
         const syncSkipped = result.ok.skipped.filter(
           (item) => item.collectionName.trim().length > 0,
         );
+        const indexingSkipped = syncSkipped.filter(isAutoIndexingSkip);
+        const setupSkipped = syncSkipped.filter(
+          (item) => !isAutoIndexingSkip(item),
+        );
+        const onlyAutoIndexing =
+          syncSkipped.length > 0 && setupSkipped.length === 0;
         if (syncErrors.length > 0) {
           console.warn("[syncUserNFTs] collection errors:", syncErrors);
         }
         if (import.meta.env.DEV && syncSkipped.length > 0) {
           console.debug(
-            "[syncUserNFTs] collections need ownership indexing for automatic discovery:",
+            "[syncUserNFTs] collections need automatic discovery follow-up:",
             syncSkipped,
           );
         }
@@ -2414,14 +2440,23 @@ export default function WalletPage() {
                 {
                   description:
                     syncSkipped.length > 0
-                      ? `${syncSkipped.length} collection(s) need ownership indexing for automatic discovery.`
+                      ? onlyAutoIndexing
+                        ? `${indexingSkipped.length} collection(s) are still indexing automatically.`
+                        : `${setupSkipped.length} collection(s) need extra discovery setup.`
                       : "Some collections could not be checked.",
                 },
               );
             } else if (syncErrors.length === 0 && syncSkipped.length > 0) {
-              toast("Wallet sync complete", {
-                description: `${syncSkipped.length} collection(s) need ownership indexing before automatic discovery can find new NFTs.`,
-              });
+              toast(
+                onlyAutoIndexing
+                  ? "Wallet sync is indexing imported collections"
+                  : "Wallet sync complete",
+                {
+                  description: onlyAutoIndexing
+                    ? "Automatic discovery is catching up in small batches. Click Sync again shortly, or import a known token ID directly."
+                    : `${setupSkipped.length} collection(s) need extra discovery setup before automatic discovery can find new NFTs.`,
+                },
+              );
             } else {
               toast("Sync finished with collection warnings", {
                 description: warningMessage,
@@ -2490,7 +2525,7 @@ export default function WalletPage() {
             setSyncStatus({ kind: "syncing", slow: true });
             toast("Wallet sync is still running", {
               description:
-                "Mintlab will keep refreshing your wallet. For older EXT collections, importing a known token ID is the fastest path.",
+                "Mintlab will keep refreshing your wallet while automatic indexing catches up. Importing a known token ID still works immediately.",
             });
           }
           rawSyncPromise

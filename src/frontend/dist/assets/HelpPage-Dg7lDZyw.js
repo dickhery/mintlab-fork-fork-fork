@@ -1,8 +1,8 @@
-import { c as createLucideIcon, r as reactExports, N as useRouterState, j as jsxRuntimeExports, O as Link, B as Button, W as Wallet, t as CircleDollarSign, T as CreditCard, S as ShoppingBag, G as Grid3x3, C as CircleHelp, m as motion } from "./index-FlqJKsFj.js";
-import { B as Badge, I as Input } from "./badge-DW0Kgz5Q.js";
-import { S as Search, a as ShieldCheck } from "./shield-check-CaFbmdHL.js";
-import { A as ArrowRight } from "./arrow-right-CNmAFIV9.js";
-import { C as CircleCheck } from "./circle-check-CgMDu5zx.js";
+import { c as createLucideIcon, r as reactExports, N as useRouterState, j as jsxRuntimeExports, O as Link, B as Button, W as Wallet, t as CircleDollarSign, T as CreditCard, S as ShoppingBag, G as Grid3x3, C as CircleHelp, m as motion } from "./index-BfhsZBFS.js";
+import { B as Badge, I as Input } from "./badge-w58N1pmI.js";
+import { S as Search, a as ShieldCheck } from "./shield-check-DWOqwDfQ.js";
+import { A as ArrowRight } from "./arrow-right-DcKUfRt5.js";
+import { C as CircleCheck } from "./circle-check-BygXReeH.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -290,7 +290,7 @@ const faqItems = [
   },
   {
     question: "Why is my NFT not showing after a transfer?",
-    answer: "Use Wallet Sync first. If the collection needs ownership indexing or you know the token ID, use Import NFT to register that exact token."
+    answer: "Use Wallet Sync first. Mintlab indexes imported collections automatically in small batches. If you know the token ID, use Import NFT to register that exact token immediately."
   },
   {
     question: "What happens if I remove Mintlab as a controller?",
