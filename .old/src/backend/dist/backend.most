@@ -324,6 +324,9 @@ type WalletNFT__72979044 =
     tokenId : Text
   };
 actor {
+  stable AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat;
+  stable AUTO_INDEX_PAGE_LIMIT : Nat;
+  stable IMPORT_INDEX_WARM_PAGE_LIMIT : Nat;
   stable authState : {var adminPrincipal : ?Principal};
   stable collectionCreationPayoutSplitState :
     {
