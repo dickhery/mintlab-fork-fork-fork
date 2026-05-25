@@ -79,6 +79,7 @@ import { toast } from "sonner";
 
 const E8S = 100_000_000n;
 const MAX_MARKETPLACE_FEE_BASIS_POINTS = 9_999n;
+const PAYOUT_BASIS_POINTS_TOTAL = 10_000n;
 const APP_LOW_CYCLES_THRESHOLD = 1_000_000_000_000n;
 const MIN_COLLECTION_CANISTER_CYCLES = 2_000_000_000_000n;
 const MAX_ON_CHAIN_IMAGE_CHARS = 1_900_000;
@@ -340,6 +341,10 @@ function formatMarketplaceFeePercent(basisPoints: bigint): string {
   return trimmedFrac ? `${whole}.${trimmedFrac}` : whole.toString();
 }
 
+function formatPayoutPercent(basisPoints: bigint): string {
+  return formatMarketplaceFeePercent(basisPoints);
+}
+
 function formatCycles(cycles: bigint): string {
   const trillion = 1_000_000_000_000n;
   if (cycles < trillion) return cycles.toString();
@@ -364,6 +369,18 @@ function parseMarketplaceFeePercentToBasisPoints(value: string): bigint | null {
   const basisPoints =
     BigInt(wholePart) * 100n + BigInt(`${fracPart}00`.slice(0, 2));
   if (basisPoints === 0n || basisPoints > MAX_MARKETPLACE_FEE_BASIS_POINTS) {
+    return null;
+  }
+  return basisPoints;
+}
+
+function parsePayoutPercentToBasisPoints(value: string): bigint | null {
+  const trimmed = value.trim();
+  if (!trimmed || !/^\d+(\.\d{0,2})?$/.test(trimmed)) return null;
+  const [wholePart, fracPart = ""] = trimmed.split(".");
+  const basisPoints =
+    BigInt(wholePart) * 100n + BigInt(`${fracPart}00`.slice(0, 2));
+  if (basisPoints < 0n || basisPoints > PAYOUT_BASIS_POINTS_TOTAL) {
     return null;
   }
   return basisPoints;
@@ -1848,6 +1865,18 @@ function MintConfigForm() {
   const [imageUrl, setImageUrl] = useState("");
   const [imageFileName, setImageFileName] = useState("");
   const [collectionCreationPayout, setCollectionCreationPayout] = useState("");
+  const [
+    collectionCreationSecondaryPayout,
+    setCollectionCreationSecondaryPayout,
+  ] = useState("");
+  const [
+    collectionCreationPrimaryPayoutPercent,
+    setCollectionCreationPrimaryPayoutPercent,
+  ] = useState("100");
+  const [
+    collectionCreationSecondaryPayoutPercent,
+    setCollectionCreationSecondaryPayoutPercent,
+  ] = useState("0");
   const [collectionCreationPrice, setCollectionCreationPrice] = useState("");
   const [collectionCreationEnabled, setCollectionCreationEnabled] =
     useState(false);
@@ -1917,10 +1946,22 @@ function MintConfigForm() {
   const parsedCollectionCanisterCycles = parseWholeBigInt(
     collectionCanisterCycles,
   );
+  const parsedPrimaryPayoutBasisPoints = parsePayoutPercentToBasisPoints(
+    collectionCreationPrimaryPayoutPercent,
+  );
+  const parsedSecondaryPayoutBasisPoints = parsePayoutPercentToBasisPoints(
+    collectionCreationSecondaryPayoutPercent,
+  );
+  const payoutPercentagesValid =
+    parsedPrimaryPayoutBasisPoints !== null &&
+    parsedSecondaryPayoutBasisPoints !== null &&
+    parsedPrimaryPayoutBasisPoints + parsedSecondaryPayoutBasisPoints ===
+      PAYOUT_BASIS_POINTS_TOTAL;
   const canQuoteCreationCost =
     !!actor &&
     parsedCreationPriceE8s !== null &&
-    parsedCollectionCanisterCycles !== null;
+    parsedCollectionCanisterCycles !== null &&
+    payoutPercentagesValid;
 
   const {
     data: creationQuote,
@@ -1931,18 +1972,24 @@ function MintConfigForm() {
       "collectionCreationQuote",
       collectionCreationPrice.trim(),
       collectionCanisterCycles.trim(),
+      collectionCreationPrimaryPayoutPercent.trim(),
+      collectionCreationSecondaryPayoutPercent.trim(),
     ],
     queryFn: async () => {
       if (
         !actor ||
         parsedCreationPriceE8s === null ||
-        parsedCollectionCanisterCycles === null
+        parsedCollectionCanisterCycles === null ||
+        parsedPrimaryPayoutBasisPoints === null ||
+        parsedSecondaryPayoutBasisPoints === null
       ) {
         return null;
       }
       return actor.quoteCollectionCreationCost(
         parsedCollectionCanisterCycles,
         parsedCreationPriceE8s,
+        parsedPrimaryPayoutBasisPoints,
+        parsedSecondaryPayoutBasisPoints,
       );
     },
     enabled: canQuoteCreationCost,
@@ -1977,6 +2024,21 @@ function MintConfigForm() {
       mintConfig.collectionCreationPayoutAccount
         ? accountIdToHex(mintConfig.collectionCreationPayoutAccount)
         : "",
+    );
+    setCollectionCreationSecondaryPayout(
+      mintConfig.collectionCreationSecondaryPayoutAccount
+        ? accountIdToHex(mintConfig.collectionCreationSecondaryPayoutAccount)
+        : "",
+    );
+    setCollectionCreationPrimaryPayoutPercent(
+      formatPayoutPercent(
+        mintConfig.collectionCreationPrimaryPayoutBasisPoints,
+      ),
+    );
+    setCollectionCreationSecondaryPayoutPercent(
+      formatPayoutPercent(
+        mintConfig.collectionCreationSecondaryPayoutBasisPoints,
+      ),
     );
     setCollectionCreationPrice(
       mintConfig.collectionCreationPriceE8s > 0n
@@ -2037,12 +2099,28 @@ function MintConfigForm() {
       const creationPriceE8s = parseICPToE8s(collectionCreationPrice);
       const mainMintPriceE8s = parseICPToE8s(mainMintPrice);
       const cycles = parseWholeBigInt(collectionCanisterCycles);
+      const primaryPayoutBasisPoints = parsePayoutPercentToBasisPoints(
+        collectionCreationPrimaryPayoutPercent,
+      );
+      const secondaryPayoutBasisPoints = parsePayoutPercentToBasisPoints(
+        collectionCreationSecondaryPayoutPercent,
+      );
       if (creationPriceE8s === null)
         throw new Error("Collection creation fee must be a valid ICP amount");
       if (mainMintPriceE8s === null)
         throw new Error("Main mint price must be a valid ICP amount");
       if (cycles === null)
         throw new Error("Collection canister cycles must be a whole number");
+      if (
+        primaryPayoutBasisPoints === null ||
+        secondaryPayoutBasisPoints === null ||
+        primaryPayoutBasisPoints + secondaryPayoutBasisPoints !==
+          PAYOUT_BASIS_POINTS_TOTAL
+      ) {
+        throw new Error(
+          "Collection creation payout percentages must add up to 100%",
+        );
+      }
       if (
         collectionCreationEnabled &&
         creationQuote &&
@@ -2055,11 +2133,21 @@ function MintConfigForm() {
         );
       }
 
-      const creationPayoutRequired = creationQuote
-        ? creationQuote.adminPayoutE8s > 0n
-        : creationPriceE8s > 0n;
-      const creationPayout = creationPayoutRequired
+      const primaryPayoutRequired = creationQuote
+        ? creationQuote.adminPrimaryPayoutE8s > 0n
+        : creationPriceE8s > 0n && primaryPayoutBasisPoints > 0n;
+      const secondaryPayoutRequired = creationQuote
+        ? creationQuote.adminSecondaryPayoutE8s > 0n ||
+          secondaryPayoutBasisPoints > 0n
+        : secondaryPayoutBasisPoints > 0n;
+      const creationPayout = primaryPayoutRequired
         ? validateAccountId(collectionCreationPayout, "collection creation")
+        : null;
+      const secondaryCreationPayout = secondaryPayoutRequired
+        ? validateAccountId(
+            collectionCreationSecondaryPayout,
+            "secondary collection creation",
+          )
         : null;
       const mintPayout =
         mainMintPriceE8s > 0n
@@ -2072,6 +2160,9 @@ function MintConfigForm() {
         symbol.trim().toUpperCase(),
         imageUrl,
         creationPayout,
+        secondaryCreationPayout,
+        primaryPayoutBasisPoints,
+        secondaryPayoutBasisPoints,
         creationPriceE8s,
         collectionCreationEnabled,
         mintPayout,
@@ -2420,19 +2511,70 @@ function MintConfigForm() {
             <p className="text-sm font-semibold text-foreground">
               User Collection Creation
             </p>
-            <div className="space-y-1.5">
-              <Label htmlFor="creation-payout">
-                Creation payout account ID
-              </Label>
-              <Input
-                id="creation-payout"
-                value={collectionCreationPayout}
-                onChange={(e) => setCollectionCreationPayout(e.target.value)}
-                placeholder="64-character ICP account hex"
-                className="font-mono text-xs"
-                data-ocid="admin.mint_config.creation_payout_input"
-              />
+            <div className="grid grid-cols-1 xl:grid-cols-[1fr_7rem] gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="creation-payout">
+                  Primary payout account ID
+                </Label>
+                <Input
+                  id="creation-payout"
+                  value={collectionCreationPayout}
+                  onChange={(e) => setCollectionCreationPayout(e.target.value)}
+                  placeholder="64-character ICP account hex"
+                  className="font-mono text-xs"
+                  data-ocid="admin.mint_config.creation_payout_input"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="creation-primary-percent">Share (%)</Label>
+                <Input
+                  id="creation-primary-percent"
+                  value={collectionCreationPrimaryPayoutPercent}
+                  onChange={(e) =>
+                    setCollectionCreationPrimaryPayoutPercent(e.target.value)
+                  }
+                  placeholder="100"
+                  inputMode="decimal"
+                  data-ocid="admin.mint_config.creation_primary_percent_input"
+                />
+              </div>
             </div>
+            <div className="grid grid-cols-1 xl:grid-cols-[1fr_7rem] gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="creation-secondary-payout">
+                  Secondary payout account ID
+                </Label>
+                <Input
+                  id="creation-secondary-payout"
+                  value={collectionCreationSecondaryPayout}
+                  onChange={(e) =>
+                    setCollectionCreationSecondaryPayout(e.target.value)
+                  }
+                  placeholder="Optional 64-character ICP account hex"
+                  className="font-mono text-xs"
+                  data-ocid="admin.mint_config.creation_secondary_payout_input"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="creation-secondary-percent">Share (%)</Label>
+                <Input
+                  id="creation-secondary-percent"
+                  value={collectionCreationSecondaryPayoutPercent}
+                  onChange={(e) =>
+                    setCollectionCreationSecondaryPayoutPercent(e.target.value)
+                  }
+                  placeholder="0"
+                  inputMode="decimal"
+                  data-ocid="admin.mint_config.creation_secondary_percent_input"
+                />
+              </div>
+            </div>
+            {!payoutPercentagesValid && (
+              <div className="flex items-start gap-2 rounded-md border border-destructive/20 bg-destructive/5 p-2 text-xs text-destructive">
+                <AlertCircle size={14} className="mt-0.5 shrink-0" />
+                <span>Payout shares must add up to 100%.</span>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="creation-price">Creation fee (ICP)</Label>
               <Input
@@ -2470,7 +2612,25 @@ function MintConfigForm() {
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-muted-foreground">Admin receives</span>
+                  <span className="text-muted-foreground">
+                    Primary payout receives
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {formatICP(creationQuote.adminPrimaryPayoutE8s)} ICP
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">
+                    Secondary payout receives
+                  </span>
+                  <span className="font-medium text-foreground">
+                    {formatICP(creationQuote.adminSecondaryPayoutE8s)} ICP
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">
+                    Total payout remainder
+                  </span>
                   <span className="font-medium text-foreground">
                     {formatICP(creationQuote.adminPayoutE8s)} ICP
                   </span>

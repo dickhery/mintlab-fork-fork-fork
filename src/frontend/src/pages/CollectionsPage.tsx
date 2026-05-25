@@ -640,12 +640,18 @@ function CreateCollectionCard({
       "collectionCreationQuote",
       mintConfig?.collectionCanisterCycles.toString() ?? "none",
       mintConfig?.collectionCreationPriceE8s.toString() ?? "none",
+      mintConfig?.collectionCreationPrimaryPayoutBasisPoints.toString() ??
+        "none",
+      mintConfig?.collectionCreationSecondaryPayoutBasisPoints.toString() ??
+        "none",
     ],
     queryFn: async () => {
       if (!actor || !mintConfig) return null;
       return actor.quoteCollectionCreationCost(
         mintConfig.collectionCanisterCycles,
         mintConfig.collectionCreationPriceE8s,
+        mintConfig.collectionCreationPrimaryPayoutBasisPoints,
+        mintConfig.collectionCreationSecondaryPayoutBasisPoints,
       );
     },
     enabled: !!actor && !!mintConfig,
@@ -791,9 +797,11 @@ function CreateCollectionCard({
                   Mintlab attaches those cycles to the IC canister creation call
                   so the new collection canister receives about{" "}
                   {formatCycles(creationQuote.collectionCanisterCycles)} after
-                  the IC creation fee, and{" "}
-                  {formatICP(creationQuote.adminPayoutE8s)} ICP goes to the
-                  admin payout account. Ledger fees bring the total debit to{" "}
+                  the IC creation fee, and the remaining{" "}
+                  {formatICP(creationQuote.adminPayoutE8s)} ICP is split across
+                  the configured payout account
+                  {creationQuote.adminSecondaryPayoutE8s > 0n ? "s" : ""}.
+                  Ledger fees bring the total debit to{" "}
                   {formatICP(creationQuote.totalUserDebitE8s)} ICP.
                 </>
               ) : (
@@ -950,6 +958,12 @@ function CreateCollectionCard({
             label: "New canister cycles after fee",
             value: creationQuote
               ? formatCycles(creationQuote.collectionCanisterCycles)
+              : "Loading",
+          },
+          {
+            label: "Payout remainder",
+            value: creationQuote
+              ? `${formatICP(creationQuote.adminPayoutE8s)} ICP`
               : "Loading",
           },
           {

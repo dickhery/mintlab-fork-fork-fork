@@ -6,7 +6,7 @@ module {
   public type AccountIdentifier = CommonTypes.AccountIdentifier;
   public type CollectionId = CollectionTypes.CollectionId;
 
-  public type MintConfig = {
+  public type StoredMintConfig = {
     collectionId : ?CollectionId;
     payoutAccount : ?AccountIdentifier;
     mintPriceE8s : Nat64;
@@ -19,6 +19,38 @@ module {
     mainMintEnabled : Bool;
     collectionCanisterWasmUploaded : Bool;
     collectionCanisterCycles : Nat;
+  };
+
+  public type MintConfig = {
+    collectionId : ?CollectionId;
+    payoutAccount : ?AccountIdentifier;
+    mintPriceE8s : Nat64;
+    mintEnabled : Bool;
+    collectionCreationPayoutAccount : ?AccountIdentifier;
+    collectionCreationSecondaryPayoutAccount : ?AccountIdentifier;
+    collectionCreationPrimaryPayoutBasisPoints : Nat;
+    collectionCreationSecondaryPayoutBasisPoints : Nat;
+    collectionCreationPriceE8s : Nat64;
+    collectionCreationEnabled : Bool;
+    mainMintPayoutAccount : ?AccountIdentifier;
+    mainMintPriceE8s : Nat64;
+    mainMintEnabled : Bool;
+    collectionCanisterWasmUploaded : Bool;
+    collectionCanisterCycles : Nat;
+  };
+
+  public type CollectionCreationPayoutSplitConfig = {
+    secondaryPayoutAccount : ?AccountIdentifier;
+    primaryPayoutBasisPoints : Nat;
+    secondaryPayoutBasisPoints : Nat;
+  };
+
+  public type CollectionCreationRequestPayout = {
+    requestId : Nat;
+    primaryPayoutE8s : Nat64;
+    secondaryPayoutE8s : Nat64;
+    secondaryPayoutAccount : ?AccountIdentifier;
+    secondaryPayoutBlock : ?Nat64;
   };
 
   public type ModerationCategorySettings = {
@@ -56,6 +88,8 @@ module {
     minimumCreationPriceE8s : Nat64;
     collectionCreationPriceE8s : Nat64;
     adminPayoutE8s : Nat64;
+    adminPrimaryPayoutE8s : Nat64;
+    adminSecondaryPayoutE8s : Nat64;
     ledgerFeeE8s : Nat64;
     cycleTransferFeeE8s : Nat64;
     adminPayoutFeeE8s : Nat64;

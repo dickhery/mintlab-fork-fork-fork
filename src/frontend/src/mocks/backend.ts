@@ -650,6 +650,9 @@ export const mockBackend: backendInterface = {
     mintPriceE8s: BigInt(100_000_000),
     mintEnabled: true,
     collectionCreationPayoutAccount: mockAccountId,
+    collectionCreationSecondaryPayoutAccount: null,
+    collectionCreationPrimaryPayoutBasisPoints: 10_000n,
+    collectionCreationSecondaryPayoutBasisPoints: 0n,
     collectionCreationPriceE8s: BigInt(100_000_000),
     collectionCreationEnabled: true,
     mainMintPayoutAccount: mockAccountId,
@@ -713,6 +716,8 @@ export const mockBackend: backendInterface = {
   quoteCollectionCreationCost: async (
     collectionCanisterCycles,
     collectionCreationPriceE8s,
+    _collectionCreationPrimaryPayoutBasisPoints,
+    collectionCreationSecondaryPayoutBasisPoints,
   ) => {
     const minimumCollectionCanisterCycles = 2_000_000_000_000n;
     const normalizedCollectionCanisterCycles =
@@ -727,7 +732,15 @@ export const mockBackend: backendInterface = {
       collectionCreationPriceE8s > cycleCostE8s
         ? collectionCreationPriceE8s - cycleCostE8s
         : 0n;
-    const adminPayoutFeeE8s = adminPayoutE8s > 0n ? 10_000n : 0n;
+    const adminSecondaryPayoutE8s =
+      (adminPayoutE8s * collectionCreationSecondaryPayoutBasisPoints) /
+      10_000n;
+    const adminPrimaryPayoutE8s =
+      adminPayoutE8s - adminSecondaryPayoutE8s;
+    const adminPayoutTransferCount =
+      (adminPrimaryPayoutE8s > 0n ? 1n : 0n) +
+      (adminSecondaryPayoutE8s > 0n ? 1n : 0n);
+    const adminPayoutFeeE8s = adminPayoutTransferCount * 10_000n;
     return {
       collectionCanisterCycles: normalizedCollectionCanisterCycles,
       factoryReserveCycles,
@@ -736,6 +749,8 @@ export const mockBackend: backendInterface = {
       minimumCreationPriceE8s: cycleCostE8s,
       collectionCreationPriceE8s,
       adminPayoutE8s,
+      adminPrimaryPayoutE8s,
+      adminSecondaryPayoutE8s,
       ledgerFeeE8s: 10_000n,
       cycleTransferFeeE8s: 10_000n,
       adminPayoutFeeE8s,

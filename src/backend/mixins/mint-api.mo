@@ -30,6 +30,7 @@ import Time "mo:core/Time";
 mixin (
   mintState : MintLib.MintState,
   collectionCreationState : MintLib.CollectionCreationState,
+  collectionCreationPayoutSplitState : MintLib.CollectionCreationPayoutSplitState,
   moderationState : MintLib.ModerationState,
   collectionsState : CollectionsLib.CollectionsState,
   walletState : WalletLib.WalletState,
@@ -252,6 +253,7 @@ mixin (
   // Keep Base64 image moderation comfortably below IC outcall payload limits.
   transient let MODERATION_MAX_IMAGE_DATA_URL_CHARS : Nat = 450_000;
   transient let MODERATION_MAX_REQUEST_BODY_BYTES : Nat = 600_000;
+  transient let PAYOUT_BASIS_POINTS_TOTAL : Nat = 10_000;
   transient var moderationImageNonce : Nat = 0;
 
   func acquireUserPaymentLockResult(user : Principal) : ?Text {
@@ -314,7 +316,7 @@ mixin (
   };
 
   public query func getMintConfig() : async MintTypes.MintConfig {
-    MintLib.getConfig(mintState);
+    MintLib.getPublicConfig(mintState, collectionCreationPayoutSplitState);
   };
 
   public query func getModerationConfig() : async MintTypes.PublicModerationConfig {
@@ -472,10 +474,18 @@ mixin (
   public func quoteCollectionCreationCost(
     collectionCanisterCycles : Nat,
     collectionCreationPriceE8s : Nat64,
+    collectionCreationPrimaryPayoutBasisPoints : Nat,
+    collectionCreationSecondaryPayoutBasisPoints : Nat,
   ) : async MintTypes.CollectionCreationQuote {
+    validateCollectionCreationPayoutShares(
+      collectionCreationPrimaryPayoutBasisPoints,
+      collectionCreationSecondaryPayoutBasisPoints,
+    );
     await collectionCreationQuoteFor(
       normalizedCollectionCanisterCycles(collectionCanisterCycles),
       collectionCreationPriceE8s,
+      collectionCreationPrimaryPayoutBasisPoints,
+      collectionCreationSecondaryPayoutBasisPoints,
     );
   };
 
@@ -766,7 +776,12 @@ mixin (
       case (?_) {};
     };
     let quote = try {
-      await collectionCreationQuoteFor(canisterCycles, config.collectionCreationPriceE8s);
+      await collectionCreationQuoteFor(
+        canisterCycles,
+        config.collectionCreationPriceE8s,
+        MintLib.collectionCreationPrimaryPayoutBasisPoints(collectionCreationPayoutSplitState),
+        MintLib.collectionCreationSecondaryPayoutBasisPoints(collectionCreationPayoutSplitState),
+      );
     } catch (error) {
       return #err("Could not fetch the ICP-to-cycles conversion rate: " # Error.message(error));
     };
@@ -781,6 +796,7 @@ mixin (
       try {
         let request = MintLib.beginRecoveredCollectionCreationRequest(
           collectionCreationState,
+          collectionCreationPayoutSplitState,
           owner,
           cyclePaymentBlock,
           name,
@@ -1013,6 +1029,9 @@ mixin (
     symbol : Text,
     imageUrl : Text,
     collectionCreationPayoutAccount : ?MintTypes.AccountIdentifier,
+    collectionCreationSecondaryPayoutAccount : ?MintTypes.AccountIdentifier,
+    collectionCreationPrimaryPayoutBasisPoints : Nat,
+    collectionCreationSecondaryPayoutBasisPoints : Nat,
     collectionCreationPriceE8s : Nat64,
     collectionCreationEnabled : Bool,
     mainMintPayoutAccount : ?MintTypes.AccountIdentifier,
@@ -1024,6 +1043,16 @@ mixin (
     if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
     if (not AuthLib.isAdmin(authState, caller)) Runtime.trap("Unauthorized: admin only");
     validateCollectionProfile(name, description, symbol, imageUrl);
+    validateOptionalAccountIdentifier(collectionCreationPayoutAccount, "Collection creation primary payout account");
+    validateOptionalAccountIdentifier(collectionCreationSecondaryPayoutAccount, "Collection creation secondary payout account");
+    validateOptionalAccountIdentifier(mainMintPayoutAccount, "Main collection mint payout account");
+    validateCollectionCreationPayoutShares(
+      collectionCreationPrimaryPayoutBasisPoints,
+      collectionCreationSecondaryPayoutBasisPoints,
+    );
+    if (collectionCreationSecondaryPayoutBasisPoints > 0 and collectionCreationSecondaryPayoutAccount == null) {
+      Runtime.trap("Collection creation secondary payout account is required when its split is greater than 0%");
+    };
     let collection = switch (MintLib.getConfig(mintState).collectionId) {
       case (?collectionId) {
         switch (
@@ -1074,8 +1103,12 @@ mixin (
     };
     MintLib.configure(
       mintState,
+      collectionCreationPayoutSplitState,
       ?collection.id,
       collectionCreationPayoutAccount,
+      collectionCreationSecondaryPayoutAccount,
+      collectionCreationPrimaryPayoutBasisPoints,
+      collectionCreationSecondaryPayoutBasisPoints,
       collectionCreationPriceE8s,
       collectionCreationEnabled,
       mainMintPayoutAccount,
@@ -1128,7 +1161,12 @@ mixin (
       case null {};
     };
     let quote = try {
-      await collectionCreationQuoteFor(canisterCycles, config.collectionCreationPriceE8s);
+      await collectionCreationQuoteFor(
+        canisterCycles,
+        config.collectionCreationPriceE8s,
+        MintLib.collectionCreationPrimaryPayoutBasisPoints(collectionCreationPayoutSplitState),
+        MintLib.collectionCreationSecondaryPayoutBasisPoints(collectionCreationPayoutSplitState),
+      );
     } catch (error) {
       return #err("Could not fetch the ICP-to-cycles conversion rate: " # Error.message(error));
     };
@@ -1139,12 +1177,25 @@ mixin (
         " e8s"
       );
     };
-    let payoutAccount = if (quote.adminPayoutE8s > 0) {
+    let payoutAccount = if (quote.adminPrimaryPayoutE8s > 0) {
       switch (config.collectionCreationPayoutAccount) {
-        case null return #err("The collection creation payout account has not been configured");
+        case null return #err("The collection creation primary payout account has not been configured");
         case (?value) {
           if (value.size() != 32) {
-            return #err("The collection creation payout account must be a 32-byte ICP account identifier");
+            return #err("The collection creation primary payout account must be a 32-byte ICP account identifier");
+          };
+          ?value;
+        };
+      };
+    } else {
+      null;
+    };
+    let secondaryPayoutAccount = if (quote.adminSecondaryPayoutE8s > 0) {
+      switch (MintLib.getPayoutSplitConfig(collectionCreationPayoutSplitState).secondaryPayoutAccount) {
+        case null return #err("The collection creation secondary payout account has not been configured");
+        case (?value) {
+          if (value.size() != 32) {
+            return #err("The collection creation secondary payout account must be a 32-byte ICP account identifier");
           };
           ?value;
         };
@@ -1191,6 +1242,7 @@ mixin (
       try {
         let request = MintLib.beginCollectionCreationRequest(
           collectionCreationState,
+          collectionCreationPayoutSplitState,
           caller,
           name,
           description,
@@ -1199,6 +1251,7 @@ mixin (
           dividendsEnabled,
           quote,
           payoutAccount,
+          secondaryPayoutAccount,
         );
         await resumeCollectionCreationInternal(caller, request.id);
       } finally {
@@ -1485,7 +1538,12 @@ mixin (
     let config = MintLib.getConfig(mintState);
     let canisterCycles = normalizedCollectionCanisterCycles(config.collectionCanisterCycles);
     let quote = try {
-      await collectionCreationQuoteFor(canisterCycles, config.collectionCreationPriceE8s);
+      await collectionCreationQuoteFor(
+        canisterCycles,
+        config.collectionCreationPriceE8s,
+        MintLib.collectionCreationPrimaryPayoutBasisPoints(collectionCreationPayoutSplitState),
+        MintLib.collectionCreationSecondaryPayoutBasisPoints(collectionCreationPayoutSplitState),
+      );
     } catch (error) {
       return #err("Could not fetch the ICP-to-cycles conversion rate: " # Error.message(error));
     };
@@ -1497,7 +1555,7 @@ mixin (
       );
     };
 
-    switch (MintLib.repairCollectionCreationRequestCycles(collectionCreationState, requestId, quote)) {
+    switch (MintLib.repairCollectionCreationRequestCycles(collectionCreationState, collectionCreationPayoutSplitState, requestId, quote)) {
       case null #err("Collection creation request not found");
       case (?updated) #ok(MintLib.collectionCreationRequestView(updated));
     };
@@ -3318,6 +3376,29 @@ mixin (
     null;
   };
 
+  func validateOptionalAccountIdentifier(
+    account : ?MintTypes.AccountIdentifier,
+    accountLabel : Text,
+  ) {
+    switch (account) {
+      case null {};
+      case (?value) {
+        if (value.size() != 32) {
+          Runtime.trap(accountLabel # " must be a 32-byte ICP account identifier");
+        };
+      };
+    };
+  };
+
+  func validateCollectionCreationPayoutShares(
+    primaryBasisPoints : Nat,
+    secondaryBasisPoints : Nat,
+  ) {
+    if (primaryBasisPoints + secondaryBasisPoints != PAYOUT_BASIS_POINTS_TOTAL) {
+      Runtime.trap("Collection creation payout percentages must add up to 100%");
+    };
+  };
+
   func transferResultBlock(
     result : CommonTypes.TransferResult
   ) : { #ok : Nat64; #err : Text } {
@@ -3413,44 +3494,96 @@ mixin (
   };
 
   func settleCollectionCreationAdminPayout(requestId : Nat) : async () {
-    let request = switch (MintLib.getCollectionCreationRequest(collectionCreationState, requestId)) {
+    var request = switch (MintLib.getCollectionCreationRequest(collectionCreationState, requestId)) {
       case null return;
       case (?value) value;
     };
-    if (request.adminPayoutE8s == 0 or request.adminPayoutBlock != null) {
+    var primaryPayoutE8s = MintLib.collectionCreationPrimaryAdminPayoutE8s(collectionCreationPayoutSplitState, request);
+    var secondaryPayoutE8s = MintLib.collectionCreationSecondaryAdminPayoutE8s(collectionCreationPayoutSplitState, request);
+    if (
+      request.adminPayoutE8s == 0 or
+      (
+        (primaryPayoutE8s == 0 or request.adminPayoutBlock != null) and
+        (secondaryPayoutE8s == 0 or MintLib.collectionCreationSecondaryAdminPayoutBlock(collectionCreationPayoutSplitState, request) != null)
+      )
+    ) {
       return;
     };
-    let payoutAccount = switch (request.adminPayoutAccount) {
-      case null {
-        ignore MintLib.markCollectionCreationError(
-          collectionCreationState,
-          requestId,
-          "Admin payout pending: collection creation payout account is not configured",
-        );
-        return;
+    if (primaryPayoutE8s > 0 and request.adminPayoutBlock == null) {
+      let payoutAccount = switch (request.adminPayoutAccount) {
+        case null {
+          ignore MintLib.markCollectionCreationError(
+            collectionCreationState,
+            requestId,
+            "Admin payout pending: collection creation primary payout account is not configured",
+          );
+          return;
+        };
+        case (?value) value;
       };
-      case (?value) value;
+      let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+      let userSubaccount = IcpLib.principalToSubaccount(request.owner);
+      let payoutResult = await* IcpLib.transferOutAt(
+        ledger,
+        ?userSubaccount,
+        payoutAccount,
+        primaryPayoutE8s,
+        Nat64.fromNat(request.id),
+        request.createdAt + 1,
+      );
+      switch (transferResultBlock(payoutResult)) {
+        case (#ok(blockIndex)) {
+          ignore MintLib.markCollectionCreationAdminPayout(collectionCreationState, collectionCreationPayoutSplitState, requestId, blockIndex);
+        };
+        case (#err(message)) {
+          ignore MintLib.markCollectionCreationError(
+            collectionCreationState,
+            requestId,
+            "Admin primary payout pending: " # message,
+          );
+          return;
+        };
+      };
+      request := switch (MintLib.getCollectionCreationRequest(collectionCreationState, requestId)) {
+        case null return;
+        case (?value) value;
+      };
+      primaryPayoutE8s := MintLib.collectionCreationPrimaryAdminPayoutE8s(collectionCreationPayoutSplitState, request);
+      secondaryPayoutE8s := MintLib.collectionCreationSecondaryAdminPayoutE8s(collectionCreationPayoutSplitState, request);
     };
-    let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
-    let userSubaccount = IcpLib.principalToSubaccount(request.owner);
-    let payoutResult = await* IcpLib.transferOutAt(
-      ledger,
-      ?userSubaccount,
-      payoutAccount,
-      request.adminPayoutE8s,
-      Nat64.fromNat(request.id),
-      request.createdAt + 1,
-    );
-    switch (transferResultBlock(payoutResult)) {
-      case (#ok(blockIndex)) {
-        ignore MintLib.markCollectionCreationAdminPayout(collectionCreationState, requestId, blockIndex);
+    if (secondaryPayoutE8s > 0 and MintLib.collectionCreationSecondaryAdminPayoutBlock(collectionCreationPayoutSplitState, request) == null) {
+      let secondaryPayoutAccount = switch (MintLib.collectionCreationSecondaryAdminPayoutAccount(collectionCreationPayoutSplitState, request)) {
+        case null {
+          ignore MintLib.markCollectionCreationError(
+            collectionCreationState,
+            requestId,
+            "Admin payout pending: collection creation secondary payout account is not configured",
+          );
+          return;
+        };
+        case (?value) value;
       };
-      case (#err(message)) {
-        ignore MintLib.markCollectionCreationError(
-          collectionCreationState,
-          requestId,
-          "Admin payout pending: " # message,
-        );
+      let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+      let userSubaccount = IcpLib.principalToSubaccount(request.owner);
+      let payoutResult = await* IcpLib.transferOutAt(
+        ledger,
+        ?userSubaccount,
+        secondaryPayoutAccount,
+        secondaryPayoutE8s,
+        Nat64.fromNat(request.id),
+        request.createdAt + 2,
+      );
+      switch (transferResultBlock(payoutResult)) {
+        case (#ok(blockIndex)) {
+          ignore MintLib.markCollectionCreationSecondaryAdminPayout(collectionCreationState, collectionCreationPayoutSplitState, requestId, blockIndex);
+        };
+        case (#err(message)) {
+          ignore MintLib.markCollectionCreationError(
+            collectionCreationState,
+            requestId,
+            "Admin secondary payout pending: " # message,
+          );
+        };
       };
     };
   };
@@ -3868,10 +4001,28 @@ mixin (
     10_000_000_000_000;
   };
 
+  func splitAdminPayoutE8s(
+    adminPayoutE8s : Nat64,
+    secondaryBasisPoints : Nat,
+  ) : {
+    primary : Nat64;
+    secondary : Nat64;
+  } {
+    let total = Nat64.toNat(adminPayoutE8s);
+    let secondary = Nat64.fromNat((total * secondaryBasisPoints) / PAYOUT_BASIS_POINTS_TOTAL);
+    {
+      primary = adminPayoutE8s - secondary;
+      secondary;
+    };
+  };
+
   func collectionCreationQuoteFor(
     canisterCycles : Nat,
     creationPriceE8s : Nat64,
+    primaryPayoutBasisPoints : Nat,
+    secondaryPayoutBasisPoints : Nat,
   ) : async MintTypes.CollectionCreationQuote {
+    validateCollectionCreationPayoutShares(primaryPayoutBasisPoints, secondaryPayoutBasisPoints);
     let cmc = actor (IcpLib.CYCLES_MINTING_CANISTER_ID) : IcpLib.CyclesMintingCanister;
     let rate = (await cmc.get_icp_xdr_conversion_rate()).data;
     let collectionCanisterCycles = normalizedCollectionCanisterCycles(canisterCycles);
@@ -3883,11 +4034,11 @@ mixin (
     } else {
       0 : Nat64;
     };
-    let adminPayoutFeeE8s = if (adminPayoutE8s > 0) {
-      IcpLib.DEFAULT_FEE;
-    } else {
-      0 : Nat64;
-    };
+    let payoutSplit = splitAdminPayoutE8s(adminPayoutE8s, secondaryPayoutBasisPoints);
+    let adminPayoutTransferCount =
+      (if (payoutSplit.primary > 0) 1 else 0) +
+      (if (payoutSplit.secondary > 0) 1 else 0);
+    let adminPayoutFeeE8s = Nat64.fromNat(adminPayoutTransferCount) * IcpLib.DEFAULT_FEE;
     {
       collectionCanisterCycles;
       factoryReserveCycles;
@@ -3896,6 +4047,8 @@ mixin (
       minimumCreationPriceE8s = cycleCostE8s;
       collectionCreationPriceE8s = creationPriceE8s;
       adminPayoutE8s;
+      adminPrimaryPayoutE8s = payoutSplit.primary;
+      adminSecondaryPayoutE8s = payoutSplit.secondary;
       ledgerFeeE8s = IcpLib.DEFAULT_FEE;
       cycleTransferFeeE8s = IcpLib.DEFAULT_FEE;
       adminPayoutFeeE8s;

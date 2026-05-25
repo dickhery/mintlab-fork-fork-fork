@@ -16,7 +16,7 @@ module {
     pendingCollectionCreates : Map.Map<Principal, Bool>;
     var nextTokenId : Nat;
     var nextTransactionId : Nat;
-    var config : Types.MintConfig;
+    var config : Types.StoredMintConfig;
     var collectionCanisterWasm : ?Blob;
   };
 
@@ -26,8 +26,23 @@ module {
     var nextRequestId : Nat;
   };
 
+  public type CollectionCreationPayoutSplitState = {
+    requestPayouts : Map.Map<Nat, Types.CollectionCreationRequestPayout>;
+    var secondaryPayoutAccount : ?Types.AccountIdentifier;
+    var primaryPayoutBasisPoints : Nat;
+    var secondaryPayoutBasisPoints : Nat;
+  };
+
   public type ModerationState = {
     var config : Types.ModerationConfig;
+  };
+
+  public func defaultCollectionCreationPrimaryPayoutBasisPoints() : Nat {
+    10_000;
+  };
+
+  public func defaultCollectionCreationSecondaryPayoutBasisPoints() : Nat {
+    0;
   };
 
   public func newState() : MintState {
@@ -59,6 +74,15 @@ module {
       requests = Map.empty<Nat, Types.CollectionCreationRequest>();
       requestsByOwner = Map.empty<Principal, [Nat]>();
       var nextRequestId = 1;
+    };
+  };
+
+  public func newCollectionCreationPayoutSplitState() : CollectionCreationPayoutSplitState {
+    {
+      requestPayouts = Map.empty<Nat, Types.CollectionCreationRequestPayout>();
+      var secondaryPayoutAccount = null;
+      var primaryPayoutBasisPoints = defaultCollectionCreationPrimaryPayoutBasisPoints();
+      var secondaryPayoutBasisPoints = defaultCollectionCreationSecondaryPayoutBasisPoints();
     };
   };
 
@@ -160,8 +184,108 @@ module {
     };
   };
 
-  public func getConfig(state : MintState) : Types.MintConfig {
+  public func getPayoutSplitConfig(
+    payoutSplitState : CollectionCreationPayoutSplitState
+  ) : Types.CollectionCreationPayoutSplitConfig {
+    {
+      secondaryPayoutAccount = payoutSplitState.secondaryPayoutAccount;
+      primaryPayoutBasisPoints = payoutSplitState.primaryPayoutBasisPoints;
+      secondaryPayoutBasisPoints = payoutSplitState.secondaryPayoutBasisPoints;
+    };
+  };
+
+  public func collectionCreationPrimaryPayoutBasisPoints(
+    payoutSplitState : CollectionCreationPayoutSplitState
+  ) : Nat {
+    payoutSplitState.primaryPayoutBasisPoints;
+  };
+
+  public func collectionCreationSecondaryPayoutBasisPoints(
+    payoutSplitState : CollectionCreationPayoutSplitState
+  ) : Nat {
+    payoutSplitState.secondaryPayoutBasisPoints;
+  };
+
+  func getCollectionCreationRequestPayout(
+    payoutSplitState : CollectionCreationPayoutSplitState,
+    requestId : Nat,
+  ) : ?Types.CollectionCreationRequestPayout {
+    Map.get(payoutSplitState.requestPayouts, Nat.compare, requestId);
+  };
+
+  func saveCollectionCreationRequestPayout(
+    payoutSplitState : CollectionCreationPayoutSplitState,
+    payout : Types.CollectionCreationRequestPayout,
+  ) {
+    Map.add(payoutSplitState.requestPayouts, Nat.compare, payout.requestId, payout);
+  };
+
+  public func collectionCreationPrimaryAdminPayoutE8s(
+    payoutSplitState : CollectionCreationPayoutSplitState,
+    request : Types.CollectionCreationRequest,
+  ) : Nat64 {
+    switch (getCollectionCreationRequestPayout(payoutSplitState, request.id)) {
+      case (?payout) payout.primaryPayoutE8s;
+      case null request.adminPayoutE8s;
+    };
+  };
+
+  public func collectionCreationSecondaryAdminPayoutE8s(
+    payoutSplitState : CollectionCreationPayoutSplitState,
+    request : Types.CollectionCreationRequest,
+  ) : Nat64 {
+    switch (getCollectionCreationRequestPayout(payoutSplitState, request.id)) {
+      case (?payout) payout.secondaryPayoutE8s;
+      case null 0;
+    };
+  };
+
+  public func collectionCreationSecondaryAdminPayoutAccount(
+    payoutSplitState : CollectionCreationPayoutSplitState,
+    request : Types.CollectionCreationRequest,
+  ) : ?Types.AccountIdentifier {
+    switch (getCollectionCreationRequestPayout(payoutSplitState, request.id)) {
+      case (?payout) payout.secondaryPayoutAccount;
+      case null null;
+    };
+  };
+
+  public func collectionCreationSecondaryAdminPayoutBlock(
+    payoutSplitState : CollectionCreationPayoutSplitState,
+    request : Types.CollectionCreationRequest,
+  ) : ?Nat64 {
+    switch (getCollectionCreationRequestPayout(payoutSplitState, request.id)) {
+      case (?payout) payout.secondaryPayoutBlock;
+      case null null;
+    };
+  };
+
+  public func getConfig(state : MintState) : Types.StoredMintConfig {
     state.config;
+  };
+
+  public func getPublicConfig(
+    state : MintState,
+    payoutSplitState : CollectionCreationPayoutSplitState,
+  ) : Types.MintConfig {
+    let config = state.config;
+    {
+      collectionId = config.collectionId;
+      payoutAccount = config.payoutAccount;
+      mintPriceE8s = config.mintPriceE8s;
+      mintEnabled = config.mintEnabled;
+      collectionCreationPayoutAccount = config.collectionCreationPayoutAccount;
+      collectionCreationSecondaryPayoutAccount = payoutSplitState.secondaryPayoutAccount;
+      collectionCreationPrimaryPayoutBasisPoints = payoutSplitState.primaryPayoutBasisPoints;
+      collectionCreationSecondaryPayoutBasisPoints = payoutSplitState.secondaryPayoutBasisPoints;
+      collectionCreationPriceE8s = config.collectionCreationPriceE8s;
+      collectionCreationEnabled = config.collectionCreationEnabled;
+      mainMintPayoutAccount = config.mainMintPayoutAccount;
+      mainMintPriceE8s = config.mainMintPriceE8s;
+      mainMintEnabled = config.mainMintEnabled;
+      collectionCanisterWasmUploaded = config.collectionCanisterWasmUploaded;
+      collectionCanisterCycles = config.collectionCanisterCycles;
+    };
   };
 
   public func getModerationConfig(state : ModerationState) : Types.ModerationConfig {
@@ -216,8 +340,12 @@ module {
 
   public func configure(
     state : MintState,
+    payoutSplitState : CollectionCreationPayoutSplitState,
     collectionId : ?Types.CollectionId,
     collectionCreationPayoutAccount : ?Types.AccountIdentifier,
+    collectionCreationSecondaryPayoutAccount : ?Types.AccountIdentifier,
+    collectionCreationPrimaryPayoutBasisPoints : Nat,
+    collectionCreationSecondaryPayoutBasisPoints : Nat,
     collectionCreationPriceE8s : Nat64,
     collectionCreationEnabled : Bool,
     mainMintPayoutAccount : ?Types.AccountIdentifier,
@@ -239,6 +367,9 @@ module {
       collectionCanisterWasmUploaded = state.collectionCanisterWasm != null;
       collectionCanisterCycles;
     };
+    payoutSplitState.secondaryPayoutAccount := collectionCreationSecondaryPayoutAccount;
+    payoutSplitState.primaryPayoutBasisPoints := collectionCreationPrimaryPayoutBasisPoints;
+    payoutSplitState.secondaryPayoutBasisPoints := collectionCreationSecondaryPayoutBasisPoints;
   };
 
   public func setCollectionCanisterWasm(state : MintState, wasm : Blob) {
@@ -311,6 +442,7 @@ module {
 
   public func beginCollectionCreationRequest(
     state : CollectionCreationState,
+    payoutSplitState : CollectionCreationPayoutSplitState,
     owner : Principal,
     name : Text,
     description : Text,
@@ -319,6 +451,7 @@ module {
     dividendsEnabled : Bool,
     quote : Types.CollectionCreationQuote,
     adminPayoutAccount : ?Types.AccountIdentifier,
+    adminSecondaryPayoutAccount : ?Types.AccountIdentifier,
   ) : Types.CollectionCreationRequest {
     let requestId = state.nextRequestId;
     state.nextRequestId += 1;
@@ -349,12 +482,23 @@ module {
       attempts = 0;
     };
     Map.add(collectionCreationRequestMap(state), Nat.compare, requestId, request);
+    saveCollectionCreationRequestPayout(
+      payoutSplitState,
+      {
+        requestId;
+        primaryPayoutE8s = quote.adminPrimaryPayoutE8s;
+        secondaryPayoutE8s = quote.adminSecondaryPayoutE8s;
+        secondaryPayoutAccount = adminSecondaryPayoutAccount;
+        secondaryPayoutBlock = null;
+      },
+    );
     appendCollectionCreationRequestOwner(state, owner, requestId);
     request;
   };
 
   public func beginRecoveredCollectionCreationRequest(
     state : CollectionCreationState,
+    payoutSplitState : CollectionCreationPayoutSplitState,
     owner : Principal,
     cyclePaymentBlock : Nat64,
     name : Text,
@@ -366,6 +510,7 @@ module {
   ) : Types.CollectionCreationRequest {
     let request = beginCollectionCreationRequest(
       state,
+      payoutSplitState,
       owner,
       name,
       description,
@@ -375,9 +520,12 @@ module {
       {
         quote with
         adminPayoutE8s = 0;
+        adminPrimaryPayoutE8s = 0;
+        adminSecondaryPayoutE8s = 0;
         adminPayoutFeeE8s = 0;
         totalUserDebitE8s = 0;
       },
+      null,
       null,
     );
     let recovered = {
@@ -540,26 +688,86 @@ module {
 
   public func markCollectionCreationAdminPayout(
     state : CollectionCreationState,
+    payoutSplitState : CollectionCreationPayoutSplitState,
     requestId : Nat,
     blockIndex : Nat64,
   ) : ?Types.CollectionCreationRequest {
     switch (getCollectionCreationRequest(state, requestId)) {
       case null null;
       case (?request) {
-        let nextStatus = if (request.status == #Installed) {
-          #Installed;
-        } else {
-          #AdminPayoutSent;
-        };
-        ?saveCollectionCreationRequest(state, {
+        let updatedRequest = {
           request with
-          status = nextStatus;
           adminPayoutBlock = ?blockIndex;
           updatedAt = nowNat64();
           lastError = null;
+        };
+        let nextStatus = if (updatedRequest.status == #Installed) {
+          #Installed;
+        } else if (collectionCreationAdminPayoutsComplete(payoutSplitState, updatedRequest)) {
+          #AdminPayoutSent;
+        } else {
+          #AdminPayoutPending;
+        };
+        ?saveCollectionCreationRequest(state, {
+          updatedRequest with
+          status = nextStatus;
         });
       };
     };
+  };
+
+  public func markCollectionCreationSecondaryAdminPayout(
+    state : CollectionCreationState,
+    payoutSplitState : CollectionCreationPayoutSplitState,
+    requestId : Nat,
+    blockIndex : Nat64,
+  ) : ?Types.CollectionCreationRequest {
+    switch (getCollectionCreationRequest(state, requestId)) {
+      case null null;
+      case (?request) {
+        let payout = switch (getCollectionCreationRequestPayout(payoutSplitState, requestId)) {
+          case (?value) value;
+          case null {
+            {
+              requestId;
+              primaryPayoutE8s = request.adminPayoutE8s;
+              secondaryPayoutE8s = 0 : Nat64;
+              secondaryPayoutAccount = null;
+              secondaryPayoutBlock = null;
+            };
+          };
+        };
+        saveCollectionCreationRequestPayout(payoutSplitState, {
+          payout with
+          secondaryPayoutBlock = ?blockIndex;
+        });
+        let updatedRequest = {
+          request with
+          updatedAt = nowNat64();
+          lastError = null;
+        };
+        let nextStatus = if (updatedRequest.status == #Installed) {
+          #Installed;
+        } else if (collectionCreationAdminPayoutsComplete(payoutSplitState, updatedRequest)) {
+          #AdminPayoutSent;
+        } else {
+          #AdminPayoutPending;
+        };
+        ?saveCollectionCreationRequest(state, {
+          updatedRequest with
+          status = nextStatus;
+        });
+      };
+    };
+  };
+
+  func collectionCreationAdminPayoutsComplete(
+    payoutSplitState : CollectionCreationPayoutSplitState,
+    request : Types.CollectionCreationRequest
+  ) : Bool {
+    let primaryComplete = collectionCreationPrimaryAdminPayoutE8s(payoutSplitState, request) == 0 or request.adminPayoutBlock != null;
+    let secondaryComplete = collectionCreationSecondaryAdminPayoutE8s(payoutSplitState, request) == 0 or collectionCreationSecondaryAdminPayoutBlock(payoutSplitState, request) != null;
+    primaryComplete and secondaryComplete;
   };
 
   public func markCollectionCreationError(
@@ -599,6 +807,7 @@ module {
 
   public func repairCollectionCreationRequestCycles(
     state : CollectionCreationState,
+    payoutSplitState : CollectionCreationPayoutSplitState,
     requestId : Nat,
     quote : Types.CollectionCreationQuote,
   ) : ?Types.CollectionCreationRequest {
@@ -628,6 +837,11 @@ module {
           } else {
             quote.cycleCostE8s;
           };
+          adminPayoutE8s = if (hasPayment) {
+            request.adminPayoutE8s;
+          } else {
+            quote.adminPayoutE8s;
+          };
           totalUserDebitE8s = if (hasPayment) {
             request.totalUserDebitE8s;
           } else {
@@ -638,6 +852,27 @@ module {
             "Paid setup request repaired for retry without changing the funded cycle amount";
           } else {
             "Unpaid setup request cycle values were repaired for retry";
+          });
+        };
+        if (not hasPayment) {
+          let payout = switch (getCollectionCreationRequestPayout(payoutSplitState, requestId)) {
+            case (?value) value;
+            case null {
+              {
+                requestId;
+                primaryPayoutE8s = quote.adminPrimaryPayoutE8s;
+                secondaryPayoutE8s = quote.adminSecondaryPayoutE8s;
+                secondaryPayoutAccount = payoutSplitState.secondaryPayoutAccount;
+                secondaryPayoutBlock = null;
+              };
+            };
+          };
+          saveCollectionCreationRequestPayout(payoutSplitState, {
+            payout with
+            primaryPayoutE8s = quote.adminPrimaryPayoutE8s;
+            secondaryPayoutE8s = quote.adminSecondaryPayoutE8s;
+            secondaryPayoutAccount = payoutSplitState.secondaryPayoutAccount;
+            secondaryPayoutBlock = null;
           });
         };
         ?saveCollectionCreationRequest(state, updated);

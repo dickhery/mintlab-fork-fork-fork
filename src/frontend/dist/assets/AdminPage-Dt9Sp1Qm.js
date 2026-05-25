@@ -1,13 +1,13 @@
-import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, a as cn, k as useNavigate, d as useAdmin, b as useBackend, e as useQueryClient, f as useQuery, l as Shield, g as ue, B as Button, P as Principal, A as Actor } from "./index-CtiMvMn7.js";
-import { L as LoaderCircle, A as AppCanisterTopUpDialog, P as Plus, F as Fuel } from "./AppCanisterTopUpDialog-B64rsl3B.js";
-import { S as Switch, r as recommendedCollectionCreationTopUpCycles, T as Trash2, C as CollectionCreationDiagnosticsPanel } from "./switch-CLn2Az5E.js";
-import { A as AlertDialog, i as AlertDialogTrigger, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-BapO8db_.js";
-import { j as Primitive, u as useMutation, L as Label, I as Input, B as Badge } from "./badge-C5lHJ171.js";
-import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, R as RefreshCw, c as CardContent } from "./card-BoW9Rghx.js";
-import { L as Layers, e as ChevronDown, T as Textarea, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, E as ExternalLink, C as Check, I as Info } from "./textarea-2W0efyWb.js";
-import { S as Skeleton, C as Copy } from "./skeleton-D1D97gY-.js";
-import { r as resolveImageUrl, I as ImageOff } from "./media-CwL-LlCK.js";
-import { C as CircleAlert } from "./circle-alert-BjFBt0Am.js";
+import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, a as cn, k as useNavigate, d as useAdmin, b as useBackend, e as useQueryClient, f as useQuery, l as Shield, g as ue, B as Button, P as Principal, A as Actor } from "./index-CRVxxeUX.js";
+import { L as LoaderCircle, A as AppCanisterTopUpDialog, P as Plus, F as Fuel } from "./AppCanisterTopUpDialog-CXud1Nu2.js";
+import { S as Switch, r as recommendedCollectionCreationTopUpCycles, T as Trash2, C as CollectionCreationDiagnosticsPanel } from "./switch-C92bQj8h.js";
+import { A as AlertDialog, i as AlertDialogTrigger, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-D8WOMrwU.js";
+import { j as Primitive, u as useMutation, L as Label, I as Input, B as Badge } from "./badge-D7pMFf5q.js";
+import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, R as RefreshCw, c as CardContent } from "./card-BOMMhh3H.js";
+import { L as Layers, e as ChevronDown, T as Textarea, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, E as ExternalLink, C as Check, I as Info } from "./textarea-DO7BdJ5N.js";
+import { S as Skeleton, C as Copy } from "./skeleton-C3xms0CW.js";
+import { r as resolveImageUrl, I as ImageOff } from "./media-BzIBsxeE.js";
+import { C as CircleAlert } from "./circle-alert-DCmDTjN3.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -83,6 +83,7 @@ function Separator({
 var define_process_env_default = {};
 const E8S = 100000000n;
 const MAX_MARKETPLACE_FEE_BASIS_POINTS = 9999n;
+const PAYOUT_BASIS_POINTS_TOTAL = 10000n;
 const APP_LOW_CYCLES_THRESHOLD = 1000000000000n;
 const MIN_COLLECTION_CANISTER_CYCLES = 2000000000000n;
 const MAX_ON_CHAIN_IMAGE_CHARS = 19e5;
@@ -294,6 +295,9 @@ function formatMarketplaceFeePercent(basisPoints) {
   const trimmedFrac = frac.replace(/0+$/, "");
   return trimmedFrac ? `${whole}.${trimmedFrac}` : whole.toString();
 }
+function formatPayoutPercent(basisPoints) {
+  return formatMarketplaceFeePercent(basisPoints);
+}
 function formatCycles(cycles) {
   const trillion = 1000000000000n;
   if (cycles < trillion) return cycles.toString();
@@ -315,6 +319,16 @@ function parseMarketplaceFeePercentToBasisPoints(value) {
   const [wholePart, fracPart = ""] = trimmed.split(".");
   const basisPoints = BigInt(wholePart) * 100n + BigInt(`${fracPart}00`.slice(0, 2));
   if (basisPoints === 0n || basisPoints > MAX_MARKETPLACE_FEE_BASIS_POINTS) {
+    return null;
+  }
+  return basisPoints;
+}
+function parsePayoutPercentToBasisPoints(value) {
+  const trimmed = value.trim();
+  if (!trimmed || !/^\d+(\.\d{0,2})?$/.test(trimmed)) return null;
+  const [wholePart, fracPart = ""] = trimmed.split(".");
+  const basisPoints = BigInt(wholePart) * 100n + BigInt(`${fracPart}00`.slice(0, 2));
+  if (basisPoints < 0n || basisPoints > PAYOUT_BASIS_POINTS_TOTAL) {
     return null;
   }
   return basisPoints;
@@ -1605,6 +1619,18 @@ function MintConfigForm() {
   const [imageUrl, setImageUrl] = reactExports.useState("");
   const [imageFileName, setImageFileName] = reactExports.useState("");
   const [collectionCreationPayout, setCollectionCreationPayout] = reactExports.useState("");
+  const [
+    collectionCreationSecondaryPayout,
+    setCollectionCreationSecondaryPayout
+  ] = reactExports.useState("");
+  const [
+    collectionCreationPrimaryPayoutPercent,
+    setCollectionCreationPrimaryPayoutPercent
+  ] = reactExports.useState("100");
+  const [
+    collectionCreationSecondaryPayoutPercent,
+    setCollectionCreationSecondaryPayoutPercent
+  ] = reactExports.useState("0");
   const [collectionCreationPrice, setCollectionCreationPrice] = reactExports.useState("");
   const [collectionCreationEnabled, setCollectionCreationEnabled] = reactExports.useState(false);
   const [mainMintPayout, setMainMintPayout] = reactExports.useState("");
@@ -1662,7 +1688,14 @@ function MintConfigForm() {
   const parsedCollectionCanisterCycles = parseWholeBigInt(
     collectionCanisterCycles
   );
-  const canQuoteCreationCost = !!actor && parsedCreationPriceE8s !== null && parsedCollectionCanisterCycles !== null;
+  const parsedPrimaryPayoutBasisPoints = parsePayoutPercentToBasisPoints(
+    collectionCreationPrimaryPayoutPercent
+  );
+  const parsedSecondaryPayoutBasisPoints = parsePayoutPercentToBasisPoints(
+    collectionCreationSecondaryPayoutPercent
+  );
+  const payoutPercentagesValid = parsedPrimaryPayoutBasisPoints !== null && parsedSecondaryPayoutBasisPoints !== null && parsedPrimaryPayoutBasisPoints + parsedSecondaryPayoutBasisPoints === PAYOUT_BASIS_POINTS_TOTAL;
+  const canQuoteCreationCost = !!actor && parsedCreationPriceE8s !== null && parsedCollectionCanisterCycles !== null && payoutPercentagesValid;
   const {
     data: creationQuote,
     error: creationQuoteError,
@@ -1671,15 +1704,19 @@ function MintConfigForm() {
     queryKey: [
       "collectionCreationQuote",
       collectionCreationPrice.trim(),
-      collectionCanisterCycles.trim()
+      collectionCanisterCycles.trim(),
+      collectionCreationPrimaryPayoutPercent.trim(),
+      collectionCreationSecondaryPayoutPercent.trim()
     ],
     queryFn: async () => {
-      if (!actor || parsedCreationPriceE8s === null || parsedCollectionCanisterCycles === null) {
+      if (!actor || parsedCreationPriceE8s === null || parsedCollectionCanisterCycles === null || parsedPrimaryPayoutBasisPoints === null || parsedSecondaryPayoutBasisPoints === null) {
         return null;
       }
       return actor.quoteCollectionCreationCost(
         parsedCollectionCanisterCycles,
-        parsedCreationPriceE8s
+        parsedCreationPriceE8s,
+        parsedPrimaryPayoutBasisPoints,
+        parsedSecondaryPayoutBasisPoints
       );
     },
     enabled: canQuoteCreationCost,
@@ -1702,6 +1739,19 @@ function MintConfigForm() {
     setImageFileName((mainCollection == null ? void 0 : mainCollection.imageUrl) ? "Current image" : "");
     setCollectionCreationPayout(
       mintConfig.collectionCreationPayoutAccount ? accountIdToHex(mintConfig.collectionCreationPayoutAccount) : ""
+    );
+    setCollectionCreationSecondaryPayout(
+      mintConfig.collectionCreationSecondaryPayoutAccount ? accountIdToHex(mintConfig.collectionCreationSecondaryPayoutAccount) : ""
+    );
+    setCollectionCreationPrimaryPayoutPercent(
+      formatPayoutPercent(
+        mintConfig.collectionCreationPrimaryPayoutBasisPoints
+      )
+    );
+    setCollectionCreationSecondaryPayoutPercent(
+      formatPayoutPercent(
+        mintConfig.collectionCreationSecondaryPayoutBasisPoints
+      )
     );
     setCollectionCreationPrice(
       mintConfig.collectionCreationPriceE8s > 0n ? formatICP(mintConfig.collectionCreationPriceE8s) : "0"
@@ -1750,12 +1800,23 @@ function MintConfigForm() {
       const creationPriceE8s = parseICPToE8s(collectionCreationPrice);
       const mainMintPriceE8s = parseICPToE8s(mainMintPrice);
       const cycles = parseWholeBigInt(collectionCanisterCycles);
+      const primaryPayoutBasisPoints = parsePayoutPercentToBasisPoints(
+        collectionCreationPrimaryPayoutPercent
+      );
+      const secondaryPayoutBasisPoints = parsePayoutPercentToBasisPoints(
+        collectionCreationSecondaryPayoutPercent
+      );
       if (creationPriceE8s === null)
         throw new Error("Collection creation fee must be a valid ICP amount");
       if (mainMintPriceE8s === null)
         throw new Error("Main mint price must be a valid ICP amount");
       if (cycles === null)
         throw new Error("Collection canister cycles must be a whole number");
+      if (primaryPayoutBasisPoints === null || secondaryPayoutBasisPoints === null || primaryPayoutBasisPoints + secondaryPayoutBasisPoints !== PAYOUT_BASIS_POINTS_TOTAL) {
+        throw new Error(
+          "Collection creation payout percentages must add up to 100%"
+        );
+      }
       if (collectionCreationEnabled && creationQuote && creationPriceE8s < creationQuote.minimumCreationPriceE8s) {
         throw new Error(
           `Collection creation fee must be at least ${formatICP(
@@ -1763,8 +1824,13 @@ function MintConfigForm() {
           )} ICP at the current cycles rate`
         );
       }
-      const creationPayoutRequired = creationQuote ? creationQuote.adminPayoutE8s > 0n : creationPriceE8s > 0n;
-      const creationPayout = creationPayoutRequired ? validateAccountId(collectionCreationPayout, "collection creation") : null;
+      const primaryPayoutRequired = creationQuote ? creationQuote.adminPrimaryPayoutE8s > 0n : creationPriceE8s > 0n && primaryPayoutBasisPoints > 0n;
+      const secondaryPayoutRequired = creationQuote ? creationQuote.adminSecondaryPayoutE8s > 0n || secondaryPayoutBasisPoints > 0n : secondaryPayoutBasisPoints > 0n;
+      const creationPayout = primaryPayoutRequired ? validateAccountId(collectionCreationPayout, "collection creation") : null;
+      const secondaryCreationPayout = secondaryPayoutRequired ? validateAccountId(
+        collectionCreationSecondaryPayout,
+        "secondary collection creation"
+      ) : null;
       const mintPayout = mainMintPriceE8s > 0n ? validateAccountId(mainMintPayout, "main mint") : null;
       return actor.configureMinting(
         name.trim(),
@@ -1772,6 +1838,9 @@ function MintConfigForm() {
         symbol.trim().toUpperCase(),
         imageUrl,
         creationPayout,
+        secondaryCreationPayout,
+        primaryPayoutBasisPoints,
+        secondaryPayoutBasisPoints,
         creationPriceE8s,
         collectionCreationEnabled,
         mintPayout,
@@ -2090,19 +2159,69 @@ function MintConfigForm() {
       /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 lg:grid-cols-2 gap-4", children: [
         /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3 rounded-xl border border-border bg-muted/20 p-4", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-semibold text-foreground", children: "User Collection Creation" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { htmlFor: "creation-payout", children: "Creation payout account ID" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsx(
-              Input,
-              {
-                id: "creation-payout",
-                value: collectionCreationPayout,
-                onChange: (e) => setCollectionCreationPayout(e.target.value),
-                placeholder: "64-character ICP account hex",
-                className: "font-mono text-xs",
-                "data-ocid": "admin.mint_config.creation_payout_input"
-              }
-            )
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 xl:grid-cols-[1fr_7rem] gap-3", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { htmlFor: "creation-payout", children: "Primary payout account ID" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                Input,
+                {
+                  id: "creation-payout",
+                  value: collectionCreationPayout,
+                  onChange: (e) => setCollectionCreationPayout(e.target.value),
+                  placeholder: "64-character ICP account hex",
+                  className: "font-mono text-xs",
+                  "data-ocid": "admin.mint_config.creation_payout_input"
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { htmlFor: "creation-primary-percent", children: "Share (%)" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                Input,
+                {
+                  id: "creation-primary-percent",
+                  value: collectionCreationPrimaryPayoutPercent,
+                  onChange: (e) => setCollectionCreationPrimaryPayoutPercent(e.target.value),
+                  placeholder: "100",
+                  inputMode: "decimal",
+                  "data-ocid": "admin.mint_config.creation_primary_percent_input"
+                }
+              )
+            ] })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 xl:grid-cols-[1fr_7rem] gap-3", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { htmlFor: "creation-secondary-payout", children: "Secondary payout account ID" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                Input,
+                {
+                  id: "creation-secondary-payout",
+                  value: collectionCreationSecondaryPayout,
+                  onChange: (e) => setCollectionCreationSecondaryPayout(e.target.value),
+                  placeholder: "Optional 64-character ICP account hex",
+                  className: "font-mono text-xs",
+                  "data-ocid": "admin.mint_config.creation_secondary_payout_input"
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { htmlFor: "creation-secondary-percent", children: "Share (%)" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                Input,
+                {
+                  id: "creation-secondary-percent",
+                  value: collectionCreationSecondaryPayoutPercent,
+                  onChange: (e) => setCollectionCreationSecondaryPayoutPercent(e.target.value),
+                  placeholder: "0",
+                  inputMode: "decimal",
+                  "data-ocid": "admin.mint_config.creation_secondary_percent_input"
+                }
+              )
+            ] })
+          ] }),
+          !payoutPercentagesValid && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-start gap-2 rounded-md border border-destructive/20 bg-destructive/5 p-2 text-xs text-destructive", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsx(CircleAlert, { size: 14, className: "mt-0.5 shrink-0" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { children: "Payout shares must add up to 100%." })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { htmlFor: "creation-price", children: "Creation fee (ICP)" }),
@@ -2135,7 +2254,21 @@ function MintConfigForm() {
               ] })
             ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between gap-3", children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-muted-foreground", children: "Admin receives" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-muted-foreground", children: "Primary payout receives" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "font-medium text-foreground", children: [
+                formatICP(creationQuote.adminPrimaryPayoutE8s),
+                " ICP"
+              ] })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between gap-3", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-muted-foreground", children: "Secondary payout receives" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "font-medium text-foreground", children: [
+                formatICP(creationQuote.adminSecondaryPayoutE8s),
+                " ICP"
+              ] })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between gap-3", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-muted-foreground", children: "Total payout remainder" }),
               /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "font-medium text-foreground", children: [
                 formatICP(creationQuote.adminPayoutE8s),
                 " ICP"

@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-CLeG_B3-.js","assets/AppCanisterTopUpDialog-B64rsl3B.js","assets/badge-C5lHJ171.js","assets/external-nft-transfer-BGwyGpdw.js","assets/media-CwL-LlCK.js","assets/MediaImage-VYauyIcl.js","assets/ZoomableMediaImage-BrythtH2.js","assets/index-BapO8db_.js","assets/card-BoW9Rghx.js","assets/textarea-2W0efyWb.js","assets/skeleton-D1D97gY-.js","assets/imageUtils-vhRE8bl-.js","assets/send-D3Jj-dw4.js","assets/coins-B4lPSfxB.js","assets/MarketplacePage-D7huheIE.js","assets/icp-BXjZNIYq.js","assets/AdminPage-CACr567E.js","assets/switch-CLn2Az5E.js","assets/circle-alert-BjFBt0Am.js","assets/ICPAccountPage-BPFTk9nN.js","assets/CollectionsPage-BaR-929m.js","assets/DividendsPage-DvBFhoC3.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-CR8HAclo.js","assets/AppCanisterTopUpDialog-CXud1Nu2.js","assets/badge-D7pMFf5q.js","assets/external-nft-transfer-BqxdEgJK.js","assets/media-BzIBsxeE.js","assets/MediaImage-37fBglp0.js","assets/ZoomableMediaImage-7Sr-aEma.js","assets/index-D8WOMrwU.js","assets/card-BOMMhh3H.js","assets/textarea-DO7BdJ5N.js","assets/skeleton-C3xms0CW.js","assets/imageUtils-BAQY8lHp.js","assets/send-Df7gKxBe.js","assets/coins-SIjifN7o.js","assets/MarketplacePage-CWXH5ggh.js","assets/icp-BXjZNIYq.js","assets/AdminPage-Dt9Sp1Qm.js","assets/switch-C92bQj8h.js","assets/circle-alert-DCmDTjN3.js","assets/ICPAccountPage-BtHFob8Y.js","assets/CollectionsPage-BXRVZeEB.js","assets/DividendsPage-DgL-8H9J.js"])))=>i.map(i=>d[i]);
 var __defProp = Object.defineProperty;
 var __typeError = (msg) => {
   throw TypeError(msg);
@@ -15595,7 +15595,7 @@ function mergeLoginOptions(loginOptions, otherLoginOptions) {
   };
 }
 const ONE_HOUR_IN_NANOSECONDS = BigInt(36e11);
-const DEFAULT_IDENTITY_PROVIDER = "https://id.ai";
+const DEFAULT_IDENTITY_PROVIDER = "https://identity.internetcomputer.org/";
 const InternetIdentityReactContext = reactExports.createContext(void 0);
 async function createAuthClient(createOptions) {
   const config = await loadConfig();
@@ -30354,6 +30354,9 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "mintEnabled": IDL2.Bool,
     "mintPriceE8s": IDL2.Nat64,
     "collectionCreationPayoutAccount": IDL2.Opt(AccountIdentifier),
+    "collectionCreationSecondaryPayoutAccount": IDL2.Opt(AccountIdentifier),
+    "collectionCreationPrimaryPayoutBasisPoints": IDL2.Nat,
+    "collectionCreationSecondaryPayoutBasisPoints": IDL2.Nat,
     "collectionCanisterWasmUploaded": IDL2.Bool,
     "mainMintPayoutAccount": IDL2.Opt(AccountIdentifier),
     "collectionCanisterCycles": IDL2.Nat
@@ -30464,6 +30467,8 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "totalCyclesToConvert": IDL2.Nat,
     "totalUserDebitE8s": IDL2.Nat64,
     "adminPayoutE8s": IDL2.Nat64,
+    "adminPrimaryPayoutE8s": IDL2.Nat64,
+    "adminSecondaryPayoutE8s": IDL2.Nat64,
     "adminPayoutFeeE8s": IDL2.Nat64,
     "collectionCanisterCycles": IDL2.Nat
   });
@@ -30705,6 +30710,9 @@ const idlFactory = ({ IDL: IDL2 }) => {
         IDL2.Text,
         IDL2.Text,
         IDL2.Opt(AccountIdentifier),
+        IDL2.Opt(AccountIdentifier),
+        IDL2.Nat,
+        IDL2.Nat,
         IDL2.Nat64,
         IDL2.Bool,
         IDL2.Opt(AccountIdentifier),
@@ -30980,7 +30988,7 @@ const idlFactory = ({ IDL: IDL2 }) => {
       []
     ),
     "quoteCollectionCreationCost": IDL2.Func(
-      [IDL2.Nat, IDL2.Nat64],
+      [IDL2.Nat, IDL2.Nat64, IDL2.Nat, IDL2.Nat],
       [CollectionCreationQuote],
       []
     ),
@@ -31418,6 +31426,11 @@ function fromRawMintConfig(value) {
     collectionCreationPayoutAccount: fromRawOption(
       value.collectionCreationPayoutAccount
     ),
+    collectionCreationSecondaryPayoutAccount: fromRawOption(
+      value.collectionCreationSecondaryPayoutAccount
+    ),
+    collectionCreationPrimaryPayoutBasisPoints: value.collectionCreationPrimaryPayoutBasisPoints,
+    collectionCreationSecondaryPayoutBasisPoints: value.collectionCreationSecondaryPayoutBasisPoints,
     collectionCreationPriceE8s: value.collectionCreationPriceE8s,
     collectionCreationEnabled: value.collectionCreationEnabled,
     mainMintPayoutAccount: fromRawOption(value.mainMintPayoutAccount),
@@ -31469,6 +31482,8 @@ function fromRawCollectionCreationQuote(value) {
     minimumCreationPriceE8s: value.minimumCreationPriceE8s,
     collectionCreationPriceE8s: value.collectionCreationPriceE8s,
     adminPayoutE8s: value.adminPayoutE8s,
+    adminPrimaryPayoutE8s: value.adminPrimaryPayoutE8s,
+    adminSecondaryPayoutE8s: value.adminSecondaryPayoutE8s,
     ledgerFeeE8s: value.ledgerFeeE8s,
     cycleTransferFeeE8s: value.cycleTransferFeeE8s,
     adminPayoutFeeE8s: value.adminPayoutFeeE8s,
@@ -31911,7 +31926,7 @@ class Backend {
       )
     );
   }
-  async configureMinting(name, description, symbol, imageUrl, collectionCreationPayoutAccount, collectionCreationPriceE8s, collectionCreationEnabled, mainMintPayoutAccount, mainMintPriceE8s, mainMintEnabled, mainMintDividendsEnabled, collectionCanisterCycles) {
+  async configureMinting(name, description, symbol, imageUrl, collectionCreationPayoutAccount, collectionCreationSecondaryPayoutAccount, collectionCreationPrimaryPayoutBasisPoints, collectionCreationSecondaryPayoutBasisPoints, collectionCreationPriceE8s, collectionCreationEnabled, mainMintPayoutAccount, mainMintPriceE8s, mainMintEnabled, mainMintDividendsEnabled, collectionCanisterCycles) {
     return fromRawCollection(
       await this.run(
         () => this.actor.configureMinting(
@@ -31920,6 +31935,9 @@ class Backend {
           symbol,
           imageUrl,
           toRawOption(collectionCreationPayoutAccount),
+          toRawOption(collectionCreationSecondaryPayoutAccount),
+          collectionCreationPrimaryPayoutBasisPoints,
+          collectionCreationSecondaryPayoutBasisPoints,
           collectionCreationPriceE8s,
           collectionCreationEnabled,
           toRawOption(mainMintPayoutAccount),
@@ -32041,12 +32059,14 @@ class Backend {
       await this.run(() => this.actor.createFixedListing(nftId, price))
     );
   }
-  async quoteCollectionCreationCost(collectionCanisterCycles, collectionCreationPriceE8s) {
+  async quoteCollectionCreationCost(collectionCanisterCycles, collectionCreationPriceE8s, collectionCreationPrimaryPayoutBasisPoints, collectionCreationSecondaryPayoutBasisPoints) {
     return fromRawCollectionCreationQuote(
       await this.run(
         () => this.actor.quoteCollectionCreationCost(
           collectionCanisterCycles,
-          collectionCreationPriceE8s
+          collectionCreationPriceE8s,
+          collectionCreationPrimaryPayoutBasisPoints,
+          collectionCreationSecondaryPayoutBasisPoints
         )
       )
     );
@@ -46614,13 +46634,13 @@ const Toaster = ({ ...props }) => {
     }
   );
 };
-const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-CLeG_B3-.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
-const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-D7huheIE.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,15,13]) : void 0));
-const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-CACr567E.js"), true ? __vite__mapDeps([16,1,2,17,9,7,8,10,4,18]) : void 0));
-const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-BPFTk9nN.js"), true ? __vite__mapDeps([19,2,8,10,15,12,18]) : void 0));
-const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-C4gkwiP5.js"), true ? [] : void 0));
-const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-BaR-929m.js"), true ? __vite__mapDeps([20,1,2,17,9,7,5,4,6,8,10,11]) : void 0));
-const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-DvBFhoC3.js"), true ? __vite__mapDeps([21,1,2,5,4,8,13]) : void 0));
+const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-CR8HAclo.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
+const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-CWXH5ggh.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,15,13]) : void 0));
+const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-Dt9Sp1Qm.js"), true ? __vite__mapDeps([16,1,2,17,9,7,8,10,4,18]) : void 0));
+const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-BtHFob8Y.js"), true ? __vite__mapDeps([19,2,8,10,15,12,18]) : void 0));
+const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-ZRCLewHx.js"), true ? [] : void 0));
+const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-BXRVZeEB.js"), true ? __vite__mapDeps([20,1,2,17,9,7,5,4,6,8,10,11]) : void 0));
+const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-DgL-8H9J.js"), true ? __vite__mapDeps([21,1,2,5,4,8,13]) : void 0));
 const rootRoute = createRootRoute({
   component: () => /* @__PURE__ */ jsxRuntimeExports.jsx(Layout, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(
     reactExports.Suspense,

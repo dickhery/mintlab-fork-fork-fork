@@ -250,6 +250,9 @@ type MintConfig =
    collectionCreationEnabled: bool;
    collectionCreationPayoutAccount: opt AccountIdentifier;
    collectionCreationPriceE8s: nat64;
+   collectionCreationPrimaryPayoutBasisPoints: nat;
+   collectionCreationSecondaryPayoutAccount: opt AccountIdentifier;
+   collectionCreationSecondaryPayoutBasisPoints: nat;
    collectionId: opt CollectionId;
    mainMintEnabled: bool;
    mainMintPayoutAccount: opt AccountIdentifier;
@@ -704,6 +707,8 @@ type CollectionCreationQuote =
  record {
    adminPayoutE8s: nat64;
    adminPayoutFeeE8s: nat64;
+   adminPrimaryPayoutE8s: nat64;
+   adminSecondaryPayoutE8s: nat64;
    collectionCanisterCycles: nat;
    collectionCreationPriceE8s: nat64;
    cycleCostE8s: nat64;
@@ -945,6 +950,9 @@ service : {
    (MarketplaceFeeConfig);
   configureMinting: (name: text, description: text, symbol: text, imageUrl:
    text, collectionCreationPayoutAccount: opt AccountIdentifier,
+   collectionCreationSecondaryPayoutAccount: opt AccountIdentifier,
+   collectionCreationPrimaryPayoutBasisPoints: nat,
+   collectionCreationSecondaryPayoutBasisPoints: nat,
    collectionCreationPriceE8s: nat64, collectionCreationEnabled: bool,
    mainMintPayoutAccount: opt AccountIdentifier, mainMintPriceE8s: nat64,
    mainMintEnabled: bool, mainMintDividendsEnabled: bool,
@@ -1126,7 +1134,10 @@ service : {
   quoteAppCanisterCycleTopUp: (cyclesToTopUp: nat) ->
    (CollectionCycleTopUpQuote);
   quoteCollectionCreationCost: (collectionCanisterCycles: nat,
-   collectionCreationPriceE8s: nat64) -> (CollectionCreationQuote);
+   collectionCreationPriceE8s: nat64,
+   collectionCreationPrimaryPayoutBasisPoints: nat,
+   collectionCreationSecondaryPayoutBasisPoints: nat) ->
+   (CollectionCreationQuote);
   quoteCollectionCycleTopUp: (cyclesToTopUp: nat) ->
    (CollectionCycleTopUpQuote);
   recoverCollectionCreationRecord: (requestId: nat) ->

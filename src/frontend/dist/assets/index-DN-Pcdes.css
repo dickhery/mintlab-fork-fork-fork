@@ -4472,6 +4472,10 @@ video {
   .xl\:grid-cols-5 {
     grid-template-columns: repeat(5, minmax(0, 1fr));
   }
+
+  .xl\:grid-cols-\[1fr_7rem\] {
+    grid-template-columns: 1fr 7rem;
+  }
 }
 
 .\[\&\:first-child\[data-selected\=true\]_button\]\:rounded-l-md:first-child[data-selected=true] button {

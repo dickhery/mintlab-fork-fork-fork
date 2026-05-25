@@ -21,6 +21,7 @@ persistent actor Backend {
   let collectionsState = CollectionsLib.newState();
   let mintState = MintLib.newState();
   let collectionCreationState = MintLib.newCollectionCreationState();
+  let collectionCreationPayoutSplitState = MintLib.newCollectionCreationPayoutSplitState();
   let moderationState = MintLib.newModerationState();
   let walletState = WalletLib.newState();
   let ownershipIndexState = WalletLib.newOwnershipIndexState();
@@ -43,6 +44,7 @@ persistent actor Backend {
   include MintApi(
     mintState,
     collectionCreationState,
+    collectionCreationPayoutSplitState,
     moderationState,
     collectionsState,
     walletState,

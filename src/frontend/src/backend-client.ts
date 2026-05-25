@@ -247,6 +247,9 @@ export interface MintConfig {
   mintPriceE8s: bigint;
   mintEnabled: boolean;
   collectionCreationPayoutAccount: AccountIdentifier | null;
+  collectionCreationSecondaryPayoutAccount: AccountIdentifier | null;
+  collectionCreationPrimaryPayoutBasisPoints: bigint;
+  collectionCreationSecondaryPayoutBasisPoints: bigint;
   collectionCreationPriceE8s: bigint;
   collectionCreationEnabled: boolean;
   mainMintPayoutAccount: AccountIdentifier | null;
@@ -283,6 +286,8 @@ export interface CollectionCreationQuote {
   minimumCreationPriceE8s: bigint;
   collectionCreationPriceE8s: bigint;
   adminPayoutE8s: bigint;
+  adminPrimaryPayoutE8s: bigint;
+  adminSecondaryPayoutE8s: bigint;
   ledgerFeeE8s: bigint;
   cycleTransferFeeE8s: bigint;
   adminPayoutFeeE8s: bigint;
@@ -588,6 +593,9 @@ export interface backendInterface {
     symbol: string,
     imageUrl: string,
     collectionCreationPayoutAccount: AccountIdentifier | null,
+    collectionCreationSecondaryPayoutAccount: AccountIdentifier | null,
+    collectionCreationPrimaryPayoutBasisPoints: bigint,
+    collectionCreationSecondaryPayoutBasisPoints: bigint,
     collectionCreationPriceE8s: bigint,
     collectionCreationEnabled: boolean,
     mainMintPayoutAccount: AccountIdentifier | null,
@@ -660,6 +668,8 @@ export interface backendInterface {
   quoteCollectionCreationCost(
     collectionCanisterCycles: bigint,
     collectionCreationPriceE8s: bigint,
+    collectionCreationPrimaryPayoutBasisPoints: bigint,
+    collectionCreationSecondaryPayoutBasisPoints: bigint,
   ): Promise<CollectionCreationQuote>;
   quoteCollectionCycleTopUp(
     cyclesToTopUp: bigint,
@@ -1009,6 +1019,9 @@ type RawMintConfig = {
   mintPriceE8s: bigint;
   mintEnabled: boolean;
   collectionCreationPayoutAccount: [] | [AccountIdentifier];
+  collectionCreationSecondaryPayoutAccount: [] | [AccountIdentifier];
+  collectionCreationPrimaryPayoutBasisPoints: bigint;
+  collectionCreationSecondaryPayoutBasisPoints: bigint;
   collectionCreationPriceE8s: bigint;
   collectionCreationEnabled: boolean;
   mainMintPayoutAccount: [] | [AccountIdentifier];
@@ -1042,6 +1055,8 @@ type RawCollectionCreationQuote = {
   minimumCreationPriceE8s: bigint;
   collectionCreationPriceE8s: bigint;
   adminPayoutE8s: bigint;
+  adminPrimaryPayoutE8s: bigint;
+  adminSecondaryPayoutE8s: bigint;
   ledgerFeeE8s: bigint;
   cycleTransferFeeE8s: bigint;
   adminPayoutFeeE8s: bigint;
@@ -1682,6 +1697,13 @@ function fromRawMintConfig(value: RawMintConfig): MintConfig {
     collectionCreationPayoutAccount: fromRawOption(
       value.collectionCreationPayoutAccount,
     ),
+    collectionCreationSecondaryPayoutAccount: fromRawOption(
+      value.collectionCreationSecondaryPayoutAccount,
+    ),
+    collectionCreationPrimaryPayoutBasisPoints:
+      value.collectionCreationPrimaryPayoutBasisPoints,
+    collectionCreationSecondaryPayoutBasisPoints:
+      value.collectionCreationSecondaryPayoutBasisPoints,
     collectionCreationPriceE8s: value.collectionCreationPriceE8s,
     collectionCreationEnabled: value.collectionCreationEnabled,
     mainMintPayoutAccount: fromRawOption(value.mainMintPayoutAccount),
@@ -1745,6 +1767,8 @@ function fromRawCollectionCreationQuote(
     minimumCreationPriceE8s: value.minimumCreationPriceE8s,
     collectionCreationPriceE8s: value.collectionCreationPriceE8s,
     adminPayoutE8s: value.adminPayoutE8s,
+    adminPrimaryPayoutE8s: value.adminPrimaryPayoutE8s,
+    adminSecondaryPayoutE8s: value.adminSecondaryPayoutE8s,
     ledgerFeeE8s: value.ledgerFeeE8s,
     cycleTransferFeeE8s: value.cycleTransferFeeE8s,
     adminPayoutFeeE8s: value.adminPayoutFeeE8s,
@@ -2375,6 +2399,9 @@ export class Backend implements backendInterface {
     symbol: string,
     imageUrl: string,
     collectionCreationPayoutAccount: AccountIdentifier | null,
+    collectionCreationSecondaryPayoutAccount: AccountIdentifier | null,
+    collectionCreationPrimaryPayoutBasisPoints: bigint,
+    collectionCreationSecondaryPayoutBasisPoints: bigint,
     collectionCreationPriceE8s: bigint,
     collectionCreationEnabled: boolean,
     mainMintPayoutAccount: AccountIdentifier | null,
@@ -2391,6 +2418,9 @@ export class Backend implements backendInterface {
           symbol,
           imageUrl,
           toRawOption(collectionCreationPayoutAccount),
+          toRawOption(collectionCreationSecondaryPayoutAccount),
+          collectionCreationPrimaryPayoutBasisPoints,
+          collectionCreationSecondaryPayoutBasisPoints,
           collectionCreationPriceE8s,
           collectionCreationEnabled,
           toRawOption(mainMintPayoutAccount),
@@ -2577,12 +2607,16 @@ export class Backend implements backendInterface {
   async quoteCollectionCreationCost(
     collectionCanisterCycles: bigint,
     collectionCreationPriceE8s: bigint,
+    collectionCreationPrimaryPayoutBasisPoints: bigint,
+    collectionCreationSecondaryPayoutBasisPoints: bigint,
   ): Promise<CollectionCreationQuote> {
     return fromRawCollectionCreationQuote(
       await this.run(() =>
         this.actor.quoteCollectionCreationCost(
           collectionCanisterCycles,
           collectionCreationPriceE8s,
+          collectionCreationPrimaryPayoutBasisPoints,
+          collectionCreationSecondaryPayoutBasisPoints,
         ),
       ),
     );

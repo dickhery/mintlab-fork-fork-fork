@@ -1,15 +1,15 @@
-import { Q as QueryObserver, n as infiniteQueryBehavior, o as hasPreviousPage, p as hasNextPage, q as useBaseQuery, c as createLucideIcon, r as reactExports, h as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, d as useAdmin, e as useQueryClient, f as useQuery, s as AnimatePresence, m as motion, B as Button, g as ue, C as CircleDollarSign, X, G as Grid3x3, P as Principal, i as LoadingSpinner } from "./index-CtiMvMn7.js";
-import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-B64rsl3B.js";
-import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-CLn2Az5E.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-VYauyIcl.js";
-import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-BrythtH2.js";
-import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, B as Badge, I as Input, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./badge-C5lHJ171.js";
-import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent } from "./card-BoW9Rghx.js";
-import { u as useDirection } from "./index-BapO8db_.js";
-import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-2W0efyWb.js";
-import { S as Skeleton, C as Copy } from "./skeleton-D1D97gY-.js";
-import { S as Sparkles, c as compressModerationImage } from "./imageUtils-vhRE8bl-.js";
-import { r as resolveImageUrl, I as ImageOff } from "./media-CwL-LlCK.js";
+import { Q as QueryObserver, n as infiniteQueryBehavior, o as hasPreviousPage, p as hasNextPage, q as useBaseQuery, c as createLucideIcon, r as reactExports, h as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, d as useAdmin, e as useQueryClient, f as useQuery, s as AnimatePresence, m as motion, B as Button, g as ue, C as CircleDollarSign, X, G as Grid3x3, P as Principal, i as LoadingSpinner } from "./index-CRVxxeUX.js";
+import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-CXud1Nu2.js";
+import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-C92bQj8h.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-37fBglp0.js";
+import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-7Sr-aEma.js";
+import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, B as Badge, I as Input, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./badge-D7pMFf5q.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent } from "./card-BOMMhh3H.js";
+import { u as useDirection } from "./index-D8WOMrwU.js";
+import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-DO7BdJ5N.js";
+import { S as Skeleton, C as Copy } from "./skeleton-C3xms0CW.js";
+import { S as Sparkles, c as compressModerationImage } from "./imageUtils-BAQY8lHp.js";
+import { r as resolveImageUrl, I as ImageOff } from "./media-BzIBsxeE.js";
 var InfiniteQueryObserver = class extends QueryObserver {
   constructor(client, options) {
     super(client, options);
@@ -1325,13 +1325,17 @@ function CreateCollectionCard({
     queryKey: [
       "collectionCreationQuote",
       (mintConfig == null ? void 0 : mintConfig.collectionCanisterCycles.toString()) ?? "none",
-      (mintConfig == null ? void 0 : mintConfig.collectionCreationPriceE8s.toString()) ?? "none"
+      (mintConfig == null ? void 0 : mintConfig.collectionCreationPriceE8s.toString()) ?? "none",
+      (mintConfig == null ? void 0 : mintConfig.collectionCreationPrimaryPayoutBasisPoints.toString()) ?? "none",
+      (mintConfig == null ? void 0 : mintConfig.collectionCreationSecondaryPayoutBasisPoints.toString()) ?? "none"
     ],
     queryFn: async () => {
       if (!actor || !mintConfig) return null;
       return actor.quoteCollectionCreationCost(
         mintConfig.collectionCanisterCycles,
-        mintConfig.collectionCreationPriceE8s
+        mintConfig.collectionCreationPriceE8s,
+        mintConfig.collectionCreationPrimaryPayoutBasisPoints,
+        mintConfig.collectionCreationSecondaryPayoutBasisPoints
       );
     },
     enabled: !!actor && !!mintConfig,
@@ -1465,10 +1469,12 @@ function CreateCollectionCard({
             " cycles. Mintlab attaches those cycles to the IC canister creation call so the new collection canister receives about",
             " ",
             formatCycles(creationQuote.collectionCanisterCycles),
-            " after the IC creation fee, and",
+            " after the IC creation fee, and the remaining",
             " ",
             formatICP(creationQuote.adminPayoutE8s),
-            " ICP goes to the admin payout account. Ledger fees bring the total debit to",
+            " ICP is split across the configured payout account",
+            creationQuote.adminSecondaryPayoutE8s > 0n ? "s" : "",
+            ". Ledger fees bring the total debit to",
             " ",
             formatICP(creationQuote.totalUserDebitE8s),
             " ICP."
@@ -1598,6 +1604,10 @@ function CreateCollectionCard({
           {
             label: "New canister cycles after fee",
             value: creationQuote ? formatCycles(creationQuote.collectionCanisterCycles) : "Loading"
+          },
+          {
+            label: "Payout remainder",
+            value: creationQuote ? `${formatICP(creationQuote.adminPayoutE8s)} ICP` : "Loading"
           },
           {
             label: "Ledger fees",
