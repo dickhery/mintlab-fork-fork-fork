@@ -1,5 +1,5 @@
-import { j as jsxRuntimeExports, r as reactExports, h as useComposedRefs, a as cn, v as buttonVariants, R as React2 } from "./index-CRVxxeUX.js";
-import { s as Root, W as WarningProvider, C as Content, e as composeEventHandlers, T as Title, t as Description, v as Close, w as createDialogScope, x as Portal, O as Overlay, y as createSlottable, z as Trigger, f as createContextScope, r as createSlot } from "./badge-D7pMFf5q.js";
+import { j as jsxRuntimeExports, r as reactExports, h as useComposedRefs, a as cn, w as buttonVariants, R as React2 } from "./index-FlqJKsFj.js";
+import { x as Root, W as WarningProvider, y as Content, e as composeEventHandlers, T as Title, z as Description, B as Close, E as createDialogScope, G as Portal, O as Overlay, H as createSlottable, I as Trigger, f as createContextScope, v as createSlot } from "./index-Cfq6NGMu.js";
 var ROOT_NAME = "AlertDialog";
 var [createAlertDialogContext] = createContextScope(ROOT_NAME, [
   createDialogScope

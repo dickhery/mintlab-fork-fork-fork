@@ -1,4 +1,4 @@
-import { c as createLucideIcon, k as useNavigate, j as jsxRuntimeExports, m as motion, B as Button, W as Wallet, Z as Zap } from "./index-CRVxxeUX.js";
+import { c as createLucideIcon, k as useNavigate, j as jsxRuntimeExports, m as motion, B as Button, W as Wallet, C as CircleHelp, Z as Zap } from "./index-FlqJKsFj.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -118,6 +118,20 @@ function LandingPage() {
                           children: [
                             /* @__PURE__ */ jsxRuntimeExports.jsx(Wallet, { className: "w-4 h-4" }),
                             "Open Wallet"
+                          ]
+                        }
+                      ),
+                      /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                        Button,
+                        {
+                          size: "lg",
+                          variant: "ghost",
+                          className: "hover:bg-muted/40 transition-smooth gap-2 font-semibold px-8",
+                          onClick: () => navigate({ to: "/help" }),
+                          "data-ocid": "landing.help_button",
+                          children: [
+                            /* @__PURE__ */ jsxRuntimeExports.jsx(CircleHelp, { className: "w-4 h-4" }),
+                            "Learn Mintlab"
                           ]
                         }
                       )

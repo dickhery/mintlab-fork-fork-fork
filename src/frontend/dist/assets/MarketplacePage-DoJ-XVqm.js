@@ -1,12 +1,15 @@
-import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, h as useComposedRefs, a as cn, b as useBackend, u as useAuth, e as useQueryClient, f as useQuery, B as Button, S as ShoppingBag, i as LoadingSpinner, m as motion, X, g as ue } from "./index-CRVxxeUX.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-BqxdEgJK.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-37fBglp0.js";
-import { T as Tag, Z as ZoomableMediaImage, P as PaymentConfirmationDialog } from "./ZoomableMediaImage-7Sr-aEma.js";
-import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-D8WOMrwU.js";
-import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, B as Badge, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-D7pMFf5q.js";
+import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, h as useComposedRefs, a as cn, b as useBackend, u as useAuth, e as useQueryClient, f as useQuery, B as Button, S as ShoppingBag, i as LoadingSpinner, m as motion, X, g as ue } from "./index-FlqJKsFj.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-SJXVB9NH.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-BP-PKfxO.js";
+import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-B142X8u_.js";
+import { T as Tag, Z as ZoomableMediaImage, P as PaymentConfirmationDialog } from "./ZoomableMediaImage-CVfMaP9O.js";
+import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-D1GhiUVP.js";
+import { B as Badge, I as Input } from "./badge-DW0Kgz5Q.js";
+import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label } from "./index-Cfq6NGMu.js";
 import { f as formatICPAmount, p as parseICPToE8s } from "./icp-BXjZNIYq.js";
-import { C as Coins } from "./coins-SIjifN7o.js";
-import { I as ImageOff } from "./media-BzIBsxeE.js";
+import { C as Coins } from "./coins-AkJbzAZ5.js";
+import { I as ImageOff } from "./media-l_ybcBPo.js";
+import "./arrow-right-CNmAFIV9.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -1091,7 +1094,10 @@ function ListNFTModal({
             }) })
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-2", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { className: "text-xs text-muted-foreground uppercase tracking-wider", children: "Listing Type" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(Label, { className: "flex items-center gap-1.5 text-xs text-muted-foreground uppercase tracking-wider", children: [
+              "Listing Type",
+              /* @__PURE__ */ jsxRuntimeExports.jsx(HelpTooltip, { children: "Fixed listings sell at one price. Auctions hold bids in escrow, can run 1 hour to 30 days, and cannot be canceled after the first bid." })
+            ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex gap-2", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsxs(
                 "button",
@@ -1733,144 +1739,157 @@ function MarketplacePage() {
         }
       )
     ] }) }),
-    /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
-      Tabs,
-      {
-        value: activeTab,
-        onValueChange: (v) => setActiveTab(v),
-        children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs(
-            TabsList,
-            {
-              className: "bg-muted/60 border border-border mb-6",
-              "data-ocid": "marketplace.tabs",
-              children: [
-                /* @__PURE__ */ jsxRuntimeExports.jsxs(
-                  TabsTrigger,
-                  {
-                    value: "fixed",
-                    className: "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-medium",
-                    "data-ocid": "marketplace.tab.fixed",
-                    children: [
-                      /* @__PURE__ */ jsxRuntimeExports.jsx(ShoppingBag, { className: "w-4 h-4 mr-2" }),
-                      "Fixed Price",
-                      fixedListings.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { className: "ml-2 bg-primary/20 text-primary text-[10px] px-1.5 py-0 font-mono border-0", children: fixedListings.length })
-                    ]
-                  }
-                ),
-                /* @__PURE__ */ jsxRuntimeExports.jsxs(
-                  TabsTrigger,
-                  {
-                    value: "auctions",
-                    className: "data-[state=active]:bg-accent data-[state=active]:text-accent-foreground font-medium",
-                    "data-ocid": "marketplace.tab.auctions",
-                    children: [
-                      /* @__PURE__ */ jsxRuntimeExports.jsx(Gavel, { className: "w-4 h-4 mr-2" }),
-                      "Auctions",
-                      auctionListings.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { className: "ml-2 bg-accent/20 text-accent text-[10px] px-1.5 py-0 font-mono border-0", children: auctionListings.length })
-                    ]
-                  }
-                )
-              ]
-            }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(TabsContent, { value: "fixed", className: "mt-0", children: listingsLoading ? /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "div",
-            {
-              className: "flex items-center justify-center min-h-[40vh]",
-              "data-ocid": "marketplace.fixed.loading_state",
-              children: /* @__PURE__ */ jsxRuntimeExports.jsx(LoadingSpinner, { size: "lg", label: "Loading listings…" })
-            }
-          ) : fixedListings.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx(
-            EmptyState,
-            {
-              icon: ShoppingBag,
-              title: "No fixed-price listings",
-              description: "Be the first to list an NFT for a fixed price. Connect your wallet and click 'List Your NFT' above.",
-              action: isAuthenticated ? {
-                label: "List Your NFT",
-                onClick: () => setListModalOpen(true),
-                "data-ocid": "marketplace.fixed.list_cta"
-              } : void 0,
-              "data-ocid": "marketplace.fixed.empty_state"
-            }
-          ) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4", children: fixedListings.map(({ listing, nft, collection }, i) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-            FixedListingCard,
-            {
-              listing,
-              nft,
-              collection,
-              dividendE8s: listingDividendMap.get(
-                nftKey(nft.collectionId, nft.tokenId)
-              ) ?? 0n,
-              index: i,
-              currentPrincipal: principalStr,
-              onBuy: (id) => setBuyTarget(id),
-              onCancel: (id) => setCancelTarget(id),
-              onDetails: () => setDetailTarget({
-                listing: { __kind__: "Fixed", Fixed: listing },
+    /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8", children: [
+      /* @__PURE__ */ jsxRuntimeExports.jsx(
+        HelpCallout,
+        {
+          title: "List from your Wallet, buy and bid from your ICP Account",
+          sectionId: "marketplace",
+          actionLabel: "Marketplace guide",
+          className: "mb-6",
+          ocid: "marketplace.help_callout",
+          children: "Fixed purchases and auction bids use your in-app ICP balance. External registered NFTs are vaulted before listing so Mintlab can settle the sale on-chain."
+        }
+      ),
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(
+        Tabs,
+        {
+          value: activeTab,
+          onValueChange: (v) => setActiveTab(v),
+          children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(
+              TabsList,
+              {
+                className: "bg-muted/60 border border-border mb-6",
+                "data-ocid": "marketplace.tabs",
+                children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                    TabsTrigger,
+                    {
+                      value: "fixed",
+                      className: "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-medium",
+                      "data-ocid": "marketplace.tab.fixed",
+                      children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx(ShoppingBag, { className: "w-4 h-4 mr-2" }),
+                        "Fixed Price",
+                        fixedListings.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { className: "ml-2 bg-primary/20 text-primary text-[10px] px-1.5 py-0 font-mono border-0", children: fixedListings.length })
+                      ]
+                    }
+                  ),
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                    TabsTrigger,
+                    {
+                      value: "auctions",
+                      className: "data-[state=active]:bg-accent data-[state=active]:text-accent-foreground font-medium",
+                      "data-ocid": "marketplace.tab.auctions",
+                      children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx(Gavel, { className: "w-4 h-4 mr-2" }),
+                        "Auctions",
+                        auctionListings.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { className: "ml-2 bg-accent/20 text-accent text-[10px] px-1.5 py-0 font-mono border-0", children: auctionListings.length })
+                      ]
+                    }
+                  )
+                ]
+              }
+            ),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(TabsContent, { value: "fixed", className: "mt-0", children: listingsLoading ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "div",
+              {
+                className: "flex items-center justify-center min-h-[40vh]",
+                "data-ocid": "marketplace.fixed.loading_state",
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx(LoadingSpinner, { size: "lg", label: "Loading listings…" })
+              }
+            ) : fixedListings.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+              EmptyState,
+              {
+                icon: ShoppingBag,
+                title: "No fixed-price listings",
+                description: "Be the first to list an NFT for a fixed price. Connect your wallet and click 'List Your NFT' above.",
+                action: isAuthenticated ? {
+                  label: "List Your NFT",
+                  onClick: () => setListModalOpen(true),
+                  "data-ocid": "marketplace.fixed.list_cta"
+                } : void 0,
+                "data-ocid": "marketplace.fixed.empty_state"
+              }
+            ) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4", children: fixedListings.map(({ listing, nft, collection }, i) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+              FixedListingCard,
+              {
+                listing,
                 nft,
                 collection,
                 dividendE8s: listingDividendMap.get(
                   nftKey(nft.collectionId, nft.tokenId)
-                ) ?? 0n
-              }),
-              isBuying: isBuying && buyTarget === listing.id,
-              isCancelling: isCancelling && cancelTarget === listing.id
-            },
-            listing.id.toString()
-          )) }) }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(TabsContent, { value: "auctions", className: "mt-0", children: listingsLoading ? /* @__PURE__ */ jsxRuntimeExports.jsx(
-            "div",
-            {
-              className: "flex items-center justify-center min-h-[40vh]",
-              "data-ocid": "marketplace.auction.loading_state",
-              children: /* @__PURE__ */ jsxRuntimeExports.jsx(LoadingSpinner, { size: "lg", label: "Loading auctions…" })
-            }
-          ) : auctionListings.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx(
-            EmptyState,
-            {
-              icon: Gavel,
-              title: "No active auctions",
-              description: "No NFTs are currently up for auction. List yours to start the bidding!",
-              action: isAuthenticated ? {
-                label: "Start an Auction",
-                onClick: () => setListModalOpen(true),
-                "data-ocid": "marketplace.auction.list_cta"
-              } : void 0,
-              "data-ocid": "marketplace.auction.empty_state"
-            }
-          ) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4", children: auctionListings.map(({ listing, nft, collection }, i) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-            AuctionListingCard,
-            {
-              listing,
-              nft,
-              collection,
-              dividendE8s: listingDividendMap.get(
-                nftKey(nft.collectionId, nft.tokenId)
-              ) ?? 0n,
-              index: i,
-              currentPrincipal: principalStr,
-              bidStatus: myAuctionBidStatusMap.get(listing.id.toString()),
-              onBid: (l) => setBidTarget(l),
-              onSettle: (id) => settleAuction(id),
-              onCancel: (id) => setCancelTarget(id),
-              onDetails: () => setDetailTarget({
-                listing: { __kind__: "Auction", Auction: listing },
+                ) ?? 0n,
+                index: i,
+                currentPrincipal: principalStr,
+                onBuy: (id) => setBuyTarget(id),
+                onCancel: (id) => setCancelTarget(id),
+                onDetails: () => setDetailTarget({
+                  listing: { __kind__: "Fixed", Fixed: listing },
+                  nft,
+                  collection,
+                  dividendE8s: listingDividendMap.get(
+                    nftKey(nft.collectionId, nft.tokenId)
+                  ) ?? 0n
+                }),
+                isBuying: isBuying && buyTarget === listing.id,
+                isCancelling: isCancelling && cancelTarget === listing.id
+              },
+              listing.id.toString()
+            )) }) }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(TabsContent, { value: "auctions", className: "mt-0", children: listingsLoading ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+              "div",
+              {
+                className: "flex items-center justify-center min-h-[40vh]",
+                "data-ocid": "marketplace.auction.loading_state",
+                children: /* @__PURE__ */ jsxRuntimeExports.jsx(LoadingSpinner, { size: "lg", label: "Loading auctions…" })
+              }
+            ) : auctionListings.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsx(
+              EmptyState,
+              {
+                icon: Gavel,
+                title: "No active auctions",
+                description: "No NFTs are currently up for auction. List yours to start the bidding!",
+                action: isAuthenticated ? {
+                  label: "Start an Auction",
+                  onClick: () => setListModalOpen(true),
+                  "data-ocid": "marketplace.auction.list_cta"
+                } : void 0,
+                "data-ocid": "marketplace.auction.empty_state"
+              }
+            ) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4", children: auctionListings.map(({ listing, nft, collection }, i) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+              AuctionListingCard,
+              {
+                listing,
                 nft,
                 collection,
                 dividendE8s: listingDividendMap.get(
                   nftKey(nft.collectionId, nft.tokenId)
-                ) ?? 0n
-              }),
-              isSettling,
-              isCancelling: isCancelling && cancelTarget === listing.id
-            },
-            listing.id.toString()
-          )) }) })
-        ]
-      }
-    ) }),
+                ) ?? 0n,
+                index: i,
+                currentPrincipal: principalStr,
+                bidStatus: myAuctionBidStatusMap.get(listing.id.toString()),
+                onBid: (l) => setBidTarget(l),
+                onSettle: (id) => settleAuction(id),
+                onCancel: (id) => setCancelTarget(id),
+                onDetails: () => setDetailTarget({
+                  listing: { __kind__: "Auction", Auction: listing },
+                  nft,
+                  collection,
+                  dividendE8s: listingDividendMap.get(
+                    nftKey(nft.collectionId, nft.tokenId)
+                  ) ?? 0n
+                }),
+                isSettling,
+                isCancelling: isCancelling && cancelTarget === listing.id
+              },
+              listing.id.toString()
+            )) }) })
+          ]
+        }
+      )
+    ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsx(
       ListingDetailModal,
       {

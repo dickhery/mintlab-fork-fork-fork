@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-CR8HAclo.js","assets/AppCanisterTopUpDialog-CXud1Nu2.js","assets/badge-D7pMFf5q.js","assets/external-nft-transfer-BqxdEgJK.js","assets/media-BzIBsxeE.js","assets/MediaImage-37fBglp0.js","assets/ZoomableMediaImage-7Sr-aEma.js","assets/index-D8WOMrwU.js","assets/card-BOMMhh3H.js","assets/textarea-DO7BdJ5N.js","assets/skeleton-C3xms0CW.js","assets/imageUtils-BAQY8lHp.js","assets/send-Df7gKxBe.js","assets/coins-SIjifN7o.js","assets/MarketplacePage-CWXH5ggh.js","assets/icp-BXjZNIYq.js","assets/AdminPage-Dt9Sp1Qm.js","assets/switch-C92bQj8h.js","assets/circle-alert-DCmDTjN3.js","assets/ICPAccountPage-BtHFob8Y.js","assets/CollectionsPage-BXRVZeEB.js","assets/DividendsPage-DgL-8H9J.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-CxOoqyts.js","assets/AppCanisterTopUpDialog-D92vcrIp.js","assets/index-Cfq6NGMu.js","assets/badge-DW0Kgz5Q.js","assets/external-nft-transfer-SJXVB9NH.js","assets/media-l_ybcBPo.js","assets/MediaImage-BP-PKfxO.js","assets/HelpCallout-B142X8u_.js","assets/arrow-right-CNmAFIV9.js","assets/ZoomableMediaImage-CVfMaP9O.js","assets/index-D1GhiUVP.js","assets/card-BDJQhKr4.js","assets/textarea-DkMJPvrX.js","assets/skeleton-B32iwKGa.js","assets/imageUtils-Cgt_fgUu.js","assets/circle-check-CgMDu5zx.js","assets/coins-AkJbzAZ5.js","assets/send-CpLfuS_t.js","assets/MarketplacePage-DoJ-XVqm.js","assets/icp-BXjZNIYq.js","assets/AdminPage-DPo0Ao7g.js","assets/switch-CzGBiepV.js","assets/circle-alert-Ccomv8wR.js","assets/ICPAccountPage-DcTUTDF4.js","assets/CollectionsPage-D4ohGVGI.js","assets/shield-check-CaFbmdHL.js","assets/DividendsPage-BA3BBKtZ.js","assets/HelpPage-CJvaLFPw.js"])))=>i.map(i=>d[i]);
 var __defProp = Object.defineProperty;
 var __typeError = (msg) => {
   throw TypeError(msg);
@@ -15595,7 +15595,7 @@ function mergeLoginOptions(loginOptions, otherLoginOptions) {
   };
 }
 const ONE_HOUR_IN_NANOSECONDS = BigInt(36e11);
-const DEFAULT_IDENTITY_PROVIDER = "https://identity.internetcomputer.org/";
+const DEFAULT_IDENTITY_PROVIDER = "https://id.ai";
 const InternetIdentityReactContext = reactExports.createContext(void 0);
 async function createAuthClient(createOptions) {
   const config = await loadConfig();
@@ -37865,12 +37865,24 @@ const createLucideIcon = (iconName, iconNode) => {
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
  */
-const __iconNode$a = [
+const __iconNode$b = [
   ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
   ["path", { d: "M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8", key: "1h4pet" }],
   ["path", { d: "M12 18V6", key: "zqpxq5" }]
 ];
-const CircleDollarSign = createLucideIcon("circle-dollar-sign", __iconNode$a);
+const CircleDollarSign = createLucideIcon("circle-dollar-sign", __iconNode$b);
+/**
+ * @license lucide-react v0.511.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+const __iconNode$a = [
+  ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
+  ["path", { d: "M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3", key: "1u773s" }],
+  ["path", { d: "M12 17h.01", key: "p32p05" }]
+];
+const CircleHelp = createLucideIcon("circle-help", __iconNode$a);
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -46078,7 +46090,8 @@ const NAV_LINKS = [
   { label: "Collections", href: "/collections", icon: Grid3x3 },
   { label: "Marketplace", href: "/marketplace", icon: ShoppingBag },
   { label: "Dividends", href: "/dividends", icon: CircleDollarSign },
-  { label: "ICP Account", href: "/icp-account", icon: CreditCard }
+  { label: "ICP Account", href: "/icp-account", icon: CreditCard },
+  { label: "Help", href: "/help", icon: CircleHelp }
 ];
 function TruncatedPrincipal({ text }) {
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("span", { className: "font-mono text-xs text-muted-foreground", children: [
@@ -46274,7 +46287,18 @@ function Layout({ children }) {
           )
         ] })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-mono text-xs", children: "Built on Internet Computer" })
+      /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center gap-3", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          Link,
+          {
+            to: "/help",
+            className: "text-accent transition-colors hover:text-accent/80",
+            "data-ocid": "footer.help.link",
+            children: "Help"
+          }
+        ),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "font-mono text-xs", children: "Built on Internet Computer" })
+      ] })
     ] }) })
   ] });
 }
@@ -46634,13 +46658,14 @@ const Toaster = ({ ...props }) => {
     }
   );
 };
-const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-CR8HAclo.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13]) : void 0));
-const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-CWXH5ggh.js"), true ? __vite__mapDeps([14,3,4,5,6,7,2,15,13]) : void 0));
-const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-Dt9Sp1Qm.js"), true ? __vite__mapDeps([16,1,2,17,9,7,8,10,4,18]) : void 0));
-const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-BtHFob8Y.js"), true ? __vite__mapDeps([19,2,8,10,15,12,18]) : void 0));
-const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-ZRCLewHx.js"), true ? [] : void 0));
-const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-BXRVZeEB.js"), true ? __vite__mapDeps([20,1,2,17,9,7,5,4,6,8,10,11]) : void 0));
-const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-DgL-8H9J.js"), true ? __vite__mapDeps([21,1,2,5,4,8,13]) : void 0));
+const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-CxOoqyts.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]) : void 0));
+const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-DoJ-XVqm.js"), true ? __vite__mapDeps([18,4,5,6,7,2,8,9,10,3,19,16]) : void 0));
+const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-DPo0Ao7g.js"), true ? __vite__mapDeps([20,1,2,3,21,12,10,11,13,5,22]) : void 0));
+const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-DcTUTDF4.js"), true ? __vite__mapDeps([23,7,2,8,3,11,13,19,17,22,15]) : void 0));
+const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-EEid2_o3.js"), true ? [] : void 0));
+const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-D4ohGVGI.js"), true ? __vite__mapDeps([24,1,2,3,21,12,10,6,5,7,8,9,11,13,14,25]) : void 0));
+const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-BA3BBKtZ.js"), true ? __vite__mapDeps([26,1,2,3,6,5,7,8,11,16]) : void 0));
+const HelpPage = reactExports.lazy(() => __vitePreload(() => import("./HelpPage-CJvaLFPw.js"), true ? __vite__mapDeps([27,3,25,8,15]) : void 0));
 const rootRoute = createRootRoute({
   component: () => /* @__PURE__ */ jsxRuntimeExports.jsx(Layout, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(
     reactExports.Suspense,
@@ -46685,6 +46710,11 @@ const dividendsRoute = createRoute({
   path: "/dividends",
   component: DividendsPage
 });
+const helpRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/help",
+  component: HelpPage
+});
 const routeTree = rootRoute.addChildren([
   indexRoute,
   walletRoute,
@@ -46692,7 +46722,8 @@ const routeTree = rootRoute.addChildren([
   icpAccountRoute,
   adminRoute,
   collectionsRoute,
-  dividendsRoute
+  dividendsRoute,
+  helpRoute
 ]);
 const router = createRouter({ routeTree });
 function App() {
@@ -46711,22 +46742,26 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 export {
   Actor as A,
   Button as B,
-  CircleDollarSign as C,
-  notifyManager as D,
-  noop$7 as E,
-  shouldThrowError as F,
+  CircleHelp as C,
+  getDefaultState as D,
+  notifyManager as E,
+  noop$7 as F,
   Grid3x3 as G,
-  React$4 as H,
-  composeRefs$1 as I,
-  ReactDOM$2 as J,
-  createSlot as K,
+  shouldThrowError as H,
+  React$4 as I,
+  composeRefs$1 as J,
+  ReactDOM$2 as K,
   LogIn as L,
-  Slot as M,
-  cva as N,
+  createSlot as M,
+  useRouterState as N,
+  Link as O,
   Principal$1 as P,
   QueryObserver as Q,
   React2 as R,
   ShoppingBag as S,
+  CreditCard as T,
+  Slot as U,
+  cva as V,
   Wallet as W,
   X,
   Zap as Z,
@@ -46749,11 +46784,11 @@ export {
   useBaseQuery as q,
   reactExports as r,
   AnimatePresence as s,
-  reactDomExports as t,
+  CircleDollarSign as t,
   useAuth as u,
-  buttonVariants as v,
-  Subscribable as w,
-  shallowEqualObjects as x,
-  hashKey as y,
-  getDefaultState as z
+  reactDomExports as v,
+  buttonVariants as w,
+  Subscribable as x,
+  shallowEqualObjects as y,
+  hashKey as z
 };

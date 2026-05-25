@@ -1,10 +1,13 @@
-import { b as useBackend, u as useAuth, e as useQueryClient, r as reactExports, f as useQuery, j as jsxRuntimeExports, C as CircleDollarSign, B as Button, L as LogIn, i as LoadingSpinner, g as ue } from "./index-CRVxxeUX.js";
-import { L as LoaderCircle, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-CXud1Nu2.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-37fBglp0.js";
-import { u as useMutation, B as Badge } from "./badge-D7pMFf5q.js";
-import { R as RefreshCw, C as Card, c as CardContent } from "./card-BOMMhh3H.js";
-import { C as Coins } from "./coins-SIjifN7o.js";
-import { I as ImageOff } from "./media-BzIBsxeE.js";
+import { b as useBackend, u as useAuth, e as useQueryClient, r as reactExports, f as useQuery, j as jsxRuntimeExports, t as CircleDollarSign, B as Button, L as LogIn, i as LoadingSpinner, g as ue } from "./index-FlqJKsFj.js";
+import { L as LoaderCircle, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-D92vcrIp.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-BP-PKfxO.js";
+import { H as HelpCallout } from "./HelpCallout-B142X8u_.js";
+import { B as Badge } from "./badge-DW0Kgz5Q.js";
+import { R as RefreshCw, C as Card, c as CardContent } from "./card-BDJQhKr4.js";
+import { u as useMutation } from "./index-Cfq6NGMu.js";
+import { C as Coins } from "./coins-AkJbzAZ5.js";
+import { I as ImageOff } from "./media-l_ybcBPo.js";
+import "./arrow-right-CNmAFIV9.js";
 const E8S = 100000000n;
 const ICP_FEE = 10000n;
 function formatICP(e8s) {
@@ -192,6 +195,16 @@ function DividendsPage() {
               }
             )
           ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx(
+            HelpCallout,
+            {
+              title: "This is where dividend ICP is collected",
+              sectionId: "dividends",
+              actionLabel: "Dividend guide",
+              ocid: "dividends.help_callout",
+              children: "Dividend-enabled collection deposits are checked here, then claimable ICP can be collected from the NFTs you currently hold."
+            }
+          ),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-3 gap-3", children: [
             /* @__PURE__ */ jsxRuntimeExports.jsx(Card, { className: "border-border bg-card", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(CardContent, { className: "p-4", children: [
               /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs uppercase tracking-wider text-muted-foreground", children: "Claimable" }),

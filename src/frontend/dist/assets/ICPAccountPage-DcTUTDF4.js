@@ -1,10 +1,14 @@
-import { c as createLucideIcon, u as useAuth, b as useBackend, e as useQueryClient, r as reactExports, f as useQuery, j as jsxRuntimeExports, W as Wallet, B as Button, L as LogIn, g as ue } from "./index-CRVxxeUX.js";
-import { u as useMutation, B as Badge, L as Label, I as Input, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./badge-D7pMFf5q.js";
-import { C as Card, a as CardHeader, b as CardTitle, R as RefreshCw, c as CardContent } from "./card-BOMMhh3H.js";
-import { S as Skeleton, C as Copy } from "./skeleton-C3xms0CW.js";
+import { c as createLucideIcon, u as useAuth, b as useBackend, e as useQueryClient, r as reactExports, f as useQuery, j as jsxRuntimeExports, W as Wallet, B as Button, L as LogIn, g as ue } from "./index-FlqJKsFj.js";
+import { H as HelpCallout } from "./HelpCallout-B142X8u_.js";
+import { B as Badge, I as Input } from "./badge-DW0Kgz5Q.js";
+import { C as Card, a as CardHeader, b as CardTitle, R as RefreshCw, c as CardContent } from "./card-BDJQhKr4.js";
+import { u as useMutation, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./index-Cfq6NGMu.js";
+import { S as Skeleton, C as Copy } from "./skeleton-B32iwKGa.js";
 import { p as parseICPToE8s, I as ICP_E8S } from "./icp-BXjZNIYq.js";
-import { S as Send, C as CircleCheck } from "./send-Df7gKxBe.js";
-import { C as CircleAlert } from "./circle-alert-DCmDTjN3.js";
+import { S as Send } from "./send-CpLfuS_t.js";
+import { C as CircleAlert } from "./circle-alert-Ccomv8wR.js";
+import { C as CircleCheck } from "./circle-check-CgMDu5zx.js";
+import "./arrow-right-CNmAFIV9.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -197,6 +201,16 @@ function ICPAccountPage() {
           /* @__PURE__ */ jsxRuntimeExports.jsx("h1", { className: "text-2xl font-display font-bold text-foreground", children: "ICP Account" }),
           /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-muted-foreground", children: "View your balance and transfer ICP to any address" })
         ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          HelpCallout,
+          {
+            title: "Your in-app balance funds Mintlab actions",
+            sectionId: "icp-account",
+            actionLabel: "ICP guide",
+            ocid: "icp-account.help_callout",
+            children: "Use the Account Identifier below to receive ICP. This balance pays for minting, collection creation, marketplace buys, auction bids, and cycle top-ups."
+          }
+        ),
         /* @__PURE__ */ jsxRuntimeExports.jsxs(
           Card,
           {

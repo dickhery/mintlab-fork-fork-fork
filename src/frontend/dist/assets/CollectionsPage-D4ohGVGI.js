@@ -1,15 +1,19 @@
-import { Q as QueryObserver, n as infiniteQueryBehavior, o as hasPreviousPage, p as hasNextPage, q as useBaseQuery, c as createLucideIcon, r as reactExports, h as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, d as useAdmin, e as useQueryClient, f as useQuery, s as AnimatePresence, m as motion, B as Button, g as ue, C as CircleDollarSign, X, G as Grid3x3, P as Principal, i as LoadingSpinner } from "./index-CRVxxeUX.js";
-import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-CXud1Nu2.js";
-import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-C92bQj8h.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-37fBglp0.js";
-import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-7Sr-aEma.js";
-import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, B as Badge, I as Input, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./badge-D7pMFf5q.js";
-import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent } from "./card-BOMMhh3H.js";
-import { u as useDirection } from "./index-D8WOMrwU.js";
-import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-DO7BdJ5N.js";
-import { S as Skeleton, C as Copy } from "./skeleton-C3xms0CW.js";
-import { S as Sparkles, c as compressModerationImage } from "./imageUtils-BAQY8lHp.js";
-import { r as resolveImageUrl, I as ImageOff } from "./media-BzIBsxeE.js";
+import { Q as QueryObserver, n as infiniteQueryBehavior, o as hasPreviousPage, p as hasNextPage, q as useBaseQuery, c as createLucideIcon, r as reactExports, h as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, d as useAdmin, e as useQueryClient, f as useQuery, s as AnimatePresence, m as motion, B as Button, g as ue, t as CircleDollarSign, X, G as Grid3x3, P as Principal, i as LoadingSpinner } from "./index-FlqJKsFj.js";
+import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-D92vcrIp.js";
+import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-CzGBiepV.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-BP-PKfxO.js";
+import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-B142X8u_.js";
+import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-CVfMaP9O.js";
+import { B as Badge, I as Input } from "./badge-DW0Kgz5Q.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent } from "./card-BDJQhKr4.js";
+import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./index-Cfq6NGMu.js";
+import { u as useDirection } from "./index-D1GhiUVP.js";
+import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-DkMJPvrX.js";
+import { S as Skeleton, C as Copy } from "./skeleton-B32iwKGa.js";
+import { S as Sparkles, c as compressModerationImage } from "./imageUtils-Cgt_fgUu.js";
+import { r as resolveImageUrl, I as ImageOff } from "./media-l_ybcBPo.js";
+import { S as Search, a as ShieldCheck } from "./shield-check-CaFbmdHL.js";
+import "./arrow-right-CNmAFIV9.js";
 var InfiniteQueryObserver = class extends QueryObserver {
   constructor(client, options) {
     super(client, options);
@@ -83,39 +87,11 @@ function useInfiniteQuery(options, queryClient) {
  * This source code is licensed under the ISC license.
  * See the LICENSE file in the root directory of this source tree.
  */
-const __iconNode$2 = [
+const __iconNode = [
   ["path", { d: "m12 19-7-7 7-7", key: "1l729n" }],
   ["path", { d: "M19 12H5", key: "x3x0zl" }]
 ];
-const ArrowLeft = createLucideIcon("arrow-left", __iconNode$2);
-/**
- * @license lucide-react v0.511.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const __iconNode$1 = [
-  ["path", { d: "m21 21-4.34-4.34", key: "14j7rj" }],
-  ["circle", { cx: "11", cy: "11", r: "8", key: "4ej97u" }]
-];
-const Search = createLucideIcon("search", __iconNode$1);
-/**
- * @license lucide-react v0.511.0 - ISC
- *
- * This source code is licensed under the ISC license.
- * See the LICENSE file in the root directory of this source tree.
- */
-const __iconNode = [
-  [
-    "path",
-    {
-      d: "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z",
-      key: "oel41y"
-    }
-  ],
-  ["path", { d: "m9 12 2 2 4-4", key: "dzmm74" }]
-];
-const ShieldCheck = createLucideIcon("shield-check", __iconNode);
+const ArrowLeft = createLucideIcon("arrow-left", __iconNode);
 function useStateMachine(initialState, machine) {
   return reactExports.useReducer((state, event) => {
     const nextState = machine[state][event];
@@ -1550,7 +1526,8 @@ function CreateCollectionCard({
                 className: "flex items-center gap-2 text-sm font-medium text-foreground",
                 children: [
                   /* @__PURE__ */ jsxRuntimeExports.jsx(CircleDollarSign, { className: "w-4 h-4 text-accent" }),
-                  "Enable collection dividends"
+                  "Enable collection dividends",
+                  /* @__PURE__ */ jsxRuntimeExports.jsx(HelpTooltip, { children: "Dividends create a dedicated ICP address for this collection. Deposits can be checked from the collection browser and claimed by current NFT holders from Dividends." })
                 ]
               }
             ),
@@ -3381,6 +3358,16 @@ function CollectionsPage() {
                 /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-muted-foreground", children: "Discover community collections, import supported ICP NFT collections from elsewhere, and launch your own Mintlab collection after paying the admin-set setup fee." })
               ] }),
               !isLoading && !isAuthenticated && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-2xl border border-accent/20 bg-accent/5 p-4 text-sm text-muted-foreground", children: "Sign in to preview your NFTs, import collections into the shared directory, and create your own Mintlab collection." }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                HelpCallout,
+                {
+                  title: "Collections are for setup and browsing",
+                  sectionId: "collections",
+                  actionLabel: "Collections guide",
+                  ocid: "collections.help_callout",
+                  children: "Import supported external canisters here, create your own collection canister here, then mint new NFTs from the Wallet page."
+                }
+              ),
               /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 xl:grid-cols-2 gap-5", children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx(
                   ImportCollectionCard,

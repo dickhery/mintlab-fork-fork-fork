@@ -1,17 +1,21 @@
-import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useAdmin, e as useQueryClient, r as reactExports, f as useQuery, g as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-CRVxxeUX.js";
-import { P as Plus, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-CXud1Nu2.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-BqxdEgJK.js";
-import { M as MediaImage, E as EmptyState } from "./MediaImage-37fBglp0.js";
-import { B as Badge, u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label, I as Input } from "./badge-D7pMFf5q.js";
-import { I as ImageOff, r as resolveImageUrl } from "./media-BzIBsxeE.js";
-import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-7Sr-aEma.js";
-import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-BOMMhh3H.js";
-import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-DO7BdJ5N.js";
-import { S as Skeleton, C as Copy } from "./skeleton-C3xms0CW.js";
-import { S as Sparkles, c as compressModerationImage } from "./imageUtils-BAQY8lHp.js";
-import { C as CircleCheck, S as Send } from "./send-Df7gKxBe.js";
-import { C as Coins } from "./coins-SIjifN7o.js";
-import "./index-D8WOMrwU.js";
+import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useAdmin, e as useQueryClient, r as reactExports, f as useQuery, g as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-FlqJKsFj.js";
+import { P as Plus, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-D92vcrIp.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-SJXVB9NH.js";
+import { M as MediaImage, E as EmptyState } from "./MediaImage-BP-PKfxO.js";
+import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-B142X8u_.js";
+import { B as Badge, I as Input } from "./badge-DW0Kgz5Q.js";
+import { I as ImageOff, r as resolveImageUrl } from "./media-l_ybcBPo.js";
+import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-CVfMaP9O.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-BDJQhKr4.js";
+import { u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label } from "./index-Cfq6NGMu.js";
+import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-DkMJPvrX.js";
+import { S as Skeleton, C as Copy } from "./skeleton-B32iwKGa.js";
+import { S as Sparkles, c as compressModerationImage } from "./imageUtils-Cgt_fgUu.js";
+import { C as CircleCheck } from "./circle-check-CgMDu5zx.js";
+import { C as Coins } from "./coins-AkJbzAZ5.js";
+import { S as Send } from "./send-CpLfuS_t.js";
+import "./arrow-right-CNmAFIV9.js";
+import "./index-D1GhiUVP.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -1183,158 +1187,180 @@ function MintComposer({
         ] }),
         /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-muted-foreground", children: "Upload artwork, choose a collection, and add optional traits for filtering and discovery." })
       ] }),
-      /* @__PURE__ */ jsxRuntimeExports.jsx(CardContent, { className: "space-y-4", children: !mintConfig ? /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-muted-foreground", children: "Minting has not been configured by the admin yet." }) : !mainMintAvailable && creatorCollections.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-accent/20 bg-accent/5 p-3 text-sm text-muted-foreground", children: "Create your first Mintlab collection on the Collections page, or wait for the admin to enable public minting into the main collection." }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-xl border border-border bg-muted/20 p-3 text-sm text-muted-foreground", children: [
-          "Collection creation fee:",
-          " ",
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("strong", { className: "text-foreground", children: [
-            formatICP(mintConfig.collectionCreationPriceE8s),
-            " ICP"
-          ] }),
-          mintConfig.collectionCreationEnabled ? "" : " - collection creation is currently disabled by the admin"
-        ] })
-      ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { htmlFor: "mint-collection", children: "Mint target" }),
-            /* @__PURE__ */ jsxRuntimeExports.jsxs(
-              Select,
-              {
-                value: selectedTarget,
-                onValueChange: setSelectedTarget,
-                children: [
-                  /* @__PURE__ */ jsxRuntimeExports.jsx(
-                    SelectTrigger,
-                    {
-                      id: "mint-collection",
-                      "data-ocid": "wallet.mint.collection_select",
-                      children: /* @__PURE__ */ jsxRuntimeExports.jsx(SelectValue, { placeholder: "Select a collection" })
-                    }
-                  ),
-                  /* @__PURE__ */ jsxRuntimeExports.jsxs(SelectContent, { children: [
-                    mainMintAvailable && mainCollection && /* @__PURE__ */ jsxRuntimeExports.jsxs(SelectItem, { value: "main", children: [
-                      mainCollection.name,
-                      " (",
-                      formatICP(mintConfig.mainMintPriceE8s),
-                      " ICP)"
-                    ] }),
-                    creatorCollections.map((collection) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
-                      SelectItem,
+      /* @__PURE__ */ jsxRuntimeExports.jsxs(CardContent, { className: "space-y-4", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsx(
+          HelpCallout,
+          {
+            title: "Minting starts here",
+            sectionId: "wallet",
+            actionLabel: "Minting guide",
+            ocid: "wallet.mint.help_callout",
+            children: "Use this panel to mint into the main app collection when public minting is enabled, or into one of the Mintlab collections you created."
+          }
+        ),
+        !mintConfig ? /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-muted-foreground", children: "Minting has not been configured by the admin yet." }) : !mainMintAvailable && creatorCollections.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-accent/20 bg-accent/5 p-3 text-sm text-muted-foreground", children: "Create your first Mintlab collection on the Collections page, or wait for the admin to enable public minting into the main collection." }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-xl border border-border bg-muted/20 p-3 text-sm text-muted-foreground", children: [
+            "Collection creation fee:",
+            " ",
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("strong", { className: "text-foreground", children: [
+              formatICP(mintConfig.collectionCreationPriceE8s),
+              " ICP"
+            ] }),
+            mintConfig.collectionCreationEnabled ? "" : " - collection creation is currently disabled by the admin"
+          ] })
+        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                Label,
+                {
+                  htmlFor: "mint-collection",
+                  className: "flex items-center gap-1.5",
+                  children: [
+                    "Mint target",
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(HelpTooltip, { children: "Main app minting uses the admin-set price when enabled. Your creator collections mint into their own ICRC-7 canisters." })
+                  ]
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                Select,
+                {
+                  value: selectedTarget,
+                  onValueChange: setSelectedTarget,
+                  children: [
+                    /* @__PURE__ */ jsxRuntimeExports.jsx(
+                      SelectTrigger,
                       {
-                        value: `collection:${collection.id.toString()}`,
-                        children: [
-                          collection.name,
-                          " (",
-                          collection.symbol,
-                          ")"
-                        ]
-                      },
-                      collection.id.toString()
-                    ))
-                  ] })
-                ]
+                        id: "mint-collection",
+                        "data-ocid": "wallet.mint.collection_select",
+                        children: /* @__PURE__ */ jsxRuntimeExports.jsx(SelectValue, { placeholder: "Select a collection" })
+                      }
+                    ),
+                    /* @__PURE__ */ jsxRuntimeExports.jsxs(SelectContent, { children: [
+                      mainMintAvailable && mainCollection && /* @__PURE__ */ jsxRuntimeExports.jsxs(SelectItem, { value: "main", children: [
+                        mainCollection.name,
+                        " (",
+                        formatICP(mintConfig.mainMintPriceE8s),
+                        " ICP)"
+                      ] }),
+                      creatorCollections.map((collection) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                        SelectItem,
+                        {
+                          value: `collection:${collection.id.toString()}`,
+                          children: [
+                            collection.name,
+                            " (",
+                            collection.symbol,
+                            ")"
+                          ]
+                        },
+                        collection.id.toString()
+                      ))
+                    ] })
+                  ]
+                }
+              )
+            ] }),
+            targetCollection && /* @__PURE__ */ jsxRuntimeExports.jsx(
+              CopyField,
+              {
+                label: "Collection Canister",
+                value: targetCollection.canisterId.toString(),
+                ocid: "wallet.mint.copy_canister_id"
               }
             )
           ] }),
-          targetCollection && /* @__PURE__ */ jsxRuntimeExports.jsx(
-            CopyField,
-            {
-              label: "Collection Canister",
-              value: targetCollection.canisterId.toString(),
-              ocid: "wallet.mint.copy_canister_id"
-            }
-          )
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-accent/20 bg-accent/5 p-3 text-sm text-muted-foreground", children: selectedTarget === "main" ? `Minting into the main collection costs ${formatICP(mintConfig.mainMintPriceE8s)} ICP from your in-app account.` : "Creator collections use their own dedicated ICRC-7 canister." }),
-        (moderationConfig == null ? void 0 : moderationConfig.enabled) && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground", children: moderationConfig.userMessage }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-accent/20 bg-accent/5 p-3 text-sm text-muted-foreground", children: selectedTarget === "main" ? `Minting into the main collection costs ${formatICP(mintConfig.mainMintPriceE8s)} ICP from your in-app account.` : "Creator collections use their own dedicated ICRC-7 canister." }),
+          (moderationConfig == null ? void 0 : moderationConfig.enabled) && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground", children: moderationConfig.userMessage }),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "grid grid-cols-1 md:grid-cols-2 gap-4", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { htmlFor: "mint-name", children: "NFT name" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                Input,
+                {
+                  id: "mint-name",
+                  value: name,
+                  onChange: (e) => setName(e.target.value),
+                  placeholder: "e.g. Vault Original #1",
+                  "data-ocid": "wallet.mint.name_input"
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { htmlFor: "mint-image", children: "Image upload" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx(
+                Input,
+                {
+                  id: "mint-image",
+                  type: "file",
+                  accept: MODERATION_IMAGE_ACCEPT,
+                  onChange: (e) => {
+                    var _a;
+                    return void handleFileChange(((_a = e.target.files) == null ? void 0 : _a[0]) ?? null);
+                  },
+                  "data-ocid": "wallet.mint.image_input"
+                }
+              ),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: fileName || ((moderationConfig == null ? void 0 : moderationConfig.enabled) ? "Choose a JPG or PNG under about 1 MB" : "Choose an image to store with the minted NFT") })
+            ] })
+          ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { htmlFor: "mint-name", children: "NFT name" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { htmlFor: "mint-description", children: "Description" }),
             /* @__PURE__ */ jsxRuntimeExports.jsx(
-              Input,
+              Textarea,
               {
-                id: "mint-name",
-                value: name,
-                onChange: (e) => setName(e.target.value),
-                placeholder: "e.g. Vault Original #1",
-                "data-ocid": "wallet.mint.name_input"
+                id: "mint-description",
+                rows: 3,
+                value: description,
+                onChange: (e) => setDescription(e.target.value),
+                placeholder: "Describe your NFT…",
+                "data-ocid": "wallet.mint.description_textarea"
               }
             )
           ] }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
-            /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { htmlFor: "mint-image", children: "Image upload" }),
+            /* @__PURE__ */ jsxRuntimeExports.jsxs(Label, { htmlFor: "mint-attributes", children: [
+              "Attributes",
+              " ",
+              /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-muted-foreground", children: "(Trait: Value)" })
+            ] }),
             /* @__PURE__ */ jsxRuntimeExports.jsx(
-              Input,
+              Textarea,
               {
-                id: "mint-image",
-                type: "file",
-                accept: MODERATION_IMAGE_ACCEPT,
-                onChange: (e) => {
-                  var _a;
-                  return void handleFileChange(((_a = e.target.files) == null ? void 0 : _a[0]) ?? null);
-                },
-                "data-ocid": "wallet.mint.image_input"
+                id: "mint-attributes",
+                rows: 3,
+                value: attributesText,
+                onChange: (e) => setAttributesText(e.target.value),
+                placeholder: "Rarity: Rare\nSeries: Genesis",
+                "data-ocid": "wallet.mint.attributes_textarea"
               }
             ),
-            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: fileName || ((moderationConfig == null ? void 0 : moderationConfig.enabled) ? "Choose a JPG or PNG under about 1 MB" : "Choose an image to store with the minted NFT") })
-          ] })
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsx(Label, { htmlFor: "mint-description", children: "Description" }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            Textarea,
-            {
-              id: "mint-description",
-              rows: 3,
-              value: description,
-              onChange: (e) => setDescription(e.target.value),
-              placeholder: "Describe your NFT…",
-              "data-ocid": "wallet.mint.description_textarea"
-            }
-          )
-        ] }),
-        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-1.5", children: [
-          /* @__PURE__ */ jsxRuntimeExports.jsxs(Label, { htmlFor: "mint-attributes", children: [
-            "Attributes",
-            " ",
-            /* @__PURE__ */ jsxRuntimeExports.jsx("span", { className: "text-muted-foreground", children: "(Trait: Value)" })
+            /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Attributes are optional traits like Background: Blue or Rarity: Rare. They appear as filters on collection pages." })
           ] }),
-          /* @__PURE__ */ jsxRuntimeExports.jsx(
-            Textarea,
+          imageDataUrl && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-border bg-muted/20 p-3", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+            "img",
             {
-              id: "mint-attributes",
-              rows: 3,
-              value: attributesText,
-              onChange: (e) => setAttributesText(e.target.value),
-              placeholder: "Rarity: Rare\nSeries: Genesis",
-              "data-ocid": "wallet.mint.attributes_textarea"
+              src: imageDataUrl,
+              alt: "Mint preview",
+              className: "w-28 h-28 rounded-lg object-cover border border-border/50"
             }
-          ),
-          /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Attributes are optional traits like Background: Blue or Rarity: Rare. They appear as filters on collection pages." })
-        ] }),
-        imageDataUrl && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-border bg-muted/20 p-3", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
-          "img",
-          {
-            src: imageDataUrl,
-            alt: "Mint preview",
-            className: "w-28 h-28 rounded-lg object-cover border border-border/50"
-          }
-        ) }),
-        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex justify-end", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
-          Button,
-          {
-            onClick: startMint,
-            disabled: mutation.isPending || !targetCollection,
-            className: "gap-2",
-            "data-ocid": "wallet.mint.submit_button",
-            children: [
-              /* @__PURE__ */ jsxRuntimeExports.jsx(ImagePlus, { className: "w-4 h-4" }),
-              mutation.isPending ? "Minting..." : "Mint NFT"
-            ]
-          }
-        ) })
-      ] }) })
+          ) }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex justify-end", children: /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            Button,
+            {
+              onClick: startMint,
+              disabled: mutation.isPending || !targetCollection,
+              className: "gap-2",
+              "data-ocid": "wallet.mint.submit_button",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(ImagePlus, { className: "w-4 h-4" }),
+                mutation.isPending ? "Minting..." : "Mint NFT"
+              ]
+            }
+          ) })
+        ] })
+      ] })
     ] }),
     /* @__PURE__ */ jsxRuntimeExports.jsx(
       PaymentConfirmationDialog,

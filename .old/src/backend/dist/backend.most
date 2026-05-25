@@ -56,6 +56,14 @@ type Bid__832380272 =
   };
 type CollectionBrowseInfo__259459099 =
   {tokenIndexOffset : ?Nat; totalSupply : ?Nat};
+type CollectionCreationRequestPayout__971108668 =
+  {
+    primaryPayoutE8s : Nat64;
+    requestId : Nat;
+    secondaryPayoutAccount : ?AccountIdentifier__537905862;
+    secondaryPayoutBlock : ?Nat64;
+    secondaryPayoutE8s : Nat64
+  };
 type CollectionCreationRequest__20821532 =
   {
     adminPayoutAccount : ?AccountIdentifier__537905862;
@@ -188,21 +196,6 @@ type Map__158565046<K, V> = Map__297112838<K, V>;
 type Map__297112838<K, V> =
   {var root : Node__46230540<K, V>; var size : Nat__490723111};
 type Map__605269027<K, V> = Map__158565046<K, V>;
-type MintConfig__1058316781 =
-  {
-    collectionCanisterCycles : Nat;
-    collectionCanisterWasmUploaded : Bool;
-    collectionCreationEnabled : Bool;
-    collectionCreationPayoutAccount : ?AccountIdentifier__537905862;
-    collectionCreationPriceE8s : Nat64;
-    collectionId : ?CollectionId__413579528;
-    mainMintEnabled : Bool;
-    mainMintPayoutAccount : ?AccountIdentifier__537905862;
-    mainMintPriceE8s : Nat64;
-    mintEnabled : Bool;
-    mintPriceE8s : Nat64;
-    payoutAccount : ?AccountIdentifier__537905862
-  };
 type MintedToken__579944743 =
   {
     metadata : NFTMetadata__480568277;
@@ -299,6 +292,21 @@ type SettlementStage__594654131 =
     #PaymentPending;
     #SellerPaymentPending
   };
+type StoredMintConfig__154708401 =
+  {
+    collectionCanisterCycles : Nat;
+    collectionCanisterWasmUploaded : Bool;
+    collectionCreationEnabled : Bool;
+    collectionCreationPayoutAccount : ?AccountIdentifier__537905862;
+    collectionCreationPriceE8s : Nat64;
+    collectionId : ?CollectionId__413579528;
+    mainMintEnabled : Bool;
+    mainMintPayoutAccount : ?AccountIdentifier__537905862;
+    mainMintPriceE8s : Nat64;
+    mintEnabled : Bool;
+    mintPriceE8s : Nat64;
+    payoutAccount : ?AccountIdentifier__537905862
+  };
 type Timestamp__301639476 = Int;
 type Timestamp__534280185 = Timestamp__301639476;
 type UserId__158757552 = Principal;
@@ -317,6 +325,14 @@ type WalletNFT__72979044 =
   };
 actor {
   stable authState : {var adminPrincipal : ?Principal};
+  stable collectionCreationPayoutSplitState :
+    {
+      var primaryPayoutBasisPoints : Nat;
+      requestPayouts :
+        Map__605269027<Nat, CollectionCreationRequestPayout__971108668>;
+      var secondaryPayoutAccount : ?AccountIdentifier__537905862;
+      var secondaryPayoutBasisPoints : Nat
+    };
   stable collectionCreationState :
     {
       var nextRequestId : Nat;
@@ -395,7 +411,7 @@ actor {
   stable mintState :
     {
       var collectionCanisterWasm : ?Blob;
-      var config : MintConfig__1058316781;
+      var config : StoredMintConfig__154708401;
       var nextTokenId : Nat;
       var nextTransactionId : Nat;
       pendingCollectionCreates : Map__605269027<Principal, Bool>;
