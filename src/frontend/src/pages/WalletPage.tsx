@@ -1,6 +1,7 @@
 import { AppCanisterTopUpDialog } from "@/components/AppCanisterTopUpDialog";
 import { CollectionBadge } from "@/components/CollectionBadge";
 import { EmptyState } from "@/components/EmptyState";
+import { HelpCallout, HelpTooltip } from "@/components/HelpCallout";
 import { MediaImage } from "@/components/MediaImage";
 import { NFTCard } from "@/components/NFTCard";
 import { PaymentConfirmationDialog } from "@/components/PaymentConfirmationDialog";
@@ -1337,6 +1338,17 @@ function MintComposer({
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
+          <HelpCallout
+            title="Minting starts here"
+            sectionId="wallet"
+            actionLabel="Minting guide"
+            ocid="wallet.mint.help_callout"
+          >
+            Use this panel to mint into the main app collection when public
+            minting is enabled, or into one of the Mintlab collections you
+            created.
+          </HelpCallout>
+
           {!mintConfig ? (
             <p className="text-sm text-muted-foreground">
               Minting has not been configured by the admin yet.
@@ -1362,7 +1374,17 @@ function MintComposer({
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <Label htmlFor="mint-collection">Mint target</Label>
+                  <Label
+                    htmlFor="mint-collection"
+                    className="flex items-center gap-1.5"
+                  >
+                    Mint target
+                    <HelpTooltip>
+                      Main app minting uses the admin-set price when enabled.
+                      Your creator collections mint into their own ICRC-7
+                      canisters.
+                    </HelpTooltip>
+                  </Label>
                   <Select
                     value={selectedTarget}
                     onValueChange={setSelectedTarget}

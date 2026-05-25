@@ -1,5 +1,6 @@
 import { AppCanisterTopUpDialog } from "@/components/AppCanisterTopUpDialog";
 import { EmptyState } from "@/components/EmptyState";
+import { HelpCallout } from "@/components/HelpCallout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { MediaImage } from "@/components/MediaImage";
 import { Badge } from "@/components/ui/badge";
@@ -237,6 +238,16 @@ export default function DividendsPage() {
             Check Deposits
           </Button>
         </div>
+
+        <HelpCallout
+          title="This is where dividend ICP is collected"
+          sectionId="dividends"
+          actionLabel="Dividend guide"
+          ocid="dividends.help_callout"
+        >
+          Dividend-enabled collection deposits are checked here, then claimable
+          ICP can be collected from the NFTs you currently hold.
+        </HelpCallout>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Card className="border-border bg-card">

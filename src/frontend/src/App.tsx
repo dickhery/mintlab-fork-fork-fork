@@ -17,6 +17,7 @@ const ICPAccountPage = lazy(() => import("@/pages/ICPAccountPage"));
 const LandingPage = lazy(() => import("@/pages/LandingPage"));
 const CollectionsPage = lazy(() => import("@/pages/CollectionsPage"));
 const DividendsPage = lazy(() => import("@/pages/DividendsPage"));
+const HelpPage = lazy(() => import("@/pages/HelpPage"));
 
 const rootRoute = createRootRoute({
   component: () => (
@@ -76,6 +77,12 @@ const dividendsRoute = createRoute({
   component: DividendsPage,
 });
 
+const helpRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/help",
+  component: HelpPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   walletRoute,
@@ -84,6 +91,7 @@ const routeTree = rootRoute.addChildren([
   adminRoute,
   collectionsRoute,
   dividendsRoute,
+  helpRoute,
 ]);
 
 const router = createRouter({ routeTree });

@@ -4,6 +4,7 @@ import {
   recommendedCollectionCreationTopUpCycles,
 } from "@/components/CollectionCreationDiagnosticsPanel";
 import { EmptyState } from "@/components/EmptyState";
+import { HelpCallout, HelpTooltip } from "@/components/HelpCallout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { MediaImage } from "@/components/MediaImage";
 import { PaymentConfirmationDialog } from "@/components/PaymentConfirmationDialog";
@@ -886,6 +887,11 @@ function CreateCollectionCard({
               >
                 <CircleDollarSign className="w-4 h-4 text-accent" />
                 Enable collection dividends
+                <HelpTooltip>
+                  Dividends create a dedicated ICP address for this collection.
+                  Deposits can be checked from the collection browser and
+                  claimed by current NFT holders from Dividends.
+                </HelpTooltip>
               </Label>
               <p className="text-xs text-muted-foreground leading-relaxed">
                 Creates a dedicated ICP address for this collection so deposits
@@ -3075,6 +3081,16 @@ export default function CollectionsPage() {
                 directory, and create your own Mintlab collection.
               </div>
             )}
+
+            <HelpCallout
+              title="Collections are for setup and browsing"
+              sectionId="collections"
+              actionLabel="Collections guide"
+              ocid="collections.help_callout"
+            >
+              Import supported external canisters here, create your own
+              collection canister here, then mint new NFTs from the Wallet page.
+            </HelpCallout>
 
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
               <ImportCollectionCard

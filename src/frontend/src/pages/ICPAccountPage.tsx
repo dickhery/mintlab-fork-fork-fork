@@ -1,4 +1,5 @@
 import type { AccountIdentifier, TransferResult } from "@/backend-client";
+import { HelpCallout } from "@/components/HelpCallout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -264,6 +265,17 @@ export default function ICPAccountPage() {
           View your balance and transfer ICP to any address
         </p>
       </div>
+
+      <HelpCallout
+        title="Your in-app balance funds Mintlab actions"
+        sectionId="icp-account"
+        actionLabel="ICP guide"
+        ocid="icp-account.help_callout"
+      >
+        Use the Account Identifier below to receive ICP. This balance pays for
+        minting, collection creation, marketplace buys, auction bids, and cycle
+        top-ups.
+      </HelpCallout>
 
       {/* ── Balance card ── */}
       <Card

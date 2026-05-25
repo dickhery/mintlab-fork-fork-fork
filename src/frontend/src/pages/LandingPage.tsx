@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "@tanstack/react-router";
-import { LayoutGrid, Wallet, Zap } from "lucide-react";
+import { CircleHelp, LayoutGrid, Wallet, Zap } from "lucide-react";
 import { motion } from "motion/react";
 
 const features = [
@@ -106,6 +106,16 @@ export default function LandingPage() {
             >
               <Wallet className="w-4 h-4" />
               Open Wallet
+            </Button>
+            <Button
+              size="lg"
+              variant="ghost"
+              className="hover:bg-muted/40 transition-smooth gap-2 font-semibold px-8"
+              onClick={() => navigate({ to: "/help" })}
+              data-ocid="landing.help_button"
+            >
+              <CircleHelp className="w-4 h-4" />
+              Learn Mintlab
             </Button>
           </motion.div>
         </motion.div>

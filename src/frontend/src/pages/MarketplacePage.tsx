@@ -1,5 +1,6 @@
 import { CollectionBadge } from "@/components/CollectionBadge";
 import { EmptyState } from "@/components/EmptyState";
+import { HelpCallout, HelpTooltip } from "@/components/HelpCallout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { MediaImage } from "@/components/MediaImage";
 import { PaymentConfirmationDialog } from "@/components/PaymentConfirmationDialog";
@@ -899,8 +900,13 @@ function ListNFTModal({
 
           {/* Type Toggle */}
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground uppercase tracking-wider">
+            <Label className="flex items-center gap-1.5 text-xs text-muted-foreground uppercase tracking-wider">
               Listing Type
+              <HelpTooltip>
+                Fixed listings sell at one price. Auctions hold bids in escrow,
+                can run 1 hour to 30 days, and cannot be canceled after the
+                first bid.
+              </HelpTooltip>
             </Label>
             <div className="flex gap-2">
               <button
@@ -1657,6 +1663,18 @@ export default function MarketplacePage() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <HelpCallout
+          title="List from your Wallet, buy and bid from your ICP Account"
+          sectionId="marketplace"
+          actionLabel="Marketplace guide"
+          className="mb-6"
+          ocid="marketplace.help_callout"
+        >
+          Fixed purchases and auction bids use your in-app ICP balance. External
+          registered NFTs are vaulted before listing so Mintlab can settle the
+          sale on-chain.
+        </HelpCallout>
+
         <Tabs
           value={activeTab}
           onValueChange={(v) => setActiveTab(v as "fixed" | "auctions")}

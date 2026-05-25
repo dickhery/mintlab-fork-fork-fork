@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   CircleDollarSign,
+  CircleHelp,
   CreditCard,
   Grid3X3,
   LogIn,
@@ -25,6 +26,7 @@ const NAV_LINKS = [
   { label: "Marketplace", href: "/marketplace", icon: ShoppingBag },
   { label: "Dividends", href: "/dividends", icon: CircleDollarSign },
   { label: "ICP Account", href: "/icp-account", icon: CreditCard },
+  { label: "Help", href: "/help", icon: CircleHelp },
 ];
 
 function TruncatedPrincipal({ text }: { text: string }) {
@@ -226,7 +228,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </a>
             </span>
           </div>
-          <span className="font-mono text-xs">Built on Internet Computer</span>
+          <div className="flex items-center gap-3">
+            <Link
+              to="/help"
+              className="text-accent transition-colors hover:text-accent/80"
+              data-ocid="footer.help.link"
+            >
+              Help
+            </Link>
+            <span className="font-mono text-xs">
+              Built on Internet Computer
+            </span>
+          </div>
         </div>
       </footer>
     </div>
