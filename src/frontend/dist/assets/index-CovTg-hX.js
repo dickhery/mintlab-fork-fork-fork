@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-B8KhRekg.js","assets/AppCanisterTopUpDialog-DDsHUyXD.js","assets/index-Byv1oxo0.js","assets/badge-DyWrd8S9.js","assets/external-nft-transfer-RODVCHlo.js","assets/media-l8J0swV4.js","assets/MediaImage-DM01sE6x.js","assets/HelpCallout-CcsBl9sy.js","assets/arrow-right-F_r_3qVe.js","assets/ZoomableMediaImage-BeocNwgW.js","assets/index-CpwJYIFc.js","assets/card-BmmW0ULT.js","assets/textarea-DwDGf75G.js","assets/skeleton-4xVXen6F.js","assets/imageUtils-CNIauznE.js","assets/circle-check-DgD_5Naj.js","assets/coins-cikpxwHj.js","assets/send-Dc4Qp647.js","assets/MarketplacePage-w2pUIUzN.js","assets/icp-BXjZNIYq.js","assets/AdminPage-Ce0BOZAL.js","assets/switch-DT4oYvX4.js","assets/circle-alert-DD_5MABl.js","assets/ICPAccountPage-BluO_Tqg.js","assets/CollectionsPage-DXrlOB5I.js","assets/shield-check-C6WnLQ_s.js","assets/DividendsPage-DNIxmxPH.js","assets/HelpPage-D5c6GLU2.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-BJvCxoU7.js","assets/AppCanisterTopUpDialog-n0FWRqZ-.js","assets/index-CkhE-A-E.js","assets/badge-CfPrF_7D.js","assets/external-nft-transfer-D8xRTvFp.js","assets/media-CRobFZT0.js","assets/MediaImage-UgFcbtut.js","assets/HelpCallout-T-QMDs9O.js","assets/arrow-right-0kqjpRcW.js","assets/ZoomableMediaImage-CY5BV5vl.js","assets/index-UzwHq4RI.js","assets/card-jfIVO2Xy.js","assets/textarea-C60GPmHU.js","assets/skeleton-ged-8493.js","assets/imageUtils-BvIv5vFD.js","assets/circle-check-DMGdSLn6.js","assets/coins-CsEe8omy.js","assets/send-BDcICmY3.js","assets/MarketplacePage-NBDTWosy.js","assets/icp-BXjZNIYq.js","assets/AdminPage-jOnEL-qd.js","assets/switch-BsbVSVyq.js","assets/circle-alert-C3xm30wx.js","assets/ICPAccountPage-BSmk-dr9.js","assets/CollectionsPage-DE6CakD-.js","assets/shield-check-B-NQbn1n.js","assets/DividendsPage-Cd9tfzTO.js","assets/HelpPage-ZutRWD09.js"])))=>i.map(i=>d[i]);
 var __defProp = Object.defineProperty;
 var __typeError = (msg) => {
   throw TypeError(msg);
@@ -15595,7 +15595,7 @@ function mergeLoginOptions(loginOptions, otherLoginOptions) {
   };
 }
 const ONE_HOUR_IN_NANOSECONDS = BigInt(36e11);
-const DEFAULT_IDENTITY_PROVIDER = "https://identity.internetcomputer.org/";
+const DEFAULT_IDENTITY_PROVIDER = "https://id.ai";
 const InternetIdentityReactContext = reactExports.createContext(void 0);
 async function createAuthClient(createOptions) {
   const config = await loadConfig();
@@ -47360,14 +47360,14 @@ const Toaster = ({ ...props }) => {
     }
   );
 };
-const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-B8KhRekg.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]) : void 0));
-const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-w2pUIUzN.js"), true ? __vite__mapDeps([18,4,5,6,7,2,8,9,10,3,19,16]) : void 0));
-const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-Ce0BOZAL.js"), true ? __vite__mapDeps([20,1,2,3,21,12,10,11,13,5,22]) : void 0));
-const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-BluO_Tqg.js"), true ? __vite__mapDeps([23,7,2,8,3,11,13,19,17,22,15]) : void 0));
-const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-QEWHfvdL.js"), true ? [] : void 0));
-const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-DXrlOB5I.js"), true ? __vite__mapDeps([24,1,2,3,21,12,10,6,5,7,8,9,11,13,14,25]) : void 0));
-const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-DNIxmxPH.js"), true ? __vite__mapDeps([26,1,2,3,6,5,7,8,11,16]) : void 0));
-const HelpPage = reactExports.lazy(() => __vitePreload(() => import("./HelpPage-D5c6GLU2.js"), true ? __vite__mapDeps([27,3,25,8,15]) : void 0));
+const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-BJvCxoU7.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]) : void 0));
+const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-NBDTWosy.js"), true ? __vite__mapDeps([18,4,5,6,7,2,8,9,10,3,19,16]) : void 0));
+const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-jOnEL-qd.js"), true ? __vite__mapDeps([20,1,2,3,21,12,10,11,13,5,22]) : void 0));
+const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-BSmk-dr9.js"), true ? __vite__mapDeps([23,7,2,8,3,11,13,19,17,22,15]) : void 0));
+const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-LxIfnW2X.js"), true ? [] : void 0));
+const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-DE6CakD-.js"), true ? __vite__mapDeps([24,1,2,3,21,12,10,6,5,7,8,9,11,13,14,25]) : void 0));
+const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-Cd9tfzTO.js"), true ? __vite__mapDeps([26,1,2,3,6,5,7,8,11,16]) : void 0));
+const HelpPage = reactExports.lazy(() => __vitePreload(() => import("./HelpPage-ZutRWD09.js"), true ? __vite__mapDeps([27,3,25,8,15]) : void 0));
 const rootRoute = createRootRoute({
   component: () => /* @__PURE__ */ jsxRuntimeExports.jsx(Layout, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(
     reactExports.Suspense,

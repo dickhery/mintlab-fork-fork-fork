@@ -2,6 +2,7 @@
 type AccountIdentifier__461726824 = Blob;
 type AccountIdentifier__537905862 = AccountIdentifier__461726824;
 type AccountIdentifier__659921903 = AccountIdentifier__461726824;
+type AccountIdentifier__844475998 = AccountIdentifier__461726824;
 type AuctionEscrow__460860708 =
   {
     amount : Nat64;
@@ -285,6 +286,25 @@ type PendingBidDeposit__499993912 =
     paymentCreatedAt : Nat64;
     updatedAt : Timestamp__534280185
   };
+type PendingMintPaymentStatus__1070325767 =
+  {#Failed; #Minted; #PaymentPending; #PaymentSent};
+type PendingMintPayment__763212301 =
+  {
+    amountE8s : Nat64;
+    caller : Principal;
+    collectionId : CollectionId__413579528;
+    createdAt : Nat64;
+    id : Nat;
+    lastError : ?Text;
+    memo : Nat64;
+    metadata : NFTMetadata__480568277;
+    mintedTokenId : ?Nat;
+    paymentBlock : ?Nat64;
+    paymentCreatedAt : Nat64;
+    payoutAccount : AccountIdentifier__537905862;
+    status : PendingMintPaymentStatus__1070325767;
+    updatedAt : Nat64
+  };
 type SettlementStage__594654131 =
   {
     #MintlabFeePending;
@@ -312,6 +332,7 @@ type Timestamp__534280185 = Timestamp__301639476;
 type UserId__158757552 = Principal;
 type UserId__166399690 = UserId__158757552;
 type UserId__74810557 = UserId__158757552;
+type UserId__933073725 = UserId__158757552;
 type WalletLocation__456448127 = {#Minted; #Registered; #Vaulted};
 type WalletNFT__72979044 =
   {
@@ -323,6 +344,20 @@ type WalletNFT__72979044 =
     registeredAt : Timestamp__301639476;
     tokenId : Text
   };
+type WithdrawalJournalEntry__114752974 =
+  {
+    amountE8s : Nat64;
+    blockIndex : ?Nat64;
+    caller : UserId__933073725;
+    createdAt : Nat64;
+    id : Nat;
+    lastError : ?Text;
+    memo : Nat64;
+    status : WithdrawalStatus__328667338;
+    to : AccountIdentifier__844475998;
+    updatedAt : Nat64
+  };
+type WithdrawalStatus__328667338 = {#Completed; #Failed; #Pending};
 actor {
   stable AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat;
   stable AUTO_INDEX_PAGE_LIMIT : Nat;
@@ -358,6 +393,11 @@ actor {
       claimableE8s : Map__605269027<Text, Nat64>;
       pendingClaims : Map__605269027<Text, Bool>;
       processedBalanceE8s : Map__605269027<CollectionId__674876002, Nat64>
+    };
+  stable icpWithdrawalState :
+    {
+      var nextWithdrawalId : Nat;
+      withdrawals : Map__605269027<Text, WithdrawalJournalEntry__114752974>
     };
   stable marketplaceBidState :
     {
@@ -427,6 +467,12 @@ actor {
       status :
         Map__605269027<CollectionId__519062255,
                         CollectionIndexStatus__92330500>
+    };
+  stable pendingMintPaymentState :
+    {
+      var nextPaymentId : Nat;
+      payments : Map__605269027<Nat, PendingMintPayment__763212301>;
+      paymentsByCaller : Map__605269027<Principal, [Nat]>
     };
   stable walletState :
     {
