@@ -286,6 +286,8 @@ persistent actor class MintlabCollection(init : {
   type HttpResponse = HttpMedia.HttpResponse;
 
   let tokens = Map.empty<Nat, MintedToken>();
+  let ownerTokenIndex = Map.empty<Principal, [Nat]>();
+  let ownerTokenIndexReady = Map.empty<Principal, Bool>();
   var nextTokenId : Nat = 1;
   var nextTransactionId : Nat = 0;
   let collectionOwner : Principal = init.owner;
@@ -326,6 +328,7 @@ persistent actor class MintlabCollection(init : {
       transferredBy = null;
     };
     Map.add(tokens, Nat.compare, tokenId, token);
+    addOwnerToken(to, tokenId);
     #ok({ tokenId; transactionId });
   };
 
@@ -395,7 +398,7 @@ persistent actor class MintlabCollection(init : {
             [
               {
                 tokenId = token.tokenId;
-                metadata = token.metadata;
+                metadata = publicMintlabMetadata(token);
               }
             ],
           );
@@ -859,6 +862,7 @@ persistent actor class MintlabCollection(init : {
             transferredBy = ?from;
           },
         );
+        moveOwnerToken(from, to, tokenId);
         #ok(transactionId);
       };
     };
@@ -1058,6 +1062,12 @@ persistent actor class MintlabCollection(init : {
     switch (HttpMedia.tokenAssetUrl(Principal.fromActor(this), token.tokenId)) {
       case (?value) value;
       case null tokenOriginalImageUrl(token);
+    };
+  };
+
+  func publicMintlabMetadata(token : MintedToken) : NFTMetadata {
+    {
+      token.metadata with imageUrl = ?tokenAssetUrl(token);
     };
   };
 
@@ -1329,13 +1339,86 @@ persistent actor class MintlabCollection(init : {
   };
 
   func ownerTokenIdsNat(owner : Principal) : [Nat] {
+    switch (Map.get(ownerTokenIndexReady, Principal.compare, owner)) {
+      case (?true) {
+        switch (Map.get(ownerTokenIndex, Principal.compare, owner)) {
+          case (?ids) return ids;
+          case null return [];
+        };
+      };
+      case (_) {};
+    };
+    rebuildOwnerTokenIndex(owner);
+  };
+
+  func rebuildOwnerTokenIndex(owner : Principal) : [Nat] {
     var ids : [Nat] = [];
     for (token in Map.values(tokens)) {
       if (Principal.equal(token.owner, owner)) {
-        ids := Array.concat<Nat>(ids, [token.tokenId]);
+        ids := insertSortedNat(ids, token.tokenId);
       };
     };
+    if (ids.size() == 0) {
+      Map.remove(ownerTokenIndex, Principal.compare, owner);
+    } else {
+      Map.add(ownerTokenIndex, Principal.compare, owner, ids);
+    };
+    Map.add(ownerTokenIndexReady, Principal.compare, owner, true);
     ids;
+  };
+
+  func addOwnerToken(owner : Principal, tokenId : Nat) {
+    let current = ownerTokenIdsNat(owner);
+    if (not containsNat(current, tokenId)) {
+      Map.add(ownerTokenIndex, Principal.compare, owner, insertSortedNat(current, tokenId));
+    };
+    Map.add(ownerTokenIndexReady, Principal.compare, owner, true);
+  };
+
+  func removeOwnerToken(owner : Principal, tokenId : Nat) {
+    let current = ownerTokenIdsNat(owner);
+    var filtered : [Nat] = [];
+    for (currentTokenId in current.values()) {
+      if (currentTokenId != tokenId) {
+        filtered := Array.concat<Nat>(filtered, [currentTokenId]);
+      };
+    };
+    if (filtered.size() == 0) {
+      Map.remove(ownerTokenIndex, Principal.compare, owner);
+    } else {
+      Map.add(ownerTokenIndex, Principal.compare, owner, filtered);
+    };
+    Map.add(ownerTokenIndexReady, Principal.compare, owner, true);
+  };
+
+  func moveOwnerToken(from : Principal, to : Principal, tokenId : Nat) {
+    removeOwnerToken(from, tokenId);
+    addOwnerToken(to, tokenId);
+  };
+
+  func containsNat(values : [Nat], target : Nat) : Bool {
+    for (value in values.values()) {
+      if (value == target) {
+        return true;
+      };
+    };
+    false;
+  };
+
+  func insertSortedNat(values : [Nat], target : Nat) : [Nat] {
+    var result : [Nat] = [];
+    var inserted = false;
+    for (value in values.values()) {
+      if (not inserted and target < value) {
+        result := Array.concat<Nat>(result, [target]);
+        inserted := true;
+      };
+      result := Array.concat<Nat>(result, [value]);
+    };
+    if (not inserted) {
+      result := Array.concat<Nat>(result, [target]);
+    };
+    result;
   };
 
   func paginateTokenIds(tokenIds : [Nat], prev : ?Nat, take : ?Nat) : [Nat] {

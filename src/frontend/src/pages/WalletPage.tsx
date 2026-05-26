@@ -117,7 +117,10 @@ const ICP_LEDGER_FEE_E8S = 10_000n;
 const SYNC_TIMEOUT_MS = 45_000;
 const SYNC_STILL_RUNNING_MESSAGE =
   "Wallet sync is still checking imported collections. New NFTs found during sync will appear here shortly.";
-const SYNC_PAGE_COLLECTION_LIMIT = 1n;
+const SYNC_PAGE_TIMEOUT_MESSAGE =
+  "This sync page is taking longer than expected. Mintlab saved progress and will continue on the next Sync.";
+const SYNC_PAGE_COLLECTION_LIMIT = 2n;
+const MAX_SYNC_PAGES_PER_CLICK = 20;
 const SYNC_SLOW_NOTICE_MS = 15_000;
 const SYNC_REFRESH_INTERVAL_MS = 6_000;
 
@@ -1821,7 +1824,7 @@ function ReceivingInstructions({
                   </p>
                   <p className="text-xs leading-relaxed text-muted-foreground">
                     {onlyAutoIndexing
-                      ? "Sync started automatic ownership indexing for these imported collections. Click Sync again shortly to continue; known token IDs can still be imported directly."
+                      ? "Sync is indexing imported collections in safe pages. New NFTs appear as soon as they are found; known token IDs can still be imported directly."
                       : "Sync tried automatic ownership indexing, but these imported collections need extra setup before new NFTs can be found automatically. Known token IDs can still be imported directly."}
                   </p>
                 </div>
@@ -2158,6 +2161,7 @@ export default function WalletPage() {
   const autoSyncedPrincipalRef = useRef<string | null>(null);
   const syncInFlightRef = useRef<Promise<SyncResult> | null>(null);
   const syncModeRef = useRef<SyncMode | null>(null);
+  const syncResumeCursorRef = useRef<bigint | null>(null);
   const [importSpecificOpen, setImportSpecificOpen] = useState(false);
   const [indexingCollectionId, setIndexingCollectionId] = useState<
     bigint | null
@@ -2350,21 +2354,71 @@ export default function WalletPage() {
 
       const runWalletSync = async (): Promise<SyncResult> => {
         if (typeof actor.syncUserNFTsPage !== "function") {
+          syncResumeCursorRef.current = null;
           return actor.syncUserNFTsV2();
         }
 
-        let cursor: bigint | null = null;
+        let cursor: bigint | null = syncResumeCursorRef.current;
         let newCount = 0n;
         let errors: string[] = [];
         let skipped: WalletSyncSkip[] = [];
+        let pages = 0;
+        let complete = false;
 
-        while (true) {
-          const page = await actor.syncUserNFTsPage(
+        while (pages < MAX_SYNC_PAGES_PER_CLICK) {
+          pages += 1;
+          const pagePromise = actor.syncUserNFTsPage(
             cursor,
             SYNC_PAGE_COLLECTION_LIMIT,
           );
+          let page: Awaited<ReturnType<typeof actor.syncUserNFTsPage>>;
+          try {
+            page = await withTimeout(
+              pagePromise,
+              SYNC_TIMEOUT_MS,
+              SYNC_PAGE_TIMEOUT_MESSAGE,
+            );
+          } catch (err) {
+            const message = extractError(err);
+            if (message !== SYNC_PAGE_TIMEOUT_MESSAGE) {
+              throw err;
+            }
+
+            void pagePromise
+              .then(() => {
+                void refetchNFTs();
+                void queryClient.invalidateQueries({ queryKey: ["userStats"] });
+              })
+              .catch((lateError: unknown) => {
+                if (import.meta.env.DEV) {
+                  console.debug(
+                    "[syncUserNFTs] late sync page failed:",
+                    lateError,
+                  );
+                }
+              });
+
+            syncResumeCursorRef.current = cursor;
+            return {
+              __kind__: "ok",
+              ok: {
+                newCount,
+                errors,
+                skipped: [
+                  ...skipped,
+                  {
+                    collectionId: 0n,
+                    collectionName: "Wallet sync",
+                    reason: "INDEXING_IN_PROGRESS",
+                    message: SYNC_PAGE_TIMEOUT_MESSAGE,
+                  },
+                ],
+              },
+            };
+          }
           if (page.__kind__ === "err") {
             if (newCount > 0n || errors.length > 0 || skipped.length > 0) {
+              syncResumeCursorRef.current = cursor;
               return {
                 __kind__: "ok",
                 ok: {
@@ -2385,9 +2439,25 @@ export default function WalletPage() {
           void queryClient.invalidateQueries({ queryKey: ["userStats"] });
 
           if (page.ok.complete || page.ok.nextCursor === null) {
+            complete = true;
+            syncResumeCursorRef.current = null;
             break;
           }
           cursor = page.ok.nextCursor;
+          syncResumeCursorRef.current = cursor;
+        }
+
+        if (!complete) {
+          skipped = [
+            ...skipped,
+            {
+              collectionId: 0n,
+              collectionName: "Wallet sync",
+              reason: "INDEXING_IN_PROGRESS",
+              message:
+                "Mintlab checked several wallet sync pages and saved progress. Click Sync again to continue from the next collection.",
+            },
+          ];
         }
 
         return {
@@ -2511,11 +2581,7 @@ export default function WalletPage() {
         syncInFlightRef.current = rawSyncPromise;
         syncModeRef.current = requestedMode;
       }
-      syncPromise = withTimeout(
-        rawSyncPromise,
-        SYNC_TIMEOUT_MS,
-        SYNC_STILL_RUNNING_MESSAGE,
-      );
+      syncPromise = rawSyncPromise;
 
       let slowNoticeId: number | undefined;
       let refreshId: number | undefined;

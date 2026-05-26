@@ -56,14 +56,17 @@ mixin (
     nfts : [WalletTypes.WalletNFT];
     errors : [Text];
     skip : ?WalletTypes.WalletSyncSkip;
+    complete : Bool;
   };
 
   // Kept as stable fields for upgrade compatibility; sync uses the transient safe limits below.
   let AUTO_INDEX_PAGE_LIMIT : Nat = 40;
   let AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat = 2;
-  transient let SAFE_AUTO_INDEX_PAGE_LIMIT : Nat = 20;
+  transient let SAFE_AUTO_INDEX_PAGE_LIMIT : Nat = 50;
   transient let SAFE_AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat = 1;
-  transient let CHILD_NFT_SYNC_PAGE_SIZE : Nat = 1;
+  transient let SYNC_COLLECTION_PAGE_DEFAULT : Nat = 1;
+  transient let SYNC_COLLECTION_PAGE_MAX : Nat = 3;
+  transient let CHILD_NFT_SYNC_PAGE_SIZE : Nat = 25;
   transient let CHILD_TOKEN_SYNC_PAGE_SIZE : Nat = 25;
   transient let walletSyncLocks = Map.empty<Principal, Bool>();
 
@@ -614,8 +617,14 @@ mixin (
     #ok({ newCount; errors; skipped });
   };
 
-  func normalizeSyncPageSize(_maxCollections : Nat) : Nat {
-    1;
+  func normalizeSyncPageSize(maxCollections : Nat) : Nat {
+    if (maxCollections == 0) {
+      SYNC_COLLECTION_PAGE_DEFAULT;
+    } else if (maxCollections > SYNC_COLLECTION_PAGE_MAX) {
+      SYNC_COLLECTION_PAGE_MAX;
+    } else {
+      maxCollections;
+    };
   };
 
   func syncOneWalletCollection(
@@ -654,37 +663,52 @@ mixin (
         );
         switch (preview) {
           case (#err(message)) {
-            if (indexedNFTs.size() > 0) {
-              let registered = registerPreviewNFTs(caller, collection, indexedNFTs, #Registered);
-              newCount += registered.newCount;
-            } else if (WalletLib.isOwnerIndexMissingMessage(message)) {
+            if (WalletLib.isOwnerIndexMissingMessage(message)) {
               let autoIndexed = await* autoIndexCollectionForWalletSync(
                 collection,
                 caller,
                 userAccountIdHex,
               );
-              if (autoIndexed.nfts.size() > 0) {
-                let registered = registerPreviewNFTs(caller, collection, autoIndexed.nfts, #Registered);
-                newCount += registered.newCount;
+              let nftsToRegister = if (autoIndexed.nfts.size() > 0) {
+                autoIndexed.nfts;
               } else {
-                errors := Array.concat<Text>(errors, autoIndexed.errors);
-                switch (autoIndexed.skip) {
-                  case (?skip) skipped := Array.concat<WalletTypes.WalletSyncSkip>(skipped, [skip]);
-                  case null {};
-                };
+                indexedNFTs;
               };
+              let registered = registerPreviewNFTs(caller, collection, nftsToRegister, #Registered);
+              newCount += registered.newCount;
+              if (autoIndexed.complete) {
+                await* removeStaleOnChainNFTs(
+                  caller,
+                  collection,
+                  userAccountId,
+                  #Registered,
+                  registered.tokenIds,
+                );
+              };
+              switch (autoIndexed.skip) {
+                case (?skip) skipped := Array.concat<WalletTypes.WalletSyncSkip>(skipped, [skip]);
+                case null {};
+              };
+              if (nftsToRegister.size() == 0) {
+                errors := Array.concat<Text>(errors, autoIndexed.errors);
+              };
+            } else if (indexedNFTs.size() > 0) {
+              let registered = registerPreviewNFTs(caller, collection, indexedNFTs, #Registered);
+              newCount += registered.newCount;
             } else {
               errors := Array.concat<Text>(errors, [message]);
             };
           };
           case (#ok(nfts)) {
-            let nftsToRegister = if (nfts.size() == 0 and indexedNFTs.size() > 0) {
-              indexedNFTs;
-            } else {
-              nfts;
-            };
-            let registered = registerPreviewNFTs(caller, collection, nftsToRegister, #Registered);
+            let registered = registerPreviewNFTs(caller, collection, nfts, #Registered);
             newCount += registered.newCount;
+            await* removeStaleOnChainNFTs(
+              caller,
+              collection,
+              userAccountId,
+              #Registered,
+              registered.tokenIds,
+            );
           };
         };
       };
@@ -709,6 +733,7 @@ mixin (
           message = "This collection needs token range setup before automatic wallet sync can scan it safely. " #
           "Add total supply and token offset in the collection import settings, or import a known token ID directly.";
         };
+        complete = false;
       };
     };
 
@@ -765,7 +790,7 @@ mixin (
             caller,
             userAccountIdHex,
           );
-          if (found.size() > 0 or page.complete or page.nextCursor == null) {
+          if (page.complete or page.nextCursor == null) {
             break autoIndex;
           };
         };
@@ -776,7 +801,17 @@ mixin (
       return {
         nfts = found;
         errors = [];
-        skip = null;
+        skip = if (not complete and pages > 0) {
+          ?{
+            collectionId = collection.id;
+            collectionName = collection.name;
+            reason = "INDEXING_IN_PROGRESS";
+            message = "Mintlab is indexing this imported collection in safe pages. New NFTs appear as soon as they are found; click Sync again shortly to keep checking.";
+          };
+        } else {
+          null;
+        };
+        complete;
       };
     };
 
@@ -793,6 +828,7 @@ mixin (
             "Known token IDs can still be imported directly. Details: " #
             message;
           };
+          complete = false;
         };
       };
       case null {
@@ -808,14 +844,16 @@ mixin (
               Nat.toText(scanned) #
               " tokens and saved " #
               Nat.toText(indexed) #
-              " owner records automatically. Click Sync again shortly to continue checking this collection.";
+              " owner records automatically. New NFTs appear as soon as they are found; click Sync again shortly to continue checking this collection.";
             };
+            complete = false;
           };
         } else {
           {
             nfts = [];
             errors = [];
             skip = null;
+            complete = false;
           };
         };
       };
@@ -924,7 +962,20 @@ mixin (
       if (page.size() < pageSize) {
         break paginate;
       };
-      prev := ?page[page.size() - 1].tokenId;
+      let nextPrev = page[page.size() - 1].tokenId;
+      switch (prev) {
+        case (?previous) {
+          if (nextPrev <= previous) {
+            return #err(
+              "Collection '" #
+              collection.name #
+              "': child pagination did not advance during wallet sync"
+            );
+          };
+        };
+        case null {};
+      };
+      prev := ?nextPrev;
     };
 
     for (existing in WalletLib.getUserNFTs(walletState, caller).values()) {
@@ -948,6 +999,7 @@ mixin (
     let child : WalletChildCollectionSyncActor = actor (collection.canisterId.toText());
     var prev : ?Nat = null;
     var newCount : Nat = 0;
+    var ownedTokenIds : [Text] = [];
 
     label paginate loop {
       let tokenIds = try {
@@ -978,6 +1030,7 @@ mixin (
                   tokenId,
                 );
                 let tokenIdText = Nat.toText(tokenId);
+                ownedTokenIds := Array.concat<Text>(ownedTokenIds, [tokenIdText]);
                 let existing = WalletLib.findByCollectionToken(walletState, collection.id, tokenIdText);
                 if (countsAsNewWalletNFT(existing, caller)) {
                   newCount += 1;
@@ -1002,7 +1055,30 @@ mixin (
       if (tokenIds.size() < CHILD_TOKEN_SYNC_PAGE_SIZE) {
         break paginate;
       };
-      prev := ?tokenIds[tokenIds.size() - 1];
+      let nextPrev = tokenIds[tokenIds.size() - 1];
+      switch (prev) {
+        case (?previous) {
+          if (nextPrev <= previous) {
+            return #err(
+              "Collection '" #
+              collection.name #
+              "': token ID fallback pagination did not advance during wallet sync"
+            );
+          };
+        };
+        case null {};
+      };
+      prev := ?nextPrev;
+    };
+
+    for (existing in WalletLib.getUserNFTs(walletState, caller).values()) {
+      if (
+        existing.collectionId == collection.id and
+        existing.location == #Minted and
+        not containsText(ownedTokenIds, existing.tokenId)
+      ) {
+        WalletLib.deleteNFT(walletState, existing.id);
+      };
     };
 
     #ok(newCount);

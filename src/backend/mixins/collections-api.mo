@@ -136,6 +136,19 @@ mixin (
     if (collection.kind != #External) {
       return;
     };
+    switch (collection.standard) {
+      case (#EXT) {
+        if (not warmIndexHasBrowseRange(collection)) {
+          return;
+        };
+      };
+      case (#DIP721) {
+        if (not warmIndexHasBrowseRange(collection)) {
+          return;
+        };
+      };
+      case (_) {};
+    };
     let cursor = switch (WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id)) {
       case (?status) {
         if (status.complete) {
@@ -151,6 +164,18 @@ mixin (
       cursor,
       IMPORT_INDEX_WARM_PAGE_LIMIT,
     );
+  };
+
+  func warmIndexHasBrowseRange(collection : CollectionTypes.Collection) : Bool {
+    switch (collection.browseInfo) {
+      case null false;
+      case (?browseInfo) {
+        switch (browseInfo.totalSupply) {
+          case null false;
+          case (?_) true;
+        };
+      };
+    };
   };
 
   func validateBrowseInfo(browseInfo : ?CollectionTypes.CollectionBrowseInfo) {

@@ -1,21 +1,21 @@
-import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useAdmin, e as useQueryClient, r as reactExports, f as useQuery, g as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-DxxVHT46.js";
-import { P as Plus, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-FV_P5XbQ.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-B9_QggoB.js";
-import { M as MediaImage, E as EmptyState } from "./MediaImage-VXTMofcp.js";
-import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-CbGDo1kg.js";
-import { B as Badge, I as Input } from "./badge-flvIO41N.js";
-import { I as ImageOff, r as resolveImageUrl } from "./media-BDPVARB-.js";
-import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-D6eGYwb1.js";
-import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-6vj66PZL.js";
-import { u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label } from "./index-CGYjL2_p.js";
-import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-QDJ_QMAD.js";
-import { S as Skeleton, C as Copy } from "./skeleton-DKlhXE6I.js";
-import { S as Sparkles, c as compressModerationImage } from "./imageUtils-u3z6BXCE.js";
-import { C as CircleCheck } from "./circle-check-i77Gv5cY.js";
-import { C as Coins } from "./coins-Bdsy_uRt.js";
-import { S as Send } from "./send-BIldRe4s.js";
-import "./arrow-right-C_gcAZbU.js";
-import "./index-ZsxdsPjN.js";
+import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useAdmin, e as useQueryClient, r as reactExports, f as useQuery, g as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-BjklpoWU.js";
+import { P as Plus, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-CgWQRn78.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-CRUJO5By.js";
+import { M as MediaImage, E as EmptyState } from "./MediaImage-DQQaQlz2.js";
+import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-rlAWuAza.js";
+import { B as Badge, I as Input } from "./badge-Cxipmsvb.js";
+import { I as ImageOff, r as resolveImageUrl } from "./media-CBIulzFx.js";
+import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-B34nAbLr.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-D0qd2LdJ.js";
+import { u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label } from "./index-D1EevaUf.js";
+import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-DKl5EFyR.js";
+import { S as Skeleton, C as Copy } from "./skeleton-Er_mLg7r.js";
+import { S as Sparkles, c as compressModerationImage } from "./imageUtils-Bgw7BTrU.js";
+import { C as CircleCheck } from "./circle-check-DHKpOJva.js";
+import { C as Coins } from "./coins-B4k36-7a.js";
+import { S as Send } from "./send-C2EESSnE.js";
+import "./arrow-right-BahKf-aw.js";
+import "./index-QzUFDKbw.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -157,7 +157,9 @@ const E8S = 100000000n;
 const ICP_LEDGER_FEE_E8S = 10000n;
 const SYNC_TIMEOUT_MS = 45e3;
 const SYNC_STILL_RUNNING_MESSAGE = "Wallet sync is still checking imported collections. New NFTs found during sync will appear here shortly.";
-const SYNC_PAGE_COLLECTION_LIMIT = 1n;
+const SYNC_PAGE_TIMEOUT_MESSAGE = "This sync page is taking longer than expected. Mintlab saved progress and will continue on the next Sync.";
+const SYNC_PAGE_COLLECTION_LIMIT = 2n;
+const MAX_SYNC_PAGES_PER_CLICK = 20;
 const SYNC_SLOW_NOTICE_MS = 15e3;
 const SYNC_REFRESH_INTERVAL_MS = 6e3;
 function formatICP(e8s) {
@@ -1596,7 +1598,7 @@ function ReceivingInstructions({
               /* @__PURE__ */ jsxRuntimeExports.jsx(Info, { className: "mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" }),
               /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
                 /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-medium text-foreground", children: onlyAutoIndexing ? "Automatic discovery is indexing" : "Some collections need discovery setup" }),
-                /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs leading-relaxed text-muted-foreground", children: onlyAutoIndexing ? "Sync started automatic ownership indexing for these imported collections. Click Sync again shortly to continue; known token IDs can still be imported directly." : "Sync tried automatic ownership indexing, but these imported collections need extra setup before new NFTs can be found automatically. Known token IDs can still be imported directly." })
+                /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs leading-relaxed text-muted-foreground", children: onlyAutoIndexing ? "Sync is indexing imported collections in safe pages. New NFTs appear as soon as they are found; known token IDs can still be imported directly." : "Sync tried automatic ownership indexing, but these imported collections need extra setup before new NFTs can be found automatically. Known token IDs can still be imported directly." })
               ] })
             ] }),
             syncStatus.skipped.slice(0, 4).map((skip) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
@@ -1893,6 +1895,7 @@ function WalletPage() {
   const autoSyncedPrincipalRef = reactExports.useRef(null);
   const syncInFlightRef = reactExports.useRef(null);
   const syncModeRef = reactExports.useRef(null);
+  const syncResumeCursorRef = reactExports.useRef(null);
   const [importSpecificOpen, setImportSpecificOpen] = reactExports.useState(false);
   const [indexingCollectionId, setIndexingCollectionId] = reactExports.useState(null);
   reactExports.useEffect(() => {
@@ -2036,19 +2039,59 @@ function WalletPage() {
       if (!silent) setSyncStatus({ kind: "syncing" });
       const runWalletSync = async () => {
         if (typeof actor.syncUserNFTsPage !== "function") {
+          syncResumeCursorRef.current = null;
           return actor.syncUserNFTsV2();
         }
-        let cursor = null;
+        let cursor = syncResumeCursorRef.current;
         let newCount = 0n;
         let errors = [];
         let skipped = [];
-        while (true) {
-          const page = await actor.syncUserNFTsPage(
+        let pages = 0;
+        let complete = false;
+        while (pages < MAX_SYNC_PAGES_PER_CLICK) {
+          pages += 1;
+          const pagePromise = actor.syncUserNFTsPage(
             cursor,
             SYNC_PAGE_COLLECTION_LIMIT
           );
+          let page;
+          try {
+            page = await withTimeout(
+              pagePromise,
+              SYNC_TIMEOUT_MS,
+              SYNC_PAGE_TIMEOUT_MESSAGE
+            );
+          } catch (err) {
+            const message = extractError(err);
+            if (message !== SYNC_PAGE_TIMEOUT_MESSAGE) {
+              throw err;
+            }
+            void pagePromise.then(() => {
+              void refetchNFTs();
+              void queryClient.invalidateQueries({ queryKey: ["userStats"] });
+            }).catch((lateError) => {
+            });
+            syncResumeCursorRef.current = cursor;
+            return {
+              __kind__: "ok",
+              ok: {
+                newCount,
+                errors,
+                skipped: [
+                  ...skipped,
+                  {
+                    collectionId: 0n,
+                    collectionName: "Wallet sync",
+                    reason: "INDEXING_IN_PROGRESS",
+                    message: SYNC_PAGE_TIMEOUT_MESSAGE
+                  }
+                ]
+              }
+            };
+          }
           if (page.__kind__ === "err") {
             if (newCount > 0n || errors.length > 0 || skipped.length > 0) {
+              syncResumeCursorRef.current = cursor;
               return {
                 __kind__: "ok",
                 ok: {
@@ -2066,9 +2109,23 @@ function WalletPage() {
           void refetchNFTs();
           void queryClient.invalidateQueries({ queryKey: ["userStats"] });
           if (page.ok.complete || page.ok.nextCursor === null) {
+            complete = true;
+            syncResumeCursorRef.current = null;
             break;
           }
           cursor = page.ok.nextCursor;
+          syncResumeCursorRef.current = cursor;
+        }
+        if (!complete) {
+          skipped = [
+            ...skipped,
+            {
+              collectionId: 0n,
+              collectionName: "Wallet sync",
+              reason: "INDEXING_IN_PROGRESS",
+              message: "Mintlab checked several wallet sync pages and saved progress. Click Sync again to continue from the next collection."
+            }
+          ];
         }
         return {
           __kind__: "ok",
@@ -2166,11 +2223,7 @@ function WalletPage() {
         syncInFlightRef.current = rawSyncPromise;
         syncModeRef.current = requestedMode;
       }
-      syncPromise = withTimeout(
-        rawSyncPromise,
-        SYNC_TIMEOUT_MS,
-        SYNC_STILL_RUNNING_MESSAGE
-      );
+      syncPromise = rawSyncPromise;
       let slowNoticeId;
       let refreshId;
       let keepRefreshUntilRawSettles = false;
