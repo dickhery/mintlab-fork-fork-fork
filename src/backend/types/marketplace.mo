@@ -245,4 +245,40 @@ module {
     activeUserPaymentLocks : [UserId];
     activeListingTokenLocks : [Text];
   };
+
+  public type ActiveListingPage = {
+    listings : [ActiveListing];
+    nextCursor : ?Nat;
+    totalCount : Nat;
+  };
+
+  public type ActiveListingDetailPage = {
+    details : [ActiveListingDetail];
+    nextCursor : ?Nat;
+    totalCount : Nat;
+  };
+
+  public type SettlementStatusKind = {
+    #FixedPurchase;
+    #Auction;
+    #NoBidAuctionReturn;
+    #ListingReturn;
+    #PendingBidDeposit;
+    #PendingAuctionRefund;
+  };
+
+  public type SettlementStatusRole = {
+    #Buyer;
+    #Seller;
+    #Bidder;
+  };
+
+  public type SettlementStatus = {
+    listingId : ListingId;
+    kind : SettlementStatusKind;
+    role : SettlementStatusRole;
+    stage : Text;
+    message : Text;
+    updatedAt : Timestamp;
+  };
 };

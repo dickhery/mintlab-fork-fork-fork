@@ -2,6 +2,7 @@ import CollectionsLib "../lib/collections";
 import AuthLib "../lib/auth";
 import WalletLib "../lib/wallet";
 import CollectionTypes "../types/collections";
+import Nat "mo:core/Nat";
 import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
 
@@ -84,6 +85,20 @@ mixin (
   /// Return all registered collections
   public query func listCollections() : async [CollectionTypes.Collection] {
     CollectionsLib.getCollections(collectionsState);
+  };
+
+  public query func listCollectionsPage(
+    cursor : ?Nat,
+    limit : ?Nat,
+  ) : async CollectionTypes.CollectionPage {
+    CollectionsLib.getCollectionsPage(
+      collectionsState,
+      cursor,
+      switch (limit) {
+        case (?value) value;
+        case null 0;
+      },
+    );
   };
 
   /// Return a single collection by id

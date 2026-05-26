@@ -577,6 +577,194 @@ mixin (
     };
   };
 
+  func cursorOrZero(cursor : ?Nat) : Nat {
+    switch (cursor) {
+      case (?value) value;
+      case null 0;
+    };
+  };
+
+  func normalizeMarketplacePageSize(limit : ?Nat) : Nat {
+    switch (limit) {
+      case null 25;
+      case (?value) {
+        if (value == 0) {
+          1;
+        } else if (value > 100) {
+          100;
+        } else {
+          value;
+        };
+      };
+    };
+  };
+
+  func sliceActiveListings(
+    listings : [MarketplaceTypes.ActiveListing],
+    start : Nat,
+    limit : Nat,
+  ) : [MarketplaceTypes.ActiveListing] {
+    var page : [MarketplaceTypes.ActiveListing] = [];
+    var index : Nat = 0;
+    var added : Nat = 0;
+    for (listing in listings.values()) {
+      if (index < start) {
+        index += 1;
+      } else if (added < limit) {
+        page := Array.concat<MarketplaceTypes.ActiveListing>(page, [listing]);
+        added += 1;
+        index += 1;
+      } else {
+        return page;
+      };
+    };
+    page;
+  };
+
+  func sliceActiveListingDetails(
+    details : [MarketplaceTypes.ActiveListingDetail],
+    start : Nat,
+    limit : Nat,
+  ) : [MarketplaceTypes.ActiveListingDetail] {
+    var page : [MarketplaceTypes.ActiveListingDetail] = [];
+    var index : Nat = 0;
+    var added : Nat = 0;
+    for (detail in details.values()) {
+      if (index < start) {
+        index += 1;
+      } else if (added < limit) {
+        page := Array.concat<MarketplaceTypes.ActiveListingDetail>(page, [detail]);
+        added += 1;
+        index += 1;
+      } else {
+        return page;
+      };
+    };
+    page;
+  };
+
+  func settlementStageText(stage : MarketplaceTypes.SettlementStage) : Text {
+    switch (stage) {
+      case (#PaymentPending) "payment pending";
+      case (#NFTTransferPending) "NFT delivery pending";
+      case (#MintlabFeePending) "marketplace fee pending";
+      case (#SellerPaymentPending) "seller payout pending";
+    };
+  };
+
+  func returnStageText(stage : MarketplaceTypes.NoBidAuctionReturnStage) : Text {
+    switch (stage) {
+      case (#NFTReturnPending) "NFT return pending";
+      case (#WalletRegistrationPending) "wallet registration pending";
+      case (#CleanupPending) "cleanup pending";
+    };
+  };
+
+  func fixedSettlementStatus(
+    settlement : MarketplaceTypes.FixedPurchaseSettlement,
+    role : MarketplaceTypes.SettlementStatusRole,
+  ) : MarketplaceTypes.SettlementStatus {
+    {
+      listingId = settlement.listingId;
+      kind = #FixedPurchase;
+      role;
+      stage = settlementStageText(settlement.stage);
+      message = settlementStatusMessage(role, settlement.stage);
+      updatedAt = settlement.updatedAt;
+    };
+  };
+
+  func auctionSettlementStatus(
+    settlement : MarketplaceTypes.AuctionSettlement,
+    role : MarketplaceTypes.SettlementStatusRole,
+  ) : MarketplaceTypes.SettlementStatus {
+    {
+      listingId = settlement.listingId;
+      kind = #Auction;
+      role;
+      stage = settlementStageText(settlement.stage);
+      message = settlementStatusMessage(role, settlement.stage);
+      updatedAt = settlement.updatedAt;
+    };
+  };
+
+  func settlementStatusMessage(
+    role : MarketplaceTypes.SettlementStatusRole,
+    stage : MarketplaceTypes.SettlementStage,
+  ) : Text {
+    switch (role) {
+      case (#Buyer) {
+        switch (stage) {
+          case (#PaymentPending) "Your ICP payment is being recorded. Please do not submit the purchase again.";
+          case (#NFTTransferPending) "Your payment is recorded and Mintlab is delivering the NFT.";
+          case (#MintlabFeePending) "You should have the NFT; marketplace settlement is finishing fee transfer.";
+          case (#SellerPaymentPending) "You should have the NFT; seller payout is pending and can be retried.";
+        };
+      };
+      case (#Seller) {
+        switch (stage) {
+          case (#PaymentPending) "A buyer payment is being recorded before your NFT is delivered.";
+          case (#NFTTransferPending) "Buyer payment is recorded and NFT delivery is pending.";
+          case (#MintlabFeePending) "The NFT was delivered; marketplace fee transfer is pending before seller payout.";
+          case (#SellerPaymentPending) "The NFT was delivered; your ICP payout is pending and can be retried.";
+        };
+      };
+      case (#Bidder) "Auction payment or refund is still being settled.";
+    };
+  };
+
+  func noBidReturnStatus(
+    settlement : MarketplaceTypes.NoBidAuctionReturnSettlement
+  ) : MarketplaceTypes.SettlementStatus {
+    {
+      listingId = settlement.listingId;
+      kind = #NoBidAuctionReturn;
+      role = #Seller;
+      stage = returnStageText(settlement.stage);
+      message = "Auction ended without bids; Mintlab is returning the NFT to your wallet.";
+      updatedAt = settlement.updatedAt;
+    };
+  };
+
+  func listingReturnStatus(
+    settlement : MarketplaceTypes.ListingReturnSettlement
+  ) : MarketplaceTypes.SettlementStatus {
+    {
+      listingId = settlement.listingId;
+      kind = #ListingReturn;
+      role = #Seller;
+      stage = returnStageText(settlement.stage);
+      message = "Listing cancellation is returning the NFT to your wallet.";
+      updatedAt = settlement.updatedAt;
+    };
+  };
+
+  func pendingBidStatus(
+    pending : MarketplaceTypes.PendingBidDeposit
+  ) : MarketplaceTypes.SettlementStatus {
+    {
+      listingId = pending.listingId;
+      kind = #PendingBidDeposit;
+      role = #Bidder;
+      stage = "bid deposit pending";
+      message = "Your bid deposit is still being recorded. Retry the pending bid instead of placing a duplicate bid.";
+      updatedAt = pending.updatedAt;
+    };
+  };
+
+  func pendingRefundStatus(
+    escrow : MarketplaceTypes.AuctionEscrow
+  ) : MarketplaceTypes.SettlementStatus {
+    {
+      listingId = escrow.listingId;
+      kind = #PendingAuctionRefund;
+      role = #Bidder;
+      stage = "refund pending";
+      message = "A previous auction bid refund is pending and can be retried.";
+      updatedAt = escrow.createdAt;
+    };
+  };
+
   /// List an NFT at a fixed price; caller must own the NFT (escrow transfer happens here)
   public shared ({ caller }) func createFixedListing(
     nftId : MarketplaceTypes.NFTId,
@@ -649,6 +837,26 @@ mixin (
     );
   };
 
+  public query func getActiveListingsPage(
+    cursor : ?Nat,
+    limit : ?Nat,
+  ) : async MarketplaceTypes.ActiveListingPage {
+    let listings = MarketplaceLib.getAvailableActiveListings(
+      marketplaceState,
+      marketplaceSettlementState,
+      marketplaceNoBidAuctionReturnState,
+      marketplaceListingReturnState,
+    );
+    let start = cursorOrZero(cursor);
+    let page = sliceActiveListings(listings, start, normalizeMarketplacePageSize(limit));
+    let next = start + page.size();
+    {
+      listings = page;
+      nextCursor = if (next < listings.size()) ?next else null;
+      totalCount = listings.size();
+    };
+  };
+
   public query func getActiveListingDetails() : async [MarketplaceTypes.ActiveListingDetail] {
     MarketplaceLib.getAvailableActiveListingDetails(
       marketplaceState,
@@ -656,6 +864,92 @@ mixin (
       marketplaceNoBidAuctionReturnState,
       marketplaceListingReturnState,
     );
+  };
+
+  public query func getActiveListingDetailsPage(
+    cursor : ?Nat,
+    limit : ?Nat,
+  ) : async MarketplaceTypes.ActiveListingDetailPage {
+    let details = MarketplaceLib.getAvailableActiveListingDetails(
+      marketplaceState,
+      marketplaceSettlementState,
+      marketplaceNoBidAuctionReturnState,
+      marketplaceListingReturnState,
+    );
+    let start = cursorOrZero(cursor);
+    let page = sliceActiveListingDetails(details, start, normalizeMarketplacePageSize(limit));
+    let next = start + page.size();
+    {
+      details = page;
+      nextCursor = if (next < details.size()) ?next else null;
+      totalCount = details.size();
+    };
+  };
+
+  public shared query ({ caller }) func getMyMarketplaceSettlementStatuses() : async [MarketplaceTypes.SettlementStatus] {
+    if (Principal.isAnonymous(caller)) {
+      return [];
+    };
+    var statuses : [MarketplaceTypes.SettlementStatus] = [];
+    for (settlement in MarketplaceLib.listFixedPurchaseSettlements(marketplaceSettlementState).values()) {
+      if (Principal.equal(settlement.buyer, caller)) {
+        statuses := Array.concat<MarketplaceTypes.SettlementStatus>(
+          statuses,
+          [fixedSettlementStatus(settlement, #Buyer)],
+        );
+      };
+      if (Principal.equal(settlement.seller, caller)) {
+        statuses := Array.concat<MarketplaceTypes.SettlementStatus>(
+          statuses,
+          [fixedSettlementStatus(settlement, #Seller)],
+        );
+      };
+    };
+    for (settlement in MarketplaceLib.listAuctionSettlements(marketplaceSettlementState).values()) {
+      if (Principal.equal(settlement.winner, caller)) {
+        statuses := Array.concat<MarketplaceTypes.SettlementStatus>(
+          statuses,
+          [auctionSettlementStatus(settlement, #Buyer)],
+        );
+      };
+      if (Principal.equal(settlement.seller, caller)) {
+        statuses := Array.concat<MarketplaceTypes.SettlementStatus>(
+          statuses,
+          [auctionSettlementStatus(settlement, #Seller)],
+        );
+      };
+    };
+    for (settlement in MarketplaceLib.listNoBidAuctionReturns(marketplaceNoBidAuctionReturnState).values()) {
+      if (Principal.equal(settlement.seller, caller)) {
+        statuses := Array.concat<MarketplaceTypes.SettlementStatus>(
+          statuses,
+          [noBidReturnStatus(settlement)],
+        );
+      };
+    };
+    for (settlement in MarketplaceLib.listListingReturns(marketplaceListingReturnState).values()) {
+      if (Principal.equal(settlement.seller, caller)) {
+        statuses := Array.concat<MarketplaceTypes.SettlementStatus>(
+          statuses,
+          [listingReturnStatus(settlement)],
+        );
+      };
+    };
+    for (pending in MarketplaceLib.listPendingBidDeposits(marketplaceBidState).values()) {
+      if (Principal.equal(pending.bidder, caller)) {
+        statuses := Array.concat<MarketplaceTypes.SettlementStatus>(
+          statuses,
+          [pendingBidStatus(pending)],
+        );
+      };
+    };
+    for (refund in MarketplaceLib.getPendingRefundsByBidder(marketplacePaymentState, caller).values()) {
+      statuses := Array.concat<MarketplaceTypes.SettlementStatus>(
+        statuses,
+        [pendingRefundStatus(refund)],
+      );
+    };
+    statuses;
   };
 
   public shared query ({ caller }) func getMyAuctionBidStatuses(

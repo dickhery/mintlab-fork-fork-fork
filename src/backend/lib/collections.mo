@@ -1,3 +1,4 @@
+import Array "mo:core/Array";
 import Iter "mo:core/Iter";
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
@@ -49,6 +50,39 @@ module {
 
   public func getCollections(state : CollectionsState) : [Types.Collection] {
     Iter.toArray(Map.values(state.collections));
+  };
+
+  public func getCollectionsPage(
+    state : CollectionsState,
+    cursor : ?Nat,
+    limit : Nat,
+  ) : Types.CollectionPage {
+    let start = switch (cursor) {
+      case (?value) value;
+      case null 0;
+    };
+    let pageSize = normalizePageLimit(limit);
+    var collections : [Types.Collection] = [];
+    var index : Nat = 0;
+    var added : Nat = 0;
+    for ((_, collection) in Map.entries(state.collections)) {
+      if (index < start) {
+        index += 1;
+      } else if (added < pageSize) {
+        collections := Array.concat<Types.Collection>(collections, [collection]);
+        added += 1;
+        index += 1;
+      } else {
+        index += 1;
+      };
+    };
+    let totalCount = Map.size(state.collections);
+    let next = start + added;
+    {
+      collections;
+      nextCursor = if (next < totalCount) ?next else null;
+      totalCount;
+    };
   };
 
   public func removeCollection(state : CollectionsState, id : Types.CollectionId) : Bool {
@@ -129,6 +163,16 @@ module {
         Map.add(state.collections, Nat.compare, id, updated);
         ?updated;
       };
+    };
+  };
+
+  func normalizePageLimit(limit : Nat) : Nat {
+    if (limit == 0) {
+      25;
+    } else if (limit > 100) {
+      100;
+    } else {
+      limit;
     };
   };
 };

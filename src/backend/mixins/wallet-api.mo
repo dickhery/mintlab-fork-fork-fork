@@ -14,6 +14,7 @@ import CollectionTypes "../types/collections";
 import CommonTypes "../types/common";
 import WalletTypes "../types/wallet";
 import Nat "mo:core/Nat";
+import Time "mo:core/Time";
 import Principal "mo:core/Principal";
 
 mixin (
@@ -68,7 +69,11 @@ mixin (
   transient let SYNC_COLLECTION_PAGE_MAX : Nat = 3;
   transient let CHILD_NFT_SYNC_PAGE_SIZE : Nat = 25;
   transient let CHILD_TOKEN_SYNC_PAGE_SIZE : Nat = 25;
+  transient let PUBLIC_PAGE_DEFAULT : Nat = 50;
+  transient let PUBLIC_PAGE_MAX : Nat = 100;
+  transient let WALLET_SYNC_COOLDOWN_NS : Int = 8_000_000_000; // 8 seconds
   transient let walletSyncLocks = Map.empty<Principal, Bool>();
+  transient let walletSyncCooldowns = Map.empty<Principal, Int>();
 
   func acquireWalletSyncLock(caller : Principal) : Bool {
     switch (Map.get(walletSyncLocks, Principal.compare, caller)) {
@@ -418,6 +423,26 @@ mixin (
     walletVisibleNFTs(user);
   };
 
+  public query func getUserNFTsPage(
+    user : Principal,
+    cursor : ?Nat,
+    limit : ?Nat,
+  ) : async WalletTypes.WalletNFTPage {
+    let nfts = walletVisibleNFTs(user);
+    let start = switch (cursor) {
+      case (?value) value;
+      case null 0;
+    };
+    let pageSize = normalizePublicPageSize(limit);
+    let page = sliceWalletNFTs(nfts, start, pageSize);
+    let next = start + page.size();
+    {
+      nfts = page;
+      nextCursor = if (next < nfts.size()) ?next else null;
+      totalCount = nfts.size();
+    };
+  };
+
   public query func getNFTStats(user : Principal) : async WalletTypes.NFTStats {
     WalletLib.buildNFTStats(walletVisibleNFTs(user));
   };
@@ -481,7 +506,13 @@ mixin (
       return #err("Wallet sync is already running. Wait for the current sync to finish.");
     };
     try {
-      await* syncUserNFTsInternal(caller);
+      switch (enforceWalletSyncCooldown(caller)) {
+        case (?message) return #err(message);
+        case null {};
+      };
+      legacyWalletSyncPageResult(
+        await* syncUserNFTsPageUnlocked(caller, null, SYNC_COLLECTION_PAGE_DEFAULT)
+      );
     } finally {
       releaseWalletSyncLock(caller);
     };
@@ -501,6 +532,10 @@ mixin (
       return #err("Wallet sync is already running. Wait for the current sync to finish.");
     };
     try {
+      switch (enforceWalletSyncCooldown(caller)) {
+        case (?message) return #err(message);
+        case null {};
+      };
       await* syncUserNFTsPageUnlocked(caller, cursor, maxCollections);
     } finally {
       releaseWalletSyncLock(caller);
@@ -579,7 +614,11 @@ mixin (
       return #err("Wallet sync is already running. Wait for the current sync to finish.");
     };
     try {
-      switch (await* syncUserNFTsInternal(caller)) {
+      switch (enforceWalletSyncCooldown(caller)) {
+        case (?message) return #err(message);
+        case null {};
+      };
+      switch (await* syncUserNFTsPageUnlocked(caller, null, SYNC_COLLECTION_PAGE_DEFAULT)) {
         case (#err(message)) #err(message);
         case (#ok(result)) #ok({ newCount = result.newCount; errors = result.errors });
       };
@@ -624,6 +663,65 @@ mixin (
       SYNC_COLLECTION_PAGE_MAX;
     } else {
       maxCollections;
+    };
+  };
+
+  func normalizePublicPageSize(limit : ?Nat) : Nat {
+    switch (limit) {
+      case null PUBLIC_PAGE_DEFAULT;
+      case (?value) {
+        if (value == 0) {
+          1;
+        } else if (value > PUBLIC_PAGE_MAX) {
+          PUBLIC_PAGE_MAX;
+        } else {
+          value;
+        };
+      };
+    };
+  };
+
+  func enforceWalletSyncCooldown(caller : Principal) : ?Text {
+    let now = Time.now();
+    switch (Map.get(walletSyncCooldowns, Principal.compare, caller)) {
+      case (?lastStartedAt) {
+        if (now > lastStartedAt and now - lastStartedAt < WALLET_SYNC_COOLDOWN_NS) {
+          return ?("Wallet sync was just started. Wait a few seconds before syncing again.");
+        };
+      };
+      case null {};
+    };
+    Map.add(walletSyncCooldowns, Principal.compare, caller, now);
+    null;
+  };
+
+  func legacyWalletSyncPageResult(
+    result : { #ok : WalletTypes.WalletSyncPageResult; #err : Text }
+  ) : { #ok : WalletTypes.WalletSyncV2Result; #err : Text } {
+    switch (result) {
+      case (#err(message)) #err(message);
+      case (#ok(page)) {
+        let skipped = if (page.complete) {
+          page.skipped;
+        } else {
+          Array.concat<WalletTypes.WalletSyncSkip>(
+            page.skipped,
+            [
+              {
+                collectionId = 0;
+                collectionName = "Wallet sync";
+                reason = "PAGED_SYNC_REQUIRED";
+                message = "Mintlab checked one safe wallet sync page. Use the paged sync flow to continue checking the remaining collections.";
+              }
+            ],
+          );
+        };
+        #ok({
+          newCount = page.newCount;
+          errors = page.errors;
+          skipped;
+        });
+      };
     };
   };
 
@@ -1355,6 +1453,28 @@ mixin (
       };
     };
     merged;
+  };
+
+  func sliceWalletNFTs(
+    nfts : [WalletTypes.WalletNFT],
+    start : Nat,
+    limit : Nat,
+  ) : [WalletTypes.WalletNFT] {
+    var page : [WalletTypes.WalletNFT] = [];
+    var index : Nat = 0;
+    var added : Nat = 0;
+    for (nft in nfts.values()) {
+      if (index < start) {
+        index += 1;
+      } else if (added < limit) {
+        page := Array.concat<WalletTypes.WalletNFT>(page, [nft]);
+        added += 1;
+        index += 1;
+      } else {
+        return page;
+      };
+    };
+    page;
   };
 
   func walletContainsCollectionToken(

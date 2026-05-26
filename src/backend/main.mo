@@ -4,6 +4,7 @@ import MintLib "lib/mint";
 import WalletLib "lib/wallet";
 import MarketplaceLib "lib/marketplace";
 import DividendsLib "lib/dividends";
+import IcpLib "lib/icp";
 import Principal "mo:core/Principal";
 
 import AuthApi "mixins/auth-api";
@@ -23,6 +24,7 @@ persistent actor Backend {
   let collectionCreationState = MintLib.newCollectionCreationState();
   let collectionCreationPayoutSplitState = MintLib.newCollectionCreationPayoutSplitState();
   let moderationState = MintLib.newModerationState();
+  let pendingMintPaymentState = MintLib.newPendingMintPaymentState();
   let walletState = WalletLib.newState();
   let ownershipIndexState = WalletLib.newOwnershipIndexState();
   let marketplaceState = MarketplaceLib.newState();
@@ -35,6 +37,7 @@ persistent actor Backend {
   let marketplaceListingReturnState = MarketplaceLib.newListingReturnState();
   let marketplaceBidState = MarketplaceLib.newBidState();
   let marketplaceFeeState = MarketplaceLib.newFeeState();
+  let icpWithdrawalState = IcpLib.newWithdrawalState();
   let dividendsState = DividendsLib.newState();
   let dividendFeeState = DividendsLib.newFeeState();
 
@@ -46,6 +49,7 @@ persistent actor Backend {
     collectionCreationState,
     collectionCreationPayoutSplitState,
     moderationState,
+    pendingMintPaymentState,
     collectionsState,
     walletState,
     authState,
@@ -62,7 +66,11 @@ persistent actor Backend {
     authState,
     Principal.fromActor(Backend),
   );
-  include ICPApi(marketplaceUserPaymentLockState, Principal.fromActor(Backend));
+  include ICPApi(
+    marketplaceUserPaymentLockState,
+    icpWithdrawalState,
+    Principal.fromActor(Backend),
+  );
   include MarketplaceApi(
     marketplaceState,
     marketplacePaymentState,
@@ -86,6 +94,7 @@ persistent actor Backend {
     collectionsState,
     walletState,
     marketplaceState,
+    marketplaceListingLockState,
     marketplaceUserPaymentLockState,
     mintState,
     Principal.fromActor(Backend),

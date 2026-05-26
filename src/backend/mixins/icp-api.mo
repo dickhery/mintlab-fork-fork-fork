@@ -6,6 +6,7 @@ import Principal "mo:core/Principal";
 
 mixin (
   marketplaceUserPaymentLockState : MarketplaceLib.MarketplaceUserPaymentLockState,
+  icpWithdrawalState : IcpLib.WithdrawalState,
   canisterId : Principal,
 ) {
 
@@ -31,7 +32,42 @@ mixin (
     try {
       let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
       let sub = IcpLib.principalToSubaccount(caller);
-      await* IcpLib.transferOut(ledger, ?sub, to, amount, 0);
+      let withdrawal = IcpLib.beginWithdrawal(icpWithdrawalState, caller, to, amount);
+      switch (withdrawal.status) {
+        case (#Completed) {
+          switch (withdrawal.blockIndex) {
+            case (?blockIndex) return #Ok(blockIndex);
+            case null {};
+          };
+        };
+        case (_) {};
+      };
+      let result = await* IcpLib.transferOutAt(
+        ledger,
+        ?sub,
+        to,
+        amount,
+        withdrawal.memo,
+        withdrawal.createdAt,
+      );
+      switch (result) {
+        case (#Ok(blockIndex)) {
+          ignore IcpLib.markWithdrawalCompleted(icpWithdrawalState, withdrawal, blockIndex);
+          #Ok(blockIndex);
+        };
+        case (#Err(#TxDuplicate({ duplicate_of }))) {
+          ignore IcpLib.markWithdrawalCompleted(icpWithdrawalState, withdrawal, duplicate_of);
+          #Ok(duplicate_of);
+        };
+        case (#Err(error)) {
+          ignore IcpLib.markWithdrawalFailed(
+            icpWithdrawalState,
+            withdrawal,
+            IcpLib.transferErrorText(error),
+          );
+          #Err(error);
+        };
+      };
     } finally {
       MarketplaceLib.releaseUserPaymentLock(marketplaceUserPaymentLockState, caller);
     };

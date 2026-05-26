@@ -21,6 +21,18 @@ module {
     claimableE8s : Nat64;
   };
 
+  public type NFTDividendPage = {
+    dividends : [NFTDividend];
+    nextCursor : ?Nat;
+    totalCount : Nat;
+  };
+
+  public type DividendBalancePage = {
+    balances : [(Text, Nat64)];
+    nextCursor : ?Nat;
+    totalCount : Nat;
+  };
+
   public type DividendSyncReceipt = {
     collectionId : CollectionTypes.CollectionId;
     depositedE8s : Nat64;

@@ -32,6 +32,7 @@ mixin (
   collectionCreationState : MintLib.CollectionCreationState,
   collectionCreationPayoutSplitState : MintLib.CollectionCreationPayoutSplitState,
   moderationState : MintLib.ModerationState,
+  pendingMintPaymentState : MintLib.PendingMintPaymentState,
   collectionsState : CollectionsLib.CollectionsState,
   walletState : WalletLib.WalletState,
   authState : AuthLib.AdminState,
@@ -254,7 +255,13 @@ mixin (
   transient let MODERATION_MAX_IMAGE_DATA_URL_CHARS : Nat = 450_000;
   transient let MODERATION_MAX_REQUEST_BODY_BYTES : Nat = 600_000;
   transient let PAYOUT_BASIS_POINTS_TOTAL : Nat = 10_000;
+  transient let MINT_COOLDOWN_NS : Int = 10_000_000_000; // 10 seconds
+  transient let COLLECTION_CREATION_COOLDOWN_NS : Int = 60_000_000_000; // 1 minute
+  transient let COLLECTION_CREATION_PAGE_DEFAULT : Nat = 25;
+  transient let COLLECTION_CREATION_PAGE_MAX : Nat = 100;
   transient var moderationImageNonce : Nat = 0;
+  transient let mintCooldowns = Map.empty<Principal, Int>();
+  transient let collectionCreationCooldowns = Map.empty<Principal, Int>();
 
   func acquireUserPaymentLockResult(user : Principal) : ?Text {
     if (not MarketplaceLib.acquireUserPaymentLock(marketplaceUserPaymentLockState, user)) {
@@ -266,6 +273,25 @@ mixin (
 
   func releaseUserPaymentLock(user : Principal) {
     MarketplaceLib.releaseUserPaymentLock(marketplaceUserPaymentLockState, user);
+  };
+
+  func enforcePrincipalCooldown(
+    cooldowns : Map.Map<Principal, Int>,
+    caller : Principal,
+    cooldownNs : Int,
+    message : Text,
+  ) : ?Text {
+    let now = Time.now();
+    switch (Map.get(cooldowns, Principal.compare, caller)) {
+      case (?lastStartedAt) {
+        if (now > lastStartedAt and now - lastStartedAt < cooldownNs) {
+          return ?message;
+        };
+      };
+      case null {};
+    };
+    Map.add(cooldowns, Principal.compare, caller, now);
+    null;
   };
 
   type ManagementCanisterActor = actor {
@@ -540,6 +566,24 @@ mixin (
     MintLib.repairableCollectionCreationRequestsByOwner(collectionCreationState, caller);
   };
 
+  public shared ({ caller }) func getMyCollectionCreationRequestsPage(
+    cursor : ?Nat,
+    limit : ?Nat,
+  ) : async MintTypes.CollectionCreationRequestPage {
+    if (Principal.isAnonymous(caller)) {
+      return {
+        requests = [];
+        nextCursor = null;
+        totalCount = 0;
+      };
+    };
+    collectionCreationRequestPageFromViews(
+      MintLib.repairableCollectionCreationRequestsByOwner(collectionCreationState, caller),
+      mintCursorOrZero(cursor),
+      normalizeCollectionCreationPageSize(limit),
+    );
+  };
+
   public shared ({ caller }) func getAllCollectionCreationRequests() : async {
     #ok : [MintTypes.CollectionCreationRequestView];
     #err : Text;
@@ -551,6 +595,28 @@ mixin (
       return #err("Unauthorized: admin only");
     };
     #ok(MintLib.repairableCollectionCreationRequests(collectionCreationState));
+  };
+
+  public shared ({ caller }) func getAllCollectionCreationRequestsPage(
+    cursor : ?Nat,
+    limit : ?Nat,
+  ) : async {
+    #ok : MintTypes.CollectionCreationRequestPage;
+    #err : Text;
+  } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("Anonymous caller not allowed");
+    };
+    if (not AuthLib.isAdmin(authState, caller)) {
+      return #err("Unauthorized: admin only");
+    };
+    #ok(
+      collectionCreationRequestPageFromViews(
+        MintLib.repairableCollectionCreationRequests(collectionCreationState),
+        mintCursorOrZero(cursor),
+        normalizeCollectionCreationPageSize(limit),
+      )
+    );
   };
 
   public shared ({ caller }) func recoverCollectionCreationRecord(
@@ -1140,6 +1206,17 @@ mixin (
   ) : async { #ok : MintTypes.CollectionCreationReceipt; #err : Text } {
     if (Principal.isAnonymous(caller)) {
       return #err("You must be logged in to create a collection");
+    };
+    switch (
+      enforcePrincipalCooldown(
+        collectionCreationCooldowns,
+        caller,
+        COLLECTION_CREATION_COOLDOWN_NS,
+        "Collection setup was just started. Wait a minute before trying again.",
+      )
+    ) {
+      case (?message) return #err(message);
+      case null {};
     };
     if (MintLib.activeCollectionCreationRequestsByOwner(collectionCreationState, caller).size() > 0) {
       return #err("You already have a saved collection setup request. Use the pending setup retry card to continue it without paying again.");
@@ -1814,6 +1891,17 @@ mixin (
     if (Principal.isAnonymous(caller)) {
       return #err("You must be logged in to mint");
     };
+    switch (
+      enforcePrincipalCooldown(
+        mintCooldowns,
+        caller,
+        MINT_COOLDOWN_NS,
+        "Minting was just started. Wait a few seconds before trying again.",
+      )
+    ) {
+      case (?message) return #err(message);
+      case null {};
+    };
     let config = MintLib.getConfig(mintState);
     if (not config.mainMintEnabled) {
       return #err("Main collection minting is currently disabled");
@@ -1843,47 +1931,180 @@ mixin (
       case null {};
     };
 
-    let blockIndex = if (config.mainMintPriceE8s > 0) {
+    if (
+      config.mainMintPriceE8s > 0 and
+      MintLib.pendingMintPaymentsByCaller(pendingMintPaymentState, caller).size() > 0
+    ) {
+      return #err(
+        "You already have a paid mint payment being finalized. Use the pending mint retry card before starting another paid mint."
+      );
+    };
+
+    if (config.mainMintPriceE8s > 0) {
+      let payment = MintLib.beginPendingMintPayment(
+        pendingMintPaymentState,
+        caller,
+        collectionId,
+        metadata,
+        config.mainMintPriceE8s,
+        payoutAccount,
+      );
       switch (acquireUserPaymentLockResult(caller)) {
-        case (?message) return #err(message);
+        case (?message) {
+          ignore MintLib.markPendingMintPaymentError(pendingMintPaymentState, payment.id, message);
+          return #err(message);
+        };
         case null {};
       };
       try {
         let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
         let userSubaccount = IcpLib.principalToSubaccount(caller);
-        let paymentResult = await* IcpLib.transferOut(
+        let paymentResult = await* IcpLib.transferOutAt(
           ledger,
           ?userSubaccount,
           payoutAccount,
           config.mainMintPriceE8s,
-          Nat64.fromNat(mintState.nextTokenId),
+          payment.memo,
+          payment.paymentCreatedAt,
         );
-        switch (paymentResult) {
+        let paymentBlock = switch (paymentResult) {
           case (#Err(#InsufficientFunds({ balance }))) {
-            return #err(
-              "Insufficient ICP in your in-app account. Current balance: " # Nat64.toText(balance.e8s) # " e8s"
-            );
+            let message = "Insufficient ICP in your in-app account. Current balance: " # Nat64.toText(balance.e8s) # " e8s";
+            ignore MintLib.markPendingMintPaymentError(pendingMintPaymentState, payment.id, message);
+            return #err(message);
           };
           case (#Err(#BadFee({ expected_fee }))) {
-            return #err(
-              "Ledger rejected the fee. Expected fee: " # Nat64.toText(expected_fee.e8s) # " e8s"
-            );
+            let message = "Ledger rejected the fee. Expected fee: " # Nat64.toText(expected_fee.e8s) # " e8s";
+            ignore MintLib.markPendingMintPaymentError(pendingMintPaymentState, payment.id, message);
+            return #err(message);
           };
           case (#Err(#TxDuplicate({ duplicate_of }))) {
-            return #err("Duplicate payment detected at block " # Nat64.toText(duplicate_of));
+            duplicate_of;
           };
           case (#Err(_)) {
+            ignore MintLib.markPendingMintPaymentError(pendingMintPaymentState, payment.id, "ICP payment failed");
             return #err("ICP payment failed");
           };
           case (#Ok(value)) value;
+        };
+        var persistPaymentBlock : ?Nat64 = ?paymentBlock;
+        try {
+          ignore MintLib.markPendingMintPaymentSent(pendingMintPaymentState, payment.id, paymentBlock);
+          let receipt = mintMainCollectionNFTFromMetadata(caller, collection, metadata, paymentBlock);
+          ignore MintLib.markPendingMintPaymentMinted(pendingMintPaymentState, payment.id, receipt.nft.id);
+          #ok(receipt);
+        } catch (error) {
+          let message =
+            "Your ICP payment was recorded at block " #
+            Nat64.toText(paymentBlock) #
+            ", but mint finalization failed. Retry this pending mint. Details: " #
+            Error.message(error);
+          ignore MintLib.markPendingMintPaymentError(pendingMintPaymentState, payment.id, message);
+          #err(message);
+        } finally {
+          switch (persistPaymentBlock) {
+            case (?block) {
+              switch (MintLib.getPendingMintPayment(pendingMintPaymentState, payment.id)) {
+                case (?latest) {
+                  if (latest.paymentBlock == null) {
+                    ignore MintLib.markPendingMintPaymentSent(pendingMintPaymentState, payment.id, block);
+                  };
+                };
+                case null {};
+              };
+            };
+            case null {};
+          };
         };
       } finally {
         releaseUserPaymentLock(caller);
       };
     } else {
-      0 : Nat64;
+      #ok(mintMainCollectionNFTFromMetadata(caller, collection, metadata, 0));
     };
+  };
 
+  public shared ({ caller }) func getMyPendingMintPayments() : async [MintTypes.PendingMintPaymentView] {
+    if (Principal.isAnonymous(caller)) {
+      return [];
+    };
+    MintLib.pendingMintPaymentsByCaller(pendingMintPaymentState, caller);
+  };
+
+  public shared ({ caller }) func retryPendingMintPayment(
+    paymentId : Nat
+  ) : async { #ok : MintTypes.MintReceipt; #err : Text } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("You must be logged in to retry a pending mint");
+    };
+    let payment = switch (MintLib.getPendingMintPayment(pendingMintPaymentState, paymentId)) {
+      case null return #err("Pending mint payment not found");
+      case (?value) value;
+    };
+    if (not Principal.equal(payment.caller, caller) and not AuthLib.isAdmin(authState, caller)) {
+      return #err("Only the payer or admin can retry this mint");
+    };
+    switch (payment.paymentBlock) {
+      case null return #err("This mint payment has not been recorded on the ICP ledger yet");
+      case (?paymentBlock) {
+        switch (payment.mintedTokenId) {
+          case (?tokenId) {
+            switch (WalletLib.findByCollectionToken(walletState, payment.collectionId, Nat.toText(tokenId))) {
+              case (?nft) return #ok({ nft; paymentBlock });
+              case null {
+                switch (MintLib.getToken(mintState, tokenId)) {
+                  case (?token) {
+                    if (Principal.equal(token.owner, payment.caller)) {
+                      let nft = WalletLib.registerNFT(
+                        walletState,
+                        payment.caller,
+                        payment.collectionId,
+                        Nat.toText(token.tokenId),
+                        MintLib.publicMetadata(token.metadata),
+                        #Minted,
+                      );
+                      return #ok({ nft; paymentBlock });
+                    };
+                  };
+                  case null {};
+                };
+              };
+            };
+          };
+          case null {};
+        };
+        let collection = switch (CollectionsLib.getCollection(collectionsState, payment.collectionId)) {
+          case null {
+            let message = "Minting collection is missing";
+            ignore MintLib.markPendingMintPaymentError(pendingMintPaymentState, payment.id, message);
+            return #err(message);
+          };
+          case (?value) value;
+        };
+        try {
+          let receipt = mintMainCollectionNFTFromMetadata(
+            payment.caller,
+            collection,
+            payment.metadata,
+            paymentBlock,
+          );
+          ignore MintLib.markPendingMintPaymentMinted(pendingMintPaymentState, payment.id, receipt.nft.id);
+          #ok(receipt);
+        } catch (error) {
+          let message = "Pending mint retry failed: " # Error.message(error);
+          ignore MintLib.markPendingMintPaymentError(pendingMintPaymentState, payment.id, message);
+          #err(message);
+        };
+      };
+    };
+  };
+
+  func mintMainCollectionNFTFromMetadata(
+    caller : Principal,
+    collection : CollectionTypes.Collection,
+    metadata : WalletTypes.NFTMetadata,
+    paymentBlock : Nat64,
+  ) : MintTypes.MintReceipt {
     let token = MintLib.mintToken(
       mintState,
       caller,
@@ -1897,15 +2118,15 @@ mixin (
     let nft = WalletLib.registerNFT(
       walletState,
       caller,
-      collectionId,
+      collection.id,
       Nat.toText(token.tokenId),
       MintLib.publicMetadata(token.metadata),
       #Minted,
     );
-    #ok({
+    {
       nft;
-      paymentBlock = blockIndex;
-    });
+      paymentBlock;
+    };
   };
 
   public shared ({ caller }) func mintCollectionNFT(
@@ -1914,6 +2135,17 @@ mixin (
   ) : async { #ok : WalletTypes.WalletNFT; #err : Text } {
     if (Principal.isAnonymous(caller)) {
       return #err("You must be logged in to mint");
+    };
+    switch (
+      enforcePrincipalCooldown(
+        mintCooldowns,
+        caller,
+        MINT_COOLDOWN_NS,
+        "Minting was just started. Wait a few seconds before trying again.",
+      )
+    ) {
+      case (?message) return #err(message);
+      case null {};
     };
     let collection = switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
       case null return #err("Collection not found");
@@ -4207,6 +4439,54 @@ mixin (
         };
         true;
       };
+    };
+  };
+
+  func mintCursorOrZero(cursor : ?Nat) : Nat {
+    switch (cursor) {
+      case null 0;
+      case (?value) value;
+    };
+  };
+
+  func normalizeCollectionCreationPageSize(limit : ?Nat) : Nat {
+    switch (limit) {
+      case null COLLECTION_CREATION_PAGE_DEFAULT;
+      case (?requested) {
+        if (requested > COLLECTION_CREATION_PAGE_MAX) {
+          COLLECTION_CREATION_PAGE_MAX;
+        } else {
+          requested;
+        };
+      };
+    };
+  };
+
+  func collectionCreationRequestPageFromViews(
+    requests : [MintTypes.CollectionCreationRequestView],
+    cursor : Nat,
+    limit : Nat,
+  ) : MintTypes.CollectionCreationRequestPage {
+    let total = requests.size();
+    if (cursor >= total or limit == 0) {
+      return {
+        requests = [];
+        nextCursor = null;
+        totalCount = total;
+      };
+    };
+
+    var index = cursor;
+    var page : [MintTypes.CollectionCreationRequestView] = [];
+    while (index < total and page.size() < limit) {
+      page := Array.concat<MintTypes.CollectionCreationRequestView>(page, [requests[index]]);
+      index += 1;
+    };
+
+    {
+      requests = page;
+      nextCursor = if (index < total) { ?index } else { null };
+      totalCount = total;
     };
   };
 

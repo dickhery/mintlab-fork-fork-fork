@@ -1,15 +1,15 @@
-import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, h as useComposedRefs, a as cn, b as useBackend, u as useAuth, e as useQueryClient, f as useQuery, B as Button, S as ShoppingBag, i as LoadingSpinner, m as motion, X, g as ue } from "./index-BjklpoWU.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-CRUJO5By.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-DQQaQlz2.js";
-import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-rlAWuAza.js";
-import { T as Tag, Z as ZoomableMediaImage, P as PaymentConfirmationDialog } from "./ZoomableMediaImage-B34nAbLr.js";
-import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-QzUFDKbw.js";
-import { B as Badge, I as Input } from "./badge-Cxipmsvb.js";
-import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label } from "./index-D1EevaUf.js";
+import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, h as useComposedRefs, a as cn, b as useBackend, u as useAuth, e as useQueryClient, f as useQuery, B as Button, S as ShoppingBag, i as LoadingSpinner, m as motion, X, g as ue } from "./index-Dlr-4CKz.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-RODVCHlo.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-DM01sE6x.js";
+import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-CcsBl9sy.js";
+import { T as Tag, Z as ZoomableMediaImage, P as PaymentConfirmationDialog } from "./ZoomableMediaImage-BeocNwgW.js";
+import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-CpwJYIFc.js";
+import { B as Badge, I as Input } from "./badge-DyWrd8S9.js";
+import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label } from "./index-Byv1oxo0.js";
 import { f as formatICPAmount, p as parseICPToE8s } from "./icp-BXjZNIYq.js";
-import { C as Coins } from "./coins-B4k36-7a.js";
-import { I as ImageOff } from "./media-CBIulzFx.js";
-import "./arrow-right-BahKf-aw.js";
+import { C as Coins } from "./coins-cikpxwHj.js";
+import { I as ImageOff } from "./media-l8J0swV4.js";
+import "./arrow-right-F_r_3qVe.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -1473,6 +1473,15 @@ function MarketplacePage() {
     },
     enabled: !!actor && !actorLoading && isAuthenticated && !!principal
   });
+  const { data: settlementStatuses = [] } = useQuery({
+    queryKey: ["myMarketplaceSettlementStatuses", principal == null ? void 0 : principal.toString()],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getMyMarketplaceSettlementStatuses();
+    },
+    enabled: !!actor && !actorLoading && isAuthenticated,
+    refetchInterval: 3e4
+  });
   const collectionMap = new Map(
     collections.map((collection) => [collection.id, collection])
   );
@@ -1571,6 +1580,9 @@ function MarketplacePage() {
     void qc.invalidateQueries({ queryKey: ["userStats"] });
     void qc.invalidateQueries({ queryKey: ["icp-balance"] });
     void qc.invalidateQueries({ queryKey: ["myAuctionBidStatuses"] });
+    void qc.invalidateQueries({
+      queryKey: ["myMarketplaceSettlementStatuses"]
+    });
   };
   async function ensureNFTReadyForListing(nft) {
     if (!actor) throw new Error("Not connected");
@@ -1751,6 +1763,30 @@ function MarketplacePage() {
           children: "Fixed purchases and auction bids use your in-app ICP balance. External registered NFTs are vaulted before listing so Mintlab can settle the sale on-chain."
         }
       ),
+      settlementStatuses.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4", children: [
+        /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-3 flex items-center gap-2", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsx(Clock, { className: "h-4 w-4 text-amber-700 dark:text-amber-200" }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "text-sm font-semibold text-foreground", children: "Settlement status" })
+        ] }),
+        /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "grid gap-2 md:grid-cols-2", children: settlementStatuses.map((status) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+          "div",
+          {
+            className: "rounded-md border border-border bg-background/70 p-3",
+            children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "mb-1 flex items-center justify-between gap-2", children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-sm font-medium text-foreground", children: [
+                  "Listing #",
+                  status.listingId.toString()
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { className: "shrink-0 border-0 bg-amber-500/20 text-amber-700 dark:text-amber-200", children: status.role })
+              ] }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs font-medium text-muted-foreground", children: status.stage }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-1 text-xs text-muted-foreground", children: status.message })
+            ]
+          },
+          `${status.kind}:${status.listingId.toString()}:${status.role}`
+        )) })
+      ] }),
       /* @__PURE__ */ jsxRuntimeExports.jsxs(
         Tabs,
         {

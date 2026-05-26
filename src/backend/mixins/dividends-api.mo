@@ -23,6 +23,7 @@ mixin (
   collectionsState : CollectionsLib.CollectionsState,
   walletState : WalletLib.WalletState,
   marketplaceState : MarketplaceLib.MarketplaceState,
+  marketplaceListingLockState : MarketplaceLib.MarketplaceListingLockState,
   marketplaceUserPaymentLockState : MarketplaceLib.MarketplaceUserPaymentLockState,
   mintState : MintLib.MintState,
   canisterId : Principal,
@@ -50,6 +51,9 @@ mixin (
   transient let DIVIDEND_ATTRIBUTE_LIMIT : Nat = 20;
   transient let DIVIDEND_ATTRIBUTE_KEY_LIMIT : Nat = 128;
   transient let DIVIDEND_ATTRIBUTE_VALUE_LIMIT : Nat = 512;
+  transient let DIVIDEND_PAGE_DEFAULT : Nat = 50;
+  transient let DIVIDEND_PAGE_MAX : Nat = 100;
+  transient let MAX_DIVIDEND_SYNC_TOKEN_COUNT : Nat = 1_000;
   public shared func getCollectionDividendInfo(
     collectionId : CollectionTypes.CollectionId
   ) : async ?DividendTypes.CollectionDividendInfo {
@@ -93,6 +97,24 @@ mixin (
     };
   };
 
+  public query func getCollectionDividendBalancesPage(
+    collectionId : CollectionTypes.CollectionId,
+    cursor : ?Nat,
+    limit : ?Nat,
+  ) : async DividendTypes.DividendBalancePage {
+    let balances = switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
+      case null [];
+      case (?collection) {
+        if (not DividendsLib.collectionEnabled(collection)) {
+          [];
+        } else {
+          DividendsLib.collectionBalances(dividendsState, collectionId, cachedMintedTokenIds(collectionId));
+        };
+      };
+    };
+    dividendBalancePage(balances, dividendCursorOrZero(cursor), normalizeDividendPageSize(limit));
+  };
+
   public shared func refreshCollectionDividendBalances(
     collectionId : CollectionTypes.CollectionId
   ) : async [(Text, Nat64)] {
@@ -108,12 +130,46 @@ mixin (
     };
   };
 
+  public shared func refreshCollectionDividendBalancesPage(
+    collectionId : CollectionTypes.CollectionId,
+    cursor : ?Nat,
+    limit : ?Nat,
+  ) : async DividendTypes.DividendBalancePage {
+    let balances = switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
+      case null [];
+      case (?collection) {
+        if (not DividendsLib.collectionEnabled(collection)) {
+          [];
+        } else {
+          DividendsLib.collectionBalances(dividendsState, collectionId, await* mintedTokenIds(collectionId));
+        };
+      };
+    };
+    dividendBalancePage(balances, dividendCursorOrZero(cursor), normalizeDividendPageSize(limit));
+  };
+
   public shared ({ caller }) func getMyDividendNFTs() : async [DividendTypes.NFTDividend] {
     await* refreshedDividendEntries(caller);
   };
 
   public shared ({ caller }) func refreshMyDividendNFTs() : async [DividendTypes.NFTDividend] {
     await* refreshedDividendEntries(caller);
+  };
+
+  public shared ({ caller }) func getMyDividendNFTsPage(
+    cursor : ?Nat,
+    limit : ?Nat,
+  ) : async DividendTypes.NFTDividendPage {
+    let dividends = await* refreshedDividendEntries(caller);
+    nftDividendPage(dividends, dividendCursorOrZero(cursor), normalizeDividendPageSize(limit));
+  };
+
+  public shared ({ caller }) func refreshMyDividendNFTsPage(
+    cursor : ?Nat,
+    limit : ?Nat,
+  ) : async DividendTypes.NFTDividendPage {
+    let dividends = await* refreshedDividendEntries(caller);
+    nftDividendPage(dividends, dividendCursorOrZero(cursor), normalizeDividendPageSize(limit));
   };
 
   func refreshedDividendEntries(caller : Principal) : async* [DividendTypes.NFTDividend] {
@@ -415,6 +471,13 @@ mixin (
     if (tokenIds.size() == 0) {
       return #err("This collection has no minted NFTs to distribute to yet");
     };
+    if (tokenIds.size() > MAX_DIVIDEND_SYNC_TOKEN_COUNT) {
+      return #err(
+        "Dividend syncing is disabled for collections above " #
+        Nat.toText(MAX_DIVIDEND_SYNC_TOKEN_COUNT) #
+        " NFTs until the accumulator dividend model is enabled. This prevents partial distributions on large collections."
+      );
+    };
     let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
     let balanceE8s = await* IcpLib.getBalance(ledger, collectionDividendAccountId(collectionId));
     #ok(DividendsLib.distributeNewBalance(dividendsState, collectionId, tokenIds, balanceE8s));
@@ -482,6 +545,10 @@ mixin (
     if (not DividendsLib.acquireClaim(dividendsState, key)) {
       return #err("A dividend claim is already processing for this NFT");
     };
+    if (not MarketplaceLib.acquireListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId)) {
+      DividendsLib.releaseClaim(dividendsState, key);
+      return #err("This NFT is being listed or settled. Try collecting dividends again after the marketplace action finishes.");
+    };
 
     DividendsLib.setClaimable(dividendsState, nft.collectionId, nft.tokenId, 0);
     try {
@@ -497,6 +564,7 @@ mixin (
       switch (result) {
         case (#Ok(blockIndex)) {
           DividendsLib.reduceProcessedBalance(dividendsState, nft.collectionId, claimable);
+          MarketplaceLib.releaseListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId);
           DividendsLib.releaseClaim(dividendsState, key);
           #ok({
             nft = compactDividendNFT(verifiedNft);
@@ -509,12 +577,14 @@ mixin (
         case (#Err(error)) {
           ignore error;
           DividendsLib.addClaimable(dividendsState, nft.collectionId, nft.tokenId, claimable);
+          MarketplaceLib.releaseListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId);
           DividendsLib.releaseClaim(dividendsState, key);
           #err("ICP dividend transfer failed");
         };
       };
     } catch (e) {
       DividendsLib.addClaimable(dividendsState, nft.collectionId, nft.tokenId, claimable);
+      MarketplaceLib.releaseListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId);
       DividendsLib.releaseClaim(dividendsState, key);
       #err("ICP dividend transfer failed: " # Error.message(e));
     };
@@ -924,6 +994,88 @@ mixin (
       };
     };
     nfts;
+  };
+
+  func dividendCursorOrZero(cursor : ?Nat) : Nat {
+    switch (cursor) {
+      case (?value) value;
+      case null 0;
+    };
+  };
+
+  func normalizeDividendPageSize(limit : ?Nat) : Nat {
+    switch (limit) {
+      case null DIVIDEND_PAGE_DEFAULT;
+      case (?value) {
+        if (value == 0) {
+          1;
+        } else if (value > DIVIDEND_PAGE_MAX) {
+          DIVIDEND_PAGE_MAX;
+        } else {
+          value;
+        };
+      };
+    };
+  };
+
+  func nftDividendPage(
+    dividends : [DividendTypes.NFTDividend],
+    start : Nat,
+    limit : Nat,
+  ) : DividendTypes.NFTDividendPage {
+    var page : [DividendTypes.NFTDividend] = [];
+    var index : Nat = 0;
+    var added : Nat = 0;
+    for (dividend in dividends.values()) {
+      if (index < start) {
+        index += 1;
+      } else if (added < limit) {
+        page := Array.concat<DividendTypes.NFTDividend>(page, [dividend]);
+        added += 1;
+        index += 1;
+      } else {
+        return {
+          dividends = page;
+          nextCursor = ?index;
+          totalCount = dividends.size();
+        };
+      };
+    };
+    {
+      dividends = page;
+      nextCursor = null;
+      totalCount = dividends.size();
+    };
+  };
+
+  func dividendBalancePage(
+    balances : [(Text, Nat64)],
+    start : Nat,
+    limit : Nat,
+  ) : DividendTypes.DividendBalancePage {
+    var page : [(Text, Nat64)] = [];
+    var index : Nat = 0;
+    var added : Nat = 0;
+    for (balance in balances.values()) {
+      if (index < start) {
+        index += 1;
+      } else if (added < limit) {
+        page := Array.concat<(Text, Nat64)>(page, [balance]);
+        added += 1;
+        index += 1;
+      } else {
+        return {
+          balances = page;
+          nextCursor = ?index;
+          totalCount = balances.size();
+        };
+      };
+    };
+    {
+      balances = page;
+      nextCursor = null;
+      totalCount = balances.size();
+    };
   };
 
   func findDividendNFTCandidate(caller : Principal, nftId : WalletTypes.NFTId) : ?WalletTypes.WalletNFT {

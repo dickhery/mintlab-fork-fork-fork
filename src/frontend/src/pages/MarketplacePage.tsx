@@ -39,6 +39,7 @@ import type {
   Collection,
   FixedListing,
   ListingId,
+  SettlementStatus,
   WalletNFT,
 } from "@/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -1317,6 +1318,16 @@ export default function MarketplacePage() {
     enabled: !!actor && !actorLoading && isAuthenticated && !!principal,
   });
 
+  const { data: settlementStatuses = [] } = useQuery<SettlementStatus[]>({
+    queryKey: ["myMarketplaceSettlementStatuses", principal?.toString()],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getMyMarketplaceSettlementStatuses();
+    },
+    enabled: !!actor && !actorLoading && isAuthenticated,
+    refetchInterval: 30_000,
+  });
+
   const collectionMap = new Map<bigint, Collection>(
     collections.map((collection) => [collection.id, collection]),
   );
@@ -1463,6 +1474,9 @@ export default function MarketplacePage() {
     void qc.invalidateQueries({ queryKey: ["userStats"] });
     void qc.invalidateQueries({ queryKey: ["icp-balance"] });
     void qc.invalidateQueries({ queryKey: ["myAuctionBidStatuses"] });
+    void qc.invalidateQueries({
+      queryKey: ["myMarketplaceSettlementStatuses"],
+    });
   };
 
   async function ensureNFTReadyForListing(nft: WalletNFT): Promise<bigint> {
@@ -1674,6 +1688,40 @@ export default function MarketplacePage() {
           registered NFTs are vaulted before listing so Mintlab can settle the
           sale on-chain.
         </HelpCallout>
+
+        {settlementStatuses.length > 0 && (
+          <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <Clock className="h-4 w-4 text-amber-700 dark:text-amber-200" />
+              <h2 className="text-sm font-semibold text-foreground">
+                Settlement status
+              </h2>
+            </div>
+            <div className="grid gap-2 md:grid-cols-2">
+              {settlementStatuses.map((status) => (
+                <div
+                  key={`${status.kind}:${status.listingId.toString()}:${status.role}`}
+                  className="rounded-md border border-border bg-background/70 p-3"
+                >
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="text-sm font-medium text-foreground">
+                      Listing #{status.listingId.toString()}
+                    </p>
+                    <Badge className="shrink-0 border-0 bg-amber-500/20 text-amber-700 dark:text-amber-200">
+                      {status.role}
+                    </Badge>
+                  </div>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {status.stage}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {status.message}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <Tabs
           value={activeTab}

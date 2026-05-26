@@ -2,12 +2,15 @@ import Principal "mo:core/Principal";
 import Blob "mo:core/Blob";
 import Array "mo:core/Array";
 import Int "mo:core/Int";
+import Map "mo:core/Map";
 import Nat "mo:core/Nat";
 import Nat8 "mo:core/Nat8";
 import Nat64 "mo:core/Nat64";
 import Runtime "mo:core/Runtime";
+import Text "mo:core/Text";
 import Time "mo:core/Time";
 import CommonTypes "../types/common";
+import IcpTypes "../types/icp";
 
 module {
   // ICP Ledger canister interface (subset we need)
@@ -36,6 +39,12 @@ module {
   public let DIVIDEND_FEE_MEMO : Nat64 = 1_299_490_374; // "MFEE" as a legacy ICP ledger memo
   public let E8S_PER_ICP : Nat = 100_000_000;
   public let CYCLES_PER_XDR : Nat = 1_000_000_000_000;
+  public let WITHDRAWAL_RETRY_WINDOW_NS : Nat64 = 86_400_000_000_000; // 24 hours
+
+  public type WithdrawalState = {
+    withdrawals : Map.Map<Text, IcpTypes.WithdrawalJournalEntry>;
+    var nextWithdrawalId : Nat;
+  };
 
   public type IcpXdrConversionRate = {
     xdr_permyriad_per_icp : Nat64;
@@ -126,6 +135,13 @@ module {
     notify_top_up : shared NotifyTopUpArg -> async NotifyTopUpResult;
   };
 
+  public func newWithdrawalState() : WithdrawalState {
+    {
+      withdrawals = Map.empty<Text, IcpTypes.WithdrawalJournalEntry>();
+      var nextWithdrawalId = 1;
+    };
+  };
+
   /// Get the ICP balance for an account identifier
   public func getBalance(ledger : Ledger, account : CommonTypes.AccountIdentifier) : async* Nat64 {
     let result = await ledger.account_balance({ account });
@@ -186,6 +202,98 @@ module {
     await* transferOutWithFeeAt(ledger, fromSubaccount, to, amount, memo, DEFAULT_FEE, timestampNanos);
   };
 
+  public func withdrawalKey(
+    caller : Principal,
+    to : CommonTypes.AccountIdentifier,
+    amount : Nat64,
+  ) : Text {
+    caller.toText() # ":" # blobToHex(to) # ":" # Nat64.toText(amount);
+  };
+
+  public func reusableWithdrawal(
+    state : WithdrawalState,
+    caller : Principal,
+    to : CommonTypes.AccountIdentifier,
+    amount : Nat64,
+  ) : ?IcpTypes.WithdrawalJournalEntry {
+    let key = withdrawalKey(caller, to, amount);
+    switch (Map.get(state.withdrawals, Text.compare, key)) {
+      case null null;
+      case (?entry) {
+        let now = nowNat64();
+        if (
+          entry.status != #Failed and
+          now >= entry.createdAt and
+          now - entry.createdAt < WITHDRAWAL_RETRY_WINDOW_NS
+        ) {
+          ?entry;
+        } else {
+          null;
+        };
+      };
+    };
+  };
+
+  public func beginWithdrawal(
+    state : WithdrawalState,
+    caller : Principal,
+    to : CommonTypes.AccountIdentifier,
+    amount : Nat64,
+  ) : IcpTypes.WithdrawalJournalEntry {
+    switch (reusableWithdrawal(state, caller, to, amount)) {
+      case (?entry) return entry;
+      case null {};
+    };
+    let id = state.nextWithdrawalId;
+    state.nextWithdrawalId += 1;
+    let now = nowNat64();
+    let entry : IcpTypes.WithdrawalJournalEntry = {
+      id;
+      caller;
+      to;
+      amountE8s = amount;
+      memo = Nat64.fromNat(id);
+      createdAt = now;
+      updatedAt = now;
+      blockIndex = null;
+      status = #Pending;
+      lastError = null;
+    };
+    Map.add(state.withdrawals, Text.compare, withdrawalKey(caller, to, amount), entry);
+    entry;
+  };
+
+  public func markWithdrawalCompleted(
+    state : WithdrawalState,
+    entry : IcpTypes.WithdrawalJournalEntry,
+    blockIndex : Nat64,
+  ) : IcpTypes.WithdrawalJournalEntry {
+    let updated : IcpTypes.WithdrawalJournalEntry = {
+      entry with
+      blockIndex = ?blockIndex;
+      status = #Completed;
+      updatedAt = nowNat64();
+      lastError = null;
+    };
+    Map.add(state.withdrawals, Text.compare, withdrawalKey(entry.caller, entry.to, entry.amountE8s), updated);
+    updated;
+  };
+
+  public func markWithdrawalFailed(
+    state : WithdrawalState,
+    entry : IcpTypes.WithdrawalJournalEntry,
+    message : Text,
+  ) : IcpTypes.WithdrawalJournalEntry {
+    let updated : IcpTypes.WithdrawalJournalEntry = {
+      entry with
+      status = #Failed;
+      updatedAt = nowNat64();
+      lastError = ?message;
+    };
+    Map.add(state.withdrawals, Text.compare, withdrawalKey(entry.caller, entry.to, entry.amountE8s), updated);
+    updated;
+  };
+
   public func transferOutWithFeeAt(
     ledger : Ledger,
     fromSubaccount : ?Blob,
@@ -231,6 +339,43 @@ module {
       },
     );
     Blob.fromArray(sub);
+  };
+
+  public func nowNat64() : Nat64 {
+    Nat64.fromNat(Int.abs(Time.now()));
+  };
+
+  public func blobToHex(blob : Blob) : Text {
+    let bytes = blob.toArray();
+    var result = "";
+    for (byte in bytes.values()) {
+      let high = (byte.toNat() / 16) % 16;
+      let low = byte.toNat() % 16;
+      result #= hexDigit(high) # hexDigit(low);
+    };
+    result;
+  };
+
+  func hexDigit(number : Nat) : Text {
+    switch (number) {
+      case 0 "0";
+      case 1 "1";
+      case 2 "2";
+      case 3 "3";
+      case 4 "4";
+      case 5 "5";
+      case 6 "6";
+      case 7 "7";
+      case 8 "8";
+      case 9 "9";
+      case 10 "a";
+      case 11 "b";
+      case 12 "c";
+      case 13 "d";
+      case 14 "e";
+      case 15 "f";
+      case _ "0";
+    };
   };
 
   /// Derive a full ICP account identifier from a canister principal + subaccount

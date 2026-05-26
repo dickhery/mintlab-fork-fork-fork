@@ -35,7 +35,53 @@ export const idlFactory = ({ IDL }) => {
     'canisterId' : IDL.Principal,
     'dividendConfig' : IDL.Opt(CollectionDividendConfig),
   });
+  const CollectionCanisterControllers = IDL.Record({
+    'controllers' : IDL.Vec(IDL.Principal),
+    'collectionId' : CollectionId,
+    'appCanisterId' : IDL.Principal,
+    'canisterId' : IDL.Principal,
+  });
+  const CollectionCreationReceipt = IDL.Record({
+    'collection' : Collection,
+    'paymentBlock' : IDL.Nat64,
+  });
   const ListingId = IDL.Nat;
+  const AccountIdentifier = IDL.Vec(IDL.Nat8);
+  const SettlementEscrowRepairKind = IDL.Variant({
+    'FixedPurchase' : IDL.Null,
+    'Auction' : IDL.Null,
+  });
+  const MintlabFeeRecoveryQuote = IDL.Record({
+    'escrowAccount' : AccountIdentifier,
+    'ledgerFeeE8s' : IDL.Nat64,
+    'mintlabFee' : IDL.Nat64,
+    'expectedBeforeMintlabFeeDebit' : IDL.Nat64,
+    'listingId' : ListingId,
+    'kind' : SettlementEscrowRepairKind,
+    'previousMintlabFeeCreatedAt' : IDL.Nat64,
+    'shortfallBeforeMintlabFee' : IDL.Nat64,
+    'expectedAfterMintlabFeeDebit' : IDL.Nat64,
+    'escrowBalance' : IDL.Nat64,
+    'escrowId' : IDL.Nat,
+    'feeRecipient' : AccountIdentifier,
+    'sellerProceeds' : IDL.Nat64,
+  });
+  const SettlementEscrowRepairQuote = IDL.Record({
+    'escrowAccount' : AccountIdentifier,
+    'topUpTransferFeeE8s' : IDL.Nat64,
+    'ledgerFeeE8s' : IDL.Nat64,
+    'topUpFromAccount' : AccountIdentifier,
+    'mintlabFee' : IDL.Nat64,
+    'listingId' : ListingId,
+    'kind' : SettlementEscrowRepairKind,
+    'topUpTotalDebit' : IDL.Nat64,
+    'escrowBalance' : IDL.Nat64,
+    'requiredDebit' : IDL.Nat64,
+    'topUpFromBalance' : IDL.Nat64,
+    'shortfall' : IDL.Nat64,
+    'escrowId' : IDL.Nat,
+    'sellerProceeds' : IDL.Nat64,
+  });
   const NFTId = IDL.Nat;
   const UserId = IDL.Principal;
   const NFTMetadata = IDL.Record({
@@ -59,41 +105,156 @@ export const idlFactory = ({ IDL }) => {
     'registeredAt' : Timestamp,
     'location' : WalletLocation,
   });
-  const WalletSyncSkip = IDL.Record({
-    'collectionId' : CollectionId,
-    'collectionName' : IDL.Text,
-    'message' : IDL.Text,
-    'reason' : IDL.Text,
+  const SettlementStage = IDL.Variant({
+    'NFTTransferPending' : IDL.Null,
+    'MintlabFeePending' : IDL.Null,
+    'PaymentPending' : IDL.Null,
+    'SellerPaymentPending' : IDL.Null,
   });
-  const WalletSyncV2Result = IDL.Record({
-    'errors' : IDL.Vec(IDL.Text),
-    'newCount' : IDL.Nat,
-    'skipped' : IDL.Vec(WalletSyncSkip),
-  });
-  const WalletSyncPageResult = IDL.Record({
-    'errors' : IDL.Vec(IDL.Text),
-    'newCount' : IDL.Nat,
-    'skipped' : IDL.Vec(WalletSyncSkip),
-    'nextCursor' : IDL.Opt(IDL.Nat),
-    'complete' : IDL.Bool,
-    'checkedCollections' : IDL.Nat,
-  });
-  const CollectionIndexStatus = IDL.Record({
-    'collectionId' : CollectionId,
-    'complete' : IDL.Bool,
-    'cursor' : IDL.Opt(IDL.Text),
-    'indexed' : IDL.Nat,
-    'lastError' : IDL.Opt(IDL.Text),
-    'scanned' : IDL.Nat,
+  const FixedPurchaseSettlement = IDL.Record({
+    'nft' : WalletNFT,
+    'ledgerFeeE8s' : IDL.Nat64,
+    'mintlabFee' : IDL.Nat64,
+    'mintlabFeeCreatedAt' : IDL.Opt(IDL.Nat64),
+    'nftDeliveredAt' : IDL.Opt(Timestamp),
+    'listingId' : ListingId,
+    'createdAt' : Timestamp,
+    'paymentBlock' : IDL.Opt(IDL.Nat64),
+    'seller' : UserId,
     'updatedAt' : Timestamp,
+    'stage' : SettlementStage,
+    'paymentEscrowId' : IDL.Nat,
+    'paymentCreatedAt' : IDL.Nat64,
+    'buyer' : UserId,
+    'mintlabFeeBlock' : IDL.Opt(IDL.Nat64),
+    'price' : IDL.Nat64,
+    'sellerPaymentBlock' : IDL.Opt(IDL.Nat64),
+    'feeRecipient' : IDL.Opt(AccountIdentifier),
+    'sellerProceeds' : IDL.Nat64,
+    'sellerPaymentCreatedAt' : IDL.Opt(IDL.Nat64),
   });
-  const CollectionIndexPageResult = IDL.Record({
-    'collectionId' : CollectionId,
-    'complete' : IDL.Bool,
-    'error' : IDL.Opt(IDL.Text),
-    'indexed' : IDL.Nat,
-    'nextCursor' : IDL.Opt(IDL.Text),
-    'scanned' : IDL.Nat,
+  const NoBidAuctionReturnStage = IDL.Variant({
+    'CleanupPending' : IDL.Null,
+    'NFTReturnPending' : IDL.Null,
+    'WalletRegistrationPending' : IDL.Null,
+  });
+  const NoBidAuctionReturnSettlement = IDL.Record({
+    'nft' : WalletNFT,
+    'walletRegisteredAt' : IDL.Opt(Timestamp),
+    'listingId' : ListingId,
+    'createdAt' : Timestamp,
+    'seller' : UserId,
+    'updatedAt' : Timestamp,
+    'stage' : NoBidAuctionReturnStage,
+    'returnedAt' : IDL.Opt(Timestamp),
+  });
+  const AuctionEscrow = IDL.Record({
+    'ledgerFeeE8s' : IDL.Nat64,
+    'listingId' : ListingId,
+    'createdAt' : Timestamp,
+    'feeReserve' : IDL.Nat64,
+    'depositedBlock' : IDL.Nat64,
+    'escrowId' : IDL.Nat,
+    'amount' : IDL.Nat64,
+    'bidder' : UserId,
+  });
+  const PendingAuctionRefund = IDL.Record({
+    'refundAmount' : IDL.Nat64,
+    'createdAt' : Timestamp,
+    'refundFeeE8s' : IDL.Nat64,
+    'refundCreatedAt' : IDL.Nat64,
+    'updatedAt' : Timestamp,
+    'refundBlock' : IDL.Opt(IDL.Nat64),
+    'escrow' : AuctionEscrow,
+  });
+  const PendingBidDeposit = IDL.Record({
+    'ledgerFeeE8s' : IDL.Nat64,
+    'listingId' : ListingId,
+    'createdAt' : Timestamp,
+    'paymentAttemptedAt' : IDL.Opt(Timestamp),
+    'paymentBlock' : IDL.Opt(IDL.Nat64),
+    'updatedAt' : Timestamp,
+    'feeReserve' : IDL.Nat64,
+    'paymentCreatedAt' : IDL.Nat64,
+    'escrowId' : IDL.Nat,
+    'escrowDeposit' : IDL.Nat64,
+    'amount' : IDL.Nat64,
+    'bidder' : UserId,
+  });
+  const AuctionSettlement = IDL.Record({
+    'nft' : WalletNFT,
+    'ledgerFeeE8s' : IDL.Nat64,
+    'mintlabFee' : IDL.Nat64,
+    'mintlabFeeCreatedAt' : IDL.Opt(IDL.Nat64),
+    'nftDeliveredAt' : IDL.Opt(Timestamp),
+    'listingId' : ListingId,
+    'winningEscrowId' : IDL.Nat,
+    'createdAt' : Timestamp,
+    'winner' : UserId,
+    'seller' : UserId,
+    'updatedAt' : Timestamp,
+    'stage' : SettlementStage,
+    'winningEscrowDepositedBlock' : IDL.Nat64,
+    'mintlabFeeBlock' : IDL.Opt(IDL.Nat64),
+    'price' : IDL.Nat64,
+    'sellerPaymentBlock' : IDL.Opt(IDL.Nat64),
+    'feeRecipient' : IDL.Opt(AccountIdentifier),
+    'sellerProceeds' : IDL.Nat64,
+    'sellerPaymentCreatedAt' : IDL.Opt(IDL.Nat64),
+  });
+  const ListingReturnReason = IDL.Variant({
+    'FixedCancel' : IDL.Null,
+    'AuctionCancel' : IDL.Null,
+  });
+  const ListingReturnSettlement = IDL.Record({
+    'nft' : WalletNFT,
+    'refundEscrow' : IDL.Opt(AuctionEscrow),
+    'walletRegisteredAt' : IDL.Opt(Timestamp),
+    'listingId' : ListingId,
+    'createdAt' : Timestamp,
+    'seller' : UserId,
+    'updatedAt' : Timestamp,
+    'stage' : NoBidAuctionReturnStage,
+    'returnedAt' : IDL.Opt(Timestamp),
+    'reason' : ListingReturnReason,
+  });
+  const MarketplaceRecoverySnapshot = IDL.Record({
+    'fixedSettlements' : IDL.Vec(FixedPurchaseSettlement),
+    'activeListingLocks' : IDL.Vec(ListingId),
+    'noBidReturns' : IDL.Vec(NoBidAuctionReturnSettlement),
+    'activeListingTokenLocks' : IDL.Vec(IDL.Text),
+    'pendingRefunds' : IDL.Vec(AuctionEscrow),
+    'activeUserPaymentLocks' : IDL.Vec(UserId),
+    'refundJournals' : IDL.Vec(PendingAuctionRefund),
+    'pendingBids' : IDL.Vec(PendingBidDeposit),
+    'auctionSettlements' : IDL.Vec(AuctionSettlement),
+    'listingReturns' : IDL.Vec(ListingReturnSettlement),
+  });
+  const SettlementEscrowTopUpReceipt = IDL.Record({
+    'feeE8s' : IDL.Nat64,
+    'listingId' : ListingId,
+    'quoteBefore' : SettlementEscrowRepairQuote,
+    'blockIndex' : IDL.Nat64,
+    'amount' : IDL.Nat64,
+  });
+  const EXTTokenIdentifier = IDL.Text;
+  const EXTAccountIdentifier = IDL.Text;
+  const EXTUser = IDL.Variant({
+    'principal' : IDL.Principal,
+    'address' : EXTAccountIdentifier,
+  });
+  const EXTBalanceRequest = IDL.Record({
+    'token' : EXTTokenIdentifier,
+    'user' : EXTUser,
+  });
+  const EXTBalance = IDL.Nat;
+  const EXTCommonError = IDL.Variant({
+    'InvalidToken' : EXTTokenIdentifier,
+    'Other' : IDL.Text,
+  });
+  const EXTBalanceResponse = IDL.Variant({
+    'ok' : EXTBalance,
+    'err' : EXTCommonError,
   });
   const DividendClaimReceipt = IDL.Record({
     'nft' : WalletNFT,
@@ -102,7 +263,29 @@ export const idlFactory = ({ IDL }) => {
     'blockIndex' : IDL.Nat64,
     'paidE8s' : IDL.Nat64,
   });
-  const AccountIdentifier = IDL.Vec(IDL.Nat8);
+  const MarketplaceFeeConfig = IDL.Record({
+    'ledgerFeeE8s' : IDL.Nat64,
+    'mintlabFeeRecipient' : IDL.Opt(AccountIdentifier),
+    'mintlabFeeBasisPoints' : IDL.Nat,
+    'auctionBidFeeReserveE8s' : IDL.Nat64,
+  });
+  const ModerationCategorySettings = IDL.Record({
+    'selfHarm' : IDL.Bool,
+    'hateSymbols' : IDL.Bool,
+    'hateOrHarassment' : IDL.Bool,
+    'otherNsfw' : IDL.Bool,
+    'explicitLanguage' : IDL.Bool,
+    'illegalOrDangerous' : IDL.Bool,
+    'nudityOrSexual' : IDL.Bool,
+    'graphicViolence' : IDL.Bool,
+  });
+  const PublicModerationConfig = IDL.Record({
+    'categories' : ModerationCategorySettings,
+    'model' : IDL.Text,
+    'apiKeyConfigured' : IDL.Bool,
+    'userMessage' : IDL.Text,
+    'enabled' : IDL.Bool,
+  });
   const ListingStatus = IDL.Variant({
     'Sold' : IDL.Null,
     'Active' : IDL.Null,
@@ -120,14 +303,6 @@ export const idlFactory = ({ IDL }) => {
     'nftId' : NFTId,
     'startingBid' : IDL.Nat64,
   });
-  const AuctionBidStatus = IDL.Record({
-    'listingId' : ListingId,
-    'hasBid' : IDL.Bool,
-    'isWinning' : IDL.Bool,
-    'highestBidder' : IDL.Opt(UserId),
-    'highestBid' : IDL.Nat64,
-    'myHighestBid' : IDL.Opt(IDL.Nat64),
-  });
   const FixedListing = IDL.Record({
     'id' : ListingId,
     'status' : ListingStatus,
@@ -136,22 +311,18 @@ export const idlFactory = ({ IDL }) => {
     'nftId' : NFTId,
     'price' : IDL.Nat64,
   });
-  const CollectionCreationReceipt = IDL.Record({
-    'collection' : Collection,
-    'paymentBlock' : IDL.Nat64,
-  });
   const DIP721Error = IDL.Variant({
+    'UnauthorizedOperator' : IDL.Null,
+    'SelfTransfer' : IDL.Null,
+    'TokenNotFound' : IDL.Null,
+    'UnauthorizedOwner' : IDL.Null,
     'ZeroAddress' : IDL.Null,
     'InvalidTokenId' : IDL.Null,
-    'Unauthorized' : IDL.Null,
-    'UnauthorizedOwner' : IDL.Null,
-    'UnauthorizedOperator' : IDL.Null,
-    'TokenNotFound' : IDL.Null,
-    'OwnerNotFound' : IDL.Null,
-    'OperatorNotFound' : IDL.Null,
-    'SelfTransfer' : IDL.Null,
     'SelfApprove' : IDL.Null,
+    'OperatorNotFound' : IDL.Null,
+    'Unauthorized' : IDL.Null,
     'ExistedNFT' : IDL.Null,
+    'OwnerNotFound' : IDL.Null,
     'Other' : IDL.Text,
   });
   const DIP721TokensResult = IDL.Variant({
@@ -170,7 +341,7 @@ export const idlFactory = ({ IDL }) => {
       'Principal' : IDL.Principal,
       'PrincipalContent' : IDL.Principal,
       'TextContent' : IDL.Text,
-    }),
+    })
   );
   const TokenMetadata = IDL.Record({
     'transferred_at' : IDL.Opt(IDL.Nat64),
@@ -191,6 +362,82 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : TokenMetadata,
     'Err' : DIP721Error,
   });
+  const DividendSyncReceipt = IDL.Record({
+    'collectionId' : CollectionId,
+    'shareE8s' : IDL.Nat64,
+    'nftCount' : IDL.Nat,
+    'distributedE8s' : IDL.Nat64,
+    'depositedE8s' : IDL.Nat64,
+    'balanceE8s' : IDL.Nat64,
+    'remainderE8s' : IDL.Nat64,
+  });
+  const DividendDisbursementReceipt = IDL.Record({
+    'failures' : IDL.Vec(IDL.Text),
+    'feeTopUpBlockIndex' : IDL.Opt(IDL.Nat64),
+    'collectionId' : CollectionId,
+    'feeTopUpE8s' : IDL.Nat64,
+    'totalPaidE8s' : IDL.Nat64,
+    'feeReserveRemainingE8s' : IDL.Nat64,
+    'skippedCount' : IDL.Nat,
+    'paidCount' : IDL.Nat,
+    'remainingCount' : IDL.Nat,
+    'synced' : DividendSyncReceipt,
+    'totalFeeE8s' : IDL.Nat64,
+  });
+  const EXTMetadataValue = IDL.Tuple(
+    IDL.Text,
+    IDL.Variant({
+      'nat' : IDL.Nat,
+      'blob' : IDL.Vec(IDL.Nat8),
+      'nat8' : IDL.Nat8,
+      'text' : IDL.Text,
+    }),
+  );
+  const EXTMetadataContainer = IDL.Variant({
+    'blob' : IDL.Vec(IDL.Nat8),
+    'data' : IDL.Vec(EXTMetadataValue),
+    'json' : IDL.Text,
+  });
+  const EXTMetadata = IDL.Variant({
+    'fungible' : IDL.Record({
+      'decimals' : IDL.Nat8,
+      'metadata' : IDL.Opt(EXTMetadataContainer),
+      'name' : IDL.Text,
+      'symbol' : IDL.Text,
+    }),
+    'nonfungible' : IDL.Record({
+      'thumbnail' : IDL.Text,
+      'asset' : IDL.Text,
+      'metadata' : IDL.Opt(EXTMetadataContainer),
+      'name' : IDL.Text,
+    }),
+  });
+  const EXTMetadataResult = IDL.Variant({
+    'ok' : EXTMetadata,
+    'err' : EXTCommonError,
+  });
+  const EXTMemo = IDL.Vec(IDL.Nat8);
+  const EXTSubAccount = IDL.Vec(IDL.Nat8);
+  const EXTTransferRequest = IDL.Record({
+    'to' : EXTUser,
+    'token' : EXTTokenIdentifier,
+    'notify' : IDL.Bool,
+    'from' : EXTUser,
+    'memo' : EXTMemo,
+    'subaccount' : IDL.Opt(EXTSubAccount),
+    'amount' : EXTBalance,
+  });
+  const EXTTransferResponse = IDL.Variant({
+    'ok' : EXTBalance,
+    'err' : IDL.Variant({
+      'CannotNotify' : EXTAccountIdentifier,
+      'InsufficientBalance' : IDL.Null,
+      'InvalidToken' : EXTTokenIdentifier,
+      'Rejected' : IDL.Null,
+      'Unauthorized' : EXTAccountIdentifier,
+      'Other' : IDL.Text,
+    }),
+  });
   const ActiveListing = IDL.Variant({
     'Fixed' : FixedListing,
     'Auction' : AuctionListing,
@@ -199,53 +446,56 @@ export const idlFactory = ({ IDL }) => {
     'nft' : WalletNFT,
     'listing' : ActiveListing,
   });
-  const MarketplaceFeeConfig = IDL.Record({
-    'auctionBidFeeReserveE8s' : IDL.Nat64,
-    'ledgerFeeE8s' : IDL.Nat64,
-    'mintlabFeeBasisPoints' : IDL.Nat,
-    'mintlabFeeRecipient' : IDL.Opt(AccountIdentifier),
+  const ActiveListingDetailPage = IDL.Record({
+    'totalCount' : IDL.Nat,
+    'details' : IDL.Vec(ActiveListingDetail),
+    'nextCursor' : IDL.Opt(IDL.Nat),
   });
-  const SettlementEscrowRepairKind = IDL.Variant({
-    'FixedPurchase' : IDL.Null,
-    'Auction' : IDL.Null,
+  const ActiveListingPage = IDL.Record({
+    'listings' : IDL.Vec(ActiveListing),
+    'totalCount' : IDL.Nat,
+    'nextCursor' : IDL.Opt(IDL.Nat),
   });
-  const SettlementEscrowRepairQuote = IDL.Record({
-    'listingId' : ListingId,
-    'kind' : SettlementEscrowRepairKind,
-    'escrowId' : IDL.Nat,
-    'escrowAccount' : AccountIdentifier,
-    'escrowBalance' : IDL.Nat64,
-    'requiredDebit' : IDL.Nat64,
-    'shortfall' : IDL.Nat64,
-    'ledgerFeeE8s' : IDL.Nat64,
-    'sellerProceeds' : IDL.Nat64,
-    'mintlabFee' : IDL.Nat64,
-    'topUpFromAccount' : AccountIdentifier,
-    'topUpFromBalance' : IDL.Nat64,
-    'topUpTransferFeeE8s' : IDL.Nat64,
-    'topUpTotalDebit' : IDL.Nat64,
+  const CollectionCreationStatus = IDL.Variant({
+    'Started' : IDL.Null,
+    'Failed' : IDL.Null,
+    'CanisterCreated' : IDL.Null,
+    'CyclesConverted' : IDL.Null,
+    'AdminPayoutPending' : IDL.Null,
+    'AdminPayoutSent' : IDL.Null,
+    'CyclePaymentSent' : IDL.Null,
+    'CollectionRegistered' : IDL.Null,
+    'Installed' : IDL.Null,
   });
-  const SettlementEscrowTopUpReceipt = IDL.Record({
-    'listingId' : ListingId,
-    'amount' : IDL.Nat64,
-    'feeE8s' : IDL.Nat64,
-    'blockIndex' : IDL.Nat64,
-    'quoteBefore' : SettlementEscrowRepairQuote,
+  const CollectionCreationRequestView = IDL.Record({
+    'id' : IDL.Nat,
+    'status' : CollectionCreationStatus,
+    'collectionId' : IDL.Opt(CollectionId),
+    'cyclePaymentBlock' : IDL.Opt(IDL.Nat64),
+    'name' : IDL.Text,
+    'createdAt' : IDL.Nat64,
+    'childCanisterId' : IDL.Opt(IDL.Principal),
+    'updatedAt' : IDL.Nat64,
+    'lastError' : IDL.Opt(IDL.Text),
+    'symbol' : IDL.Text,
   });
-  const MintlabFeeRecoveryQuote = IDL.Record({
-    'listingId' : ListingId,
-    'kind' : SettlementEscrowRepairKind,
-    'escrowId' : IDL.Nat,
-    'escrowAccount' : AccountIdentifier,
-    'escrowBalance' : IDL.Nat64,
-    'expectedBeforeMintlabFeeDebit' : IDL.Nat64,
-    'expectedAfterMintlabFeeDebit' : IDL.Nat64,
-    'shortfallBeforeMintlabFee' : IDL.Nat64,
-    'sellerProceeds' : IDL.Nat64,
-    'mintlabFee' : IDL.Nat64,
-    'ledgerFeeE8s' : IDL.Nat64,
-    'feeRecipient' : AccountIdentifier,
-    'previousMintlabFeeCreatedAt' : IDL.Nat64,
+  const CollectionCreationRequestPage = IDL.Record({
+    'totalCount' : IDL.Nat,
+    'requests' : IDL.Vec(CollectionCreationRequestView),
+    'nextCursor' : IDL.Opt(IDL.Nat),
+  });
+  const AppCanisterKind = IDL.Variant({
+    'Frontend' : IDL.Null,
+    'Backend' : IDL.Null,
+  });
+  const AppCanisterHealth = IDL.Record({
+    'kind' : AppCanisterKind,
+    'moduleInstalled' : IDL.Opt(IDL.Bool),
+    'error' : IDL.Opt(IDL.Text),
+    'cycles' : IDL.Opt(IDL.Nat),
+    'freezingThresholdSeconds' : IDL.Opt(IDL.Nat),
+    'idleCyclesBurnedPerDay' : IDL.Opt(IDL.Nat),
+    'canisterId' : IDL.Principal,
   });
   const CollectionBrowseCoverage = IDL.Variant({
     'Full' : IDL.Null,
@@ -258,16 +508,42 @@ export const idlFactory = ({ IDL }) => {
     'visibleCount' : IDL.Nat,
     'coverage' : CollectionBrowseCoverage,
   });
+  const CollectionCreationDiagnostics = IDL.Record({
+    'childTargetCycles' : IDL.Nat,
+    'requiredBackendCycles' : IDL.Nat,
+    'request' : CollectionCreationRequestView,
+    'requestedCanisterCycles' : IDL.Nat,
+    'totalCyclesToConvert' : IDL.Nat,
+    'buildVersion' : IDL.Text,
+    'backendCycles' : IDL.Nat,
+    'canisterCreationFeeCycles' : IDL.Nat,
+    'canCreateNow' : IDL.Bool,
+    'createCallCycles' : IDL.Nat,
+  });
+  const DividendBalancePage = IDL.Record({
+    'totalCount' : IDL.Nat,
+    'nextCursor' : IDL.Opt(IDL.Nat),
+    'balances' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat64)),
+  });
   const CollectionDividendInfo = IDL.Record({
     'accountId' : AccountIdentifier,
     'collectionId' : CollectionId,
+    'feeReserveE8s' : IDL.Nat64,
     'nftCount' : IDL.Nat,
     'enabled' : IDL.Bool,
     'balanceE8s' : IDL.Nat64,
-    'distributableBalanceE8s' : IDL.Nat64,
-    'feeReserveE8s' : IDL.Nat64,
     'processedBalanceE8s' : IDL.Nat64,
     'pendingE8s' : IDL.Nat64,
+    'distributableBalanceE8s' : IDL.Nat64,
+  });
+  const CollectionIndexStatus = IDL.Record({
+    'collectionId' : CollectionId,
+    'cursor' : IDL.Opt(IDL.Text),
+    'scanned' : IDL.Nat,
+    'complete' : IDL.Bool,
+    'updatedAt' : Timestamp,
+    'lastError' : IDL.Opt(IDL.Text),
+    'indexed' : IDL.Nat,
   });
   const CollectionNFTPage = IDL.Record({
     'nfts' : IDL.Vec(WalletNFT),
@@ -276,82 +552,120 @@ export const idlFactory = ({ IDL }) => {
     'coverage' : CollectionBrowseCoverage,
     'nextCursor' : IDL.Opt(IDL.Text),
   });
-  const CollectionNFTLookupResult = IDL.Variant({
-    'ok' : IDL.Opt(WalletNFT),
-    'err' : IDL.Text,
-  });
-  const AuctionEscrow = IDL.Record({
-    'amount' : IDL.Nat64,
-    'bidder' : UserId,
-    'createdAt' : Timestamp,
-    'depositedBlock' : IDL.Nat64,
-    'escrowId' : IDL.Nat,
-    'feeReserve' : IDL.Nat64,
-    'ledgerFeeE8s' : IDL.Nat64,
-    'listingId' : ListingId,
-  });
   const MintConfig = IDL.Record({
     'collectionCreationPriceE8s' : IDL.Nat64,
+    'collectionCreationPrimaryPayoutBasisPoints' : IDL.Nat,
     'collectionCreationEnabled' : IDL.Bool,
     'collectionId' : IDL.Opt(CollectionId),
+    'collectionCreationSecondaryPayoutAccount' : IDL.Opt(AccountIdentifier),
     'payoutAccount' : IDL.Opt(AccountIdentifier),
     'mainMintEnabled' : IDL.Bool,
     'mainMintPriceE8s' : IDL.Nat64,
+    'collectionCreationSecondaryPayoutBasisPoints' : IDL.Nat,
     'mintEnabled' : IDL.Bool,
     'mintPriceE8s' : IDL.Nat64,
     'collectionCreationPayoutAccount' : IDL.Opt(AccountIdentifier),
-    'collectionCreationSecondaryPayoutAccount' : IDL.Opt(AccountIdentifier),
-    'collectionCreationPrimaryPayoutBasisPoints' : IDL.Nat,
-    'collectionCreationSecondaryPayoutBasisPoints' : IDL.Nat,
     'collectionCanisterWasmUploaded' : IDL.Bool,
     'mainMintPayoutAccount' : IDL.Opt(AccountIdentifier),
     'collectionCanisterCycles' : IDL.Nat,
   });
-  const ModerationCategorySettings = IDL.Record({
-    'explicitLanguage' : IDL.Bool,
-    'graphicViolence' : IDL.Bool,
-    'hateOrHarassment' : IDL.Bool,
-    'hateSymbols' : IDL.Bool,
-    'illegalOrDangerous' : IDL.Bool,
-    'nudityOrSexual' : IDL.Bool,
-    'otherNsfw' : IDL.Bool,
-    'selfHarm' : IDL.Bool,
-  });
-  const PublicModerationConfig = IDL.Record({
-    'apiKeyConfigured' : IDL.Bool,
-    'categories' : ModerationCategorySettings,
-    'enabled' : IDL.Bool,
-    'model' : IDL.Text,
-    'userMessage' : IDL.Text,
+  const AuctionBidStatus = IDL.Record({
+    'highestBidder' : IDL.Opt(UserId),
+    'listingId' : ListingId,
+    'myHighestBid' : IDL.Opt(IDL.Nat64),
+    'highestBid' : IDL.Nat64,
+    'hasBid' : IDL.Bool,
+    'isWinning' : IDL.Bool,
   });
   const CollectionCanisterStatus = IDL.Record({
-    'appCanisterId' : IDL.Principal,
+    'controllers' : IDL.Vec(IDL.Principal),
     'collectionId' : CollectionId,
     'moduleInstalled' : IDL.Bool,
-    'controllers' : IDL.Vec(IDL.Principal),
+    'appCanisterId' : IDL.Principal,
     'cycles' : IDL.Nat,
     'freezingThresholdSeconds' : IDL.Nat,
     'idleCyclesBurnedPerDay' : IDL.Nat,
     'canisterId' : IDL.Principal,
-  });
-  const CollectionCanisterControllers = IDL.Record({
-    'appCanisterId' : IDL.Principal,
-    'controllers' : IDL.Vec(IDL.Principal),
-    'canisterId' : IDL.Principal,
-    'collectionId' : CollectionId,
-  });
-  const CollectionCanisterControllersResult = IDL.Variant({
-    'ok' : CollectionCanisterControllers,
-    'err' : IDL.Text,
   });
   const NFTDividend = IDL.Record({
     'nft' : WalletNFT,
     'collection' : Collection,
     'claimableE8s' : IDL.Nat64,
   });
+  const NFTDividendPage = IDL.Record({
+    'totalCount' : IDL.Nat,
+    'dividends' : IDL.Vec(NFTDividend),
+    'nextCursor' : IDL.Opt(IDL.Nat),
+  });
+  const SettlementStatusKind = IDL.Variant({
+    'NoBidAuctionReturn' : IDL.Null,
+    'PendingAuctionRefund' : IDL.Null,
+    'FixedPurchase' : IDL.Null,
+    'Auction' : IDL.Null,
+    'ListingReturn' : IDL.Null,
+    'PendingBidDeposit' : IDL.Null,
+  });
+  const SettlementStatusRole = IDL.Variant({
+    'Bidder' : IDL.Null,
+    'Buyer' : IDL.Null,
+    'Seller' : IDL.Null,
+  });
+  const SettlementStatus = IDL.Record({
+    'listingId' : ListingId,
+    'kind' : SettlementStatusKind,
+    'role' : SettlementStatusRole,
+    'updatedAt' : Timestamp,
+    'stage' : IDL.Text,
+    'message' : IDL.Text,
+  });
+  const PendingMintPaymentStatus = IDL.Variant({
+    'Failed' : IDL.Null,
+    'Minted' : IDL.Null,
+    'PaymentSent' : IDL.Null,
+    'PaymentPending' : IDL.Null,
+  });
+  const PendingMintPaymentView = IDL.Record({
+    'id' : IDL.Nat,
+    'status' : PendingMintPaymentStatus,
+    'collectionId' : CollectionId,
+    'createdAt' : IDL.Nat64,
+    'paymentBlock' : IDL.Opt(IDL.Nat64),
+    'updatedAt' : IDL.Nat64,
+    'mintedTokenId' : IDL.Opt(IDL.Nat),
+    'amountE8s' : IDL.Nat64,
+    'lastError' : IDL.Opt(IDL.Text),
+  });
   const NFTStats = IDL.Record({
     'totalCount' : IDL.Nat,
     'perCollection' : IDL.Vec(IDL.Tuple(CollectionId, IDL.Nat)),
+  });
+  const EXTTokenIndex = IDL.Nat32;
+  const EXTMetadataLegacy = IDL.Variant({
+    'fungible' : IDL.Record({
+      'decimals' : IDL.Nat8,
+      'metadata' : IDL.Opt(IDL.Vec(IDL.Nat8)),
+      'name' : IDL.Text,
+      'symbol' : IDL.Text,
+    }),
+    'nonfungible' : IDL.Record({ 'metadata' : IDL.Opt(IDL.Vec(IDL.Nat8)) }),
+  });
+  const WalletNFTPage = IDL.Record({
+    'nfts' : IDL.Vec(WalletNFT),
+    'totalCount' : IDL.Nat,
+    'nextCursor' : IDL.Opt(IDL.Nat),
+  });
+  const HeaderField = IDL.Tuple(IDL.Text, IDL.Text);
+  const AssetHttpRequest = IDL.Record({
+    'url' : IDL.Text,
+    'method' : IDL.Text,
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(HeaderField),
+  });
+  const AssetHttpResponse = IDL.Record({
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(HeaderField),
+    'upgrade' : IDL.Bool,
+    'status_code' : IDL.Nat16,
   });
   const SupportedStandard = IDL.Record({ 'url' : IDL.Text, 'name' : IDL.Text });
   const ICRC7Subaccount = IDL.Vec(IDL.Nat8);
@@ -397,61 +711,44 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : IDL.Nat,
     'Err' : ICRC7TransferError,
   });
+  const CollectionIndexPageResult = IDL.Record({
+    'collectionId' : CollectionId,
+    'scanned' : IDL.Nat,
+    'error' : IDL.Opt(IDL.Text),
+    'complete' : IDL.Bool,
+    'indexed' : IDL.Nat,
+    'nextCursor' : IDL.Opt(IDL.Text),
+  });
+  const CollectionPage = IDL.Record({
+    'totalCount' : IDL.Nat,
+    'collections' : IDL.Vec(Collection),
+    'nextCursor' : IDL.Opt(IDL.Nat),
+  });
   const MintReceipt = IDL.Record({
     'nft' : WalletNFT,
     'paymentBlock' : IDL.Nat64,
   });
-  const CollectionCreationQuote = IDL.Record({
-    'cycleCostE8s' : IDL.Nat64,
+  const DividendDisbursementPreview = IDL.Record({
     'ledgerFeeE8s' : IDL.Nat64,
-    'collectionCreationPriceE8s' : IDL.Nat64,
-    'rateTimestampSeconds' : IDL.Nat64,
-    'cycleTransferFeeE8s' : IDL.Nat64,
-    'minimumCreationPriceE8s' : IDL.Nat64,
-    'xdrPermyriadPerIcp' : IDL.Nat64,
-    'factoryReserveCycles' : IDL.Nat,
-    'totalCyclesToConvert' : IDL.Nat,
-    'totalUserDebitE8s' : IDL.Nat64,
-    'adminPayoutE8s' : IDL.Nat64,
-    'adminPrimaryPayoutE8s' : IDL.Nat64,
-    'adminSecondaryPayoutE8s' : IDL.Nat64,
-    'adminPayoutFeeE8s' : IDL.Nat64,
-    'collectionCanisterCycles' : IDL.Nat,
-  });
-  const CollectionCreationStatus = IDL.Variant({
-    'AdminPayoutPending' : IDL.Null,
-    'AdminPayoutSent' : IDL.Null,
-    'CanisterCreated' : IDL.Null,
-    'CollectionRegistered' : IDL.Null,
-    'CyclePaymentSent' : IDL.Null,
-    'CyclesConverted' : IDL.Null,
-    'Failed' : IDL.Null,
-    'Installed' : IDL.Null,
-    'Started' : IDL.Null,
-  });
-  const CollectionCreationRequestView = IDL.Record({
-    'childCanisterId' : IDL.Opt(IDL.Principal),
-    'collectionId' : IDL.Opt(CollectionId),
-    'createdAt' : IDL.Nat64,
-    'cyclePaymentBlock' : IDL.Opt(IDL.Nat64),
-    'id' : IDL.Nat,
-    'lastError' : IDL.Opt(IDL.Text),
-    'name' : IDL.Text,
-    'status' : CollectionCreationStatus,
-    'symbol' : IDL.Text,
-    'updatedAt' : IDL.Nat64,
-  });
-  const CollectionCreationDiagnostics = IDL.Record({
-    'backendCycles' : IDL.Nat,
-    'buildVersion' : IDL.Text,
-    'canCreateNow' : IDL.Bool,
-    'canisterCreationFeeCycles' : IDL.Nat,
-    'childTargetCycles' : IDL.Nat,
-    'createCallCycles' : IDL.Nat,
-    'request' : CollectionCreationRequestView,
-    'requestedCanisterCycles' : IDL.Nat,
-    'requiredBackendCycles' : IDL.Nat,
-    'totalCyclesToConvert' : IDL.Nat,
+    'requiredNetworkFeeE8s' : IDL.Nat64,
+    'accountId' : AccountIdentifier,
+    'collectionId' : CollectionId,
+    'shareE8s' : IDL.Nat64,
+    'feeReserveE8s' : IDL.Nat64,
+    'projectedPendingE8s' : IDL.Nat64,
+    'nftCount' : IDL.Nat,
+    'feeShortfallE8s' : IDL.Nat64,
+    'undistributedE8s' : IDL.Nat64,
+    'maxTransfersPerCall' : IDL.Nat,
+    'balanceE8s' : IDL.Nat64,
+    'remainderE8s' : IDL.Nat64,
+    'processedBalanceE8s' : IDL.Nat64,
+    'transferCount' : IDL.Nat,
+    'pendingE8s' : IDL.Nat64,
+    'callerFundingTransferFeeE8s' : IDL.Nat64,
+    'callerTotalDebitE8s' : IDL.Nat64,
+    'distributableBalanceE8s' : IDL.Nat64,
+    'callerBalanceE8s' : IDL.Nat64,
   });
   const CollectionCycleTopUpQuote = IDL.Record({
     'cycleCostE8s' : IDL.Nat64,
@@ -461,66 +758,56 @@ export const idlFactory = ({ IDL }) => {
     'totalUserDebitE8s' : IDL.Nat64,
     'cyclesToTopUp' : IDL.Nat,
   });
-  const AppCanisterKind = IDL.Variant({
-    'Backend' : IDL.Null,
-    'Frontend' : IDL.Null,
-  });
-  const AppCanisterHealth = IDL.Record({
-    'kind' : AppCanisterKind,
-    'moduleInstalled' : IDL.Opt(IDL.Bool),
-    'cycles' : IDL.Opt(IDL.Nat),
-    'error' : IDL.Opt(IDL.Text),
-    'freezingThresholdSeconds' : IDL.Opt(IDL.Nat),
-    'idleCyclesBurnedPerDay' : IDL.Opt(IDL.Nat),
-    'canisterId' : IDL.Principal,
-  });
-  const DividendSyncReceipt = IDL.Record({
-    'collectionId' : CollectionId,
-    'shareE8s' : IDL.Nat64,
-    'nftCount' : IDL.Nat,
-    'distributedE8s' : IDL.Nat64,
-    'depositedE8s' : IDL.Nat64,
-    'balanceE8s' : IDL.Nat64,
-    'remainderE8s' : IDL.Nat64,
-  });
-  const DividendDisbursementPreview = IDL.Record({
-    'accountId' : AccountIdentifier,
-    'balanceE8s' : IDL.Nat64,
-    'callerBalanceE8s' : IDL.Nat64,
-    'callerFundingTransferFeeE8s' : IDL.Nat64,
-    'callerTotalDebitE8s' : IDL.Nat64,
-    'collectionId' : CollectionId,
-    'distributableBalanceE8s' : IDL.Nat64,
-    'feeReserveE8s' : IDL.Nat64,
-    'feeShortfallE8s' : IDL.Nat64,
-    'ledgerFeeE8s' : IDL.Nat64,
-    'maxTransfersPerCall' : IDL.Nat,
-    'nftCount' : IDL.Nat,
-    'pendingE8s' : IDL.Nat64,
-    'processedBalanceE8s' : IDL.Nat64,
-    'projectedPendingE8s' : IDL.Nat64,
-    'remainderE8s' : IDL.Nat64,
-    'requiredNetworkFeeE8s' : IDL.Nat64,
-    'shareE8s' : IDL.Nat64,
-    'transferCount' : IDL.Nat,
-    'undistributedE8s' : IDL.Nat64,
-  });
-  const DividendDisbursementReceipt = IDL.Record({
-    'collectionId' : CollectionId,
-    'failures' : IDL.Vec(IDL.Text),
-    'feeReserveRemainingE8s' : IDL.Nat64,
-    'feeTopUpBlockIndex' : IDL.Opt(IDL.Nat64),
-    'feeTopUpE8s' : IDL.Nat64,
-    'paidCount' : IDL.Nat,
-    'remainingCount' : IDL.Nat,
-    'skippedCount' : IDL.Nat,
-    'synced' : DividendSyncReceipt,
-    'totalFeeE8s' : IDL.Nat64,
-    'totalPaidE8s' : IDL.Nat64,
-  });
-  const CollectionCycleTopUpReceipt = IDL.Record({
+  const CollectionCreationQuote = IDL.Record({
     'cycleCostE8s' : IDL.Nat64,
+    'ledgerFeeE8s' : IDL.Nat64,
+    'collectionCreationPriceE8s' : IDL.Nat64,
+    'rateTimestampSeconds' : IDL.Nat64,
+    'adminSecondaryPayoutE8s' : IDL.Nat64,
+    'cycleTransferFeeE8s' : IDL.Nat64,
+    'minimumCreationPriceE8s' : IDL.Nat64,
+    'xdrPermyriadPerIcp' : IDL.Nat64,
+    'factoryReserveCycles' : IDL.Nat,
+    'adminPrimaryPayoutE8s' : IDL.Nat64,
+    'totalCyclesToConvert' : IDL.Nat,
+    'totalUserDebitE8s' : IDL.Nat64,
+    'adminPayoutE8s' : IDL.Nat64,
+    'adminPayoutFeeE8s' : IDL.Nat64,
+    'collectionCanisterCycles' : IDL.Nat,
+  });
+  const WalletSyncSkip = IDL.Record({
     'collectionId' : CollectionId,
+    'message' : IDL.Text,
+    'collectionName' : IDL.Text,
+    'reason' : IDL.Text,
+  });
+  const WalletSyncPageResult = IDL.Record({
+    'skipped' : IDL.Vec(WalletSyncSkip),
+    'errors' : IDL.Vec(IDL.Text),
+    'checkedCollections' : IDL.Nat,
+    'newCount' : IDL.Nat,
+    'complete' : IDL.Bool,
+    'nextCursor' : IDL.Opt(IDL.Nat),
+  });
+  const WalletSyncV2Result = IDL.Record({
+    'skipped' : IDL.Vec(WalletSyncSkip),
+    'errors' : IDL.Vec(IDL.Text),
+    'newCount' : IDL.Nat,
+  });
+  const EXTTime = IDL.Int;
+  const EXTListing = IDL.Record({
+    'locked' : IDL.Opt(EXTTime),
+    'seller' : IDL.Principal,
+    'price' : IDL.Nat64,
+  });
+  const EXTTokensExtResult = IDL.Variant({
+    'ok' : IDL.Vec(
+      IDL.Tuple(EXTTokenIndex, IDL.Opt(EXTListing), IDL.Opt(IDL.Vec(IDL.Nat8)))
+    ),
+    'err' : EXTCommonError,
+  });
+  const AppCycleTopUpReceipt = IDL.Record({
+    'cycleCostE8s' : IDL.Nat64,
     'cycleBalance' : IDL.Opt(IDL.Nat),
     'cyclesRequested' : IDL.Nat,
     'paymentBlock' : IDL.Nat64,
@@ -528,8 +815,9 @@ export const idlFactory = ({ IDL }) => {
     'cyclesMinted' : IDL.Nat,
     'canisterId' : IDL.Principal,
   });
-  const AppCycleTopUpReceipt = IDL.Record({
+  const CollectionCycleTopUpReceipt = IDL.Record({
     'cycleCostE8s' : IDL.Nat64,
+    'collectionId' : CollectionId,
     'cycleBalance' : IDL.Opt(IDL.Nat),
     'cyclesRequested' : IDL.Nat,
     'paymentBlock' : IDL.Nat64,
@@ -550,6 +838,12 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : IDL.Nat64,
     'Err' : TransferError,
   });
+  const HttpHeader = IDL.Record({ 'value' : IDL.Text, 'name' : IDL.Text });
+  const HttpRequestResult = IDL.Record({
+    'status' : IDL.Nat,
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(HttpHeader),
+  });
   return IDL.Service({
     'addCollection' : IDL.Func(
         [
@@ -566,7 +860,42 @@ export const idlFactory = ({ IDL }) => {
       ),
     'addCollectionCanisterController' : IDL.Func(
         [CollectionId, IDL.Principal],
-        [CollectionCanisterControllersResult],
+        [
+          IDL.Variant({
+            'ok' : CollectionCanisterControllers,
+            'err' : IDL.Text,
+          }),
+        ],
+        [],
+      ),
+    'adminAttachExistingCanisterToCreationRequest' : IDL.Func(
+        [IDL.Nat, IDL.Principal],
+        [IDL.Variant({ 'ok' : CollectionCreationReceipt, 'err' : IDL.Text })],
+        [],
+      ),
+    'adminDeleteCollectionCreationRequest' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Variant({ 'ok' : IDL.Bool, 'err' : IDL.Text })],
+        [],
+      ),
+    'adminGetMintlabFeeRecoveryQuote' : IDL.Func(
+        [ListingId],
+        [MintlabFeeRecoveryQuote],
+        [],
+      ),
+    'adminGetSettlementEscrowRepairQuote' : IDL.Func(
+        [ListingId],
+        [SettlementEscrowRepairQuote],
+        [],
+      ),
+    'adminListMarketplaceRecoveryState' : IDL.Func(
+        [],
+        [MarketplaceRecoverySnapshot],
+        ['query'],
+      ),
+    'adminMarkMintlabFeeBalanceVerified' : IDL.Func(
+        [ListingId],
+        [MintlabFeeRecoveryQuote],
         [],
       ),
     'adminRecoverPaidCollectionCreation' : IDL.Func(
@@ -582,56 +911,27 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : CollectionCreationReceipt, 'err' : IDL.Text })],
         [],
       ),
-    'adminDeleteCollectionCreationRequest' : IDL.Func(
-        [IDL.Nat],
-        [IDL.Variant({ 'ok' : IDL.Bool, 'err' : IDL.Text })],
-        [],
-      ),
-    'adminGetSettlementEscrowRepairQuote' : IDL.Func(
-        [ListingId],
-        [SettlementEscrowRepairQuote],
-        [],
-      ),
-    'adminGetMintlabFeeRecoveryQuote' : IDL.Func(
-        [ListingId],
-        [MintlabFeeRecoveryQuote],
-        [],
-      ),
     'adminResetUnresolvedMintlabFeeAttempt' : IDL.Func(
         [ListingId],
         [MintlabFeeRecoveryQuote],
         [],
       ),
-    'adminMarkMintlabFeeBalanceVerified' : IDL.Func(
-        [ListingId],
-        [MintlabFeeRecoveryQuote],
-        [],
-      ),
-    'adminRetryListingReturn' : IDL.Func([ListingId], [], []),
-    'adminRetryNoBidAuctionReturn' : IDL.Func([ListingId], [], []),
     'adminRetryAuctionSettlement' : IDL.Func([ListingId], [], []),
     'adminRetryFixedPurchaseSettlement' : IDL.Func([ListingId], [], []),
+    'adminRetryListingReturn' : IDL.Func([ListingId], [], []),
+    'adminRetryNoBidAuctionReturn' : IDL.Func([ListingId], [], []),
     'adminTopUpSettlementEscrow' : IDL.Func(
         [ListingId, IDL.Nat64],
         [SettlementEscrowTopUpReceipt],
         [],
       ),
+    'balance' : IDL.Func([EXTBalanceRequest], [EXTBalanceResponse], ['query']),
     'bootstrapAdmin' : IDL.Func([], [], []),
     'buyFixedListing' : IDL.Func([ListingId], [], []),
     'cancelListing' : IDL.Func([ListingId], [], []),
     'claimNFTDividend' : IDL.Func(
         [NFTId],
         [IDL.Variant({ 'ok' : DividendClaimReceipt, 'err' : IDL.Text })],
-        [],
-      ),
-    'disburseCollectionDividends' : IDL.Func(
-        [CollectionId, IDL.Opt(IDL.Nat)],
-        [
-          IDL.Variant({
-            'ok' : DividendDisbursementReceipt,
-            'err' : IDL.Text,
-          }),
-        ],
         [],
       ),
     'claimVaultDeposit' : IDL.Func(
@@ -703,15 +1003,48 @@ export const idlFactory = ({ IDL }) => {
         [DIP721MetadataResult],
         ['query'],
       ),
+    'disburseCollectionDividends' : IDL.Func(
+        [CollectionId, IDL.Opt(IDL.Nat)],
+        [IDL.Variant({ 'ok' : DividendDisbursementReceipt, 'err' : IDL.Text })],
+        [],
+      ),
+    'ext_balance' : IDL.Func(
+        [EXTBalanceRequest],
+        [EXTBalanceResponse],
+        ['query'],
+      ),
+    'ext_bearer' : IDL.Func(
+        [EXTTokenIdentifier],
+        [IDL.Variant({ 'ok' : EXTAccountIdentifier, 'err' : EXTCommonError })],
+        ['query'],
+      ),
+    'ext_extensions' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
+    'ext_metadata' : IDL.Func(
+        [EXTTokenIdentifier],
+        [EXTMetadataResult],
+        ['query'],
+      ),
+    'ext_transfer' : IDL.Func([EXTTransferRequest], [EXTTransferResponse], []),
+    'extdata_supply' : IDL.Func(
+        [EXTTokenIdentifier],
+        [IDL.Variant({ 'ok' : EXTBalance, 'err' : EXTCommonError })],
+        ['query'],
+      ),
+    'extensions' : IDL.Func([], [IDL.Vec(IDL.Text)], ['query']),
     'getActiveListingDetails' : IDL.Func(
         [],
         [IDL.Vec(ActiveListingDetail)],
         ['query'],
       ),
+    'getActiveListingDetailsPage' : IDL.Func(
+        [IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
+        [ActiveListingDetailPage],
+        ['query'],
+      ),
     'getActiveListings' : IDL.Func([], [IDL.Vec(ActiveListing)], ['query']),
-    'getMyAuctionBidStatuses' : IDL.Func(
-        [IDL.Vec(ListingId)],
-        [IDL.Vec(AuctionBidStatus)],
+    'getActiveListingsPage' : IDL.Func(
+        [IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
+        [ActiveListingPage],
         ['query'],
       ),
     'getAdminPrincipal' : IDL.Func([], [IDL.Opt(IDL.Principal)], ['query']),
@@ -723,6 +1056,21 @@ export const idlFactory = ({ IDL }) => {
             'err' : IDL.Text,
           }),
         ],
+        [],
+      ),
+    'getAllCollectionCreationRequestsPage' : IDL.Func(
+        [IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
+        [
+          IDL.Variant({
+            'ok' : CollectionCreationRequestPage,
+            'err' : IDL.Text,
+          }),
+        ],
+        [],
+      ),
+    'getAppCanisterHealth' : IDL.Func(
+        [IDL.Opt(IDL.Principal)],
+        [IDL.Variant({ 'ok' : IDL.Vec(AppCanisterHealth), 'err' : IDL.Text })],
         [],
       ),
     'getCollection' : IDL.Func(
@@ -737,7 +1085,12 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getCollectionCanisterControllers' : IDL.Func(
         [CollectionId],
-        [CollectionCanisterControllersResult],
+        [
+          IDL.Variant({
+            'ok' : CollectionCanisterControllers,
+            'err' : IDL.Text,
+          }),
+        ],
         [],
       ),
     'getCollectionCreationDiagnostics' : IDL.Func(
@@ -765,6 +1118,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat64))],
         ['query'],
       ),
+    'getCollectionDividendBalancesPage' : IDL.Func(
+        [CollectionId, IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
+        [DividendBalancePage],
+        ['query'],
+      ),
     'getCollectionDividendInfo' : IDL.Func(
         [CollectionId],
         [IDL.Opt(CollectionDividendInfo)],
@@ -786,16 +1144,12 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'getCollectionNFTs' : IDL.Func([CollectionId], [IDL.Vec(WalletNFT)], []),
-    'lookupCollectionNFT' : IDL.Func(
-        [CollectionId, IDL.Text],
-        [CollectionNFTLookupResult],
-        [],
-      ),
     'getMarketplaceFeeConfig' : IDL.Func([], [MarketplaceFeeConfig], []),
     'getMintConfig' : IDL.Func([], [MintConfig], ['query']),
-    'getModerationConfig' : IDL.Func(
-        [],
-        [PublicModerationConfig],
+    'getModerationConfig' : IDL.Func([], [PublicModerationConfig], ['query']),
+    'getMyAuctionBidStatuses' : IDL.Func(
+        [IDL.Vec(ListingId)],
+        [IDL.Vec(AuctionBidStatus)],
         ['query'],
       ),
     'getMyCollectionCanisterStatuses' : IDL.Func(
@@ -808,24 +1162,60 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(CollectionCreationRequestView)],
         [],
       ),
-    'getAppCanisterHealth' : IDL.Func(
-        [IDL.Opt(IDL.Principal)],
-        [IDL.Variant({ 'ok' : IDL.Vec(AppCanisterHealth), 'err' : IDL.Text })],
+    'getMyCollectionCreationRequestsPage' : IDL.Func(
+        [IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
+        [CollectionCreationRequestPage],
         [],
       ),
     'getMyCreatedCollections' : IDL.Func([], [IDL.Vec(Collection)], []),
     'getMyDividendNFTs' : IDL.Func([], [IDL.Vec(NFTDividend)], []),
-    'getMyPendingAuctionRefunds' : IDL.Func(
+    'getMyDividendNFTsPage' : IDL.Func(
+        [IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
+        [NFTDividendPage],
         [],
-        [IDL.Vec(AuctionEscrow)],
+      ),
+    'getMyMarketplaceSettlementStatuses' : IDL.Func(
+        [],
+        [IDL.Vec(SettlementStatus)],
+        ['query'],
+      ),
+    'getMyPendingAuctionRefunds' : IDL.Func([], [IDL.Vec(AuctionEscrow)], []),
+    'getMyPendingMintPayments' : IDL.Func(
+        [],
+        [IDL.Vec(PendingMintPaymentView)],
         [],
       ),
     'getNFTStats' : IDL.Func([IDL.Principal], [NFTStats], ['query']),
+    'getRegistry' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(EXTTokenIndex, EXTAccountIdentifier))],
+        ['query'],
+      ),
+    'getTokens' : IDL.Func(
+        [],
+        [IDL.Vec(IDL.Tuple(EXTTokenIndex, EXTMetadataLegacy))],
+        ['query'],
+      ),
     'getUserAccountId' : IDL.Func([], [AccountIdentifier], ['query']),
     'getUserICPBalance' : IDL.Func([], [IDL.Nat64], []),
     'getUserNFTs' : IDL.Func([IDL.Principal], [IDL.Vec(WalletNFT)], ['query']),
+    'getUserNFTsPage' : IDL.Func(
+        [IDL.Principal, IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
+        [WalletNFTPage],
+        ['query'],
+      ),
     'getVaultAccountId' : IDL.Func([], [AccountIdentifier], ['query']),
     'getVaultPrincipal' : IDL.Func([], [IDL.Principal], ['query']),
+    'http_request' : IDL.Func(
+        [AssetHttpRequest],
+        [AssetHttpResponse],
+        ['query'],
+      ),
+    'http_request_update' : IDL.Func(
+        [AssetHttpRequest],
+        [AssetHttpResponse],
+        [],
+      ),
     'icrc10_supported_standards' : IDL.Func(
         [],
         [IDL.Vec(SupportedStandard)],
@@ -886,12 +1276,7 @@ export const idlFactory = ({ IDL }) => {
     'icrc7_tx_window' : IDL.Func([], [IDL.Opt(IDL.Nat)], ['query']),
     'indexCollectionOwnershipPage' : IDL.Func(
         [CollectionId, IDL.Opt(IDL.Text), IDL.Nat],
-        [
-          IDL.Variant({
-            'ok' : CollectionIndexPageResult,
-            'err' : IDL.Text,
-          }),
-        ],
+        [IDL.Variant({ 'ok' : CollectionIndexPageResult, 'err' : IDL.Text })],
         [],
       ),
     'isAdmin' : IDL.Func([], [IDL.Bool], ['query']),
@@ -901,6 +1286,16 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'listCollections' : IDL.Func([], [IDL.Vec(Collection)], ['query']),
+    'listCollectionsPage' : IDL.Func(
+        [IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
+        [CollectionPage],
+        ['query'],
+      ),
+    'lookupCollectionNFT' : IDL.Func(
+        [CollectionId, IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Opt(WalletNFT), 'err' : IDL.Text })],
+        [],
+      ),
     'mintCollectionNFT' : IDL.Func(
         [CollectionId, NFTMetadata],
         [IDL.Variant({ 'ok' : WalletNFT, 'err' : IDL.Text })],
@@ -912,7 +1307,6 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'placeBid' : IDL.Func([ListingId, IDL.Nat64], [AuctionListing], []),
-    'retryPendingBid' : IDL.Func([ListingId], [AuctionListing], []),
     'prepareVaultDeposit' : IDL.Func(
         [CollectionId, IDL.Text],
         [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
@@ -920,17 +1314,17 @@ export const idlFactory = ({ IDL }) => {
       ),
     'previewCollectionDividendDisbursement' : IDL.Func(
         [CollectionId],
-        [
-          IDL.Variant({
-            'ok' : DividendDisbursementPreview,
-            'err' : IDL.Text,
-          }),
-        ],
+        [IDL.Variant({ 'ok' : DividendDisbursementPreview, 'err' : IDL.Text })],
         [],
       ),
     'previewMyCollectionNFTs' : IDL.Func(
         [CollectionId],
         [IDL.Variant({ 'ok' : IDL.Vec(WalletNFT), 'err' : IDL.Text })],
+        [],
+      ),
+    'quoteAppCanisterCycleTopUp' : IDL.Func(
+        [IDL.Nat],
+        [CollectionCycleTopUpQuote],
         [],
       ),
     'quoteCollectionCreationCost' : IDL.Func(
@@ -943,9 +1337,14 @@ export const idlFactory = ({ IDL }) => {
         [CollectionCycleTopUpQuote],
         [],
       ),
-    'quoteAppCanisterCycleTopUp' : IDL.Func(
+    'recoverCollectionCreationRecord' : IDL.Func(
         [IDL.Nat],
-        [CollectionCycleTopUpQuote],
+        [
+          IDL.Variant({
+            'ok' : CollectionCreationRequestView,
+            'err' : IDL.Text,
+          }),
+        ],
         [],
       ),
     'refreshCollectionDividendBalances' : IDL.Func(
@@ -953,7 +1352,17 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat64))],
         [],
       ),
+    'refreshCollectionDividendBalancesPage' : IDL.Func(
+        [CollectionId, IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
+        [DividendBalancePage],
+        [],
+      ),
     'refreshMyDividendNFTs' : IDL.Func([], [IDL.Vec(NFTDividend)], []),
+    'refreshMyDividendNFTsPage' : IDL.Func(
+        [IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
+        [NFTDividendPage],
+        [],
+      ),
     'registerNFT' : IDL.Func(
         [CollectionId, IDL.Text, NFTMetadata],
         [IDL.Variant({ 'ok' : WalletNFT, 'err' : IDL.Text })],
@@ -962,14 +1371,9 @@ export const idlFactory = ({ IDL }) => {
     'removeCollection' : IDL.Func([CollectionId], [IDL.Bool], []),
     'removeCollectionCanisterController' : IDL.Func(
         [CollectionId, IDL.Principal],
-        [CollectionCanisterControllersResult],
-        [],
-      ),
-    'recoverCollectionCreationRecord' : IDL.Func(
-        [IDL.Nat],
         [
           IDL.Variant({
-            'ok' : CollectionCreationRequestView,
+            'ok' : CollectionCanisterControllers,
             'err' : IDL.Text,
           }),
         ],
@@ -996,26 +1400,32 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : Collection, 'err' : IDL.Text })],
         [],
       ),
+    'retryPendingBid' : IDL.Func([ListingId], [AuctionListing], []),
+    'retryPendingMintPayment' : IDL.Func(
+        [IDL.Nat],
+        [IDL.Variant({ 'ok' : MintReceipt, 'err' : IDL.Text })],
+        [],
+      ),
     'sendNFT' : IDL.Func(
         [NFTId, IDL.Principal],
         [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
         [],
       ),
-    'syncExternalNFTOwner' : IDL.Func(
-        [CollectionId, IDL.Text, IDL.Principal],
-        [IDL.Variant({ 'ok' : WalletNFT, 'err' : IDL.Text })],
-        [],
-      ),
-    'updateCollectionBrowseInfo' : IDL.Func(
-        [CollectionId, IDL.Opt(CollectionBrowseInfo)],
-        [IDL.Variant({ 'ok' : Collection, 'err' : IDL.Text })],
-        [],
-      ),
     'setCollectionCanisterWasm' : IDL.Func([IDL.Vec(IDL.Nat8)], [], []),
     'settleAuction' : IDL.Func([ListingId], [], []),
+    'supply' : IDL.Func(
+        [EXTTokenIdentifier],
+        [IDL.Variant({ 'ok' : EXTBalance, 'err' : EXTCommonError })],
+        ['query'],
+      ),
     'syncCollectionDividends' : IDL.Func(
         [CollectionId],
         [IDL.Variant({ 'ok' : DividendSyncReceipt, 'err' : IDL.Text })],
+        [],
+      ),
+    'syncExternalNFTOwner' : IDL.Func(
+        [CollectionId, IDL.Text, IDL.Principal],
+        [IDL.Variant({ 'ok' : WalletNFT, 'err' : IDL.Text })],
         [],
       ),
     'syncUserNFTs' : IDL.Func(
@@ -1031,30 +1441,20 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
-    'syncUserNFTsV2' : IDL.Func(
-        [],
-        [
-          IDL.Variant({
-            'ok' : WalletSyncV2Result,
-            'err' : IDL.Text,
-          }),
-        ],
-        [],
-      ),
     'syncUserNFTsPage' : IDL.Func(
         [IDL.Opt(IDL.Nat), IDL.Nat],
-        [
-          IDL.Variant({
-            'ok' : WalletSyncPageResult,
-            'err' : IDL.Text,
-          }),
-        ],
+        [IDL.Variant({ 'ok' : WalletSyncPageResult, 'err' : IDL.Text })],
         [],
       ),
-    'topUpCollectionCanisterCycles' : IDL.Func(
-        [CollectionId, IDL.Nat],
-        [IDL.Variant({ 'ok' : CollectionCycleTopUpReceipt, 'err' : IDL.Text })],
+    'syncUserNFTsV2' : IDL.Func(
         [],
+        [IDL.Variant({ 'ok' : WalletSyncV2Result, 'err' : IDL.Text })],
+        [],
+      ),
+    'tokens_ext' : IDL.Func(
+        [EXTAccountIdentifier],
+        [EXTTokensExtResult],
+        ['query'],
       ),
     'topUpAppCanisterCycles' : IDL.Func(
         [IDL.Nat],
@@ -1064,6 +1464,11 @@ export const idlFactory = ({ IDL }) => {
     'topUpCanisterCycles' : IDL.Func(
         [IDL.Principal, IDL.Nat],
         [IDL.Variant({ 'ok' : AppCycleTopUpReceipt, 'err' : IDL.Text })],
+        [],
+      ),
+    'topUpCollectionCanisterCycles' : IDL.Func(
+        [CollectionId, IDL.Nat],
+        [IDL.Variant({ 'ok' : CollectionCycleTopUpReceipt, 'err' : IDL.Text })],
         [],
       ),
     'transfer' : IDL.Func([IDL.Principal, IDL.Nat], [DIP721NatResult], []),
@@ -1077,6 +1482,21 @@ export const idlFactory = ({ IDL }) => {
         [TransferResult],
         [],
       ),
+    'transformModerationResponse' : IDL.Func(
+        [
+          IDL.Record({
+            'context' : IDL.Vec(IDL.Nat8),
+            'response' : HttpRequestResult,
+          }),
+        ],
+        [HttpRequestResult],
+        ['query'],
+      ),
+    'updateCollectionBrowseInfo' : IDL.Func(
+        [CollectionId, IDL.Opt(CollectionBrowseInfo)],
+        [IDL.Variant({ 'ok' : Collection, 'err' : IDL.Text })],
+        [],
+      ),
     'upgradeCollectionCanister' : IDL.Func(
         [CollectionId],
         [IDL.Variant({ 'ok' : Collection, 'err' : IDL.Text })],
@@ -1084,6 +1504,6 @@ export const idlFactory = ({ IDL }) => {
       ),
   });
 };
-export const idlService = idlFactory({ IDL });
-export const idlInitArgs = [];
 export const init = ({ IDL }) => { return []; };
+
+export const idlService = idlFactory({ IDL });

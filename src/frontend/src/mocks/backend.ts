@@ -332,6 +332,33 @@ function sampleCollectionNFTs(collectionId: bigint): WalletNFT[] {
   return sampleBrowseNFTsByCollection.get(collectionId.toString()) ?? [];
 }
 
+function paginateMock<T>(
+  items: T[],
+  cursor: bigint | null,
+  limit: bigint | null,
+): { items: T[]; nextCursor: bigint | null; totalCount: bigint } {
+  const start = cursor == null ? 0 : Number(cursor);
+  const pageSize = limit == null ? 100 : Number(limit);
+  const page = items.slice(start, start + pageSize);
+  const next = start + page.length < items.length ? BigInt(start + page.length) : null;
+  return {
+    items: page,
+    nextCursor: next,
+    totalCount: BigInt(items.length),
+  };
+}
+
+function sampleCollectionDividendBalances(
+  collectionId: bigint,
+): Array<[string, bigint]> {
+  return collectionId === 4n
+    ? [
+        ["12", 50_000_000n],
+        ["13", 50_000_000n],
+      ]
+    : [];
+}
+
 export const mockBackend: backendInterface = {
   getAgent: (): Agent => {
     throw new Error("Mock backend does not provide an authenticated agent");
@@ -540,7 +567,24 @@ export const mockBackend: backendInterface = {
     price,
   }),
   getActiveListingDetails: async () => sampleActiveListingDetails,
+  getActiveListingDetailsPage: async (cursor, limit) => {
+    const page = paginateMock(sampleActiveListingDetails, cursor, limit);
+    return {
+      details: page.items,
+      nextCursor: page.nextCursor,
+      totalCount: page.totalCount,
+    };
+  },
   getActiveListings: async () => sampleActiveListings,
+  getActiveListingsPage: async (cursor, limit) => {
+    const page = paginateMock(sampleActiveListings, cursor, limit);
+    return {
+      listings: page.items,
+      nextCursor: page.nextCursor,
+      totalCount: page.totalCount,
+    };
+  },
+  getMyMarketplaceSettlementStatuses: async () => [],
   getMyAuctionBidStatuses: async (listingIds) =>
     listingIds.flatMap((listingId) => {
       const active = sampleActiveListings.find(
@@ -593,14 +637,23 @@ export const mockBackend: backendInterface = {
   getCollectionCreator: async (id) => (id === 4n ? samplePrincipal : null),
   getCollectionDividendAccountId: async () => mockAccountId,
   getCollectionDividendBalances: async (collectionId) =>
-    collectionId === 4n
-      ? [
-          ["12", 50_000_000n],
-          ["13", 50_000_000n],
-        ]
-      : [],
+    sampleCollectionDividendBalances(collectionId),
+  getCollectionDividendBalancesPage: async (collectionId, cursor, limit) => {
+    const page = paginateMock(
+      sampleCollectionDividendBalances(collectionId),
+      cursor,
+      limit,
+    );
+    return {
+      balances: page.items,
+      nextCursor: page.nextCursor,
+      totalCount: page.totalCount,
+    };
+  },
   refreshCollectionDividendBalances: async (collectionId) =>
     mockBackend.getCollectionDividendBalances(collectionId),
+  refreshCollectionDividendBalancesPage: async (collectionId, cursor, limit) =>
+    mockBackend.getCollectionDividendBalancesPage(collectionId, cursor, limit),
   getCollectionDividendInfo: async (collectionId) => ({
     collectionId,
     enabled: collectionId === 4n,
@@ -638,6 +691,14 @@ export const mockBackend: backendInterface = {
   getUserAccountId: async () => mockAccountId,
   getUserICPBalance: async () => BigInt(4_250_000_000),
   getUserNFTs: async () => sampleNFTs,
+  getUserNFTsPage: async (_user, cursor, limit) => {
+    const page = paginateMock(sampleNFTs, cursor, limit);
+    return {
+      nfts: page.items,
+      nextCursor: page.nextCursor,
+      totalCount: page.totalCount,
+    };
+  },
   getMarketplaceFeeConfig: async () => ({
     auctionBidFeeReserveE8s: 20_000n,
     ledgerFeeE8s: 10_000n,
@@ -800,6 +861,14 @@ export const mockBackend: backendInterface = {
     __kind__: "ok" as const,
     ok: [],
   }),
+  getAllCollectionCreationRequestsPage: async () => ({
+    __kind__: "ok" as const,
+    ok: {
+      requests: [],
+      nextCursor: null,
+      totalCount: 0n,
+    },
+  }),
   getCollectionCreationDiagnostics: async (requestId) => ({
     __kind__: "ok" as const,
     ok: {
@@ -842,6 +911,11 @@ export const mockBackend: backendInterface = {
         idleCyclesBurnedPerDay: 12_500_000_000n,
       })),
   getMyCollectionCreationRequests: async () => [],
+  getMyCollectionCreationRequestsPage: async () => ({
+    requests: [],
+    nextCursor: null,
+    totalCount: 0n,
+  }),
   getCollectionCanisterControllers: async (collectionId) => ({
     __kind__: "ok" as const,
     ok: {
@@ -885,12 +959,32 @@ export const mockBackend: backendInterface = {
         collection: sampleCollections[3],
         claimableE8s: 50_000_000n,
       })),
+  getMyDividendNFTsPage: async (cursor, limit) => {
+    const dividends = await mockBackend.getMyDividendNFTs();
+    const page = paginateMock(dividends, cursor, limit);
+    return {
+      dividends: page.items,
+      nextCursor: page.nextCursor,
+      totalCount: page.totalCount,
+    };
+  },
   getMyPendingAuctionRefunds: async () => [],
+  getMyPendingMintPayments: async () => [],
   refreshMyDividendNFTs: async () => mockBackend.getMyDividendNFTs(),
+  refreshMyDividendNFTsPage: async (cursor, limit) =>
+    mockBackend.getMyDividendNFTsPage(cursor, limit),
   getVaultAccountId: async () => mockAccountId,
   getVaultPrincipal: async () => samplePrincipal,
   isAdmin: async () => true,
   listCollections: async () => sampleCollections,
+  listCollectionsPage: async (cursor, limit) => {
+    const page = paginateMock(sampleCollections, cursor, limit);
+    return {
+      collections: page.items,
+      nextCursor: page.nextCursor,
+      totalCount: page.totalCount,
+    };
+  },
   mintCollectionNFT: async (collectionId, metadata) => ({
     __kind__: "ok" as const,
     ok: {
@@ -926,6 +1020,10 @@ export const mockBackend: backendInterface = {
   retryPendingBid: async (listingId) => ({
     ...auctionListing,
     id: listingId,
+  }),
+  retryPendingMintPayment: async () => ({
+    __kind__: "err" as const,
+    err: "No pending mock mint payment found",
   }),
   prepareVaultDeposit: async () => ({ __kind__: "ok" as const, ok: "Mock deposit prepared" }),
   previewCollectionDividendDisbursement: async () => ({

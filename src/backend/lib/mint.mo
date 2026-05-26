@@ -37,6 +37,12 @@ module {
     var config : Types.ModerationConfig;
   };
 
+  public type PendingMintPaymentState = {
+    payments : Map.Map<Nat, Types.PendingMintPayment>;
+    paymentsByCaller : Map.Map<Principal, [Nat]>;
+    var nextPaymentId : Nat;
+  };
+
   public func defaultCollectionCreationPrimaryPayoutBasisPoints() : Nat {
     10_000;
   };
@@ -88,6 +94,14 @@ module {
 
   public func newModerationState() : ModerationState {
     { var config = defaultModerationConfig() };
+  };
+
+  public func newPendingMintPaymentState() : PendingMintPaymentState {
+    {
+      payments = Map.empty<Nat, Types.PendingMintPayment>();
+      paymentsByCaller = Map.empty<Principal, [Nat]>();
+      var nextPaymentId = 1;
+    };
   };
 
   public func defaultModerationCategories() : Types.ModerationCategorySettings {
@@ -370,6 +384,159 @@ module {
     payoutSplitState.secondaryPayoutAccount := collectionCreationSecondaryPayoutAccount;
     payoutSplitState.primaryPayoutBasisPoints := collectionCreationPrimaryPayoutBasisPoints;
     payoutSplitState.secondaryPayoutBasisPoints := collectionCreationSecondaryPayoutBasisPoints;
+  };
+
+  public func beginPendingMintPayment(
+    state : PendingMintPaymentState,
+    caller : Principal,
+    collectionId : Types.CollectionId,
+    metadata : WalletTypes.NFTMetadata,
+    amountE8s : Nat64,
+    payoutAccount : Types.AccountIdentifier,
+  ) : Types.PendingMintPayment {
+    let id = state.nextPaymentId;
+    state.nextPaymentId += 1;
+    let now = nowNat64();
+    let payment : Types.PendingMintPayment = {
+      id;
+      caller;
+      collectionId;
+      metadata;
+      amountE8s;
+      payoutAccount;
+      memo = Nat64.fromNat(id);
+      paymentCreatedAt = now;
+      paymentBlock = null;
+      mintedTokenId = null;
+      status = #PaymentPending;
+      createdAt = now;
+      updatedAt = now;
+      lastError = null;
+    };
+    savePendingMintPayment(state, payment);
+  };
+
+  public func getPendingMintPayment(
+    state : PendingMintPaymentState,
+    paymentId : Nat,
+  ) : ?Types.PendingMintPayment {
+    Map.get(state.payments, Nat.compare, paymentId);
+  };
+
+  public func markPendingMintPaymentSent(
+    state : PendingMintPaymentState,
+    paymentId : Nat,
+    blockIndex : Nat64,
+  ) : ?Types.PendingMintPayment {
+    switch (getPendingMintPayment(state, paymentId)) {
+      case null null;
+      case (?payment) {
+        ?savePendingMintPayment(state, {
+          payment with
+          paymentBlock = ?blockIndex;
+          status = #PaymentSent;
+          updatedAt = nowNat64();
+          lastError = null;
+        });
+      };
+    };
+  };
+
+  public func markPendingMintPaymentMinted(
+    state : PendingMintPaymentState,
+    paymentId : Nat,
+    tokenId : Nat,
+  ) : ?Types.PendingMintPayment {
+    switch (getPendingMintPayment(state, paymentId)) {
+      case null null;
+      case (?payment) {
+        ?savePendingMintPayment(state, {
+          payment with
+          mintedTokenId = ?tokenId;
+          status = #Minted;
+          updatedAt = nowNat64();
+          lastError = null;
+        });
+      };
+    };
+  };
+
+  public func markPendingMintPaymentError(
+    state : PendingMintPaymentState,
+    paymentId : Nat,
+    message : Text,
+  ) : ?Types.PendingMintPayment {
+    switch (getPendingMintPayment(state, paymentId)) {
+      case null null;
+      case (?payment) {
+        let nextStatus = switch (payment.paymentBlock) {
+          case (?_) #PaymentSent;
+          case null #Failed;
+        };
+        ?savePendingMintPayment(state, {
+          payment with
+          status = nextStatus;
+          updatedAt = nowNat64();
+          lastError = ?message;
+        });
+      };
+    };
+  };
+
+  public func pendingMintPaymentView(
+    payment : Types.PendingMintPayment
+  ) : Types.PendingMintPaymentView {
+    {
+      id = payment.id;
+      collectionId = payment.collectionId;
+      amountE8s = payment.amountE8s;
+      paymentBlock = payment.paymentBlock;
+      mintedTokenId = payment.mintedTokenId;
+      status = payment.status;
+      createdAt = payment.createdAt;
+      updatedAt = payment.updatedAt;
+      lastError = payment.lastError;
+    };
+  };
+
+  public func pendingMintPaymentsByCaller(
+    state : PendingMintPaymentState,
+    caller : Principal,
+  ) : [Types.PendingMintPaymentView] {
+    var payments : [Types.PendingMintPaymentView] = [];
+    for (payment in Map.values(state.payments)) {
+      if (
+        Principal.equal(payment.caller, caller) and
+        payment.status != #Minted and
+        (payment.status != #Failed or payment.paymentBlock != null)
+      ) {
+        payments := Array.concat<Types.PendingMintPaymentView>(
+          payments,
+          [pendingMintPaymentView(payment)],
+        );
+      };
+    };
+    payments;
+  };
+
+  func savePendingMintPayment(
+    state : PendingMintPaymentState,
+    payment : Types.PendingMintPayment,
+  ) : Types.PendingMintPayment {
+    Map.add(state.payments, Nat.compare, payment.id, payment);
+    let current = switch (Map.get(state.paymentsByCaller, Principal.compare, payment.caller)) {
+      case (?ids) ids;
+      case null [];
+    };
+    if (not containsRequestId(current, payment.id)) {
+      Map.add(
+        state.paymentsByCaller,
+        Principal.compare,
+        payment.caller,
+        Array.concat<Nat>(current, [payment.id]),
+      );
+    };
+    payment;
   };
 
   public func setCollectionCanisterWasm(state : MintState, wasm : Blob) {

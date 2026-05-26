@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-uxIxOZSG.js","assets/AppCanisterTopUpDialog-CgWQRn78.js","assets/index-D1EevaUf.js","assets/badge-Cxipmsvb.js","assets/external-nft-transfer-CRUJO5By.js","assets/media-CBIulzFx.js","assets/MediaImage-DQQaQlz2.js","assets/HelpCallout-rlAWuAza.js","assets/arrow-right-BahKf-aw.js","assets/ZoomableMediaImage-B34nAbLr.js","assets/index-QzUFDKbw.js","assets/card-D0qd2LdJ.js","assets/textarea-DKl5EFyR.js","assets/skeleton-Er_mLg7r.js","assets/imageUtils-Bgw7BTrU.js","assets/circle-check-DHKpOJva.js","assets/coins-B4k36-7a.js","assets/send-C2EESSnE.js","assets/MarketplacePage-CxEPAiBs.js","assets/icp-BXjZNIYq.js","assets/AdminPage-BUfWSOIO.js","assets/switch-xewWtXj_.js","assets/circle-alert-CK03UyfW.js","assets/ICPAccountPage-DRYXd5gc.js","assets/CollectionsPage-DycftSof.js","assets/shield-check-nW8WgR8-.js","assets/DividendsPage-CGd-TQ1m.js","assets/HelpPage-ZNXAenll.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-B8KhRekg.js","assets/AppCanisterTopUpDialog-DDsHUyXD.js","assets/index-Byv1oxo0.js","assets/badge-DyWrd8S9.js","assets/external-nft-transfer-RODVCHlo.js","assets/media-l8J0swV4.js","assets/MediaImage-DM01sE6x.js","assets/HelpCallout-CcsBl9sy.js","assets/arrow-right-F_r_3qVe.js","assets/ZoomableMediaImage-BeocNwgW.js","assets/index-CpwJYIFc.js","assets/card-BmmW0ULT.js","assets/textarea-DwDGf75G.js","assets/skeleton-4xVXen6F.js","assets/imageUtils-CNIauznE.js","assets/circle-check-DgD_5Naj.js","assets/coins-cikpxwHj.js","assets/send-Dc4Qp647.js","assets/MarketplacePage-w2pUIUzN.js","assets/icp-BXjZNIYq.js","assets/AdminPage-Ce0BOZAL.js","assets/switch-DT4oYvX4.js","assets/circle-alert-DD_5MABl.js","assets/ICPAccountPage-BluO_Tqg.js","assets/CollectionsPage-DXrlOB5I.js","assets/shield-check-C6WnLQ_s.js","assets/DividendsPage-DNIxmxPH.js","assets/HelpPage-D5c6GLU2.js"])))=>i.map(i=>d[i]);
 var __defProp = Object.defineProperty;
 var __typeError = (msg) => {
   throw TypeError(msg);
@@ -30089,7 +30089,53 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "canisterId": IDL2.Principal,
     "dividendConfig": IDL2.Opt(CollectionDividendConfig)
   });
+  const CollectionCanisterControllers = IDL2.Record({
+    "controllers": IDL2.Vec(IDL2.Principal),
+    "collectionId": CollectionId,
+    "appCanisterId": IDL2.Principal,
+    "canisterId": IDL2.Principal
+  });
+  const CollectionCreationReceipt = IDL2.Record({
+    "collection": Collection,
+    "paymentBlock": IDL2.Nat64
+  });
   const ListingId = IDL2.Nat;
+  const AccountIdentifier = IDL2.Vec(IDL2.Nat8);
+  const SettlementEscrowRepairKind = IDL2.Variant({
+    "FixedPurchase": IDL2.Null,
+    "Auction": IDL2.Null
+  });
+  const MintlabFeeRecoveryQuote = IDL2.Record({
+    "escrowAccount": AccountIdentifier,
+    "ledgerFeeE8s": IDL2.Nat64,
+    "mintlabFee": IDL2.Nat64,
+    "expectedBeforeMintlabFeeDebit": IDL2.Nat64,
+    "listingId": ListingId,
+    "kind": SettlementEscrowRepairKind,
+    "previousMintlabFeeCreatedAt": IDL2.Nat64,
+    "shortfallBeforeMintlabFee": IDL2.Nat64,
+    "expectedAfterMintlabFeeDebit": IDL2.Nat64,
+    "escrowBalance": IDL2.Nat64,
+    "escrowId": IDL2.Nat,
+    "feeRecipient": AccountIdentifier,
+    "sellerProceeds": IDL2.Nat64
+  });
+  const SettlementEscrowRepairQuote = IDL2.Record({
+    "escrowAccount": AccountIdentifier,
+    "topUpTransferFeeE8s": IDL2.Nat64,
+    "ledgerFeeE8s": IDL2.Nat64,
+    "topUpFromAccount": AccountIdentifier,
+    "mintlabFee": IDL2.Nat64,
+    "listingId": ListingId,
+    "kind": SettlementEscrowRepairKind,
+    "topUpTotalDebit": IDL2.Nat64,
+    "escrowBalance": IDL2.Nat64,
+    "requiredDebit": IDL2.Nat64,
+    "topUpFromBalance": IDL2.Nat64,
+    "shortfall": IDL2.Nat64,
+    "escrowId": IDL2.Nat,
+    "sellerProceeds": IDL2.Nat64
+  });
   const NFTId = IDL2.Nat;
   const UserId = IDL2.Principal;
   const NFTMetadata = IDL2.Record({
@@ -30113,41 +30159,156 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "registeredAt": Timestamp,
     "location": WalletLocation
   });
-  const WalletSyncSkip = IDL2.Record({
-    "collectionId": CollectionId,
-    "collectionName": IDL2.Text,
-    "message": IDL2.Text,
-    "reason": IDL2.Text
+  const SettlementStage = IDL2.Variant({
+    "NFTTransferPending": IDL2.Null,
+    "MintlabFeePending": IDL2.Null,
+    "PaymentPending": IDL2.Null,
+    "SellerPaymentPending": IDL2.Null
   });
-  const WalletSyncV2Result = IDL2.Record({
-    "errors": IDL2.Vec(IDL2.Text),
-    "newCount": IDL2.Nat,
-    "skipped": IDL2.Vec(WalletSyncSkip)
+  const FixedPurchaseSettlement = IDL2.Record({
+    "nft": WalletNFT,
+    "ledgerFeeE8s": IDL2.Nat64,
+    "mintlabFee": IDL2.Nat64,
+    "mintlabFeeCreatedAt": IDL2.Opt(IDL2.Nat64),
+    "nftDeliveredAt": IDL2.Opt(Timestamp),
+    "listingId": ListingId,
+    "createdAt": Timestamp,
+    "paymentBlock": IDL2.Opt(IDL2.Nat64),
+    "seller": UserId,
+    "updatedAt": Timestamp,
+    "stage": SettlementStage,
+    "paymentEscrowId": IDL2.Nat,
+    "paymentCreatedAt": IDL2.Nat64,
+    "buyer": UserId,
+    "mintlabFeeBlock": IDL2.Opt(IDL2.Nat64),
+    "price": IDL2.Nat64,
+    "sellerPaymentBlock": IDL2.Opt(IDL2.Nat64),
+    "feeRecipient": IDL2.Opt(AccountIdentifier),
+    "sellerProceeds": IDL2.Nat64,
+    "sellerPaymentCreatedAt": IDL2.Opt(IDL2.Nat64)
   });
-  const WalletSyncPageResult = IDL2.Record({
-    "errors": IDL2.Vec(IDL2.Text),
-    "newCount": IDL2.Nat,
-    "skipped": IDL2.Vec(WalletSyncSkip),
-    "nextCursor": IDL2.Opt(IDL2.Nat),
-    "complete": IDL2.Bool,
-    "checkedCollections": IDL2.Nat
+  const NoBidAuctionReturnStage = IDL2.Variant({
+    "CleanupPending": IDL2.Null,
+    "NFTReturnPending": IDL2.Null,
+    "WalletRegistrationPending": IDL2.Null
   });
-  const CollectionIndexStatus = IDL2.Record({
-    "collectionId": CollectionId,
-    "complete": IDL2.Bool,
-    "cursor": IDL2.Opt(IDL2.Text),
-    "indexed": IDL2.Nat,
-    "lastError": IDL2.Opt(IDL2.Text),
-    "scanned": IDL2.Nat,
-    "updatedAt": Timestamp
+  const NoBidAuctionReturnSettlement = IDL2.Record({
+    "nft": WalletNFT,
+    "walletRegisteredAt": IDL2.Opt(Timestamp),
+    "listingId": ListingId,
+    "createdAt": Timestamp,
+    "seller": UserId,
+    "updatedAt": Timestamp,
+    "stage": NoBidAuctionReturnStage,
+    "returnedAt": IDL2.Opt(Timestamp)
   });
-  const CollectionIndexPageResult = IDL2.Record({
-    "collectionId": CollectionId,
-    "complete": IDL2.Bool,
-    "error": IDL2.Opt(IDL2.Text),
-    "indexed": IDL2.Nat,
-    "nextCursor": IDL2.Opt(IDL2.Text),
-    "scanned": IDL2.Nat
+  const AuctionEscrow = IDL2.Record({
+    "ledgerFeeE8s": IDL2.Nat64,
+    "listingId": ListingId,
+    "createdAt": Timestamp,
+    "feeReserve": IDL2.Nat64,
+    "depositedBlock": IDL2.Nat64,
+    "escrowId": IDL2.Nat,
+    "amount": IDL2.Nat64,
+    "bidder": UserId
+  });
+  const PendingAuctionRefund = IDL2.Record({
+    "refundAmount": IDL2.Nat64,
+    "createdAt": Timestamp,
+    "refundFeeE8s": IDL2.Nat64,
+    "refundCreatedAt": IDL2.Nat64,
+    "updatedAt": Timestamp,
+    "refundBlock": IDL2.Opt(IDL2.Nat64),
+    "escrow": AuctionEscrow
+  });
+  const PendingBidDeposit = IDL2.Record({
+    "ledgerFeeE8s": IDL2.Nat64,
+    "listingId": ListingId,
+    "createdAt": Timestamp,
+    "paymentAttemptedAt": IDL2.Opt(Timestamp),
+    "paymentBlock": IDL2.Opt(IDL2.Nat64),
+    "updatedAt": Timestamp,
+    "feeReserve": IDL2.Nat64,
+    "paymentCreatedAt": IDL2.Nat64,
+    "escrowId": IDL2.Nat,
+    "escrowDeposit": IDL2.Nat64,
+    "amount": IDL2.Nat64,
+    "bidder": UserId
+  });
+  const AuctionSettlement = IDL2.Record({
+    "nft": WalletNFT,
+    "ledgerFeeE8s": IDL2.Nat64,
+    "mintlabFee": IDL2.Nat64,
+    "mintlabFeeCreatedAt": IDL2.Opt(IDL2.Nat64),
+    "nftDeliveredAt": IDL2.Opt(Timestamp),
+    "listingId": ListingId,
+    "winningEscrowId": IDL2.Nat,
+    "createdAt": Timestamp,
+    "winner": UserId,
+    "seller": UserId,
+    "updatedAt": Timestamp,
+    "stage": SettlementStage,
+    "winningEscrowDepositedBlock": IDL2.Nat64,
+    "mintlabFeeBlock": IDL2.Opt(IDL2.Nat64),
+    "price": IDL2.Nat64,
+    "sellerPaymentBlock": IDL2.Opt(IDL2.Nat64),
+    "feeRecipient": IDL2.Opt(AccountIdentifier),
+    "sellerProceeds": IDL2.Nat64,
+    "sellerPaymentCreatedAt": IDL2.Opt(IDL2.Nat64)
+  });
+  const ListingReturnReason = IDL2.Variant({
+    "FixedCancel": IDL2.Null,
+    "AuctionCancel": IDL2.Null
+  });
+  const ListingReturnSettlement = IDL2.Record({
+    "nft": WalletNFT,
+    "refundEscrow": IDL2.Opt(AuctionEscrow),
+    "walletRegisteredAt": IDL2.Opt(Timestamp),
+    "listingId": ListingId,
+    "createdAt": Timestamp,
+    "seller": UserId,
+    "updatedAt": Timestamp,
+    "stage": NoBidAuctionReturnStage,
+    "returnedAt": IDL2.Opt(Timestamp),
+    "reason": ListingReturnReason
+  });
+  const MarketplaceRecoverySnapshot = IDL2.Record({
+    "fixedSettlements": IDL2.Vec(FixedPurchaseSettlement),
+    "activeListingLocks": IDL2.Vec(ListingId),
+    "noBidReturns": IDL2.Vec(NoBidAuctionReturnSettlement),
+    "activeListingTokenLocks": IDL2.Vec(IDL2.Text),
+    "pendingRefunds": IDL2.Vec(AuctionEscrow),
+    "activeUserPaymentLocks": IDL2.Vec(UserId),
+    "refundJournals": IDL2.Vec(PendingAuctionRefund),
+    "pendingBids": IDL2.Vec(PendingBidDeposit),
+    "auctionSettlements": IDL2.Vec(AuctionSettlement),
+    "listingReturns": IDL2.Vec(ListingReturnSettlement)
+  });
+  const SettlementEscrowTopUpReceipt = IDL2.Record({
+    "feeE8s": IDL2.Nat64,
+    "listingId": ListingId,
+    "quoteBefore": SettlementEscrowRepairQuote,
+    "blockIndex": IDL2.Nat64,
+    "amount": IDL2.Nat64
+  });
+  const EXTTokenIdentifier = IDL2.Text;
+  const EXTAccountIdentifier = IDL2.Text;
+  const EXTUser = IDL2.Variant({
+    "principal": IDL2.Principal,
+    "address": EXTAccountIdentifier
+  });
+  const EXTBalanceRequest = IDL2.Record({
+    "token": EXTTokenIdentifier,
+    "user": EXTUser
+  });
+  const EXTBalance = IDL2.Nat;
+  const EXTCommonError = IDL2.Variant({
+    "InvalidToken": EXTTokenIdentifier,
+    "Other": IDL2.Text
+  });
+  const EXTBalanceResponse = IDL2.Variant({
+    "ok": EXTBalance,
+    "err": EXTCommonError
   });
   const DividendClaimReceipt = IDL2.Record({
     "nft": WalletNFT,
@@ -30156,7 +30317,29 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "blockIndex": IDL2.Nat64,
     "paidE8s": IDL2.Nat64
   });
-  const AccountIdentifier = IDL2.Vec(IDL2.Nat8);
+  const MarketplaceFeeConfig = IDL2.Record({
+    "ledgerFeeE8s": IDL2.Nat64,
+    "mintlabFeeRecipient": IDL2.Opt(AccountIdentifier),
+    "mintlabFeeBasisPoints": IDL2.Nat,
+    "auctionBidFeeReserveE8s": IDL2.Nat64
+  });
+  const ModerationCategorySettings = IDL2.Record({
+    "selfHarm": IDL2.Bool,
+    "hateSymbols": IDL2.Bool,
+    "hateOrHarassment": IDL2.Bool,
+    "otherNsfw": IDL2.Bool,
+    "explicitLanguage": IDL2.Bool,
+    "illegalOrDangerous": IDL2.Bool,
+    "nudityOrSexual": IDL2.Bool,
+    "graphicViolence": IDL2.Bool
+  });
+  const PublicModerationConfig = IDL2.Record({
+    "categories": ModerationCategorySettings,
+    "model": IDL2.Text,
+    "apiKeyConfigured": IDL2.Bool,
+    "userMessage": IDL2.Text,
+    "enabled": IDL2.Bool
+  });
   const ListingStatus = IDL2.Variant({
     "Sold": IDL2.Null,
     "Active": IDL2.Null,
@@ -30174,14 +30357,6 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "nftId": NFTId,
     "startingBid": IDL2.Nat64
   });
-  const AuctionBidStatus = IDL2.Record({
-    "listingId": ListingId,
-    "hasBid": IDL2.Bool,
-    "isWinning": IDL2.Bool,
-    "highestBidder": IDL2.Opt(UserId),
-    "highestBid": IDL2.Nat64,
-    "myHighestBid": IDL2.Opt(IDL2.Nat64)
-  });
   const FixedListing = IDL2.Record({
     "id": ListingId,
     "status": ListingStatus,
@@ -30190,22 +30365,18 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "nftId": NFTId,
     "price": IDL2.Nat64
   });
-  const CollectionCreationReceipt = IDL2.Record({
-    "collection": Collection,
-    "paymentBlock": IDL2.Nat64
-  });
   const DIP721Error = IDL2.Variant({
+    "UnauthorizedOperator": IDL2.Null,
+    "SelfTransfer": IDL2.Null,
+    "TokenNotFound": IDL2.Null,
+    "UnauthorizedOwner": IDL2.Null,
     "ZeroAddress": IDL2.Null,
     "InvalidTokenId": IDL2.Null,
-    "Unauthorized": IDL2.Null,
-    "UnauthorizedOwner": IDL2.Null,
-    "UnauthorizedOperator": IDL2.Null,
-    "TokenNotFound": IDL2.Null,
-    "OwnerNotFound": IDL2.Null,
-    "OperatorNotFound": IDL2.Null,
-    "SelfTransfer": IDL2.Null,
     "SelfApprove": IDL2.Null,
+    "OperatorNotFound": IDL2.Null,
+    "Unauthorized": IDL2.Null,
     "ExistedNFT": IDL2.Null,
+    "OwnerNotFound": IDL2.Null,
     "Other": IDL2.Text
   });
   const DIP721TokensResult = IDL2.Variant({
@@ -30245,6 +30416,82 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "Ok": TokenMetadata,
     "Err": DIP721Error
   });
+  const DividendSyncReceipt = IDL2.Record({
+    "collectionId": CollectionId,
+    "shareE8s": IDL2.Nat64,
+    "nftCount": IDL2.Nat,
+    "distributedE8s": IDL2.Nat64,
+    "depositedE8s": IDL2.Nat64,
+    "balanceE8s": IDL2.Nat64,
+    "remainderE8s": IDL2.Nat64
+  });
+  const DividendDisbursementReceipt = IDL2.Record({
+    "failures": IDL2.Vec(IDL2.Text),
+    "feeTopUpBlockIndex": IDL2.Opt(IDL2.Nat64),
+    "collectionId": CollectionId,
+    "feeTopUpE8s": IDL2.Nat64,
+    "totalPaidE8s": IDL2.Nat64,
+    "feeReserveRemainingE8s": IDL2.Nat64,
+    "skippedCount": IDL2.Nat,
+    "paidCount": IDL2.Nat,
+    "remainingCount": IDL2.Nat,
+    "synced": DividendSyncReceipt,
+    "totalFeeE8s": IDL2.Nat64
+  });
+  const EXTMetadataValue = IDL2.Tuple(
+    IDL2.Text,
+    IDL2.Variant({
+      "nat": IDL2.Nat,
+      "blob": IDL2.Vec(IDL2.Nat8),
+      "nat8": IDL2.Nat8,
+      "text": IDL2.Text
+    })
+  );
+  const EXTMetadataContainer = IDL2.Variant({
+    "blob": IDL2.Vec(IDL2.Nat8),
+    "data": IDL2.Vec(EXTMetadataValue),
+    "json": IDL2.Text
+  });
+  const EXTMetadata = IDL2.Variant({
+    "fungible": IDL2.Record({
+      "decimals": IDL2.Nat8,
+      "metadata": IDL2.Opt(EXTMetadataContainer),
+      "name": IDL2.Text,
+      "symbol": IDL2.Text
+    }),
+    "nonfungible": IDL2.Record({
+      "thumbnail": IDL2.Text,
+      "asset": IDL2.Text,
+      "metadata": IDL2.Opt(EXTMetadataContainer),
+      "name": IDL2.Text
+    })
+  });
+  const EXTMetadataResult = IDL2.Variant({
+    "ok": EXTMetadata,
+    "err": EXTCommonError
+  });
+  const EXTMemo = IDL2.Vec(IDL2.Nat8);
+  const EXTSubAccount = IDL2.Vec(IDL2.Nat8);
+  const EXTTransferRequest = IDL2.Record({
+    "to": EXTUser,
+    "token": EXTTokenIdentifier,
+    "notify": IDL2.Bool,
+    "from": EXTUser,
+    "memo": EXTMemo,
+    "subaccount": IDL2.Opt(EXTSubAccount),
+    "amount": EXTBalance
+  });
+  const EXTTransferResponse = IDL2.Variant({
+    "ok": EXTBalance,
+    "err": IDL2.Variant({
+      "CannotNotify": EXTAccountIdentifier,
+      "InsufficientBalance": IDL2.Null,
+      "InvalidToken": EXTTokenIdentifier,
+      "Rejected": IDL2.Null,
+      "Unauthorized": EXTAccountIdentifier,
+      "Other": IDL2.Text
+    })
+  });
   const ActiveListing = IDL2.Variant({
     "Fixed": FixedListing,
     "Auction": AuctionListing
@@ -30253,53 +30500,56 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "nft": WalletNFT,
     "listing": ActiveListing
   });
-  const MarketplaceFeeConfig = IDL2.Record({
-    "auctionBidFeeReserveE8s": IDL2.Nat64,
-    "ledgerFeeE8s": IDL2.Nat64,
-    "mintlabFeeBasisPoints": IDL2.Nat,
-    "mintlabFeeRecipient": IDL2.Opt(AccountIdentifier)
+  const ActiveListingDetailPage = IDL2.Record({
+    "totalCount": IDL2.Nat,
+    "details": IDL2.Vec(ActiveListingDetail),
+    "nextCursor": IDL2.Opt(IDL2.Nat)
   });
-  const SettlementEscrowRepairKind = IDL2.Variant({
-    "FixedPurchase": IDL2.Null,
-    "Auction": IDL2.Null
+  const ActiveListingPage = IDL2.Record({
+    "listings": IDL2.Vec(ActiveListing),
+    "totalCount": IDL2.Nat,
+    "nextCursor": IDL2.Opt(IDL2.Nat)
   });
-  const SettlementEscrowRepairQuote = IDL2.Record({
-    "listingId": ListingId,
-    "kind": SettlementEscrowRepairKind,
-    "escrowId": IDL2.Nat,
-    "escrowAccount": AccountIdentifier,
-    "escrowBalance": IDL2.Nat64,
-    "requiredDebit": IDL2.Nat64,
-    "shortfall": IDL2.Nat64,
-    "ledgerFeeE8s": IDL2.Nat64,
-    "sellerProceeds": IDL2.Nat64,
-    "mintlabFee": IDL2.Nat64,
-    "topUpFromAccount": AccountIdentifier,
-    "topUpFromBalance": IDL2.Nat64,
-    "topUpTransferFeeE8s": IDL2.Nat64,
-    "topUpTotalDebit": IDL2.Nat64
+  const CollectionCreationStatus = IDL2.Variant({
+    "Started": IDL2.Null,
+    "Failed": IDL2.Null,
+    "CanisterCreated": IDL2.Null,
+    "CyclesConverted": IDL2.Null,
+    "AdminPayoutPending": IDL2.Null,
+    "AdminPayoutSent": IDL2.Null,
+    "CyclePaymentSent": IDL2.Null,
+    "CollectionRegistered": IDL2.Null,
+    "Installed": IDL2.Null
   });
-  const SettlementEscrowTopUpReceipt = IDL2.Record({
-    "listingId": ListingId,
-    "amount": IDL2.Nat64,
-    "feeE8s": IDL2.Nat64,
-    "blockIndex": IDL2.Nat64,
-    "quoteBefore": SettlementEscrowRepairQuote
+  const CollectionCreationRequestView = IDL2.Record({
+    "id": IDL2.Nat,
+    "status": CollectionCreationStatus,
+    "collectionId": IDL2.Opt(CollectionId),
+    "cyclePaymentBlock": IDL2.Opt(IDL2.Nat64),
+    "name": IDL2.Text,
+    "createdAt": IDL2.Nat64,
+    "childCanisterId": IDL2.Opt(IDL2.Principal),
+    "updatedAt": IDL2.Nat64,
+    "lastError": IDL2.Opt(IDL2.Text),
+    "symbol": IDL2.Text
   });
-  const MintlabFeeRecoveryQuote = IDL2.Record({
-    "listingId": ListingId,
-    "kind": SettlementEscrowRepairKind,
-    "escrowId": IDL2.Nat,
-    "escrowAccount": AccountIdentifier,
-    "escrowBalance": IDL2.Nat64,
-    "expectedBeforeMintlabFeeDebit": IDL2.Nat64,
-    "expectedAfterMintlabFeeDebit": IDL2.Nat64,
-    "shortfallBeforeMintlabFee": IDL2.Nat64,
-    "sellerProceeds": IDL2.Nat64,
-    "mintlabFee": IDL2.Nat64,
-    "ledgerFeeE8s": IDL2.Nat64,
-    "feeRecipient": AccountIdentifier,
-    "previousMintlabFeeCreatedAt": IDL2.Nat64
+  const CollectionCreationRequestPage = IDL2.Record({
+    "totalCount": IDL2.Nat,
+    "requests": IDL2.Vec(CollectionCreationRequestView),
+    "nextCursor": IDL2.Opt(IDL2.Nat)
+  });
+  const AppCanisterKind = IDL2.Variant({
+    "Frontend": IDL2.Null,
+    "Backend": IDL2.Null
+  });
+  const AppCanisterHealth = IDL2.Record({
+    "kind": AppCanisterKind,
+    "moduleInstalled": IDL2.Opt(IDL2.Bool),
+    "error": IDL2.Opt(IDL2.Text),
+    "cycles": IDL2.Opt(IDL2.Nat),
+    "freezingThresholdSeconds": IDL2.Opt(IDL2.Nat),
+    "idleCyclesBurnedPerDay": IDL2.Opt(IDL2.Nat),
+    "canisterId": IDL2.Principal
   });
   const CollectionBrowseCoverage = IDL2.Variant({
     "Full": IDL2.Null,
@@ -30312,16 +30562,42 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "visibleCount": IDL2.Nat,
     "coverage": CollectionBrowseCoverage
   });
+  const CollectionCreationDiagnostics = IDL2.Record({
+    "childTargetCycles": IDL2.Nat,
+    "requiredBackendCycles": IDL2.Nat,
+    "request": CollectionCreationRequestView,
+    "requestedCanisterCycles": IDL2.Nat,
+    "totalCyclesToConvert": IDL2.Nat,
+    "buildVersion": IDL2.Text,
+    "backendCycles": IDL2.Nat,
+    "canisterCreationFeeCycles": IDL2.Nat,
+    "canCreateNow": IDL2.Bool,
+    "createCallCycles": IDL2.Nat
+  });
+  const DividendBalancePage = IDL2.Record({
+    "totalCount": IDL2.Nat,
+    "nextCursor": IDL2.Opt(IDL2.Nat),
+    "balances": IDL2.Vec(IDL2.Tuple(IDL2.Text, IDL2.Nat64))
+  });
   const CollectionDividendInfo = IDL2.Record({
     "accountId": AccountIdentifier,
     "collectionId": CollectionId,
+    "feeReserveE8s": IDL2.Nat64,
     "nftCount": IDL2.Nat,
     "enabled": IDL2.Bool,
     "balanceE8s": IDL2.Nat64,
-    "distributableBalanceE8s": IDL2.Nat64,
-    "feeReserveE8s": IDL2.Nat64,
     "processedBalanceE8s": IDL2.Nat64,
-    "pendingE8s": IDL2.Nat64
+    "pendingE8s": IDL2.Nat64,
+    "distributableBalanceE8s": IDL2.Nat64
+  });
+  const CollectionIndexStatus = IDL2.Record({
+    "collectionId": CollectionId,
+    "cursor": IDL2.Opt(IDL2.Text),
+    "scanned": IDL2.Nat,
+    "complete": IDL2.Bool,
+    "updatedAt": Timestamp,
+    "lastError": IDL2.Opt(IDL2.Text),
+    "indexed": IDL2.Nat
   });
   const CollectionNFTPage = IDL2.Record({
     "nfts": IDL2.Vec(WalletNFT),
@@ -30330,82 +30606,120 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "coverage": CollectionBrowseCoverage,
     "nextCursor": IDL2.Opt(IDL2.Text)
   });
-  const CollectionNFTLookupResult = IDL2.Variant({
-    "ok": IDL2.Opt(WalletNFT),
-    "err": IDL2.Text
-  });
-  const AuctionEscrow = IDL2.Record({
-    "amount": IDL2.Nat64,
-    "bidder": UserId,
-    "createdAt": Timestamp,
-    "depositedBlock": IDL2.Nat64,
-    "escrowId": IDL2.Nat,
-    "feeReserve": IDL2.Nat64,
-    "ledgerFeeE8s": IDL2.Nat64,
-    "listingId": ListingId
-  });
   const MintConfig = IDL2.Record({
     "collectionCreationPriceE8s": IDL2.Nat64,
+    "collectionCreationPrimaryPayoutBasisPoints": IDL2.Nat,
     "collectionCreationEnabled": IDL2.Bool,
     "collectionId": IDL2.Opt(CollectionId),
+    "collectionCreationSecondaryPayoutAccount": IDL2.Opt(AccountIdentifier),
     "payoutAccount": IDL2.Opt(AccountIdentifier),
     "mainMintEnabled": IDL2.Bool,
     "mainMintPriceE8s": IDL2.Nat64,
+    "collectionCreationSecondaryPayoutBasisPoints": IDL2.Nat,
     "mintEnabled": IDL2.Bool,
     "mintPriceE8s": IDL2.Nat64,
     "collectionCreationPayoutAccount": IDL2.Opt(AccountIdentifier),
-    "collectionCreationSecondaryPayoutAccount": IDL2.Opt(AccountIdentifier),
-    "collectionCreationPrimaryPayoutBasisPoints": IDL2.Nat,
-    "collectionCreationSecondaryPayoutBasisPoints": IDL2.Nat,
     "collectionCanisterWasmUploaded": IDL2.Bool,
     "mainMintPayoutAccount": IDL2.Opt(AccountIdentifier),
     "collectionCanisterCycles": IDL2.Nat
   });
-  const ModerationCategorySettings = IDL2.Record({
-    "explicitLanguage": IDL2.Bool,
-    "graphicViolence": IDL2.Bool,
-    "hateOrHarassment": IDL2.Bool,
-    "hateSymbols": IDL2.Bool,
-    "illegalOrDangerous": IDL2.Bool,
-    "nudityOrSexual": IDL2.Bool,
-    "otherNsfw": IDL2.Bool,
-    "selfHarm": IDL2.Bool
-  });
-  const PublicModerationConfig = IDL2.Record({
-    "apiKeyConfigured": IDL2.Bool,
-    "categories": ModerationCategorySettings,
-    "enabled": IDL2.Bool,
-    "model": IDL2.Text,
-    "userMessage": IDL2.Text
+  const AuctionBidStatus = IDL2.Record({
+    "highestBidder": IDL2.Opt(UserId),
+    "listingId": ListingId,
+    "myHighestBid": IDL2.Opt(IDL2.Nat64),
+    "highestBid": IDL2.Nat64,
+    "hasBid": IDL2.Bool,
+    "isWinning": IDL2.Bool
   });
   const CollectionCanisterStatus = IDL2.Record({
-    "appCanisterId": IDL2.Principal,
+    "controllers": IDL2.Vec(IDL2.Principal),
     "collectionId": CollectionId,
     "moduleInstalled": IDL2.Bool,
-    "controllers": IDL2.Vec(IDL2.Principal),
+    "appCanisterId": IDL2.Principal,
     "cycles": IDL2.Nat,
     "freezingThresholdSeconds": IDL2.Nat,
     "idleCyclesBurnedPerDay": IDL2.Nat,
     "canisterId": IDL2.Principal
-  });
-  const CollectionCanisterControllers = IDL2.Record({
-    "appCanisterId": IDL2.Principal,
-    "controllers": IDL2.Vec(IDL2.Principal),
-    "canisterId": IDL2.Principal,
-    "collectionId": CollectionId
-  });
-  const CollectionCanisterControllersResult = IDL2.Variant({
-    "ok": CollectionCanisterControllers,
-    "err": IDL2.Text
   });
   const NFTDividend = IDL2.Record({
     "nft": WalletNFT,
     "collection": Collection,
     "claimableE8s": IDL2.Nat64
   });
+  const NFTDividendPage = IDL2.Record({
+    "totalCount": IDL2.Nat,
+    "dividends": IDL2.Vec(NFTDividend),
+    "nextCursor": IDL2.Opt(IDL2.Nat)
+  });
+  const SettlementStatusKind = IDL2.Variant({
+    "NoBidAuctionReturn": IDL2.Null,
+    "PendingAuctionRefund": IDL2.Null,
+    "FixedPurchase": IDL2.Null,
+    "Auction": IDL2.Null,
+    "ListingReturn": IDL2.Null,
+    "PendingBidDeposit": IDL2.Null
+  });
+  const SettlementStatusRole = IDL2.Variant({
+    "Bidder": IDL2.Null,
+    "Buyer": IDL2.Null,
+    "Seller": IDL2.Null
+  });
+  const SettlementStatus = IDL2.Record({
+    "listingId": ListingId,
+    "kind": SettlementStatusKind,
+    "role": SettlementStatusRole,
+    "updatedAt": Timestamp,
+    "stage": IDL2.Text,
+    "message": IDL2.Text
+  });
+  const PendingMintPaymentStatus = IDL2.Variant({
+    "Failed": IDL2.Null,
+    "Minted": IDL2.Null,
+    "PaymentSent": IDL2.Null,
+    "PaymentPending": IDL2.Null
+  });
+  const PendingMintPaymentView = IDL2.Record({
+    "id": IDL2.Nat,
+    "status": PendingMintPaymentStatus,
+    "collectionId": CollectionId,
+    "createdAt": IDL2.Nat64,
+    "paymentBlock": IDL2.Opt(IDL2.Nat64),
+    "updatedAt": IDL2.Nat64,
+    "mintedTokenId": IDL2.Opt(IDL2.Nat),
+    "amountE8s": IDL2.Nat64,
+    "lastError": IDL2.Opt(IDL2.Text)
+  });
   const NFTStats = IDL2.Record({
     "totalCount": IDL2.Nat,
     "perCollection": IDL2.Vec(IDL2.Tuple(CollectionId, IDL2.Nat))
+  });
+  const EXTTokenIndex = IDL2.Nat32;
+  const EXTMetadataLegacy = IDL2.Variant({
+    "fungible": IDL2.Record({
+      "decimals": IDL2.Nat8,
+      "metadata": IDL2.Opt(IDL2.Vec(IDL2.Nat8)),
+      "name": IDL2.Text,
+      "symbol": IDL2.Text
+    }),
+    "nonfungible": IDL2.Record({ "metadata": IDL2.Opt(IDL2.Vec(IDL2.Nat8)) })
+  });
+  const WalletNFTPage = IDL2.Record({
+    "nfts": IDL2.Vec(WalletNFT),
+    "totalCount": IDL2.Nat,
+    "nextCursor": IDL2.Opt(IDL2.Nat)
+  });
+  const HeaderField = IDL2.Tuple(IDL2.Text, IDL2.Text);
+  const AssetHttpRequest = IDL2.Record({
+    "url": IDL2.Text,
+    "method": IDL2.Text,
+    "body": IDL2.Vec(IDL2.Nat8),
+    "headers": IDL2.Vec(HeaderField)
+  });
+  const AssetHttpResponse = IDL2.Record({
+    "body": IDL2.Vec(IDL2.Nat8),
+    "headers": IDL2.Vec(HeaderField),
+    "upgrade": IDL2.Bool,
+    "status_code": IDL2.Nat16
   });
   const SupportedStandard = IDL2.Record({ "url": IDL2.Text, "name": IDL2.Text });
   const ICRC7Subaccount = IDL2.Vec(IDL2.Nat8);
@@ -30451,61 +30765,44 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "Ok": IDL2.Nat,
     "Err": ICRC7TransferError
   });
+  const CollectionIndexPageResult = IDL2.Record({
+    "collectionId": CollectionId,
+    "scanned": IDL2.Nat,
+    "error": IDL2.Opt(IDL2.Text),
+    "complete": IDL2.Bool,
+    "indexed": IDL2.Nat,
+    "nextCursor": IDL2.Opt(IDL2.Text)
+  });
+  const CollectionPage = IDL2.Record({
+    "totalCount": IDL2.Nat,
+    "collections": IDL2.Vec(Collection),
+    "nextCursor": IDL2.Opt(IDL2.Nat)
+  });
   const MintReceipt = IDL2.Record({
     "nft": WalletNFT,
     "paymentBlock": IDL2.Nat64
   });
-  const CollectionCreationQuote = IDL2.Record({
-    "cycleCostE8s": IDL2.Nat64,
+  const DividendDisbursementPreview = IDL2.Record({
     "ledgerFeeE8s": IDL2.Nat64,
-    "collectionCreationPriceE8s": IDL2.Nat64,
-    "rateTimestampSeconds": IDL2.Nat64,
-    "cycleTransferFeeE8s": IDL2.Nat64,
-    "minimumCreationPriceE8s": IDL2.Nat64,
-    "xdrPermyriadPerIcp": IDL2.Nat64,
-    "factoryReserveCycles": IDL2.Nat,
-    "totalCyclesToConvert": IDL2.Nat,
-    "totalUserDebitE8s": IDL2.Nat64,
-    "adminPayoutE8s": IDL2.Nat64,
-    "adminPrimaryPayoutE8s": IDL2.Nat64,
-    "adminSecondaryPayoutE8s": IDL2.Nat64,
-    "adminPayoutFeeE8s": IDL2.Nat64,
-    "collectionCanisterCycles": IDL2.Nat
-  });
-  const CollectionCreationStatus = IDL2.Variant({
-    "AdminPayoutPending": IDL2.Null,
-    "AdminPayoutSent": IDL2.Null,
-    "CanisterCreated": IDL2.Null,
-    "CollectionRegistered": IDL2.Null,
-    "CyclePaymentSent": IDL2.Null,
-    "CyclesConverted": IDL2.Null,
-    "Failed": IDL2.Null,
-    "Installed": IDL2.Null,
-    "Started": IDL2.Null
-  });
-  const CollectionCreationRequestView = IDL2.Record({
-    "childCanisterId": IDL2.Opt(IDL2.Principal),
-    "collectionId": IDL2.Opt(CollectionId),
-    "createdAt": IDL2.Nat64,
-    "cyclePaymentBlock": IDL2.Opt(IDL2.Nat64),
-    "id": IDL2.Nat,
-    "lastError": IDL2.Opt(IDL2.Text),
-    "name": IDL2.Text,
-    "status": CollectionCreationStatus,
-    "symbol": IDL2.Text,
-    "updatedAt": IDL2.Nat64
-  });
-  const CollectionCreationDiagnostics = IDL2.Record({
-    "backendCycles": IDL2.Nat,
-    "buildVersion": IDL2.Text,
-    "canCreateNow": IDL2.Bool,
-    "canisterCreationFeeCycles": IDL2.Nat,
-    "childTargetCycles": IDL2.Nat,
-    "createCallCycles": IDL2.Nat,
-    "request": CollectionCreationRequestView,
-    "requestedCanisterCycles": IDL2.Nat,
-    "requiredBackendCycles": IDL2.Nat,
-    "totalCyclesToConvert": IDL2.Nat
+    "requiredNetworkFeeE8s": IDL2.Nat64,
+    "accountId": AccountIdentifier,
+    "collectionId": CollectionId,
+    "shareE8s": IDL2.Nat64,
+    "feeReserveE8s": IDL2.Nat64,
+    "projectedPendingE8s": IDL2.Nat64,
+    "nftCount": IDL2.Nat,
+    "feeShortfallE8s": IDL2.Nat64,
+    "undistributedE8s": IDL2.Nat64,
+    "maxTransfersPerCall": IDL2.Nat,
+    "balanceE8s": IDL2.Nat64,
+    "remainderE8s": IDL2.Nat64,
+    "processedBalanceE8s": IDL2.Nat64,
+    "transferCount": IDL2.Nat,
+    "pendingE8s": IDL2.Nat64,
+    "callerFundingTransferFeeE8s": IDL2.Nat64,
+    "callerTotalDebitE8s": IDL2.Nat64,
+    "distributableBalanceE8s": IDL2.Nat64,
+    "callerBalanceE8s": IDL2.Nat64
   });
   const CollectionCycleTopUpQuote = IDL2.Record({
     "cycleCostE8s": IDL2.Nat64,
@@ -30515,66 +30812,56 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "totalUserDebitE8s": IDL2.Nat64,
     "cyclesToTopUp": IDL2.Nat
   });
-  const AppCanisterKind = IDL2.Variant({
-    "Backend": IDL2.Null,
-    "Frontend": IDL2.Null
-  });
-  const AppCanisterHealth = IDL2.Record({
-    "kind": AppCanisterKind,
-    "moduleInstalled": IDL2.Opt(IDL2.Bool),
-    "cycles": IDL2.Opt(IDL2.Nat),
-    "error": IDL2.Opt(IDL2.Text),
-    "freezingThresholdSeconds": IDL2.Opt(IDL2.Nat),
-    "idleCyclesBurnedPerDay": IDL2.Opt(IDL2.Nat),
-    "canisterId": IDL2.Principal
-  });
-  const DividendSyncReceipt = IDL2.Record({
-    "collectionId": CollectionId,
-    "shareE8s": IDL2.Nat64,
-    "nftCount": IDL2.Nat,
-    "distributedE8s": IDL2.Nat64,
-    "depositedE8s": IDL2.Nat64,
-    "balanceE8s": IDL2.Nat64,
-    "remainderE8s": IDL2.Nat64
-  });
-  const DividendDisbursementPreview = IDL2.Record({
-    "accountId": AccountIdentifier,
-    "balanceE8s": IDL2.Nat64,
-    "callerBalanceE8s": IDL2.Nat64,
-    "callerFundingTransferFeeE8s": IDL2.Nat64,
-    "callerTotalDebitE8s": IDL2.Nat64,
-    "collectionId": CollectionId,
-    "distributableBalanceE8s": IDL2.Nat64,
-    "feeReserveE8s": IDL2.Nat64,
-    "feeShortfallE8s": IDL2.Nat64,
-    "ledgerFeeE8s": IDL2.Nat64,
-    "maxTransfersPerCall": IDL2.Nat,
-    "nftCount": IDL2.Nat,
-    "pendingE8s": IDL2.Nat64,
-    "processedBalanceE8s": IDL2.Nat64,
-    "projectedPendingE8s": IDL2.Nat64,
-    "remainderE8s": IDL2.Nat64,
-    "requiredNetworkFeeE8s": IDL2.Nat64,
-    "shareE8s": IDL2.Nat64,
-    "transferCount": IDL2.Nat,
-    "undistributedE8s": IDL2.Nat64
-  });
-  const DividendDisbursementReceipt = IDL2.Record({
-    "collectionId": CollectionId,
-    "failures": IDL2.Vec(IDL2.Text),
-    "feeReserveRemainingE8s": IDL2.Nat64,
-    "feeTopUpBlockIndex": IDL2.Opt(IDL2.Nat64),
-    "feeTopUpE8s": IDL2.Nat64,
-    "paidCount": IDL2.Nat,
-    "remainingCount": IDL2.Nat,
-    "skippedCount": IDL2.Nat,
-    "synced": DividendSyncReceipt,
-    "totalFeeE8s": IDL2.Nat64,
-    "totalPaidE8s": IDL2.Nat64
-  });
-  const CollectionCycleTopUpReceipt = IDL2.Record({
+  const CollectionCreationQuote = IDL2.Record({
     "cycleCostE8s": IDL2.Nat64,
+    "ledgerFeeE8s": IDL2.Nat64,
+    "collectionCreationPriceE8s": IDL2.Nat64,
+    "rateTimestampSeconds": IDL2.Nat64,
+    "adminSecondaryPayoutE8s": IDL2.Nat64,
+    "cycleTransferFeeE8s": IDL2.Nat64,
+    "minimumCreationPriceE8s": IDL2.Nat64,
+    "xdrPermyriadPerIcp": IDL2.Nat64,
+    "factoryReserveCycles": IDL2.Nat,
+    "adminPrimaryPayoutE8s": IDL2.Nat64,
+    "totalCyclesToConvert": IDL2.Nat,
+    "totalUserDebitE8s": IDL2.Nat64,
+    "adminPayoutE8s": IDL2.Nat64,
+    "adminPayoutFeeE8s": IDL2.Nat64,
+    "collectionCanisterCycles": IDL2.Nat
+  });
+  const WalletSyncSkip = IDL2.Record({
     "collectionId": CollectionId,
+    "message": IDL2.Text,
+    "collectionName": IDL2.Text,
+    "reason": IDL2.Text
+  });
+  const WalletSyncPageResult = IDL2.Record({
+    "skipped": IDL2.Vec(WalletSyncSkip),
+    "errors": IDL2.Vec(IDL2.Text),
+    "checkedCollections": IDL2.Nat,
+    "newCount": IDL2.Nat,
+    "complete": IDL2.Bool,
+    "nextCursor": IDL2.Opt(IDL2.Nat)
+  });
+  const WalletSyncV2Result = IDL2.Record({
+    "skipped": IDL2.Vec(WalletSyncSkip),
+    "errors": IDL2.Vec(IDL2.Text),
+    "newCount": IDL2.Nat
+  });
+  const EXTTime = IDL2.Int;
+  const EXTListing = IDL2.Record({
+    "locked": IDL2.Opt(EXTTime),
+    "seller": IDL2.Principal,
+    "price": IDL2.Nat64
+  });
+  const EXTTokensExtResult = IDL2.Variant({
+    "ok": IDL2.Vec(
+      IDL2.Tuple(EXTTokenIndex, IDL2.Opt(EXTListing), IDL2.Opt(IDL2.Vec(IDL2.Nat8)))
+    ),
+    "err": EXTCommonError
+  });
+  const AppCycleTopUpReceipt = IDL2.Record({
+    "cycleCostE8s": IDL2.Nat64,
     "cycleBalance": IDL2.Opt(IDL2.Nat),
     "cyclesRequested": IDL2.Nat,
     "paymentBlock": IDL2.Nat64,
@@ -30582,8 +30869,9 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "cyclesMinted": IDL2.Nat,
     "canisterId": IDL2.Principal
   });
-  const AppCycleTopUpReceipt = IDL2.Record({
+  const CollectionCycleTopUpReceipt = IDL2.Record({
     "cycleCostE8s": IDL2.Nat64,
+    "collectionId": CollectionId,
     "cycleBalance": IDL2.Opt(IDL2.Nat),
     "cyclesRequested": IDL2.Nat,
     "paymentBlock": IDL2.Nat64,
@@ -30604,6 +30892,12 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "Ok": IDL2.Nat64,
     "Err": TransferError
   });
+  const HttpHeader = IDL2.Record({ "value": IDL2.Text, "name": IDL2.Text });
+  const HttpRequestResult = IDL2.Record({
+    "status": IDL2.Nat,
+    "body": IDL2.Vec(IDL2.Nat8),
+    "headers": IDL2.Vec(HttpHeader)
+  });
   return IDL2.Service({
     "addCollection": IDL2.Func(
       [
@@ -30620,7 +30914,42 @@ const idlFactory = ({ IDL: IDL2 }) => {
     ),
     "addCollectionCanisterController": IDL2.Func(
       [CollectionId, IDL2.Principal],
-      [CollectionCanisterControllersResult],
+      [
+        IDL2.Variant({
+          "ok": CollectionCanisterControllers,
+          "err": IDL2.Text
+        })
+      ],
+      []
+    ),
+    "adminAttachExistingCanisterToCreationRequest": IDL2.Func(
+      [IDL2.Nat, IDL2.Principal],
+      [IDL2.Variant({ "ok": CollectionCreationReceipt, "err": IDL2.Text })],
+      []
+    ),
+    "adminDeleteCollectionCreationRequest": IDL2.Func(
+      [IDL2.Nat],
+      [IDL2.Variant({ "ok": IDL2.Bool, "err": IDL2.Text })],
+      []
+    ),
+    "adminGetMintlabFeeRecoveryQuote": IDL2.Func(
+      [ListingId],
+      [MintlabFeeRecoveryQuote],
+      []
+    ),
+    "adminGetSettlementEscrowRepairQuote": IDL2.Func(
+      [ListingId],
+      [SettlementEscrowRepairQuote],
+      []
+    ),
+    "adminListMarketplaceRecoveryState": IDL2.Func(
+      [],
+      [MarketplaceRecoverySnapshot],
+      ["query"]
+    ),
+    "adminMarkMintlabFeeBalanceVerified": IDL2.Func(
+      [ListingId],
+      [MintlabFeeRecoveryQuote],
       []
     ),
     "adminRecoverPaidCollectionCreation": IDL2.Func(
@@ -30636,56 +30965,27 @@ const idlFactory = ({ IDL: IDL2 }) => {
       [IDL2.Variant({ "ok": CollectionCreationReceipt, "err": IDL2.Text })],
       []
     ),
-    "adminDeleteCollectionCreationRequest": IDL2.Func(
-      [IDL2.Nat],
-      [IDL2.Variant({ "ok": IDL2.Bool, "err": IDL2.Text })],
-      []
-    ),
-    "adminGetSettlementEscrowRepairQuote": IDL2.Func(
-      [ListingId],
-      [SettlementEscrowRepairQuote],
-      []
-    ),
-    "adminGetMintlabFeeRecoveryQuote": IDL2.Func(
-      [ListingId],
-      [MintlabFeeRecoveryQuote],
-      []
-    ),
     "adminResetUnresolvedMintlabFeeAttempt": IDL2.Func(
       [ListingId],
       [MintlabFeeRecoveryQuote],
       []
     ),
-    "adminMarkMintlabFeeBalanceVerified": IDL2.Func(
-      [ListingId],
-      [MintlabFeeRecoveryQuote],
-      []
-    ),
-    "adminRetryListingReturn": IDL2.Func([ListingId], [], []),
-    "adminRetryNoBidAuctionReturn": IDL2.Func([ListingId], [], []),
     "adminRetryAuctionSettlement": IDL2.Func([ListingId], [], []),
     "adminRetryFixedPurchaseSettlement": IDL2.Func([ListingId], [], []),
+    "adminRetryListingReturn": IDL2.Func([ListingId], [], []),
+    "adminRetryNoBidAuctionReturn": IDL2.Func([ListingId], [], []),
     "adminTopUpSettlementEscrow": IDL2.Func(
       [ListingId, IDL2.Nat64],
       [SettlementEscrowTopUpReceipt],
       []
     ),
+    "balance": IDL2.Func([EXTBalanceRequest], [EXTBalanceResponse], ["query"]),
     "bootstrapAdmin": IDL2.Func([], [], []),
     "buyFixedListing": IDL2.Func([ListingId], [], []),
     "cancelListing": IDL2.Func([ListingId], [], []),
     "claimNFTDividend": IDL2.Func(
       [NFTId],
       [IDL2.Variant({ "ok": DividendClaimReceipt, "err": IDL2.Text })],
-      []
-    ),
-    "disburseCollectionDividends": IDL2.Func(
-      [CollectionId, IDL2.Opt(IDL2.Nat)],
-      [
-        IDL2.Variant({
-          "ok": DividendDisbursementReceipt,
-          "err": IDL2.Text
-        })
-      ],
       []
     ),
     "claimVaultDeposit": IDL2.Func(
@@ -30757,15 +31057,48 @@ const idlFactory = ({ IDL: IDL2 }) => {
       [DIP721MetadataResult],
       ["query"]
     ),
+    "disburseCollectionDividends": IDL2.Func(
+      [CollectionId, IDL2.Opt(IDL2.Nat)],
+      [IDL2.Variant({ "ok": DividendDisbursementReceipt, "err": IDL2.Text })],
+      []
+    ),
+    "ext_balance": IDL2.Func(
+      [EXTBalanceRequest],
+      [EXTBalanceResponse],
+      ["query"]
+    ),
+    "ext_bearer": IDL2.Func(
+      [EXTTokenIdentifier],
+      [IDL2.Variant({ "ok": EXTAccountIdentifier, "err": EXTCommonError })],
+      ["query"]
+    ),
+    "ext_extensions": IDL2.Func([], [IDL2.Vec(IDL2.Text)], ["query"]),
+    "ext_metadata": IDL2.Func(
+      [EXTTokenIdentifier],
+      [EXTMetadataResult],
+      ["query"]
+    ),
+    "ext_transfer": IDL2.Func([EXTTransferRequest], [EXTTransferResponse], []),
+    "extdata_supply": IDL2.Func(
+      [EXTTokenIdentifier],
+      [IDL2.Variant({ "ok": EXTBalance, "err": EXTCommonError })],
+      ["query"]
+    ),
+    "extensions": IDL2.Func([], [IDL2.Vec(IDL2.Text)], ["query"]),
     "getActiveListingDetails": IDL2.Func(
       [],
       [IDL2.Vec(ActiveListingDetail)],
       ["query"]
     ),
+    "getActiveListingDetailsPage": IDL2.Func(
+      [IDL2.Opt(IDL2.Nat), IDL2.Opt(IDL2.Nat)],
+      [ActiveListingDetailPage],
+      ["query"]
+    ),
     "getActiveListings": IDL2.Func([], [IDL2.Vec(ActiveListing)], ["query"]),
-    "getMyAuctionBidStatuses": IDL2.Func(
-      [IDL2.Vec(ListingId)],
-      [IDL2.Vec(AuctionBidStatus)],
+    "getActiveListingsPage": IDL2.Func(
+      [IDL2.Opt(IDL2.Nat), IDL2.Opt(IDL2.Nat)],
+      [ActiveListingPage],
       ["query"]
     ),
     "getAdminPrincipal": IDL2.Func([], [IDL2.Opt(IDL2.Principal)], ["query"]),
@@ -30777,6 +31110,21 @@ const idlFactory = ({ IDL: IDL2 }) => {
           "err": IDL2.Text
         })
       ],
+      []
+    ),
+    "getAllCollectionCreationRequestsPage": IDL2.Func(
+      [IDL2.Opt(IDL2.Nat), IDL2.Opt(IDL2.Nat)],
+      [
+        IDL2.Variant({
+          "ok": CollectionCreationRequestPage,
+          "err": IDL2.Text
+        })
+      ],
+      []
+    ),
+    "getAppCanisterHealth": IDL2.Func(
+      [IDL2.Opt(IDL2.Principal)],
+      [IDL2.Variant({ "ok": IDL2.Vec(AppCanisterHealth), "err": IDL2.Text })],
       []
     ),
     "getCollection": IDL2.Func(
@@ -30791,7 +31139,12 @@ const idlFactory = ({ IDL: IDL2 }) => {
     ),
     "getCollectionCanisterControllers": IDL2.Func(
       [CollectionId],
-      [CollectionCanisterControllersResult],
+      [
+        IDL2.Variant({
+          "ok": CollectionCanisterControllers,
+          "err": IDL2.Text
+        })
+      ],
       []
     ),
     "getCollectionCreationDiagnostics": IDL2.Func(
@@ -30819,6 +31172,11 @@ const idlFactory = ({ IDL: IDL2 }) => {
       [IDL2.Vec(IDL2.Tuple(IDL2.Text, IDL2.Nat64))],
       ["query"]
     ),
+    "getCollectionDividendBalancesPage": IDL2.Func(
+      [CollectionId, IDL2.Opt(IDL2.Nat), IDL2.Opt(IDL2.Nat)],
+      [DividendBalancePage],
+      ["query"]
+    ),
     "getCollectionDividendInfo": IDL2.Func(
       [CollectionId],
       [IDL2.Opt(CollectionDividendInfo)],
@@ -30840,16 +31198,12 @@ const idlFactory = ({ IDL: IDL2 }) => {
       []
     ),
     "getCollectionNFTs": IDL2.Func([CollectionId], [IDL2.Vec(WalletNFT)], []),
-    "lookupCollectionNFT": IDL2.Func(
-      [CollectionId, IDL2.Text],
-      [CollectionNFTLookupResult],
-      []
-    ),
     "getMarketplaceFeeConfig": IDL2.Func([], [MarketplaceFeeConfig], []),
     "getMintConfig": IDL2.Func([], [MintConfig], ["query"]),
-    "getModerationConfig": IDL2.Func(
-      [],
-      [PublicModerationConfig],
+    "getModerationConfig": IDL2.Func([], [PublicModerationConfig], ["query"]),
+    "getMyAuctionBidStatuses": IDL2.Func(
+      [IDL2.Vec(ListingId)],
+      [IDL2.Vec(AuctionBidStatus)],
       ["query"]
     ),
     "getMyCollectionCanisterStatuses": IDL2.Func(
@@ -30862,24 +31216,60 @@ const idlFactory = ({ IDL: IDL2 }) => {
       [IDL2.Vec(CollectionCreationRequestView)],
       []
     ),
-    "getAppCanisterHealth": IDL2.Func(
-      [IDL2.Opt(IDL2.Principal)],
-      [IDL2.Variant({ "ok": IDL2.Vec(AppCanisterHealth), "err": IDL2.Text })],
+    "getMyCollectionCreationRequestsPage": IDL2.Func(
+      [IDL2.Opt(IDL2.Nat), IDL2.Opt(IDL2.Nat)],
+      [CollectionCreationRequestPage],
       []
     ),
     "getMyCreatedCollections": IDL2.Func([], [IDL2.Vec(Collection)], []),
     "getMyDividendNFTs": IDL2.Func([], [IDL2.Vec(NFTDividend)], []),
-    "getMyPendingAuctionRefunds": IDL2.Func(
+    "getMyDividendNFTsPage": IDL2.Func(
+      [IDL2.Opt(IDL2.Nat), IDL2.Opt(IDL2.Nat)],
+      [NFTDividendPage],
+      []
+    ),
+    "getMyMarketplaceSettlementStatuses": IDL2.Func(
       [],
-      [IDL2.Vec(AuctionEscrow)],
+      [IDL2.Vec(SettlementStatus)],
+      ["query"]
+    ),
+    "getMyPendingAuctionRefunds": IDL2.Func([], [IDL2.Vec(AuctionEscrow)], []),
+    "getMyPendingMintPayments": IDL2.Func(
+      [],
+      [IDL2.Vec(PendingMintPaymentView)],
       []
     ),
     "getNFTStats": IDL2.Func([IDL2.Principal], [NFTStats], ["query"]),
+    "getRegistry": IDL2.Func(
+      [],
+      [IDL2.Vec(IDL2.Tuple(EXTTokenIndex, EXTAccountIdentifier))],
+      ["query"]
+    ),
+    "getTokens": IDL2.Func(
+      [],
+      [IDL2.Vec(IDL2.Tuple(EXTTokenIndex, EXTMetadataLegacy))],
+      ["query"]
+    ),
     "getUserAccountId": IDL2.Func([], [AccountIdentifier], ["query"]),
     "getUserICPBalance": IDL2.Func([], [IDL2.Nat64], []),
     "getUserNFTs": IDL2.Func([IDL2.Principal], [IDL2.Vec(WalletNFT)], ["query"]),
+    "getUserNFTsPage": IDL2.Func(
+      [IDL2.Principal, IDL2.Opt(IDL2.Nat), IDL2.Opt(IDL2.Nat)],
+      [WalletNFTPage],
+      ["query"]
+    ),
     "getVaultAccountId": IDL2.Func([], [AccountIdentifier], ["query"]),
     "getVaultPrincipal": IDL2.Func([], [IDL2.Principal], ["query"]),
+    "http_request": IDL2.Func(
+      [AssetHttpRequest],
+      [AssetHttpResponse],
+      ["query"]
+    ),
+    "http_request_update": IDL2.Func(
+      [AssetHttpRequest],
+      [AssetHttpResponse],
+      []
+    ),
     "icrc10_supported_standards": IDL2.Func(
       [],
       [IDL2.Vec(SupportedStandard)],
@@ -30940,12 +31330,7 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "icrc7_tx_window": IDL2.Func([], [IDL2.Opt(IDL2.Nat)], ["query"]),
     "indexCollectionOwnershipPage": IDL2.Func(
       [CollectionId, IDL2.Opt(IDL2.Text), IDL2.Nat],
-      [
-        IDL2.Variant({
-          "ok": CollectionIndexPageResult,
-          "err": IDL2.Text
-        })
-      ],
+      [IDL2.Variant({ "ok": CollectionIndexPageResult, "err": IDL2.Text })],
       []
     ),
     "isAdmin": IDL2.Func([], [IDL2.Bool], ["query"]),
@@ -30955,6 +31340,16 @@ const idlFactory = ({ IDL: IDL2 }) => {
       ["query"]
     ),
     "listCollections": IDL2.Func([], [IDL2.Vec(Collection)], ["query"]),
+    "listCollectionsPage": IDL2.Func(
+      [IDL2.Opt(IDL2.Nat), IDL2.Opt(IDL2.Nat)],
+      [CollectionPage],
+      ["query"]
+    ),
+    "lookupCollectionNFT": IDL2.Func(
+      [CollectionId, IDL2.Text],
+      [IDL2.Variant({ "ok": IDL2.Opt(WalletNFT), "err": IDL2.Text })],
+      []
+    ),
     "mintCollectionNFT": IDL2.Func(
       [CollectionId, NFTMetadata],
       [IDL2.Variant({ "ok": WalletNFT, "err": IDL2.Text })],
@@ -30966,7 +31361,6 @@ const idlFactory = ({ IDL: IDL2 }) => {
       []
     ),
     "placeBid": IDL2.Func([ListingId, IDL2.Nat64], [AuctionListing], []),
-    "retryPendingBid": IDL2.Func([ListingId], [AuctionListing], []),
     "prepareVaultDeposit": IDL2.Func(
       [CollectionId, IDL2.Text],
       [IDL2.Variant({ "ok": IDL2.Text, "err": IDL2.Text })],
@@ -30974,17 +31368,17 @@ const idlFactory = ({ IDL: IDL2 }) => {
     ),
     "previewCollectionDividendDisbursement": IDL2.Func(
       [CollectionId],
-      [
-        IDL2.Variant({
-          "ok": DividendDisbursementPreview,
-          "err": IDL2.Text
-        })
-      ],
+      [IDL2.Variant({ "ok": DividendDisbursementPreview, "err": IDL2.Text })],
       []
     ),
     "previewMyCollectionNFTs": IDL2.Func(
       [CollectionId],
       [IDL2.Variant({ "ok": IDL2.Vec(WalletNFT), "err": IDL2.Text })],
+      []
+    ),
+    "quoteAppCanisterCycleTopUp": IDL2.Func(
+      [IDL2.Nat],
+      [CollectionCycleTopUpQuote],
       []
     ),
     "quoteCollectionCreationCost": IDL2.Func(
@@ -30997,9 +31391,14 @@ const idlFactory = ({ IDL: IDL2 }) => {
       [CollectionCycleTopUpQuote],
       []
     ),
-    "quoteAppCanisterCycleTopUp": IDL2.Func(
+    "recoverCollectionCreationRecord": IDL2.Func(
       [IDL2.Nat],
-      [CollectionCycleTopUpQuote],
+      [
+        IDL2.Variant({
+          "ok": CollectionCreationRequestView,
+          "err": IDL2.Text
+        })
+      ],
       []
     ),
     "refreshCollectionDividendBalances": IDL2.Func(
@@ -31007,7 +31406,17 @@ const idlFactory = ({ IDL: IDL2 }) => {
       [IDL2.Vec(IDL2.Tuple(IDL2.Text, IDL2.Nat64))],
       []
     ),
+    "refreshCollectionDividendBalancesPage": IDL2.Func(
+      [CollectionId, IDL2.Opt(IDL2.Nat), IDL2.Opt(IDL2.Nat)],
+      [DividendBalancePage],
+      []
+    ),
     "refreshMyDividendNFTs": IDL2.Func([], [IDL2.Vec(NFTDividend)], []),
+    "refreshMyDividendNFTsPage": IDL2.Func(
+      [IDL2.Opt(IDL2.Nat), IDL2.Opt(IDL2.Nat)],
+      [NFTDividendPage],
+      []
+    ),
     "registerNFT": IDL2.Func(
       [CollectionId, IDL2.Text, NFTMetadata],
       [IDL2.Variant({ "ok": WalletNFT, "err": IDL2.Text })],
@@ -31016,14 +31425,9 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "removeCollection": IDL2.Func([CollectionId], [IDL2.Bool], []),
     "removeCollectionCanisterController": IDL2.Func(
       [CollectionId, IDL2.Principal],
-      [CollectionCanisterControllersResult],
-      []
-    ),
-    "recoverCollectionCreationRecord": IDL2.Func(
-      [IDL2.Nat],
       [
         IDL2.Variant({
-          "ok": CollectionCreationRequestView,
+          "ok": CollectionCanisterControllers,
           "err": IDL2.Text
         })
       ],
@@ -31050,26 +31454,32 @@ const idlFactory = ({ IDL: IDL2 }) => {
       [IDL2.Variant({ "ok": Collection, "err": IDL2.Text })],
       []
     ),
+    "retryPendingBid": IDL2.Func([ListingId], [AuctionListing], []),
+    "retryPendingMintPayment": IDL2.Func(
+      [IDL2.Nat],
+      [IDL2.Variant({ "ok": MintReceipt, "err": IDL2.Text })],
+      []
+    ),
     "sendNFT": IDL2.Func(
       [NFTId, IDL2.Principal],
       [IDL2.Variant({ "ok": IDL2.Text, "err": IDL2.Text })],
       []
     ),
-    "syncExternalNFTOwner": IDL2.Func(
-      [CollectionId, IDL2.Text, IDL2.Principal],
-      [IDL2.Variant({ "ok": WalletNFT, "err": IDL2.Text })],
-      []
-    ),
-    "updateCollectionBrowseInfo": IDL2.Func(
-      [CollectionId, IDL2.Opt(CollectionBrowseInfo)],
-      [IDL2.Variant({ "ok": Collection, "err": IDL2.Text })],
-      []
-    ),
     "setCollectionCanisterWasm": IDL2.Func([IDL2.Vec(IDL2.Nat8)], [], []),
     "settleAuction": IDL2.Func([ListingId], [], []),
+    "supply": IDL2.Func(
+      [EXTTokenIdentifier],
+      [IDL2.Variant({ "ok": EXTBalance, "err": EXTCommonError })],
+      ["query"]
+    ),
     "syncCollectionDividends": IDL2.Func(
       [CollectionId],
       [IDL2.Variant({ "ok": DividendSyncReceipt, "err": IDL2.Text })],
+      []
+    ),
+    "syncExternalNFTOwner": IDL2.Func(
+      [CollectionId, IDL2.Text, IDL2.Principal],
+      [IDL2.Variant({ "ok": WalletNFT, "err": IDL2.Text })],
       []
     ),
     "syncUserNFTs": IDL2.Func(
@@ -31085,30 +31495,20 @@ const idlFactory = ({ IDL: IDL2 }) => {
       ],
       []
     ),
-    "syncUserNFTsV2": IDL2.Func(
-      [],
-      [
-        IDL2.Variant({
-          "ok": WalletSyncV2Result,
-          "err": IDL2.Text
-        })
-      ],
-      []
-    ),
     "syncUserNFTsPage": IDL2.Func(
       [IDL2.Opt(IDL2.Nat), IDL2.Nat],
-      [
-        IDL2.Variant({
-          "ok": WalletSyncPageResult,
-          "err": IDL2.Text
-        })
-      ],
+      [IDL2.Variant({ "ok": WalletSyncPageResult, "err": IDL2.Text })],
       []
     ),
-    "topUpCollectionCanisterCycles": IDL2.Func(
-      [CollectionId, IDL2.Nat],
-      [IDL2.Variant({ "ok": CollectionCycleTopUpReceipt, "err": IDL2.Text })],
+    "syncUserNFTsV2": IDL2.Func(
+      [],
+      [IDL2.Variant({ "ok": WalletSyncV2Result, "err": IDL2.Text })],
       []
+    ),
+    "tokens_ext": IDL2.Func(
+      [EXTAccountIdentifier],
+      [EXTTokensExtResult],
+      ["query"]
     ),
     "topUpAppCanisterCycles": IDL2.Func(
       [IDL2.Nat],
@@ -31120,6 +31520,11 @@ const idlFactory = ({ IDL: IDL2 }) => {
       [IDL2.Variant({ "ok": AppCycleTopUpReceipt, "err": IDL2.Text })],
       []
     ),
+    "topUpCollectionCanisterCycles": IDL2.Func(
+      [CollectionId, IDL2.Nat],
+      [IDL2.Variant({ "ok": CollectionCycleTopUpReceipt, "err": IDL2.Text })],
+      []
+    ),
     "transfer": IDL2.Func([IDL2.Principal, IDL2.Nat], [DIP721NatResult], []),
     "transferFromDip721": IDL2.Func(
       [IDL2.Principal, IDL2.Principal, IDL2.Nat],
@@ -31129,6 +31534,21 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "transferICPOut": IDL2.Func(
       [AccountIdentifier, IDL2.Nat64],
       [TransferResult],
+      []
+    ),
+    "transformModerationResponse": IDL2.Func(
+      [
+        IDL2.Record({
+          "context": IDL2.Vec(IDL2.Nat8),
+          "response": HttpRequestResult
+        })
+      ],
+      [HttpRequestResult],
+      ["query"]
+    ),
+    "updateCollectionBrowseInfo": IDL2.Func(
+      [CollectionId, IDL2.Opt(CollectionBrowseInfo)],
+      [IDL2.Variant({ "ok": Collection, "err": IDL2.Text })],
       []
     ),
     "upgradeCollectionCanister": IDL2.Func(
@@ -31252,6 +31672,20 @@ function fromRawCollectionNFTPage(value) {
     totalCount: value.totalCount,
     coverage: fromRawCollectionBrowseCoverage(value.coverage),
     note: value.note
+  };
+}
+function fromRawWalletNFTPage(value) {
+  return {
+    nfts: value.nfts.map(fromRawWalletNFT),
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount
+  };
+}
+function fromRawCollectionPage(value) {
+  return {
+    collections: value.collections.map(fromRawCollection),
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount
   };
 }
 function fromRawWalletSyncSkip(value) {
@@ -31417,6 +31851,43 @@ function fromRawActiveListingDetail(value) {
     nft: fromRawWalletNFT(value.nft)
   };
 }
+function fromRawActiveListingPage(value) {
+  return {
+    listings: value.listings.map(fromRawActiveListing),
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount
+  };
+}
+function fromRawActiveListingDetailPage(value) {
+  return {
+    details: value.details.map(fromRawActiveListingDetail),
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount
+  };
+}
+function fromRawSettlementStatusKind(value) {
+  if ("FixedPurchase" in value) return "FixedPurchase";
+  if ("Auction" in value) return "Auction";
+  if ("NoBidAuctionReturn" in value) return "NoBidAuctionReturn";
+  if ("ListingReturn" in value) return "ListingReturn";
+  if ("PendingBidDeposit" in value) return "PendingBidDeposit";
+  return "PendingAuctionRefund";
+}
+function fromRawSettlementStatusRole(value) {
+  if ("Buyer" in value) return "Buyer";
+  if ("Seller" in value) return "Seller";
+  return "Bidder";
+}
+function fromRawSettlementStatus(value) {
+  return {
+    listingId: value.listingId,
+    kind: fromRawSettlementStatusKind(value.kind),
+    role: fromRawSettlementStatusRole(value.role),
+    stage: value.stage,
+    message: value.message,
+    updatedAt: value.updatedAt
+  };
+}
 function fromRawMintConfig(value) {
   return {
     collectionId: fromRawOption(value.collectionId),
@@ -31517,6 +31988,13 @@ function fromRawCollectionCreationRequestView(value) {
     updatedAt: value.updatedAt
   };
 }
+function fromRawCollectionCreationRequestPage(value) {
+  return {
+    requests: value.requests.map(fromRawCollectionCreationRequestView),
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount
+  };
+}
 function fromRawCollectionCreationDiagnostics(value) {
   return {
     request: fromRawCollectionCreationRequestView(value.request),
@@ -31581,6 +32059,25 @@ function fromRawMintReceipt(value) {
     paymentBlock: value.paymentBlock
   };
 }
+function fromRawPendingMintPaymentStatus(value) {
+  if ("PaymentPending" in value) return "PaymentPending";
+  if ("PaymentSent" in value) return "PaymentSent";
+  if ("Minted" in value) return "Minted";
+  return "Failed";
+}
+function fromRawPendingMintPaymentView(value) {
+  return {
+    id: value.id,
+    collectionId: value.collectionId,
+    amountE8s: value.amountE8s,
+    paymentBlock: fromRawOption(value.paymentBlock),
+    mintedTokenId: fromRawOption(value.mintedTokenId),
+    status: fromRawPendingMintPaymentStatus(value.status),
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
+    lastError: fromRawOption(value.lastError)
+  };
+}
 function fromRawCollectionCreationReceipt(value) {
   return {
     collection: fromRawCollection(value.collection),
@@ -31628,6 +32125,20 @@ function fromRawNFTDividend(value) {
     nft: fromRawWalletNFT(value.nft),
     collection: fromRawCollection(value.collection),
     claimableE8s: value.claimableE8s
+  };
+}
+function fromRawNFTDividendPage(value) {
+  return {
+    dividends: value.dividends.map(fromRawNFTDividend),
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount
+  };
+}
+function fromRawDividendBalancePage(value) {
+  return {
+    balances: value.balances,
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount
   };
 }
 function fromRawDividendSyncReceipt(value) {
@@ -31738,11 +32249,11 @@ function fromCollectionCreationRequestViewResult(value) {
   }
   return { __kind__: "err", err: value.err };
 }
-function fromCollectionCreationRequestViewsResult(value) {
+function fromCollectionCreationRequestPageResult(value) {
   if ("ok" in value) {
     return {
       __kind__: "ok",
-      ok: value.ok.map(fromRawCollectionCreationRequestView)
+      ok: fromRawCollectionCreationRequestPage(value.ok)
     };
   }
   return { __kind__: "err", err: value.err };
@@ -31858,6 +32369,8 @@ function fromCollectionIndexPageResult(value) {
   }
   return { __kind__: "err", err: value.err };
 }
+const PUBLIC_LIST_PAGE_SIZE = 100n;
+const ADMIN_LIST_PAGE_SIZE = 100n;
 class Backend {
   constructor(actor, _uploadFile, _downloadFile, agent, processError2) {
     this.actor = actor;
@@ -32091,8 +32604,27 @@ class Backend {
     );
   }
   async getAllCollectionCreationRequests() {
-    return fromCollectionCreationRequestViewsResult(
-      await this.run(() => this.actor.getAllCollectionCreationRequests())
+    const requests = [];
+    let cursor = null;
+    do {
+      const page = await this.getAllCollectionCreationRequestsPage(
+        cursor,
+        ADMIN_LIST_PAGE_SIZE
+      );
+      if (page.__kind__ === "err") return page;
+      requests.push(...page.ok.requests);
+      cursor = page.ok.nextCursor;
+    } while (cursor !== null);
+    return { __kind__: "ok", ok: requests };
+  }
+  async getAllCollectionCreationRequestsPage(cursor, limit) {
+    return fromCollectionCreationRequestPageResult(
+      await this.run(
+        () => this.actor.getAllCollectionCreationRequestsPage(
+          toRawOption(cursor),
+          toRawOption(limit)
+        )
+      )
     );
   }
   async getCollectionCreationDiagnostics(requestId) {
@@ -32118,16 +32650,56 @@ class Backend {
     );
   }
   async getActiveListingDetails() {
-    const result = await this.run(
-      () => this.actor.getActiveListingDetails()
+    const details = [];
+    let cursor = null;
+    do {
+      const page = await this.getActiveListingDetailsPage(
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE
+      );
+      details.push(...page.details);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return details;
+  }
+  async getActiveListingDetailsPage(cursor, limit) {
+    return fromRawActiveListingDetailPage(
+      await this.run(
+        () => this.actor.getActiveListingDetailsPage(
+          toRawOption(cursor),
+          toRawOption(limit)
+        )
+      )
     );
-    return result.map(fromRawActiveListingDetail);
   }
   async getActiveListings() {
-    const result = await this.run(
-      () => this.actor.getActiveListings()
+    const listings = [];
+    let cursor = null;
+    do {
+      const page = await this.getActiveListingsPage(
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE
+      );
+      listings.push(...page.listings);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return listings;
+  }
+  async getActiveListingsPage(cursor, limit) {
+    return fromRawActiveListingPage(
+      await this.run(
+        () => this.actor.getActiveListingsPage(
+          toRawOption(cursor),
+          toRawOption(limit)
+        )
+      )
     );
-    return result.map(fromRawActiveListing);
+  }
+  async getMyMarketplaceSettlementStatuses() {
+    const result = await this.run(
+      () => this.actor.getMyMarketplaceSettlementStatuses()
+    );
+    return result.map(fromRawSettlementStatus);
   }
   async getMyAuctionBidStatuses(listingIds) {
     const result = await this.run(
@@ -32159,13 +32731,53 @@ class Backend {
     );
   }
   async getCollectionDividendBalances(collectionId) {
-    return this.run(
-      () => this.actor.getCollectionDividendBalances(collectionId)
+    const balances = [];
+    let cursor = null;
+    do {
+      const page = await this.getCollectionDividendBalancesPage(
+        collectionId,
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE
+      );
+      balances.push(...page.balances);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return balances;
+  }
+  async getCollectionDividendBalancesPage(collectionId, cursor, limit) {
+    return fromRawDividendBalancePage(
+      await this.run(
+        () => this.actor.getCollectionDividendBalancesPage(
+          collectionId,
+          toRawOption(cursor),
+          toRawOption(limit)
+        )
+      )
     );
   }
   async refreshCollectionDividendBalances(collectionId) {
-    return this.run(
-      () => this.actor.refreshCollectionDividendBalances(collectionId)
+    const balances = [];
+    let cursor = null;
+    do {
+      const page = await this.refreshCollectionDividendBalancesPage(
+        collectionId,
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE
+      );
+      balances.push(...page.balances);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return balances;
+  }
+  async refreshCollectionDividendBalancesPage(collectionId, cursor, limit) {
+    return fromRawDividendBalancePage(
+      await this.run(
+        () => this.actor.refreshCollectionDividendBalancesPage(
+          collectionId,
+          toRawOption(cursor),
+          toRawOption(limit)
+        )
+      )
     );
   }
   async getCollectionDividendInfo(collectionId) {
@@ -32227,16 +32839,50 @@ class Backend {
     );
   }
   async getMyCollectionCreationRequests() {
-    const result = await this.run(
-      () => this.actor.getMyCollectionCreationRequests()
+    const requests = [];
+    let cursor = null;
+    do {
+      const page = await this.getMyCollectionCreationRequestsPage(
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE
+      );
+      requests.push(...page.requests);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return requests;
+  }
+  async getMyCollectionCreationRequestsPage(cursor, limit) {
+    return fromRawCollectionCreationRequestPage(
+      await this.run(
+        () => this.actor.getMyCollectionCreationRequestsPage(
+          toRawOption(cursor),
+          toRawOption(limit)
+        )
+      )
     );
-    return result.map(fromRawCollectionCreationRequestView);
   }
   async getMyDividendNFTs() {
-    const result = await this.run(
-      () => this.actor.getMyDividendNFTs()
+    const dividends = [];
+    let cursor = null;
+    do {
+      const page = await this.getMyDividendNFTsPage(
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE
+      );
+      dividends.push(...page.dividends);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return dividends;
+  }
+  async getMyDividendNFTsPage(cursor, limit) {
+    return fromRawNFTDividendPage(
+      await this.run(
+        () => this.actor.getMyDividendNFTsPage(
+          toRawOption(cursor),
+          toRawOption(limit)
+        )
+      )
     );
-    return result.map(fromRawNFTDividend);
   }
   async getMyPendingAuctionRefunds() {
     const result = await this.run(
@@ -32244,11 +32890,34 @@ class Backend {
     );
     return result.map(fromRawAuctionEscrow);
   }
-  async refreshMyDividendNFTs() {
+  async getMyPendingMintPayments() {
     const result = await this.run(
-      () => this.actor.refreshMyDividendNFTs()
+      () => this.actor.getMyPendingMintPayments()
     );
-    return result.map(fromRawNFTDividend);
+    return result.map(fromRawPendingMintPaymentView);
+  }
+  async refreshMyDividendNFTs() {
+    const dividends = [];
+    let cursor = null;
+    do {
+      const page = await this.refreshMyDividendNFTsPage(
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE
+      );
+      dividends.push(...page.dividends);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return dividends;
+  }
+  async refreshMyDividendNFTsPage(cursor, limit) {
+    return fromRawNFTDividendPage(
+      await this.run(
+        () => this.actor.refreshMyDividendNFTsPage(
+          toRawOption(cursor),
+          toRawOption(limit)
+        )
+      )
+    );
   }
   async getMyCreatedCollections() {
     const result = await this.run(
@@ -32293,10 +32962,29 @@ class Backend {
     return this.run(() => this.actor.getUserICPBalance());
   }
   async getUserNFTs(user) {
-    const result = await this.run(
-      () => this.actor.getUserNFTs(user)
+    const nfts = [];
+    let cursor = null;
+    do {
+      const page = await this.getUserNFTsPage(
+        user,
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE
+      );
+      nfts.push(...page.nfts);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return nfts;
+  }
+  async getUserNFTsPage(user, cursor, limit) {
+    return fromRawWalletNFTPage(
+      await this.run(
+        () => this.actor.getUserNFTsPage(
+          user,
+          toRawOption(cursor),
+          toRawOption(limit)
+        )
+      )
     );
-    return result.map(fromRawWalletNFT);
   }
   async getVaultAccountId() {
     return this.run(() => this.actor.getVaultAccountId());
@@ -32324,10 +33012,24 @@ class Backend {
     );
   }
   async listCollections() {
-    const result = await this.run(
-      () => this.actor.listCollections()
+    const collections = [];
+    let cursor = null;
+    do {
+      const page = await this.listCollectionsPage(
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE
+      );
+      collections.push(...page.collections);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return collections;
+  }
+  async listCollectionsPage(cursor, limit) {
+    return fromRawCollectionPage(
+      await this.run(
+        () => this.actor.listCollectionsPage(toRawOption(cursor), toRawOption(limit))
+      )
     );
-    return result.map(fromRawCollection);
   }
   async mintCollectionNFT(collectionId, metadata) {
     return fromWalletResult(
@@ -32349,6 +33051,11 @@ class Backend {
   async retryPendingBid(listingId) {
     return fromRawAuctionListing(
       await this.run(() => this.actor.retryPendingBid(listingId))
+    );
+  }
+  async retryPendingMintPayment(paymentId) {
+    return fromMintResult(
+      await this.run(() => this.actor.retryPendingMintPayment(paymentId))
     );
   }
   async prepareVaultDeposit(collectionId, tokenId) {
@@ -46653,14 +47360,14 @@ const Toaster = ({ ...props }) => {
     }
   );
 };
-const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-uxIxOZSG.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]) : void 0));
-const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-CxEPAiBs.js"), true ? __vite__mapDeps([18,4,5,6,7,2,8,9,10,3,19,16]) : void 0));
-const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-BUfWSOIO.js"), true ? __vite__mapDeps([20,1,2,3,21,12,10,11,13,5,22]) : void 0));
-const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-DRYXd5gc.js"), true ? __vite__mapDeps([23,7,2,8,3,11,13,19,17,22,15]) : void 0));
-const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-dTlwrZnE.js"), true ? [] : void 0));
-const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-DycftSof.js"), true ? __vite__mapDeps([24,1,2,3,21,12,10,6,5,7,8,9,11,13,14,25]) : void 0));
-const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-CGd-TQ1m.js"), true ? __vite__mapDeps([26,1,2,3,6,5,7,8,11,16]) : void 0));
-const HelpPage = reactExports.lazy(() => __vitePreload(() => import("./HelpPage-ZNXAenll.js"), true ? __vite__mapDeps([27,3,25,8,15]) : void 0));
+const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-B8KhRekg.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]) : void 0));
+const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-w2pUIUzN.js"), true ? __vite__mapDeps([18,4,5,6,7,2,8,9,10,3,19,16]) : void 0));
+const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-Ce0BOZAL.js"), true ? __vite__mapDeps([20,1,2,3,21,12,10,11,13,5,22]) : void 0));
+const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-BluO_Tqg.js"), true ? __vite__mapDeps([23,7,2,8,3,11,13,19,17,22,15]) : void 0));
+const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-QEWHfvdL.js"), true ? [] : void 0));
+const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-DXrlOB5I.js"), true ? __vite__mapDeps([24,1,2,3,21,12,10,6,5,7,8,9,11,13,14,25]) : void 0));
+const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-DNIxmxPH.js"), true ? __vite__mapDeps([26,1,2,3,6,5,7,8,11,16]) : void 0));
+const HelpPage = reactExports.lazy(() => __vitePreload(() => import("./HelpPage-D5c6GLU2.js"), true ? __vite__mapDeps([27,3,25,8,15]) : void 0));
 const rootRoute = createRootRoute({
   component: () => /* @__PURE__ */ jsxRuntimeExports.jsx(Layout, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(
     reactExports.Suspense,

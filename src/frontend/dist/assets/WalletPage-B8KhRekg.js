@@ -1,21 +1,21 @@
-import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useAdmin, e as useQueryClient, r as reactExports, f as useQuery, g as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-BjklpoWU.js";
-import { P as Plus, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-CgWQRn78.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-CRUJO5By.js";
-import { M as MediaImage, E as EmptyState } from "./MediaImage-DQQaQlz2.js";
-import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-rlAWuAza.js";
-import { B as Badge, I as Input } from "./badge-Cxipmsvb.js";
-import { I as ImageOff, r as resolveImageUrl } from "./media-CBIulzFx.js";
-import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-B34nAbLr.js";
-import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-D0qd2LdJ.js";
-import { u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label } from "./index-D1EevaUf.js";
-import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-DKl5EFyR.js";
-import { S as Skeleton, C as Copy } from "./skeleton-Er_mLg7r.js";
-import { S as Sparkles, c as compressModerationImage } from "./imageUtils-Bgw7BTrU.js";
-import { C as CircleCheck } from "./circle-check-DHKpOJva.js";
-import { C as Coins } from "./coins-B4k36-7a.js";
-import { S as Send } from "./send-C2EESSnE.js";
-import "./arrow-right-BahKf-aw.js";
-import "./index-QzUFDKbw.js";
+import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useAdmin, e as useQueryClient, r as reactExports, f as useQuery, g as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-Dlr-4CKz.js";
+import { P as Plus, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-DDsHUyXD.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-RODVCHlo.js";
+import { M as MediaImage, E as EmptyState } from "./MediaImage-DM01sE6x.js";
+import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-CcsBl9sy.js";
+import { B as Badge, I as Input } from "./badge-DyWrd8S9.js";
+import { I as ImageOff, r as resolveImageUrl } from "./media-l8J0swV4.js";
+import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-BeocNwgW.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-BmmW0ULT.js";
+import { u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label } from "./index-Byv1oxo0.js";
+import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-DwDGf75G.js";
+import { S as Skeleton, C as Copy } from "./skeleton-4xVXen6F.js";
+import { S as Sparkles, c as compressModerationImage } from "./imageUtils-CNIauznE.js";
+import { C as CircleCheck } from "./circle-check-DgD_5Naj.js";
+import { C as Coins } from "./coins-cikpxwHj.js";
+import { S as Send } from "./send-Dc4Qp647.js";
+import "./arrow-right-F_r_3qVe.js";
+import "./index-CpwJYIFc.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -166,6 +166,12 @@ function formatICP(e8s) {
   const whole = e8s / E8S;
   const frac = (e8s % E8S).toString().padStart(8, "0").replace(/0+$/, "");
   return frac ? `${whole}.${frac}` : whole.toString();
+}
+function pendingMintStatusLabel(status) {
+  if (status === "PaymentPending") return "Payment pending";
+  if (status === "PaymentSent") return "Mint retry ready";
+  if (status === "Minted") return "Minted";
+  return "Needs review";
 }
 function parseAttributeLines(value) {
   const seen = /* @__PURE__ */ new Set();
@@ -1066,6 +1072,37 @@ function MintComposer({
   const [confirmMintOpen, setConfirmMintOpen] = reactExports.useState(false);
   const [cycleTopUpReason, setCycleTopUpReason] = reactExports.useState(null);
   const mainMintAvailable = (mintConfig == null ? void 0 : mintConfig.mainMintEnabled) === true && mintConfig.collectionId != null && mainCollection != null;
+  const { data: pendingMintPayments = [] } = useQuery(
+    {
+      queryKey: ["pendingMintPayments"],
+      queryFn: async () => {
+        if (!actor) return [];
+        return actor.getMyPendingMintPayments();
+      },
+      enabled: !!actor,
+      refetchInterval: 3e4
+    }
+  );
+  const retryPendingMintMutation = useMutation({
+    mutationFn: async (paymentId) => {
+      if (!actor) throw new Error("Not connected");
+      const result = await actor.retryPendingMintPayment(paymentId);
+      if (result.__kind__ === "err") throw new Error(result.err);
+      return result.ok;
+    },
+    onSuccess: (receipt) => {
+      ue.success(
+        `Mint recovered at block ${receipt.paymentBlock.toString()}`
+      );
+      void queryClient.invalidateQueries({ queryKey: ["pendingMintPayments"] });
+      void queryClient.invalidateQueries({ queryKey: ["userNFTs"] });
+      void queryClient.invalidateQueries({ queryKey: ["userStats"] });
+      void queryClient.invalidateQueries({ queryKey: ["icp-balance"] });
+    },
+    onError: (err) => {
+      ue.error(extractError(err));
+    }
+  });
   reactExports.useEffect(() => {
     const targetStillAvailable = selectedTarget === "main" && mainMintAvailable || creatorCollections.some(
       (collection) => `collection:${collection.id.toString()}` === selectedTarget
@@ -1120,6 +1157,7 @@ function MintComposer({
         queryKey: ["collectionNFTs", (targetCollection == null ? void 0 : targetCollection.id.toString()) ?? ""]
       });
       void queryClient.invalidateQueries({ queryKey: ["icp-balance"] });
+      void queryClient.invalidateQueries({ queryKey: ["pendingMintPayments"] });
       setName("");
       setDescription("");
       setAttributesText("");
@@ -1211,6 +1249,47 @@ function MintComposer({
             children: "Use this panel to mint into the main app collection when public minting is enabled, or into one of the Mintlab collections you created."
           }
         ),
+        pendingMintPayments.length > 0 && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex items-center justify-between gap-3", children: [
+            /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { children: [
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-medium text-foreground", children: "Paid mint recovery" }),
+              /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-muted-foreground", children: "Payment is recorded on-chain. Retry finishes the mint without charging again." })
+            ] }),
+            /* @__PURE__ */ jsxRuntimeExports.jsx(Badge, { className: "shrink-0 bg-amber-500/20 text-amber-700 border-0 dark:text-amber-200", children: pendingMintPayments.length })
+          ] }),
+          /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-2", children: pendingMintPayments.map((payment) => /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            "div",
+            {
+              className: "flex flex-col gap-2 rounded-md border border-border bg-background/70 p-3 sm:flex-row sm:items-center sm:justify-between",
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "min-w-0", children: [
+                  /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm font-medium text-foreground", children: pendingMintStatusLabel(payment.status) }),
+                  /* @__PURE__ */ jsxRuntimeExports.jsxs("p", { className: "text-xs text-muted-foreground", children: [
+                    formatICP(payment.amountE8s),
+                    " ICP",
+                    payment.paymentBlock == null ? "" : ` - block ${payment.paymentBlock.toString()}`
+                  ] }),
+                  payment.lastError && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "mt-1 text-xs text-destructive", children: payment.lastError })
+                ] }),
+                /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                  Button,
+                  {
+                    size: "sm",
+                    variant: "outline",
+                    className: "gap-2 self-start sm:self-center",
+                    disabled: retryPendingMintMutation.isPending || payment.status === "Minted",
+                    onClick: () => retryPendingMintMutation.mutate(payment.id),
+                    children: [
+                      /* @__PURE__ */ jsxRuntimeExports.jsx(RefreshCw, { className: "h-4 w-4" }),
+                      "Retry"
+                    ]
+                  }
+                )
+              ]
+            },
+            payment.id.toString()
+          )) })
+        ] }),
         !mintConfig ? /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-muted-foreground", children: "Minting has not been configured by the admin yet." }) : !mainMintAvailable && creatorCollections.length === 0 ? /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-3", children: [
           /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "rounded-xl border border-accent/20 bg-accent/5 p-3 text-sm text-muted-foreground", children: "Create your first Mintlab collection on the Collections page, or wait for the admin to enable public minting into the main collection." }),
           /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "rounded-xl border border-border bg-muted/20 p-3 text-sm text-muted-foreground", children: [

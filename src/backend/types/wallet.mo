@@ -92,4 +92,10 @@ module {
     complete : Bool;
     checkedCollections : Nat;
   };
+
+  public type WalletNFTPage = {
+    nfts : [WalletNFT];
+    nextCursor : ?Nat;
+    totalCount : Nat;
+  };
 };

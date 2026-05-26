@@ -92,6 +92,18 @@ export interface CollectionNFTPage {
   note: string;
 }
 
+export interface WalletNFTPage {
+  nfts: Array<WalletNFT>;
+  nextCursor: bigint | null;
+  totalCount: bigint;
+}
+
+export interface CollectionPage {
+  collections: Array<Collection>;
+  nextCursor: bigint | null;
+  totalCount: bigint;
+}
+
 export interface WalletSyncSkip {
   collectionId: CollectionId;
   collectionName: string;
@@ -171,6 +183,37 @@ export type ActiveListing =
 export interface ActiveListingDetail {
   listing: ActiveListing;
   nft: WalletNFT;
+}
+
+export interface ActiveListingPage {
+  listings: Array<ActiveListing>;
+  nextCursor: bigint | null;
+  totalCount: bigint;
+}
+
+export interface ActiveListingDetailPage {
+  details: Array<ActiveListingDetail>;
+  nextCursor: bigint | null;
+  totalCount: bigint;
+}
+
+export type SettlementStatusKind =
+  | "FixedPurchase"
+  | "Auction"
+  | "NoBidAuctionReturn"
+  | "ListingReturn"
+  | "PendingBidDeposit"
+  | "PendingAuctionRefund";
+
+export type SettlementStatusRole = "Buyer" | "Seller" | "Bidder";
+
+export interface SettlementStatus {
+  listingId: ListingId;
+  kind: SettlementStatusKind;
+  role: SettlementStatusRole;
+  stage: string;
+  message: string;
+  updatedAt: Timestamp;
 }
 
 export interface AuctionEscrow {
@@ -320,6 +363,12 @@ export interface CollectionCreationRequestView {
   updatedAt: bigint;
 }
 
+export interface CollectionCreationRequestPage {
+  requests: Array<CollectionCreationRequestView>;
+  nextCursor: bigint | null;
+  totalCount: bigint;
+}
+
 export interface CollectionCreationDiagnostics {
   request: CollectionCreationRequestView;
   requestedCanisterCycles: bigint;
@@ -377,6 +426,24 @@ export interface MintReceipt {
   paymentBlock: bigint;
 }
 
+export type PendingMintPaymentStatus =
+  | "PaymentPending"
+  | "PaymentSent"
+  | "Minted"
+  | "Failed";
+
+export interface PendingMintPaymentView {
+  id: bigint;
+  collectionId: CollectionId;
+  amountE8s: bigint;
+  paymentBlock: bigint | null;
+  mintedTokenId: bigint | null;
+  status: PendingMintPaymentStatus;
+  createdAt: bigint;
+  updatedAt: bigint;
+  lastError: string | null;
+}
+
 export interface CollectionCreationReceipt {
   collection: Collection;
   paymentBlock: bigint;
@@ -419,6 +486,18 @@ export interface NFTDividend {
   nft: WalletNFT;
   collection: Collection;
   claimableE8s: bigint;
+}
+
+export interface NFTDividendPage {
+  dividends: Array<NFTDividend>;
+  nextCursor: bigint | null;
+  totalCount: bigint;
+}
+
+export interface DividendBalancePage {
+  balances: Array<[string, bigint]>;
+  nextCursor: bigint | null;
+  totalCount: bigint;
 }
 
 export interface DividendSyncReceipt {
@@ -687,6 +766,13 @@ export interface backendInterface {
     | { __kind__: "ok"; ok: Array<CollectionCreationRequestView> }
     | { __kind__: "err"; err: string }
   >;
+  getAllCollectionCreationRequestsPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionCreationRequestPage }
+    | { __kind__: "err"; err: string }
+  >;
   getCollectionCreationDiagnostics(
     requestId: bigint,
   ): Promise<
@@ -707,7 +793,16 @@ export interface backendInterface {
     | { __kind__: "err"; err: string }
   >;
   getActiveListingDetails(): Promise<Array<ActiveListingDetail>>;
+  getActiveListingDetailsPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<ActiveListingDetailPage>;
   getActiveListings(): Promise<Array<ActiveListing>>;
+  getActiveListingsPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<ActiveListingPage>;
+  getMyMarketplaceSettlementStatuses(): Promise<Array<SettlementStatus>>;
   getMyAuctionBidStatuses(
     listingIds: Array<ListingId>,
   ): Promise<Array<AuctionBidStatus>>;
@@ -723,9 +818,19 @@ export interface backendInterface {
   getCollectionDividendBalances(
     collectionId: CollectionId,
   ): Promise<Array<[string, bigint]>>;
+  getCollectionDividendBalancesPage(
+    collectionId: CollectionId,
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<DividendBalancePage>;
   refreshCollectionDividendBalances(
     collectionId: CollectionId,
   ): Promise<Array<[string, bigint]>>;
+  refreshCollectionDividendBalancesPage(
+    collectionId: CollectionId,
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<DividendBalancePage>;
   getCollectionDividendInfo(
     collectionId: CollectionId,
   ): Promise<CollectionDividendInfo | null>;
@@ -773,14 +878,32 @@ export interface backendInterface {
   getMyCollectionCreationRequests(): Promise<
     Array<CollectionCreationRequestView>
   >;
+  getMyCollectionCreationRequestsPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<CollectionCreationRequestPage>;
   getMyCreatedCollections(): Promise<Array<Collection>>;
   getMyDividendNFTs(): Promise<Array<NFTDividend>>;
+  getMyDividendNFTsPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<NFTDividendPage>;
   getMyPendingAuctionRefunds(): Promise<Array<AuctionEscrow>>;
+  getMyPendingMintPayments(): Promise<Array<PendingMintPaymentView>>;
   refreshMyDividendNFTs(): Promise<Array<NFTDividend>>;
+  refreshMyDividendNFTsPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<NFTDividendPage>;
   getNFTStats(user: Principal): Promise<NFTStats>;
   getUserAccountId(): Promise<AccountIdentifier>;
   getUserICPBalance(): Promise<bigint>;
   getUserNFTs(user: Principal): Promise<Array<WalletNFT>>;
+  getUserNFTsPage(
+    user: Principal,
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<WalletNFTPage>;
   getVaultAccountId(): Promise<AccountIdentifier>;
   getVaultPrincipal(): Promise<Principal>;
   indexCollectionOwnershipPage(
@@ -798,6 +921,10 @@ export interface backendInterface {
     user: UserId,
   ): Promise<boolean>;
   listCollections(): Promise<Array<Collection>>;
+  listCollectionsPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<CollectionPage>;
   mintCollectionNFT(
     collectionId: CollectionId,
     metadata: NFTMetadata,
@@ -811,6 +938,11 @@ export interface backendInterface {
   >;
   placeBid(listingId: ListingId, amount: bigint): Promise<AuctionListing>;
   retryPendingBid(listingId: ListingId): Promise<AuctionListing>;
+  retryPendingMintPayment(
+    paymentId: bigint,
+  ): Promise<
+    { __kind__: "ok"; ok: MintReceipt } | { __kind__: "err"; err: string }
+  >;
   prepareVaultDeposit(
     collectionId: CollectionId,
     tokenId: string,
@@ -949,6 +1081,35 @@ type RawActiveListing =
   | { Fixed: RawFixedListing }
   | { Auction: RawAuctionListing };
 type RawActiveListingDetail = { listing: RawActiveListing; nft: RawWalletNFT };
+type RawActiveListingPage = {
+  listings: Array<RawActiveListing>;
+  nextCursor: [] | [bigint];
+  totalCount: bigint;
+};
+type RawActiveListingDetailPage = {
+  details: Array<RawActiveListingDetail>;
+  nextCursor: [] | [bigint];
+  totalCount: bigint;
+};
+type RawSettlementStatusKind =
+  | { FixedPurchase: null }
+  | { Auction: null }
+  | { NoBidAuctionReturn: null }
+  | { ListingReturn: null }
+  | { PendingBidDeposit: null }
+  | { PendingAuctionRefund: null };
+type RawSettlementStatusRole =
+  | { Buyer: null }
+  | { Seller: null }
+  | { Bidder: null };
+type RawSettlementStatus = {
+  listingId: ListingId;
+  kind: RawSettlementStatusKind;
+  role: RawSettlementStatusRole;
+  stage: string;
+  message: string;
+  updatedAt: Timestamp;
+};
 type RawTransferError =
   | { TxTooOld: { allowed_window_nanos: bigint } }
   | { BadFee: { expected_fee: Tokens } }
@@ -976,6 +1137,16 @@ type RawCollectionNFTPage = {
   totalCount: bigint;
   coverage: RawCollectionBrowseCoverage;
   note: string;
+};
+type RawWalletNFTPage = {
+  nfts: Array<RawWalletNFT>;
+  nextCursor: [] | [bigint];
+  totalCount: bigint;
+};
+type RawCollectionPage = {
+  collections: Array<RawCollection>;
+  nextCursor: [] | [bigint];
+  totalCount: bigint;
 };
 type RawWalletSyncSkip = {
   collectionId: CollectionId;
@@ -1085,6 +1256,11 @@ type RawCollectionCreationRequestView = {
   lastError: [] | [string];
   createdAt: bigint;
   updatedAt: bigint;
+};
+type RawCollectionCreationRequestPage = {
+  requests: Array<RawCollectionCreationRequestView>;
+  nextCursor: [] | [bigint];
+  totalCount: bigint;
 };
 type RawCollectionCreationDiagnostics = {
   request: RawCollectionCreationRequestView;
@@ -1247,6 +1423,22 @@ type RawMintReceipt = {
   nft: RawWalletNFT;
   paymentBlock: bigint;
 };
+type RawPendingMintPaymentStatus =
+  | { PaymentPending: null }
+  | { PaymentSent: null }
+  | { Minted: null }
+  | { Failed: null };
+type RawPendingMintPaymentView = {
+  id: bigint;
+  collectionId: CollectionId;
+  amountE8s: bigint;
+  paymentBlock: [] | [bigint];
+  mintedTokenId: [] | [bigint];
+  status: RawPendingMintPaymentStatus;
+  createdAt: bigint;
+  updatedAt: bigint;
+  lastError: [] | [string];
+};
 type RawCollectionCreationReceipt = {
   collection: RawCollection;
   paymentBlock: bigint;
@@ -1285,6 +1477,16 @@ type RawNFTDividend = {
   nft: RawWalletNFT;
   collection: RawCollection;
   claimableE8s: bigint;
+};
+type RawNFTDividendPage = {
+  dividends: Array<RawNFTDividend>;
+  nextCursor: [] | [bigint];
+  totalCount: bigint;
+};
+type RawDividendBalancePage = {
+  balances: Array<[string, bigint]>;
+  nextCursor: [] | [bigint];
+  totalCount: bigint;
 };
 type RawDividendSyncReceipt = {
   collectionId: CollectionId;
@@ -1483,6 +1685,22 @@ function fromRawCollectionNFTPage(
     totalCount: value.totalCount,
     coverage: fromRawCollectionBrowseCoverage(value.coverage),
     note: value.note,
+  };
+}
+
+function fromRawWalletNFTPage(value: RawWalletNFTPage): WalletNFTPage {
+  return {
+    nfts: value.nfts.map(fromRawWalletNFT),
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount,
+  };
+}
+
+function fromRawCollectionPage(value: RawCollectionPage): CollectionPage {
+  return {
+    collections: value.collections.map(fromRawCollection),
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount,
   };
 }
 
@@ -1688,6 +1906,56 @@ function fromRawActiveListingDetail(
   };
 }
 
+function fromRawActiveListingPage(
+  value: RawActiveListingPage,
+): ActiveListingPage {
+  return {
+    listings: value.listings.map(fromRawActiveListing),
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount,
+  };
+}
+
+function fromRawActiveListingDetailPage(
+  value: RawActiveListingDetailPage,
+): ActiveListingDetailPage {
+  return {
+    details: value.details.map(fromRawActiveListingDetail),
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount,
+  };
+}
+
+function fromRawSettlementStatusKind(
+  value: RawSettlementStatusKind,
+): SettlementStatusKind {
+  if ("FixedPurchase" in value) return "FixedPurchase";
+  if ("Auction" in value) return "Auction";
+  if ("NoBidAuctionReturn" in value) return "NoBidAuctionReturn";
+  if ("ListingReturn" in value) return "ListingReturn";
+  if ("PendingBidDeposit" in value) return "PendingBidDeposit";
+  return "PendingAuctionRefund";
+}
+
+function fromRawSettlementStatusRole(
+  value: RawSettlementStatusRole,
+): SettlementStatusRole {
+  if ("Buyer" in value) return "Buyer";
+  if ("Seller" in value) return "Seller";
+  return "Bidder";
+}
+
+function fromRawSettlementStatus(value: RawSettlementStatus): SettlementStatus {
+  return {
+    listingId: value.listingId,
+    kind: fromRawSettlementStatusKind(value.kind),
+    role: fromRawSettlementStatusRole(value.role),
+    stage: value.stage,
+    message: value.message,
+    updatedAt: value.updatedAt,
+  };
+}
+
 function fromRawMintConfig(value: RawMintConfig): MintConfig {
   return {
     collectionId: fromRawOption(value.collectionId),
@@ -1809,6 +2077,16 @@ function fromRawCollectionCreationRequestView(
   };
 }
 
+function fromRawCollectionCreationRequestPage(
+  value: RawCollectionCreationRequestPage,
+): CollectionCreationRequestPage {
+  return {
+    requests: value.requests.map(fromRawCollectionCreationRequestView),
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount,
+  };
+}
+
 function fromRawCollectionCreationDiagnostics(
   value: RawCollectionCreationDiagnostics,
 ): CollectionCreationDiagnostics {
@@ -1890,6 +2168,31 @@ function fromRawMintReceipt(value: RawMintReceipt): MintReceipt {
   };
 }
 
+function fromRawPendingMintPaymentStatus(
+  value: RawPendingMintPaymentStatus,
+): PendingMintPaymentStatus {
+  if ("PaymentPending" in value) return "PaymentPending";
+  if ("PaymentSent" in value) return "PaymentSent";
+  if ("Minted" in value) return "Minted";
+  return "Failed";
+}
+
+function fromRawPendingMintPaymentView(
+  value: RawPendingMintPaymentView,
+): PendingMintPaymentView {
+  return {
+    id: value.id,
+    collectionId: value.collectionId,
+    amountE8s: value.amountE8s,
+    paymentBlock: fromRawOption(value.paymentBlock),
+    mintedTokenId: fromRawOption(value.mintedTokenId),
+    status: fromRawPendingMintPaymentStatus(value.status),
+    createdAt: value.createdAt,
+    updatedAt: value.updatedAt,
+    lastError: fromRawOption(value.lastError),
+  };
+}
+
 function fromRawCollectionCreationReceipt(
   value: RawCollectionCreationReceipt,
 ): CollectionCreationReceipt {
@@ -1949,6 +2252,24 @@ function fromRawNFTDividend(value: RawNFTDividend): NFTDividend {
     nft: fromRawWalletNFT(value.nft),
     collection: fromRawCollection(value.collection),
     claimableE8s: value.claimableE8s,
+  };
+}
+
+function fromRawNFTDividendPage(value: RawNFTDividendPage): NFTDividendPage {
+  return {
+    dividends: value.dividends.map(fromRawNFTDividend),
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount,
+  };
+}
+
+function fromRawDividendBalancePage(
+  value: RawDividendBalancePage,
+): DividendBalancePage {
+  return {
+    balances: value.balances,
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount,
   };
 }
 
@@ -2093,15 +2414,15 @@ function fromCollectionCreationRequestViewResult(
   return { __kind__: "err", err: value.err };
 }
 
-function fromCollectionCreationRequestViewsResult(
-  value: { ok: Array<RawCollectionCreationRequestView> } | { err: string },
+function fromCollectionCreationRequestPageResult(
+  value: { ok: RawCollectionCreationRequestPage } | { err: string },
 ):
-  | { __kind__: "ok"; ok: Array<CollectionCreationRequestView> }
+  | { __kind__: "ok"; ok: CollectionCreationRequestPage }
   | { __kind__: "err"; err: string } {
   if ("ok" in value) {
     return {
       __kind__: "ok",
-      ok: value.ok.map(fromRawCollectionCreationRequestView),
+      ok: fromRawCollectionCreationRequestPage(value.ok),
     };
   }
   return { __kind__: "err", err: value.err };
@@ -2291,6 +2612,9 @@ function fromCollectionIndexPageResult(
   }
   return { __kind__: "err", err: value.err };
 }
+
+const PUBLIC_LIST_PAGE_SIZE = 100n;
+const ADMIN_LIST_PAGE_SIZE = 100n;
 
 export class Backend implements backendInterface {
   constructor(
@@ -2657,8 +2981,34 @@ export class Backend implements backendInterface {
     | { __kind__: "ok"; ok: Array<CollectionCreationRequestView> }
     | { __kind__: "err"; err: string }
   > {
-    return fromCollectionCreationRequestViewsResult(
-      await this.run(() => this.actor.getAllCollectionCreationRequests()),
+    const requests: Array<CollectionCreationRequestView> = [];
+    let cursor: bigint | null = null;
+    do {
+      const page = await this.getAllCollectionCreationRequestsPage(
+        cursor,
+        ADMIN_LIST_PAGE_SIZE,
+      );
+      if (page.__kind__ === "err") return page;
+      requests.push(...page.ok.requests);
+      cursor = page.ok.nextCursor;
+    } while (cursor !== null);
+    return { __kind__: "ok", ok: requests };
+  }
+
+  async getAllCollectionCreationRequestsPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionCreationRequestPage }
+    | { __kind__: "err"; err: string }
+  > {
+    return fromCollectionCreationRequestPageResult(
+      await this.run(() =>
+        this.actor.getAllCollectionCreationRequestsPage(
+          toRawOption(cursor),
+          toRawOption(limit),
+        ),
+      ),
     );
   }
 
@@ -2704,17 +3054,66 @@ export class Backend implements backendInterface {
   }
 
   async getActiveListingDetails(): Promise<Array<ActiveListingDetail>> {
-    const result = (await this.run(() =>
-      this.actor.getActiveListingDetails(),
-    )) as Array<RawActiveListingDetail>;
-    return result.map(fromRawActiveListingDetail);
+    const details: Array<ActiveListingDetail> = [];
+    let cursor: bigint | null = null;
+    do {
+      const page = await this.getActiveListingDetailsPage(
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE,
+      );
+      details.push(...page.details);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return details;
+  }
+
+  async getActiveListingDetailsPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<ActiveListingDetailPage> {
+    return fromRawActiveListingDetailPage(
+      await this.run(() =>
+        this.actor.getActiveListingDetailsPage(
+          toRawOption(cursor),
+          toRawOption(limit),
+        ),
+      ),
+    );
   }
 
   async getActiveListings(): Promise<Array<ActiveListing>> {
+    const listings: Array<ActiveListing> = [];
+    let cursor: bigint | null = null;
+    do {
+      const page = await this.getActiveListingsPage(
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE,
+      );
+      listings.push(...page.listings);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return listings;
+  }
+
+  async getActiveListingsPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<ActiveListingPage> {
+    return fromRawActiveListingPage(
+      await this.run(() =>
+        this.actor.getActiveListingsPage(
+          toRawOption(cursor),
+          toRawOption(limit),
+        ),
+      ),
+    );
+  }
+
+  async getMyMarketplaceSettlementStatuses(): Promise<Array<SettlementStatus>> {
     const result = (await this.run(() =>
-      this.actor.getActiveListings(),
-    )) as Array<RawActiveListing>;
-    return result.map(fromRawActiveListing);
+      this.actor.getMyMarketplaceSettlementStatuses(),
+    )) as Array<RawSettlementStatus>;
+    return result.map(fromRawSettlementStatus);
   }
 
   async getMyAuctionBidStatuses(
@@ -2765,16 +3164,66 @@ export class Backend implements backendInterface {
   async getCollectionDividendBalances(
     collectionId: CollectionId,
   ): Promise<Array<[string, bigint]>> {
-    return this.run(() =>
-      this.actor.getCollectionDividendBalances(collectionId),
+    const balances: Array<[string, bigint]> = [];
+    let cursor: bigint | null = null;
+    do {
+      const page = await this.getCollectionDividendBalancesPage(
+        collectionId,
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE,
+      );
+      balances.push(...page.balances);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return balances;
+  }
+
+  async getCollectionDividendBalancesPage(
+    collectionId: CollectionId,
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<DividendBalancePage> {
+    return fromRawDividendBalancePage(
+      await this.run(() =>
+        this.actor.getCollectionDividendBalancesPage(
+          collectionId,
+          toRawOption(cursor),
+          toRawOption(limit),
+        ),
+      ),
     );
   }
 
   async refreshCollectionDividendBalances(
     collectionId: CollectionId,
   ): Promise<Array<[string, bigint]>> {
-    return this.run(() =>
-      this.actor.refreshCollectionDividendBalances(collectionId),
+    const balances: Array<[string, bigint]> = [];
+    let cursor: bigint | null = null;
+    do {
+      const page = await this.refreshCollectionDividendBalancesPage(
+        collectionId,
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE,
+      );
+      balances.push(...page.balances);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return balances;
+  }
+
+  async refreshCollectionDividendBalancesPage(
+    collectionId: CollectionId,
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<DividendBalancePage> {
+    return fromRawDividendBalancePage(
+      await this.run(() =>
+        this.actor.refreshCollectionDividendBalancesPage(
+          collectionId,
+          toRawOption(cursor),
+          toRawOption(limit),
+        ),
+      ),
     );
   }
 
@@ -2864,17 +3313,59 @@ export class Backend implements backendInterface {
   async getMyCollectionCreationRequests(): Promise<
     Array<CollectionCreationRequestView>
   > {
-    const result = (await this.run(() =>
-      this.actor.getMyCollectionCreationRequests(),
-    )) as Array<RawCollectionCreationRequestView>;
-    return result.map(fromRawCollectionCreationRequestView);
+    const requests: Array<CollectionCreationRequestView> = [];
+    let cursor: bigint | null = null;
+    do {
+      const page = await this.getMyCollectionCreationRequestsPage(
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE,
+      );
+      requests.push(...page.requests);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return requests;
+  }
+
+  async getMyCollectionCreationRequestsPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<CollectionCreationRequestPage> {
+    return fromRawCollectionCreationRequestPage(
+      await this.run(() =>
+        this.actor.getMyCollectionCreationRequestsPage(
+          toRawOption(cursor),
+          toRawOption(limit),
+        ),
+      ),
+    );
   }
 
   async getMyDividendNFTs(): Promise<Array<NFTDividend>> {
-    const result = (await this.run(() =>
-      this.actor.getMyDividendNFTs(),
-    )) as Array<RawNFTDividend>;
-    return result.map(fromRawNFTDividend);
+    const dividends: Array<NFTDividend> = [];
+    let cursor: bigint | null = null;
+    do {
+      const page = await this.getMyDividendNFTsPage(
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE,
+      );
+      dividends.push(...page.dividends);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return dividends;
+  }
+
+  async getMyDividendNFTsPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<NFTDividendPage> {
+    return fromRawNFTDividendPage(
+      await this.run(() =>
+        this.actor.getMyDividendNFTsPage(
+          toRawOption(cursor),
+          toRawOption(limit),
+        ),
+      ),
+    );
   }
 
   async getMyPendingAuctionRefunds(): Promise<Array<AuctionEscrow>> {
@@ -2884,11 +3375,39 @@ export class Backend implements backendInterface {
     return result.map(fromRawAuctionEscrow);
   }
 
-  async refreshMyDividendNFTs(): Promise<Array<NFTDividend>> {
+  async getMyPendingMintPayments(): Promise<Array<PendingMintPaymentView>> {
     const result = (await this.run(() =>
-      this.actor.refreshMyDividendNFTs(),
-    )) as Array<RawNFTDividend>;
-    return result.map(fromRawNFTDividend);
+      this.actor.getMyPendingMintPayments(),
+    )) as Array<RawPendingMintPaymentView>;
+    return result.map(fromRawPendingMintPaymentView);
+  }
+
+  async refreshMyDividendNFTs(): Promise<Array<NFTDividend>> {
+    const dividends: Array<NFTDividend> = [];
+    let cursor: bigint | null = null;
+    do {
+      const page = await this.refreshMyDividendNFTsPage(
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE,
+      );
+      dividends.push(...page.dividends);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return dividends;
+  }
+
+  async refreshMyDividendNFTsPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<NFTDividendPage> {
+    return fromRawNFTDividendPage(
+      await this.run(() =>
+        this.actor.refreshMyDividendNFTsPage(
+          toRawOption(cursor),
+          toRawOption(limit),
+        ),
+      ),
+    );
   }
 
   async getMyCreatedCollections(): Promise<Array<Collection>> {
@@ -2961,10 +3480,34 @@ export class Backend implements backendInterface {
   }
 
   async getUserNFTs(user: Principal): Promise<Array<WalletNFT>> {
-    const result = (await this.run(() =>
-      this.actor.getUserNFTs(user),
-    )) as Array<RawWalletNFT>;
-    return result.map(fromRawWalletNFT);
+    const nfts: Array<WalletNFT> = [];
+    let cursor: bigint | null = null;
+    do {
+      const page = await this.getUserNFTsPage(
+        user,
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE,
+      );
+      nfts.push(...page.nfts);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return nfts;
+  }
+
+  async getUserNFTsPage(
+    user: Principal,
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<WalletNFTPage> {
+    return fromRawWalletNFTPage(
+      await this.run(() =>
+        this.actor.getUserNFTsPage(
+          user,
+          toRawOption(cursor),
+          toRawOption(limit),
+        ),
+      ),
+    );
   }
 
   async getVaultAccountId(): Promise<AccountIdentifier> {
@@ -3009,10 +3552,28 @@ export class Backend implements backendInterface {
   }
 
   async listCollections(): Promise<Array<Collection>> {
-    const result = (await this.run(() =>
-      this.actor.listCollections(),
-    )) as Array<RawCollection>;
-    return result.map(fromRawCollection);
+    const collections: Array<Collection> = [];
+    let cursor: bigint | null = null;
+    do {
+      const page = await this.listCollectionsPage(
+        cursor,
+        PUBLIC_LIST_PAGE_SIZE,
+      );
+      collections.push(...page.collections);
+      cursor = page.nextCursor;
+    } while (cursor !== null);
+    return collections;
+  }
+
+  async listCollectionsPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<CollectionPage> {
+    return fromRawCollectionPage(
+      await this.run(() =>
+        this.actor.listCollectionsPage(toRawOption(cursor), toRawOption(limit)),
+      ),
+    );
   }
 
   async mintCollectionNFT(
@@ -3050,6 +3611,16 @@ export class Backend implements backendInterface {
   async retryPendingBid(listingId: ListingId): Promise<AuctionListing> {
     return fromRawAuctionListing(
       await this.run(() => this.actor.retryPendingBid(listingId)),
+    );
+  }
+
+  async retryPendingMintPayment(
+    paymentId: bigint,
+  ): Promise<
+    { __kind__: "ok"; ok: MintReceipt } | { __kind__: "err"; err: string }
+  > {
+    return fromMintResult(
+      await this.run(() => this.actor.retryPendingMintPayment(paymentId)),
     );
   }
 

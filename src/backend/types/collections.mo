@@ -23,4 +23,10 @@ module {
     browseInfo : ?CollectionBrowseInfo;
     dividendConfig : ?CollectionDividendConfig;
   };
+
+  public type CollectionPage = {
+    collections : [Collection];
+    nextCursor : ?Nat;
+    totalCount : Nat;
+  };
 };

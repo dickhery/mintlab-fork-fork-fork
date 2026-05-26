@@ -42,6 +42,7 @@ import type {
   NFTDividend,
   NFTMetadata,
   NFTStats,
+  PendingMintPaymentView,
   PublicModerationConfig,
   WalletNFT,
   WalletSyncSkip,
@@ -128,6 +129,13 @@ function formatICP(e8s: bigint): string {
   const whole = e8s / E8S;
   const frac = (e8s % E8S).toString().padStart(8, "0").replace(/0+$/, "");
   return frac ? `${whole}.${frac}` : whole.toString();
+}
+
+function pendingMintStatusLabel(status: PendingMintPaymentView["status"]) {
+  if (status === "PaymentPending") return "Payment pending";
+  if (status === "PaymentSent") return "Mint retry ready";
+  if (status === "Minted") return "Minted";
+  return "Needs review";
 }
 
 function parseAttributeLines(value: string): Array<[string, string]> {
@@ -1208,6 +1216,39 @@ function MintComposer({
     mintConfig.collectionId != null &&
     mainCollection != null;
 
+  const { data: pendingMintPayments = [] } = useQuery<PendingMintPaymentView[]>(
+    {
+      queryKey: ["pendingMintPayments"],
+      queryFn: async () => {
+        if (!actor) return [];
+        return actor.getMyPendingMintPayments();
+      },
+      enabled: !!actor,
+      refetchInterval: 30_000,
+    },
+  );
+
+  const retryPendingMintMutation = useMutation({
+    mutationFn: async (paymentId: bigint) => {
+      if (!actor) throw new Error("Not connected");
+      const result = await actor.retryPendingMintPayment(paymentId);
+      if (result.__kind__ === "err") throw new Error(result.err);
+      return result.ok;
+    },
+    onSuccess: (receipt) => {
+      toast.success(
+        `Mint recovered at block ${receipt.paymentBlock.toString()}`,
+      );
+      void queryClient.invalidateQueries({ queryKey: ["pendingMintPayments"] });
+      void queryClient.invalidateQueries({ queryKey: ["userNFTs"] });
+      void queryClient.invalidateQueries({ queryKey: ["userStats"] });
+      void queryClient.invalidateQueries({ queryKey: ["icp-balance"] });
+    },
+    onError: (err: unknown) => {
+      toast.error(extractError(err));
+    },
+  });
+
   useEffect(() => {
     const targetStillAvailable =
       (selectedTarget === "main" && mainMintAvailable) ||
@@ -1270,6 +1311,7 @@ function MintComposer({
         queryKey: ["collectionNFTs", targetCollection?.id.toString() ?? ""],
       });
       void queryClient.invalidateQueries({ queryKey: ["icp-balance"] });
+      void queryClient.invalidateQueries({ queryKey: ["pendingMintPayments"] });
       setName("");
       setDescription("");
       setAttributesText("");
@@ -1370,6 +1412,65 @@ function MintComposer({
             minting is enabled, or into one of the Mintlab collections you
             created.
           </HelpCallout>
+
+          {pendingMintPayments.length > 0 && (
+            <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    Paid mint recovery
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Payment is recorded on-chain. Retry finishes the mint
+                    without charging again.
+                  </p>
+                </div>
+                <Badge className="shrink-0 bg-amber-500/20 text-amber-700 border-0 dark:text-amber-200">
+                  {pendingMintPayments.length}
+                </Badge>
+              </div>
+              <div className="space-y-2">
+                {pendingMintPayments.map((payment) => (
+                  <div
+                    key={payment.id.toString()}
+                    className="flex flex-col gap-2 rounded-md border border-border bg-background/70 p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground">
+                        {pendingMintStatusLabel(payment.status)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatICP(payment.amountE8s)} ICP
+                        {payment.paymentBlock == null
+                          ? ""
+                          : ` - block ${payment.paymentBlock.toString()}`}
+                      </p>
+                      {payment.lastError && (
+                        <p className="mt-1 text-xs text-destructive">
+                          {payment.lastError}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2 self-start sm:self-center"
+                      disabled={
+                        retryPendingMintMutation.isPending ||
+                        payment.status === "Minted"
+                      }
+                      onClick={() =>
+                        retryPendingMintMutation.mutate(payment.id)
+                      }
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Retry
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {!mintConfig ? (
             <p className="text-sm text-muted-foreground">

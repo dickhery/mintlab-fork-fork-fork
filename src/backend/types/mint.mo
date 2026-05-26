@@ -149,6 +149,12 @@ module {
     updatedAt : Nat64;
   };
 
+  public type CollectionCreationRequestPage = {
+    requests : [CollectionCreationRequestView];
+    nextCursor : ?Nat;
+    totalCount : Nat;
+  };
+
   public type CollectionCreationDiagnostics = {
     request : CollectionCreationRequestView;
     requestedCanisterCycles : Nat;
@@ -222,6 +228,42 @@ module {
   public type MintReceipt = {
     nft : WalletTypes.WalletNFT;
     paymentBlock : Nat64;
+  };
+
+  public type PendingMintPaymentStatus = {
+    #PaymentPending;
+    #PaymentSent;
+    #Minted;
+    #Failed;
+  };
+
+  public type PendingMintPayment = {
+    id : Nat;
+    caller : Principal;
+    collectionId : CollectionId;
+    metadata : WalletTypes.NFTMetadata;
+    amountE8s : Nat64;
+    payoutAccount : AccountIdentifier;
+    memo : Nat64;
+    paymentCreatedAt : Nat64;
+    paymentBlock : ?Nat64;
+    mintedTokenId : ?Nat;
+    status : PendingMintPaymentStatus;
+    createdAt : Nat64;
+    updatedAt : Nat64;
+    lastError : ?Text;
+  };
+
+  public type PendingMintPaymentView = {
+    id : Nat;
+    collectionId : CollectionId;
+    amountE8s : Nat64;
+    paymentBlock : ?Nat64;
+    mintedTokenId : ?Nat;
+    status : PendingMintPaymentStatus;
+    createdAt : Nat64;
+    updatedAt : Nat64;
+    lastError : ?Text;
   };
 
   public type CollectionCreationReceipt = {

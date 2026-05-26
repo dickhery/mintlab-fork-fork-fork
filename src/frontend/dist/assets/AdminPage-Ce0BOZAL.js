@@ -1,14 +1,14 @@
-import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, a as cn, k as useNavigate, d as useAdmin, b as useBackend, e as useQueryClient, f as useQuery, l as Shield, g as ue, B as Button, P as Principal, A as Actor } from "./index-BjklpoWU.js";
-import { L as LoaderCircle, A as AppCanisterTopUpDialog, P as Plus, F as Fuel } from "./AppCanisterTopUpDialog-CgWQRn78.js";
-import { S as Switch, r as recommendedCollectionCreationTopUpCycles, T as Trash2, C as CollectionCreationDiagnosticsPanel } from "./switch-xewWtXj_.js";
-import { A as AlertDialog, i as AlertDialogTrigger, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-QzUFDKbw.js";
-import { I as Input, B as Badge } from "./badge-Cxipmsvb.js";
-import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, R as RefreshCw, c as CardContent } from "./card-D0qd2LdJ.js";
-import { j as Primitive, u as useMutation, L as Label } from "./index-D1EevaUf.js";
-import { L as Layers, e as ChevronDown, T as Textarea, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, E as ExternalLink, C as Check, I as Info } from "./textarea-DKl5EFyR.js";
-import { S as Skeleton, C as Copy } from "./skeleton-Er_mLg7r.js";
-import { r as resolveImageUrl, I as ImageOff } from "./media-CBIulzFx.js";
-import { C as CircleAlert } from "./circle-alert-CK03UyfW.js";
+import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, a as cn, k as useNavigate, d as useAdmin, b as useBackend, e as useQueryClient, f as useQuery, l as Shield, g as ue, B as Button, P as Principal, A as Actor } from "./index-Dlr-4CKz.js";
+import { L as LoaderCircle, A as AppCanisterTopUpDialog, P as Plus, F as Fuel } from "./AppCanisterTopUpDialog-DDsHUyXD.js";
+import { S as Switch, r as recommendedCollectionCreationTopUpCycles, T as Trash2, C as CollectionCreationDiagnosticsPanel } from "./switch-DT4oYvX4.js";
+import { A as AlertDialog, i as AlertDialogTrigger, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-CpwJYIFc.js";
+import { I as Input, B as Badge } from "./badge-DyWrd8S9.js";
+import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, R as RefreshCw, c as CardContent } from "./card-BmmW0ULT.js";
+import { j as Primitive, u as useMutation, L as Label } from "./index-Byv1oxo0.js";
+import { L as Layers, e as ChevronDown, T as Textarea, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, E as ExternalLink, C as Check, I as Info } from "./textarea-DwDGf75G.js";
+import { S as Skeleton, C as Copy } from "./skeleton-4xVXen6F.js";
+import { r as resolveImageUrl, I as ImageOff } from "./media-l8J0swV4.js";
+import { C as CircleAlert } from "./circle-alert-DD_5MABl.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *

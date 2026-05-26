@@ -1847,6 +1847,9 @@ video {
 .bg-amber-500\/15 {
   background-color: rgb(245 158 11 / 0.15);
 }
+.bg-amber-500\/20 {
+  background-color: rgb(245 158 11 / 0.2);
+}
 .bg-amber-500\/5 {
   background-color: rgb(245 158 11 / 0.05);
 }
@@ -4306,6 +4309,10 @@ video {
 
   .sm\:gap-2\.5 {
     gap: 0.625rem;
+  }
+
+  .sm\:self-center {
+    align-self: center;
   }
 
   .sm\:px-6 {
