@@ -345,7 +345,7 @@ module {
         let matches = switch (record.owner) {
           case (#Principal(value)) Principal.equal(value, owner);
           case (#AccountIdText(value)) {
-            value == accountIdHex or value == owner.toText() or value == blobToHex(owner.toBlob());
+            extOwnerMatches(value, accountIdHex, owner.toText(), blobToHex(owner.toBlob()));
           };
           case (#Unknown) false;
         };
@@ -692,11 +692,7 @@ module {
         let principalHex = blobToHex(owner.toBlob());
         let tokenIdentifier = normalizeEXTTokenIdentifier(collection.canisterId, tokenId);
         switch (await* fetchEXTOwnerAccountId(canister, tokenIdentifier)) {
-          case (#ok(ownerAccountId)) #ok(
-            ownerAccountId == accountIdHex or
-            ownerAccountId == principalText or
-            ownerAccountId == principalHex
-          );
+          case (#ok(ownerAccountId)) #ok(extOwnerMatches(ownerAccountId, accountIdHex, principalText, principalHex));
           case (#err(_)) {
             switch (await* fetchEXTBalance(canister, tokenIdentifier, owner, accountIdHex)) {
               case (#ok(balance)) #ok(balance > 0);
@@ -2177,17 +2173,6 @@ module {
       };
     };
 
-    if (tokenIndices.size() > 0 or sawAvailableMethod) {
-      return #ok(tokenIndices);
-    };
-
-    if (not allowRegistryFallback) {
-      switch (lastError) {
-        case (?message) return #err("Collection '" # collectionName # "': " # message);
-        case null return #err("Collection '" # collectionName # "': EXT token ownership method not available");
-      };
-    };
-
     switch (await* fetchEXTTokenIndicesForAccount(canister, principalText)) {
       case (#ok(values)) {
         sawAvailableMethod := true;
@@ -2236,7 +2221,18 @@ module {
       };
     };
 
-    if (tokenIndices.size() == 0 and not sawAvailableMethod and allowRegistryFallback) {
+    if (tokenIndices.size() > 0 or (sawAvailableMethod and not allowRegistryFallback)) {
+      return #ok(tokenIndices);
+    };
+
+    if (not allowRegistryFallback) {
+      switch (lastError) {
+        case (?message) return #err("Collection '" # collectionName # "': " # message);
+        case null return #err("Collection '" # collectionName # "': EXT token ownership method not available");
+      };
+    };
+
+    if (tokenIndices.size() == 0 and allowRegistryFallback) {
       switch (
         await* fetchEXTTokenIndicesFromRegistry(
           canister,
@@ -2727,9 +2723,10 @@ module {
     principalText : Text,
     principalHex : Text,
   ) : Bool {
-    ownerAccountId == accountIdHex or
-    ownerAccountId == principalText or
-    ownerAccountId == principalHex;
+    let normalizedOwner = Text.toLower(ownerAccountId);
+    normalizedOwner == Text.toLower(accountIdHex) or
+    normalizedOwner == Text.toLower(principalText) or
+    normalizedOwner == Text.toLower(principalHex);
   };
 
   func fetchDIP721PreviewsByOwnerScan(

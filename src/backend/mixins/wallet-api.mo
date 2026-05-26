@@ -656,7 +656,7 @@ mixin (
           caller,
           userAccountIdHex,
         );
-        let preview = await* WalletLib.previewUserOwnedNFTsFromOwnerIndex(
+        let preview = await* WalletLib.previewUserOwnedNFTs(
           collection,
           caller,
           userAccountId,
