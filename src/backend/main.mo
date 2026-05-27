@@ -15,9 +15,7 @@ import ICPApi "mixins/icp-api";
 import MarketplaceApi "mixins/marketplace-api";
 import BrowseApi "mixins/browse-api";
 import DividendsApi "mixins/dividends-api";
-import { migration } "migration";
 
-(with migration)
 persistent actor Backend {
   // ── Stable state ──────────────────────────────────────────────────────────
   let authState = AuthLib.newState();

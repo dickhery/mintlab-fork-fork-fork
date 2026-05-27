@@ -1,4 +1,4 @@
-// Version: 3.0.0
+// Version: 1.0.0
 type AccountIdentifier__461726824 = Blob;
 type AccountIdentifier__537905862 = AccountIdentifier__461726824;
 type AccountIdentifier__659921903 = AccountIdentifier__461726824;
@@ -290,69 +290,6 @@ type NoBidAuctionReturnStage__380679664 =
   {#CleanupPending; #NFTReturnPending; #WalletRegistrationPending};
 type Node__46230540<K, V> =
   {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
-type OldCollectionsState__548460930 =
-  {
-    collections :
-      Map__605269027<CollectionId__674876002, Collection__211048818>;
-    var nextId : Nat
-  };
-type OldListingReturnState__355318713 =
-  {
-    returns :
-      Map__605269027<ListingId__411740840, ListingReturnSettlement__416608273>
-  };
-type OldMarketplaceBidState__948577849 =
-  {
-    pendingBidDeposits :
-      Map__605269027<ListingId__411740840, PendingBidDeposit__499993912>
-  };
-type OldMarketplacePaymentState__503762692 =
-  {
-    auctionEscrows :
-      Map__605269027<ListingId__411740840, AuctionEscrow__460860708>;
-    listingLocks : Map__605269027<ListingId__411740840, Bool>;
-    var mintlabFeeRecipient : ?AccountIdentifier__659921903;
-    var nextEscrowId : Nat;
-    pendingRefunds : Map__605269027<Nat, AuctionEscrow__460860708>
-  };
-type OldMarketplaceSettlementState__15876355 =
-  {
-    auctionSettlements :
-      Map__605269027<ListingId__411740840, AuctionSettlement__620895947>;
-    fixedPurchaseSettlements :
-      Map__605269027<ListingId__411740840, FixedPurchaseSettlement__878942942>
-  };
-type OldMarketplaceState__487439665 =
-  {
-    auctionListings :
-      Map__605269027<ListingId__411740840, AuctionListing__214662739>;
-    bids : Map__605269027<ListingId__411740840, [Bid__832380272]>;
-    escrowedNFTs : Map__605269027<ListingId__411740840, WalletNFT__72979044>;
-    fixedListings :
-      Map__605269027<ListingId__411740840, FixedListing__362219521>;
-    var nextId : Nat
-  };
-type OldMintState__237530924 =
-  {
-    var collectionCanisterWasm : ?Blob;
-    var config : StoredMintConfig__154708401;
-    var nextTokenId : Nat;
-    var nextTransactionId : Nat;
-    pendingCollectionCreates : Map__605269027<Principal, Bool>;
-    tokens : Map__605269027<Nat, MintedToken__579944743>
-  };
-type OldNoBidAuctionReturnState__989678842 =
-  {
-    returns :
-      Map__605269027<ListingId__411740840,
-                      NoBidAuctionReturnSettlement__907278393>
-  };
-type OldOwnershipIndexState__327046650 =
-  {
-    records : Map__605269027<Text, OwnershipIndexRecord__80260664>;
-    status :
-      Map__605269027<CollectionId__519062255, CollectionIndexStatus__92330500>
-  };
 type OwnershipIndexRecord__80260664 =
   {
     collectionId : CollectionId__519062255;
@@ -458,78 +395,7 @@ type WithdrawalJournalEntry__114752974 =
     updatedAt : Nat64
   };
 type WithdrawalStatus__328667338 = {#Completed; #Failed; #Pending};
-actor ({
-  stable AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat;
-  stable AUTO_INDEX_PAGE_LIMIT : Nat;
-  stable IMPORT_COOLDOWN_NS : Int;
-  stable IMPORT_DAY_NS : Int;
-  stable IMPORT_INDEX_WARM_PAGE_LIMIT : Nat;
-  stable MAX_IMPORTS_PER_USER_PER_DAY : Nat;
-  stable MAX_UNVERIFIED_COLLECTIONS_VISIBLE : Nat;
-  stable authState : {var adminPrincipal : ?Principal};
-  stable collectionCreationPayoutSplitState :
-    {
-      var primaryPayoutBasisPoints : Nat;
-      requestPayouts :
-        Map__605269027<Nat, CollectionCreationRequestPayout__971108668>;
-      var secondaryPayoutAccount : ?AccountIdentifier__537905862;
-      var secondaryPayoutBasisPoints : Nat
-    };
-  stable collectionCreationState :
-    {
-      var nextRequestId : Nat;
-      requests : Map__605269027<Nat, CollectionCreationRequest__20821532>;
-      requestsByOwner : Map__605269027<Principal, [Nat]>
-    };
-  in collectionsState : OldCollectionsState__548460930;
-  stable dividendFeeState :
-    {
-      disbursementLocks : Map__605269027<CollectionId__674876002, Bool>;
-      feeReserveE8s : Map__605269027<CollectionId__674876002, Nat64>
-    };
-  stable dividendsState :
-    {
-      claimableE8s : Map__605269027<Text, Nat64>;
-      pendingClaims : Map__605269027<Text, Bool>;
-      processedBalanceE8s : Map__605269027<CollectionId__674876002, Nat64>
-    };
-  stable icpWithdrawalState :
-    {
-      var nextWithdrawalId : Nat;
-      withdrawals : Map__605269027<Text, WithdrawalJournalEntry__114752974>
-    };
-  in marketplaceBidState : OldMarketplaceBidState__948577849;
-  stable marketplaceFeeState : {var mintlabFeeBasisPoints : Nat};
-  stable marketplaceListingLockState :
-    {listingTokenLocks : Map__605269027<Text, Bool>};
-  in marketplaceListingReturnState : OldListingReturnState__355318713;
-  in marketplaceNoBidAuctionReturnState :
-    OldNoBidAuctionReturnState__989678842;
-  in marketplacePaymentState : OldMarketplacePaymentState__503762692;
-  stable marketplaceRefundState :
-    {refundJournals : Map__605269027<Nat, PendingAuctionRefund__138190742>};
-  in marketplaceSettlementState : OldMarketplaceSettlementState__15876355;
-  in marketplaceState : OldMarketplaceState__487439665;
-  stable marketplaceUserPaymentLockState :
-    {userPaymentLocks : Map__605269027<Principal, Bool>};
-  in mintState : OldMintState__237530924;
-  stable moderationState : {var config : ModerationConfig__323099261};
-  in ownershipIndexState : OldOwnershipIndexState__327046650;
-  stable pendingMintPaymentState :
-    {
-      var nextPaymentId : Nat;
-      payments : Map__605269027<Nat, PendingMintPayment__763212301>;
-      paymentsByCaller : Map__605269027<Principal, [Nat]>
-    };
-  stable walletState :
-    {
-      var nextId : Nat;
-      nfts : Map__605269027<NFTId__701715282, WalletNFT__72979044>;
-      pendingDeposits : Map__605269027<Text, DepositPreparation__848295656>;
-      tokenIndex : Map__605269027<Text, NFTId__701715282>;
-      userNFTs : Map__605269027<UserId__74810557, [NFTId__701715282]>
-    }
-}, {
+actor {
   stable AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat;
   stable AUTO_INDEX_PAGE_LIMIT : Nat;
   stable IMPORT_COOLDOWN_NS : Int;
@@ -681,4 +547,4 @@ actor ({
       tokenIndex : Map__605269027<Text, NFTId__701715282>;
       userNFTs : Map__605269027<UserId__74810557, [NFTId__701715282]>
     }
-}) ;
+};
