@@ -1,14 +1,14 @@
-import { c as createLucideIcon, u as useAuth, b as useBackend, e as useQueryClient, r as reactExports, f as useQuery, j as jsxRuntimeExports, W as Wallet, B as Button, L as LogIn, g as ue } from "./index-CovTg-hX.js";
-import { H as HelpCallout } from "./HelpCallout-T-QMDs9O.js";
-import { B as Badge, I as Input } from "./badge-CfPrF_7D.js";
-import { C as Card, a as CardHeader, b as CardTitle, R as RefreshCw, c as CardContent } from "./card-jfIVO2Xy.js";
-import { u as useMutation, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./index-CkhE-A-E.js";
-import { S as Skeleton, C as Copy } from "./skeleton-ged-8493.js";
+import { c as createLucideIcon, u as useAuth, b as useBackend, e as useQueryClient, r as reactExports, f as useQuery, j as jsxRuntimeExports, W as Wallet, B as Button, L as LogIn, g as ue } from "./index-DrWYGNY7.js";
+import { H as HelpCallout } from "./HelpCallout-BRevIvJK.js";
+import { B as Badge, I as Input } from "./badge-D1d2x5iE.js";
+import { C as Card, a as CardHeader, b as CardTitle, R as RefreshCw, c as CardContent } from "./card-C4gJLurl.js";
+import { u as useMutation, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./index-CkHqoma8.js";
+import { S as Skeleton, C as Copy } from "./skeleton-D7Dm5ahN.js";
 import { p as parseICPToE8s, I as ICP_E8S } from "./icp-BXjZNIYq.js";
-import { S as Send } from "./send-BDcICmY3.js";
-import { C as CircleAlert } from "./circle-alert-C3xm30wx.js";
-import { C as CircleCheck } from "./circle-check-DMGdSLn6.js";
-import "./arrow-right-0kqjpRcW.js";
+import { S as Send } from "./send-C2LIcXAp.js";
+import { C as CircleAlert } from "./circle-alert-DDFcLYdj.js";
+import { C as CircleCheck } from "./circle-check-vDdFy3HD.js";
+import "./arrow-right-R8qGCR3L.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -21,6 +21,7 @@ const __iconNode = [
 ];
 const ArrowDownLeft = createLucideIcon("arrow-down-left", __iconNode);
 const TRANSFER_FEE = 10000n;
+const MAX_NAT64 = 18446744073709551615n;
 function formatICP(e8s) {
   const whole = e8s / ICP_E8S;
   const frac = e8s % ICP_E8S;
@@ -36,6 +37,26 @@ function hexToAccountId(hex) {
     bytes[i / 2] = Number.parseInt(hex.slice(i, i + 2), 16);
   }
   return bytes;
+}
+function createWithdrawalNonce() {
+  const cryptoApi = globalThis.crypto;
+  if (cryptoApi == null ? void 0 : cryptoApi.getRandomValues) {
+    const bytes = new Uint8Array(8);
+    cryptoApi.getRandomValues(bytes);
+    let value = 0n;
+    for (const byte of bytes) {
+      value = (value << 8n) + BigInt(byte);
+    }
+    return value === 0n ? 1n : value;
+  }
+  return BigInt(Date.now()) * 1000000n + BigInt(Math.floor(Math.random() * 1e6));
+}
+function parseMemoToNat64(value) {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!/^\d+$/.test(trimmed)) return null;
+  const parsed = BigInt(trimmed);
+  return parsed <= MAX_NAT64 ? parsed : null;
 }
 function formatTransferError(result) {
   if (result.__kind__ === "Ok") return "";
@@ -96,9 +117,11 @@ function ICPAccountPage() {
   const [recipient, setRecipient] = reactExports.useState("");
   const [amount, setAmount] = reactExports.useState("");
   const [memo, setMemo] = reactExports.useState("");
+  const [withdrawalNonce, setWithdrawalNonce] = reactExports.useState(null);
   const [confirmOpen, setConfirmOpen] = reactExports.useState(false);
   const recipientError = recipient.length > 0 && !/^[0-9a-fA-F]{64}$/.test(recipient) ? "Must be a 64-character hex string" : null;
   const parsedAmountE8s = parseICPToE8s(amount);
+  const parsedMemo = parseMemoToNat64(memo);
   const amountE8s = parsedAmountE8s ?? 0n;
   const totalDebitE8s = amountE8s + TRANSFER_FEE;
   const {
@@ -127,14 +150,23 @@ function ICPAccountPage() {
   const balanceNum = balanceE8s ?? 0n;
   const hasAmount = amount.trim().length > 0;
   const amountInvalid = hasAmount && parsedAmountE8s === null;
+  const memoInvalid = memo.trim().length > 0 && parsedMemo === null;
   const amountTooSmall = amountE8s > 0n && amountE8s <= TRANSFER_FEE;
   const amountExceedsBalance = amountE8s > 0n && totalDebitE8s > balanceNum;
-  const formValid = /^[0-9a-fA-F]{64}$/.test(recipient) && amountE8s > TRANSFER_FEE && !amountExceedsBalance;
+  const formValid = /^[0-9a-fA-F]{64}$/.test(recipient) && amountE8s > TRANSFER_FEE && !amountExceedsBalance && !memoInvalid;
   const transferMutation = useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error("Not connected to backend");
       const to = hexToAccountId(recipient);
-      const result = await actor.transferICPOut(to, amountE8s);
+      const clientNonce = withdrawalNonce ?? parsedMemo ?? createWithdrawalNonce();
+      if (withdrawalNonce === null) {
+        setWithdrawalNonce(clientNonce);
+      }
+      const result = await actor.transferICPOutWithClientNonce(
+        to,
+        amountE8s,
+        clientNonce
+      );
       return result;
     },
     onSuccess: (result) => {
@@ -147,6 +179,7 @@ function ICPAccountPage() {
         setRecipient("");
         setAmount("");
         setMemo("");
+        setWithdrawalNonce(null);
         queryClient.invalidateQueries({ queryKey: ["icp-balance"] });
       } else {
         ue.error("Transfer failed", {
@@ -332,7 +365,10 @@ function ICPAccountPage() {
                       id: "recipient",
                       placeholder: "64-character hex account identifier…",
                       value: recipient,
-                      onChange: (e) => setRecipient(e.target.value.trim()),
+                      onChange: (e) => {
+                        setRecipient(e.target.value.trim());
+                        setWithdrawalNonce(null);
+                      },
                       className: "font-mono text-xs bg-muted/30 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/50",
                       "data-ocid": "icp-account.recipient_input"
                     }
@@ -368,7 +404,10 @@ function ICPAccountPage() {
                         min: "0",
                         step: "0.00000001",
                         value: amount,
-                        onChange: (e) => setAmount(e.target.value),
+                        onChange: (e) => {
+                          setAmount(e.target.value);
+                          setWithdrawalNonce(null);
+                        },
                         className: "font-mono pr-14 bg-muted/30 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/50",
                         "data-ocid": "icp-account.amount_input"
                       }
@@ -437,9 +476,23 @@ function ICPAccountPage() {
                       placeholder: "Numeric memo e.g. 12345",
                       min: "0",
                       value: memo,
-                      onChange: (e) => setMemo(e.target.value),
+                      onChange: (e) => {
+                        setMemo(e.target.value);
+                        setWithdrawalNonce(null);
+                      },
                       className: "font-mono bg-muted/30 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/50",
                       "data-ocid": "icp-account.memo_input"
+                    }
+                  ),
+                  memoInvalid && /* @__PURE__ */ jsxRuntimeExports.jsxs(
+                    "p",
+                    {
+                      className: "text-xs text-destructive flex items-center gap-1.5",
+                      "data-ocid": "icp-account.memo_field_error",
+                      children: [
+                        /* @__PURE__ */ jsxRuntimeExports.jsx(CircleAlert, { className: "h-3 w-3 shrink-0" }),
+                        "Memo must be a non-negative 64-bit integer"
+                      ]
                     }
                   )
                 ] }),
@@ -448,7 +501,12 @@ function ICPAccountPage() {
                   {
                     className: "w-full gap-2 font-medium",
                     disabled: !formValid || transferMutation.isPending,
-                    onClick: () => setConfirmOpen(true),
+                    onClick: () => {
+                      setWithdrawalNonce(
+                        (current) => current ?? parsedMemo ?? createWithdrawalNonce()
+                      );
+                      setConfirmOpen(true);
+                    },
                     "data-ocid": "icp-account.transfer_submit_button",
                     children: [
                       transferMutation.isPending ? /* @__PURE__ */ jsxRuntimeExports.jsx(RefreshCw, { className: "h-4 w-4 animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Send, { className: "h-4 w-4" }),
