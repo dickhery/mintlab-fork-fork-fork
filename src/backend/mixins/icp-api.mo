@@ -24,15 +24,33 @@ mixin (
     to : CommonTypes.AccountIdentifier,
     amount : Nat64,
   ) : async CommonTypes.TransferResult {
+    await transferICPOutWithNonce(caller, to, amount, null);
+  };
+
+  public shared ({ caller }) func transferICPOutWithClientNonce(
+    to : CommonTypes.AccountIdentifier,
+    amount : Nat64,
+    clientNonce : Nat64,
+  ) : async CommonTypes.TransferResult {
+    await transferICPOutWithNonce(caller, to, amount, ?clientNonce);
+  };
+
+  func transferICPOutWithNonce(
+    caller : Principal,
+    to : CommonTypes.AccountIdentifier,
+    amount : Nat64,
+    clientNonce : ?Nat64,
+  ) : async CommonTypes.TransferResult {
     if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
-    if (amount <= IcpLib.DEFAULT_FEE) Runtime.trap("Amount must exceed the transfer fee");
+    let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+    let feeE8s = await* IcpLib.getTransferFee(ledger);
+    if (amount <= feeE8s) Runtime.trap("Amount must exceed the current transfer fee");
     if (not MarketplaceLib.acquireUserPaymentLock(marketplaceUserPaymentLockState, caller)) {
       Runtime.trap("Another ICP operation is already using your balance. Try again shortly.");
     };
     try {
-      let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
       let sub = IcpLib.principalToSubaccount(caller);
-      let withdrawal = IcpLib.beginWithdrawal(icpWithdrawalState, caller, to, amount);
+      let withdrawal = IcpLib.beginWithdrawalWithClientNonce(icpWithdrawalState, caller, to, amount, clientNonce);
       switch (withdrawal.status) {
         case (#Completed) {
           switch (withdrawal.blockIndex) {
@@ -42,12 +60,13 @@ mixin (
         };
         case (_) {};
       };
-      let result = await* IcpLib.transferOutAt(
+      let result = await* IcpLib.transferOutWithFeeAt(
         ledger,
         ?sub,
         to,
         amount,
         withdrawal.memo,
+        feeE8s,
         withdrawal.createdAt,
       );
       switch (result) {

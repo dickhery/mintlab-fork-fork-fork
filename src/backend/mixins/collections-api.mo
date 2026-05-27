@@ -5,6 +5,7 @@ import CollectionTypes "../types/collections";
 import Nat "mo:core/Nat";
 import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
+import Text "mo:core/Text";
 
 mixin (
   collectionsState : CollectionsLib.CollectionsState,
@@ -26,6 +27,10 @@ mixin (
     if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
     if (name == "") Runtime.trap("Collection name is required");
     if (symbol == "") Runtime.trap("Collection symbol is required");
+    if (Principal.isAnonymous(canisterId)) Runtime.trap("Invalid collection canister");
+    if (Text.size(name) > 80) Runtime.trap("Collection name is too long");
+    if (Text.size(symbol) > 16) Runtime.trap("Collection symbol is too long");
+    if (Text.size(description) > 2_000) Runtime.trap("Collection description is too long");
     validateCollectionImage(imageUrl);
     validateBrowseInfo(browseInfo);
     switch (standard) {

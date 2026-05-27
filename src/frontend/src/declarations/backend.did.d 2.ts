@@ -187,6 +187,10 @@ export interface _SERVICE {
       { 'err' : string }
   >,
   'transferICPOut' : ActorMethod<[AccountIdentifier, bigint], TransferResult>,
+  'transferICPOutWithClientNonce' : ActorMethod<
+    [AccountIdentifier, bigint, bigint],
+    TransferResult
+  >,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

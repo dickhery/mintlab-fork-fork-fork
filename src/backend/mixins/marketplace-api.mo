@@ -841,20 +841,14 @@ mixin (
     cursor : ?Nat,
     limit : ?Nat,
   ) : async MarketplaceTypes.ActiveListingPage {
-    let listings = MarketplaceLib.getAvailableActiveListings(
+    MarketplaceLib.getAvailableActiveListingsPage(
       marketplaceState,
       marketplaceSettlementState,
       marketplaceNoBidAuctionReturnState,
       marketplaceListingReturnState,
+      cursorOrZero(cursor),
+      normalizeMarketplacePageSize(limit),
     );
-    let start = cursorOrZero(cursor);
-    let page = sliceActiveListings(listings, start, normalizeMarketplacePageSize(limit));
-    let next = start + page.size();
-    {
-      listings = page;
-      nextCursor = if (next < listings.size()) ?next else null;
-      totalCount = listings.size();
-    };
   };
 
   public query func getActiveListingDetails() : async [MarketplaceTypes.ActiveListingDetail] {
@@ -870,20 +864,14 @@ mixin (
     cursor : ?Nat,
     limit : ?Nat,
   ) : async MarketplaceTypes.ActiveListingDetailPage {
-    let details = MarketplaceLib.getAvailableActiveListingDetails(
+    MarketplaceLib.getAvailableActiveListingDetailsPage(
       marketplaceState,
       marketplaceSettlementState,
       marketplaceNoBidAuctionReturnState,
       marketplaceListingReturnState,
+      cursorOrZero(cursor),
+      normalizeMarketplacePageSize(limit),
     );
-    let start = cursorOrZero(cursor);
-    let page = sliceActiveListingDetails(details, start, normalizeMarketplacePageSize(limit));
-    let next = start + page.size();
-    {
-      details = page;
-      nextCursor = if (next < details.size()) ?next else null;
-      totalCount = details.size();
-    };
   };
 
   public shared query ({ caller }) func getMyMarketplaceSettlementStatuses() : async [MarketplaceTypes.SettlementStatus] {

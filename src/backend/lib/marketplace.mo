@@ -846,6 +846,120 @@ module {
     listings;
   };
 
+  public func getAvailableActiveListingsPage(
+    state : MarketplaceState,
+    settlementState : MarketplaceSettlementState,
+    noBidReturnState : NoBidAuctionReturnState,
+    listingReturnState : ListingReturnState,
+    cursor : Nat,
+    limit : Nat,
+  ) : Types.ActiveListingPage {
+    let pageSize = if (limit == 0) 1 else limit;
+    var listings : [Types.ActiveListing] = [];
+    var totalCount : Nat = 0;
+    var added : Nat = 0;
+
+    for ((listingId, listing) in Map.entries(state.fixedListings)) {
+      if (
+        listing.status == #Active and
+        not isListingSettling(settlementState, listingId) and
+        not isListingReturning(listingReturnState, listingId)
+      ) {
+        if (totalCount >= cursor and added < pageSize) {
+          listings := Array.concat<Types.ActiveListing>(listings, [#Fixed(listing)]);
+          added += 1;
+        };
+        totalCount += 1;
+      };
+    };
+    for ((listingId, listing) in Map.entries(state.auctionListings)) {
+      if (
+        listing.status == #Active and
+        not isListingSettling(settlementState, listingId) and
+        not isNoBidAuctionReturning(noBidReturnState, listingId) and
+        not isListingReturning(listingReturnState, listingId)
+      ) {
+        if (totalCount >= cursor and added < pageSize) {
+          listings := Array.concat<Types.ActiveListing>(listings, [#Auction(listing)]);
+          added += 1;
+        };
+        totalCount += 1;
+      };
+    };
+
+    let next = cursor + added;
+    {
+      listings;
+      nextCursor = if (next < totalCount) ?next else null;
+      totalCount;
+    };
+  };
+
+  public func getAvailableActiveListingDetailsPage(
+    state : MarketplaceState,
+    settlementState : MarketplaceSettlementState,
+    noBidReturnState : NoBidAuctionReturnState,
+    listingReturnState : ListingReturnState,
+    cursor : Nat,
+    limit : Nat,
+  ) : Types.ActiveListingDetailPage {
+    let pageSize = if (limit == 0) 1 else limit;
+    var details : [Types.ActiveListingDetail] = [];
+    var totalCount : Nat = 0;
+    var added : Nat = 0;
+
+    for ((listingId, listing) in Map.entries(state.fixedListings)) {
+      if (
+        listing.status == #Active and
+        not isListingSettling(settlementState, listingId) and
+        not isListingReturning(listingReturnState, listingId)
+      ) {
+        switch (Map.get(state.escrowedNFTs, Nat.compare, listingId)) {
+          case (?nft) {
+            if (totalCount >= cursor and added < pageSize) {
+              details := Array.concat<Types.ActiveListingDetail>(
+                details,
+                [{ listing = #Fixed(listing); nft }],
+              );
+              added += 1;
+            };
+            totalCount += 1;
+          };
+          case null {};
+        };
+      };
+    };
+    for ((listingId, listing) in Map.entries(state.auctionListings)) {
+      if (
+        listing.status == #Active and
+        not isListingSettling(settlementState, listingId) and
+        not isNoBidAuctionReturning(noBidReturnState, listingId) and
+        not isListingReturning(listingReturnState, listingId)
+      ) {
+        switch (Map.get(state.escrowedNFTs, Nat.compare, listingId)) {
+          case (?nft) {
+            if (totalCount >= cursor and added < pageSize) {
+              details := Array.concat<Types.ActiveListingDetail>(
+                details,
+                [{ listing = #Auction(listing); nft }],
+              );
+              added += 1;
+            };
+            totalCount += 1;
+          };
+          case null {};
+        };
+      };
+    };
+
+    let next = cursor + added;
+    {
+      details;
+      nextCursor = if (next < totalCount) ?next else null;
+      totalCount;
+    };
+  };
+
   public func settleFixedListing(
     state : MarketplaceState,
     listingId : Types.ListingId,
@@ -1158,7 +1272,17 @@ module {
     var listingIds : [Types.ListingId] = [];
     for ((listingId, nft) in Map.entries(state.escrowedNFTs)) {
       if (nft.collectionId == collectionId and nft.tokenId == tokenId) {
-        listingIds := appendListingId(listingIds, listingId);
+        let fixedActive = switch (Map.get(state.fixedListings, Nat.compare, listingId)) {
+          case (?listing) listing.status == #Active;
+          case null false;
+        };
+        let auctionActive = switch (Map.get(state.auctionListings, Nat.compare, listingId)) {
+          case (?listing) listing.status == #Active;
+          case null false;
+        };
+        if (not fixedActive and not auctionActive) {
+          listingIds := appendListingId(listingIds, listingId);
+        };
       };
     };
     for (listingId in listingIds.values()) {

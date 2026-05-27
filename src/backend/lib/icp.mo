@@ -206,8 +206,13 @@ module {
     caller : Principal,
     to : CommonTypes.AccountIdentifier,
     amount : Nat64,
+    clientNonce : ?Nat64,
   ) : Text {
-    caller.toText() # ":" # blobToHex(to) # ":" # Nat64.toText(amount);
+    let nonceText = switch (clientNonce) {
+      case (?value) Nat64.toText(value);
+      case null "legacy";
+    };
+    caller.toText() # ":" # blobToHex(to) # ":" # Nat64.toText(amount) # ":" # nonceText;
   };
 
   public func reusableWithdrawal(
@@ -215,8 +220,9 @@ module {
     caller : Principal,
     to : CommonTypes.AccountIdentifier,
     amount : Nat64,
+    clientNonce : ?Nat64,
   ) : ?IcpTypes.WithdrawalJournalEntry {
-    let key = withdrawalKey(caller, to, amount);
+    let key = withdrawalKey(caller, to, amount, clientNonce);
     switch (Map.get(state.withdrawals, Text.compare, key)) {
       case null null;
       case (?entry) {
@@ -240,7 +246,17 @@ module {
     to : CommonTypes.AccountIdentifier,
     amount : Nat64,
   ) : IcpTypes.WithdrawalJournalEntry {
-    switch (reusableWithdrawal(state, caller, to, amount)) {
+    beginWithdrawalWithClientNonce(state, caller, to, amount, null);
+  };
+
+  public func beginWithdrawalWithClientNonce(
+    state : WithdrawalState,
+    caller : Principal,
+    to : CommonTypes.AccountIdentifier,
+    amount : Nat64,
+    clientNonce : ?Nat64,
+  ) : IcpTypes.WithdrawalJournalEntry {
+    switch (reusableWithdrawal(state, caller, to, amount, clientNonce)) {
       case (?entry) return entry;
       case null {};
     };
@@ -252,14 +268,18 @@ module {
       caller;
       to;
       amountE8s = amount;
-      memo = Nat64.fromNat(id);
+      clientNonce;
+      memo = switch (clientNonce) {
+        case (?value) value;
+        case null Nat64.fromNat(id);
+      };
       createdAt = now;
       updatedAt = now;
       blockIndex = null;
       status = #Pending;
       lastError = null;
     };
-    Map.add(state.withdrawals, Text.compare, withdrawalKey(caller, to, amount), entry);
+    Map.add(state.withdrawals, Text.compare, withdrawalKey(caller, to, amount, clientNonce), entry);
     entry;
   };
 
@@ -275,7 +295,7 @@ module {
       updatedAt = nowNat64();
       lastError = null;
     };
-    Map.add(state.withdrawals, Text.compare, withdrawalKey(entry.caller, entry.to, entry.amountE8s), updated);
+    Map.add(state.withdrawals, Text.compare, withdrawalKey(entry.caller, entry.to, entry.amountE8s, entry.clientNonce), updated);
     updated;
   };
 
@@ -290,7 +310,7 @@ module {
       updatedAt = nowNat64();
       lastError = ?message;
     };
-    Map.add(state.withdrawals, Text.compare, withdrawalKey(entry.caller, entry.to, entry.amountE8s), updated);
+    Map.add(state.withdrawals, Text.compare, withdrawalKey(entry.caller, entry.to, entry.amountE8s, entry.clientNonce), updated);
     updated;
   };
 

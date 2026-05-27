@@ -135,6 +135,11 @@ mixin (
     mintlab_collection_owner : () -> async Principal;
   };
 
+  type MintFinalizeResult = {
+    receipt : MintTypes.MintReceipt;
+    tokenId : Nat;
+  };
+
   type EXTTokenIdentifier = Text;
   type EXTAccountIdentifier = Text;
   type EXTBalance = Nat;
@@ -1990,9 +1995,9 @@ mixin (
         var persistPaymentBlock : ?Nat64 = ?paymentBlock;
         try {
           ignore MintLib.markPendingMintPaymentSent(pendingMintPaymentState, payment.id, paymentBlock);
-          let receipt = mintMainCollectionNFTFromMetadata(caller, collection, metadata, paymentBlock);
-          ignore MintLib.markPendingMintPaymentMinted(pendingMintPaymentState, payment.id, receipt.nft.id);
-          #ok(receipt);
+          let finalized = mintMainCollectionNFTFromMetadata(caller, collection, metadata, paymentBlock);
+          ignore MintLib.markPendingMintPaymentMinted(pendingMintPaymentState, payment.id, finalized.tokenId);
+          #ok(finalized.receipt);
         } catch (error) {
           let message =
             "Your ICP payment was recorded at block " #
@@ -2020,7 +2025,7 @@ mixin (
         releaseUserPaymentLock(caller);
       };
     } else {
-      #ok(mintMainCollectionNFTFromMetadata(caller, collection, metadata, 0));
+      #ok(mintMainCollectionNFTFromMetadata(caller, collection, metadata, 0).receipt);
     };
   };
 
@@ -2082,14 +2087,14 @@ mixin (
           case (?value) value;
         };
         try {
-          let receipt = mintMainCollectionNFTFromMetadata(
+          let finalized = mintMainCollectionNFTFromMetadata(
             payment.caller,
             collection,
             payment.metadata,
             paymentBlock,
           );
-          ignore MintLib.markPendingMintPaymentMinted(pendingMintPaymentState, payment.id, receipt.nft.id);
-          #ok(receipt);
+          ignore MintLib.markPendingMintPaymentMinted(pendingMintPaymentState, payment.id, finalized.tokenId);
+          #ok(finalized.receipt);
         } catch (error) {
           let message = "Pending mint retry failed: " # Error.message(error);
           ignore MintLib.markPendingMintPaymentError(pendingMintPaymentState, payment.id, message);
@@ -2104,7 +2109,7 @@ mixin (
     collection : CollectionTypes.Collection,
     metadata : WalletTypes.NFTMetadata,
     paymentBlock : Nat64,
-  ) : MintTypes.MintReceipt {
+  ) : MintFinalizeResult {
     let token = MintLib.mintToken(
       mintState,
       caller,
@@ -2124,8 +2129,11 @@ mixin (
       #Minted,
     );
     {
-      nft;
-      paymentBlock;
+      receipt = {
+        nft;
+        paymentBlock;
+      };
+      tokenId = token.tokenId;
     };
   };
 

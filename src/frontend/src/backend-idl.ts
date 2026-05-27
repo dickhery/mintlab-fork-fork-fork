@@ -1482,6 +1482,11 @@ export const idlFactory = ({ IDL }) => {
         [TransferResult],
         [],
       ),
+    'transferICPOutWithClientNonce' : IDL.Func(
+        [AccountIdentifier, IDL.Nat64, IDL.Nat64],
+        [TransferResult],
+        [],
+      ),
     'transformModerationResponse' : IDL.Func(
         [
           IDL.Record({

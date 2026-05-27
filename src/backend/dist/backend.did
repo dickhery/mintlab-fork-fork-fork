@@ -1357,6 +1357,8 @@ service : {
   transferFromDip721: (from: principal, to: principal, tokenId: nat) ->
    (DIP721NatResult);
   transferICPOut: (to: AccountIdentifier, amount: nat64) -> (TransferResult);
+  transferICPOutWithClientNonce: (to: AccountIdentifier, amount: nat64,
+   clientNonce: nat64) -> (TransferResult);
   transformModerationResponse: (args:
    record {
      context: blob;

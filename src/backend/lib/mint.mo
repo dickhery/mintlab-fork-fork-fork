@@ -503,17 +503,26 @@ module {
     state : PendingMintPaymentState,
     caller : Principal,
   ) : [Types.PendingMintPaymentView] {
+    let ids = switch (Map.get(state.paymentsByCaller, Principal.compare, caller)) {
+      case (?values) values;
+      case null [];
+    };
     var payments : [Types.PendingMintPaymentView] = [];
-    for (payment in Map.values(state.payments)) {
-      if (
-        Principal.equal(payment.caller, caller) and
-        payment.status != #Minted and
-        (payment.status != #Failed or payment.paymentBlock != null)
-      ) {
-        payments := Array.concat<Types.PendingMintPaymentView>(
-          payments,
-          [pendingMintPaymentView(payment)],
-        );
+    for (id in ids.values()) {
+      switch (Map.get(state.payments, Nat.compare, id)) {
+        case null {};
+        case (?payment) {
+          if (
+            Principal.equal(payment.caller, caller) and
+            payment.status != #Minted and
+            (payment.status != #Failed or payment.paymentBlock != null)
+          ) {
+            payments := Array.concat<Types.PendingMintPaymentView>(
+              payments,
+              [pendingMintPaymentView(payment)],
+            );
+          };
+        };
       };
     };
     payments;

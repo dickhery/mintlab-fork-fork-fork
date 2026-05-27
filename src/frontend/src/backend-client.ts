@@ -1059,6 +1059,11 @@ export interface backendInterface {
     to: AccountIdentifier,
     amount: bigint,
   ): Promise<TransferResult>;
+  transferICPOutWithClientNonce(
+    to: AccountIdentifier,
+    amount: bigint,
+    clientNonce: bigint,
+  ): Promise<TransferResult>;
 }
 
 type RawNFTStandard =
@@ -3882,6 +3887,18 @@ export class Backend implements backendInterface {
   ): Promise<TransferResult> {
     return fromRawTransferResult(
       await this.run(() => this.actor.transferICPOut(to, amount)),
+    );
+  }
+
+  async transferICPOutWithClientNonce(
+    to: AccountIdentifier,
+    amount: bigint,
+    clientNonce: bigint,
+  ): Promise<TransferResult> {
+    return fromRawTransferResult(
+      await this.run(() =>
+        this.actor.transferICPOutWithClientNonce(to, amount, clientNonce),
+      ),
     );
   }
 }

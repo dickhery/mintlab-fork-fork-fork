@@ -34,6 +34,7 @@ import { toast } from "sonner";
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 const TRANSFER_FEE = 10_000n;
+const MAX_NAT64 = 18_446_744_073_709_551_615n;
 
 function formatICP(e8s: bigint): string {
   const whole = e8s / ICP_E8S;
@@ -54,6 +55,32 @@ function hexToAccountId(hex: string): Uint8Array {
     bytes[i / 2] = Number.parseInt(hex.slice(i, i + 2), 16);
   }
   return bytes;
+}
+
+function createWithdrawalNonce(): bigint {
+  const cryptoApi = globalThis.crypto;
+  if (cryptoApi?.getRandomValues) {
+    const bytes = new Uint8Array(8);
+    cryptoApi.getRandomValues(bytes);
+    let value = 0n;
+    for (const byte of bytes) {
+      value = (value << 8n) + BigInt(byte);
+    }
+    return value === 0n ? 1n : value;
+  }
+
+  return (
+    BigInt(Date.now()) * 1_000_000n +
+    BigInt(Math.floor(Math.random() * 1_000_000))
+  );
+}
+
+function parseMemoToNat64(value: string): bigint | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  if (!/^\d+$/.test(trimmed)) return null;
+  const parsed = BigInt(trimmed);
+  return parsed <= MAX_NAT64 ? parsed : null;
 }
 
 function formatTransferError(result: TransferResult): string {
@@ -136,6 +163,7 @@ export default function ICPAccountPage() {
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
   const [memo, setMemo] = useState("");
+  const [withdrawalNonce, setWithdrawalNonce] = useState<bigint | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
 
   const recipientError =
@@ -144,6 +172,7 @@ export default function ICPAccountPage() {
       : null;
 
   const parsedAmountE8s = parseICPToE8s(amount);
+  const parsedMemo = parseMemoToNat64(memo);
   const amountE8s = parsedAmountE8s ?? 0n;
   const totalDebitE8s = amountE8s + TRANSFER_FEE;
 
@@ -176,19 +205,30 @@ export default function ICPAccountPage() {
   const balanceNum = balanceE8s ?? 0n;
   const hasAmount = amount.trim().length > 0;
   const amountInvalid = hasAmount && parsedAmountE8s === null;
+  const memoInvalid = memo.trim().length > 0 && parsedMemo === null;
   const amountTooSmall = amountE8s > 0n && amountE8s <= TRANSFER_FEE;
   const amountExceedsBalance = amountE8s > 0n && totalDebitE8s > balanceNum;
 
   const formValid =
     /^[0-9a-fA-F]{64}$/.test(recipient) &&
     amountE8s > TRANSFER_FEE &&
-    !amountExceedsBalance;
+    !amountExceedsBalance &&
+    !memoInvalid;
 
   const transferMutation = useMutation<TransferResult, Error>({
     mutationFn: async () => {
       if (!actor) throw new Error("Not connected to backend");
       const to = hexToAccountId(recipient);
-      const result = await actor.transferICPOut(to, amountE8s);
+      const clientNonce =
+        withdrawalNonce ?? parsedMemo ?? createWithdrawalNonce();
+      if (withdrawalNonce === null) {
+        setWithdrawalNonce(clientNonce);
+      }
+      const result = await actor.transferICPOutWithClientNonce(
+        to,
+        amountE8s,
+        clientNonce,
+      );
       return result;
     },
     onSuccess: (result) => {
@@ -201,6 +241,7 @@ export default function ICPAccountPage() {
         setRecipient("");
         setAmount("");
         setMemo("");
+        setWithdrawalNonce(null);
         queryClient.invalidateQueries({ queryKey: ["icp-balance"] });
       } else {
         toast.error("Transfer failed", {
@@ -394,7 +435,10 @@ export default function ICPAccountPage() {
               id="recipient"
               placeholder="64-character hex account identifier…"
               value={recipient}
-              onChange={(e) => setRecipient(e.target.value.trim())}
+              onChange={(e) => {
+                setRecipient(e.target.value.trim());
+                setWithdrawalNonce(null);
+              }}
               className="font-mono text-xs bg-muted/30 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/50"
               data-ocid="icp-account.recipient_input"
             />
@@ -425,7 +469,10 @@ export default function ICPAccountPage() {
                 min="0"
                 step="0.00000001"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                onChange={(e) => {
+                  setAmount(e.target.value);
+                  setWithdrawalNonce(null);
+                }}
                 className="font-mono pr-14 bg-muted/30 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/50"
                 data-ocid="icp-account.amount_input"
               />
@@ -483,17 +530,34 @@ export default function ICPAccountPage() {
               placeholder="Numeric memo e.g. 12345"
               min="0"
               value={memo}
-              onChange={(e) => setMemo(e.target.value)}
+              onChange={(e) => {
+                setMemo(e.target.value);
+                setWithdrawalNonce(null);
+              }}
               className="font-mono bg-muted/30 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/50"
               data-ocid="icp-account.memo_input"
             />
+            {memoInvalid && (
+              <p
+                className="text-xs text-destructive flex items-center gap-1.5"
+                data-ocid="icp-account.memo_field_error"
+              >
+                <AlertCircle className="h-3 w-3 shrink-0" />
+                Memo must be a non-negative 64-bit integer
+              </p>
+            )}
           </div>
 
           {/* Submit button */}
           <Button
             className="w-full gap-2 font-medium"
             disabled={!formValid || transferMutation.isPending}
-            onClick={() => setConfirmOpen(true)}
+            onClick={() => {
+              setWithdrawalNonce(
+                (current) => current ?? parsedMemo ?? createWithdrawalNonce(),
+              );
+              setConfirmOpen(true);
+            }}
             data-ocid="icp-account.transfer_submit_button"
           >
             {transferMutation.isPending ? (

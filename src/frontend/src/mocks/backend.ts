@@ -1186,6 +1186,10 @@ export const mockBackend: backendInterface = {
     },
   }),
   transferICPOut: async () => ({ __kind__: "Ok", Ok: BigInt(1) }),
+  transferICPOutWithClientNonce: async () => ({
+    __kind__: "Ok",
+    Ok: BigInt(1),
+  }),
   getCollectionNFTs: async (collectionId) => sampleCollectionNFTs(collectionId),
   getCollectionNFT: async (collectionId, tokenId) =>
     sampleCollectionNFTs(collectionId).find((n) => n.tokenId === tokenId) ?? null,

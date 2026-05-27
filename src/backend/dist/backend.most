@@ -349,6 +349,7 @@ type WithdrawalJournalEntry__114752974 =
     amountE8s : Nat64;
     blockIndex : ?Nat64;
     caller : UserId__933073725;
+    clientNonce : ?Nat64;
     createdAt : Nat64;
     id : Nat;
     lastError : ?Text;
