@@ -16,7 +16,6 @@ module {
     caller : UserId;
     to : AccountIdentifier;
     amountE8s : Nat64;
-    clientNonce : ?Nat64;
     memo : Nat64;
     createdAt : Nat64;
     updatedAt : Nat64;

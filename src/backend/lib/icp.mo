@@ -46,6 +46,11 @@ module {
     var nextWithdrawalId : Nat;
   };
 
+  public type PreparedWithdrawal = {
+    key : Text;
+    entry : IcpTypes.WithdrawalJournalEntry;
+  };
+
   public type IcpXdrConversionRate = {
     xdr_permyriad_per_icp : Nat64;
     timestamp_seconds : Nat64;
@@ -208,11 +213,11 @@ module {
     amount : Nat64,
     clientNonce : ?Nat64,
   ) : Text {
-    let nonceText = switch (clientNonce) {
-      case (?value) Nat64.toText(value);
-      case null "legacy";
+    let base = caller.toText() # ":" # blobToHex(to) # ":" # Nat64.toText(amount);
+    switch (clientNonce) {
+      case (?value) base # ":" # Nat64.toText(value);
+      case null base;
     };
-    caller.toText() # ":" # blobToHex(to) # ":" # Nat64.toText(amount) # ":" # nonceText;
   };
 
   public func reusableWithdrawal(
@@ -245,7 +250,7 @@ module {
     caller : Principal,
     to : CommonTypes.AccountIdentifier,
     amount : Nat64,
-  ) : IcpTypes.WithdrawalJournalEntry {
+  ) : PreparedWithdrawal {
     beginWithdrawalWithClientNonce(state, caller, to, amount, null);
   };
 
@@ -255,9 +260,12 @@ module {
     to : CommonTypes.AccountIdentifier,
     amount : Nat64,
     clientNonce : ?Nat64,
-  ) : IcpTypes.WithdrawalJournalEntry {
+  ) : PreparedWithdrawal {
     switch (reusableWithdrawal(state, caller, to, amount, clientNonce)) {
-      case (?entry) return entry;
+      case (?entry) return {
+        key = withdrawalKey(caller, to, amount, clientNonce);
+        entry;
+      };
       case null {};
     };
     let id = state.nextWithdrawalId;
@@ -268,7 +276,6 @@ module {
       caller;
       to;
       amountE8s = amount;
-      clientNonce;
       memo = switch (clientNonce) {
         case (?value) value;
         case null Nat64.fromNat(id);
@@ -279,12 +286,14 @@ module {
       status = #Pending;
       lastError = null;
     };
-    Map.add(state.withdrawals, Text.compare, withdrawalKey(caller, to, amount, clientNonce), entry);
-    entry;
+    let key = withdrawalKey(caller, to, amount, clientNonce);
+    Map.add(state.withdrawals, Text.compare, key, entry);
+    { key; entry };
   };
 
-  public func markWithdrawalCompleted(
+  public func markWithdrawalCompletedAtKey(
     state : WithdrawalState,
+    key : Text,
     entry : IcpTypes.WithdrawalJournalEntry,
     blockIndex : Nat64,
   ) : IcpTypes.WithdrawalJournalEntry {
@@ -295,12 +304,13 @@ module {
       updatedAt = nowNat64();
       lastError = null;
     };
-    Map.add(state.withdrawals, Text.compare, withdrawalKey(entry.caller, entry.to, entry.amountE8s, entry.clientNonce), updated);
+    Map.add(state.withdrawals, Text.compare, key, updated);
     updated;
   };
 
-  public func markWithdrawalFailed(
+  public func markWithdrawalFailedAtKey(
     state : WithdrawalState,
+    key : Text,
     entry : IcpTypes.WithdrawalJournalEntry,
     message : Text,
   ) : IcpTypes.WithdrawalJournalEntry {
@@ -310,7 +320,7 @@ module {
       updatedAt = nowNat64();
       lastError = ?message;
     };
-    Map.add(state.withdrawals, Text.compare, withdrawalKey(entry.caller, entry.to, entry.amountE8s, entry.clientNonce), updated);
+    Map.add(state.withdrawals, Text.compare, key, updated);
     updated;
   };
 

@@ -50,7 +50,8 @@ mixin (
     };
     try {
       let sub = IcpLib.principalToSubaccount(caller);
-      let withdrawal = IcpLib.beginWithdrawalWithClientNonce(icpWithdrawalState, caller, to, amount, clientNonce);
+      let preparedWithdrawal = IcpLib.beginWithdrawalWithClientNonce(icpWithdrawalState, caller, to, amount, clientNonce);
+      let withdrawal = preparedWithdrawal.entry;
       switch (withdrawal.status) {
         case (#Completed) {
           switch (withdrawal.blockIndex) {
@@ -71,16 +72,17 @@ mixin (
       );
       switch (result) {
         case (#Ok(blockIndex)) {
-          ignore IcpLib.markWithdrawalCompleted(icpWithdrawalState, withdrawal, blockIndex);
+          ignore IcpLib.markWithdrawalCompletedAtKey(icpWithdrawalState, preparedWithdrawal.key, withdrawal, blockIndex);
           #Ok(blockIndex);
         };
         case (#Err(#TxDuplicate({ duplicate_of }))) {
-          ignore IcpLib.markWithdrawalCompleted(icpWithdrawalState, withdrawal, duplicate_of);
+          ignore IcpLib.markWithdrawalCompletedAtKey(icpWithdrawalState, preparedWithdrawal.key, withdrawal, duplicate_of);
           #Ok(duplicate_of);
         };
         case (#Err(error)) {
-          ignore IcpLib.markWithdrawalFailed(
+          ignore IcpLib.markWithdrawalFailedAtKey(
             icpWithdrawalState,
+            preparedWithdrawal.key,
             withdrawal,
             IcpLib.transferErrorText(error),
           );
