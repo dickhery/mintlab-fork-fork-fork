@@ -1,20 +1,20 @@
-import { c as createLucideIcon, r as reactExports, h as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, d as useAdmin, e as useQueryClient, f as useQuery, n as AnimatePresence, m as motion, B as Button, g as ue, o as CircleDollarSign, X, G as Grid3x3, P as Principal, i as LoadingSpinner } from "./index-LYn3MfY9.js";
-import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-DJYX5p9j.js";
-import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-B99gcMI6.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-Cbaaoybp.js";
-import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-Kf3KeQAQ.js";
-import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-DMqGDHsQ.js";
-import { B as Badge, I as Input } from "./badge-C-461XJf.js";
-import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent } from "./card-DRaFsK8K.js";
-import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./index-uKgVsXhM.js";
-import { u as useDirection } from "./index-BpS9reWx.js";
-import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-jbzYyRfm.js";
-import { S as Skeleton, C as Copy } from "./skeleton-DrBvBTEY.js";
-import { S as Sparkles, u as useInfiniteQuery, c as compressModerationImage } from "./imageUtils-DMJ5Gl7L.js";
-import { r as resolveImageUrl, I as ImageOff } from "./media-BqBE0Z3f.js";
-import { S as Search } from "./search-CRv-CkUL.js";
-import { S as ShieldCheck } from "./shield-check-D3dbbF5x.js";
-import "./arrow-right-CxHmVZMd.js";
+import { c as createLucideIcon, r as reactExports, h as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, d as useAdmin, e as useQueryClient, f as useQuery, n as AnimatePresence, m as motion, B as Button, g as ue, o as CircleDollarSign, X, G as Grid3x3, P as Principal, i as LoadingSpinner } from "./index-KX85IDYM.js";
+import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-Deh_h-YY.js";
+import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-BFGKTV-M.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-puS7oQEW.js";
+import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-DHdfSA8r.js";
+import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-ojOXx35X.js";
+import { B as Badge, I as Input } from "./badge-BdSaAu0y.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent } from "./card-BLINR29j.js";
+import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./index-ymCy4oYw.js";
+import { u as useDirection } from "./index-CfTgUWut.js";
+import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-Ch6q2_Ac.js";
+import { S as Skeleton, C as Copy } from "./skeleton-8BbINgiI.js";
+import { S as Sparkles, u as useInfiniteQuery, c as compressModerationImage } from "./imageUtils-DyCWioqB.js";
+import { r as resolveImageUrl, I as ImageOff } from "./media-DMaowCEL.js";
+import { S as Search } from "./search-BVt4QLCO.js";
+import { S as ShieldCheck } from "./shield-check-BYS08QSG.js";
+import "./arrow-right-CZKstv_w.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -2366,7 +2366,12 @@ function NFTBrowser({
     staleTime: 3e4
   });
   const { data: activeListingDetails = [] } = useQuery({
-    queryKey: ["activeListingDetails"],
+    queryKey: [
+      "activeListingDetails",
+      "collectionBrowser",
+      collection.id.toString(),
+      COLLECTIONS_LISTING_PAGE_SIZE.toString()
+    ],
     queryFn: async () => {
       if (!actor) return [];
       const page = await actor.getActiveListingDetailsPage(
@@ -3098,7 +3103,11 @@ function CollectionsPage() {
   const [retryTopUpInitialCycles, setRetryTopUpInitialCycles] = reactExports.useState(null);
   const [retryAfterTopUpRequestId, setRetryAfterTopUpRequestId] = reactExports.useState(null);
   const { data: collections, isLoading } = useQuery({
-    queryKey: ["collections"],
+    queryKey: [
+      "collections",
+      "collectionsPage",
+      COLLECTIONS_PAGE_SIZE.toString()
+    ],
     queryFn: async () => {
       if (!actor) return [];
       const page = await actor.listCollectionsPage(null, COLLECTIONS_PAGE_SIZE);

@@ -1,21 +1,21 @@
-import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useAdmin, e as useQueryClient, r as reactExports, f as useQuery, g as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-LYn3MfY9.js";
-import { P as Plus, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-DJYX5p9j.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-CGlaIhb1.js";
-import { M as MediaImage, E as EmptyState } from "./MediaImage-Cbaaoybp.js";
-import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-Kf3KeQAQ.js";
-import { B as Badge, I as Input } from "./badge-C-461XJf.js";
-import { I as ImageOff, r as resolveImageUrl } from "./media-BqBE0Z3f.js";
-import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-DMqGDHsQ.js";
-import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-DRaFsK8K.js";
-import { u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label } from "./index-uKgVsXhM.js";
-import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-jbzYyRfm.js";
-import { S as Skeleton, C as Copy } from "./skeleton-DrBvBTEY.js";
-import { u as useInfiniteQuery, S as Sparkles, c as compressModerationImage } from "./imageUtils-DMJ5Gl7L.js";
-import { C as CircleCheck } from "./circle-check-CRvR1w0r.js";
-import { C as Coins } from "./coins-D0N_1pAz.js";
-import { S as Send } from "./send-DNIDK8R5.js";
-import "./arrow-right-CxHmVZMd.js";
-import "./index-BpS9reWx.js";
+import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useAdmin, e as useQueryClient, r as reactExports, f as useQuery, g as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-KX85IDYM.js";
+import { P as Plus, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-Deh_h-YY.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-BsLtPysQ.js";
+import { M as MediaImage, E as EmptyState } from "./MediaImage-puS7oQEW.js";
+import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-DHdfSA8r.js";
+import { B as Badge, I as Input } from "./badge-BdSaAu0y.js";
+import { I as ImageOff, r as resolveImageUrl } from "./media-DMaowCEL.js";
+import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-ojOXx35X.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-BLINR29j.js";
+import { u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label } from "./index-ymCy4oYw.js";
+import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-Ch6q2_Ac.js";
+import { S as Skeleton, C as Copy } from "./skeleton-8BbINgiI.js";
+import { u as useInfiniteQuery, S as Sparkles, c as compressModerationImage } from "./imageUtils-DyCWioqB.js";
+import { C as CircleCheck } from "./circle-check-BwYP7K3V.js";
+import { C as Coins } from "./coins-CY3Tg7Yj.js";
+import { S as Send } from "./send-D70xhrGR.js";
+import "./arrow-right-CZKstv_w.js";
+import "./index-CfTgUWut.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -2010,7 +2010,7 @@ function WalletPage() {
     hasNextPage: hasMoreNFTs,
     isFetchingNextPage: isFetchingMoreNFTs
   } = useInfiniteQuery({
-    queryKey: ["userNFTs", principalText],
+    queryKey: ["userNFTs", "walletPages", principalText],
     initialPageParam: null,
     queryFn: async ({ pageParam }) => {
       if (!actor || !principal) {
@@ -2026,7 +2026,7 @@ function WalletPage() {
   const userStats = buildLoadedNFTStats(userNFTs, userNFTTotalCount);
   const statsLoading = nftsLoading;
   const { data: collectionPages } = useInfiniteQuery({
-    queryKey: ["collections"],
+    queryKey: ["collections", "walletPages"],
     initialPageParam: null,
     queryFn: async ({ pageParam }) => {
       if (!actor) {
@@ -2071,7 +2071,11 @@ function WalletPage() {
     enabled: !!actor && !isFetching && isAuthenticated
   });
   const { data: activeListingDetails = [] } = useQuery({
-    queryKey: ["activeListingDetails"],
+    queryKey: [
+      "activeListingDetails",
+      "wallet",
+      WALLET_LISTING_PAGE_SIZE.toString()
+    ],
     queryFn: async () => {
       if (!actor) return [];
       const page = await actor.getActiveListingDetailsPage(
@@ -2083,7 +2087,12 @@ function WalletPage() {
     enabled: !!actor && !isFetching && isAuthenticated
   });
   const { data: myDividendNFTs = [] } = useQuery({
-    queryKey: ["myDividendNFTs", principalText],
+    queryKey: [
+      "myDividendNFTs",
+      "wallet",
+      principalText,
+      WALLET_DIVIDEND_PAGE_SIZE.toString()
+    ],
     queryFn: async () => {
       if (!actor) return [];
       const page = await actor.getMyDividendNFTsPage(

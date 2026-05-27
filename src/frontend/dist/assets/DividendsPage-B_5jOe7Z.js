@@ -1,13 +1,13 @@
-import { b as useBackend, u as useAuth, e as useQueryClient, r as reactExports, f as useQuery, j as jsxRuntimeExports, o as CircleDollarSign, B as Button, L as LogIn, i as LoadingSpinner, g as ue } from "./index-LYn3MfY9.js";
-import { L as LoaderCircle, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-DJYX5p9j.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-Cbaaoybp.js";
-import { H as HelpCallout } from "./HelpCallout-Kf3KeQAQ.js";
-import { B as Badge } from "./badge-C-461XJf.js";
-import { R as RefreshCw, C as Card, c as CardContent } from "./card-DRaFsK8K.js";
-import { u as useMutation } from "./index-uKgVsXhM.js";
-import { C as Coins } from "./coins-D0N_1pAz.js";
-import { I as ImageOff } from "./media-BqBE0Z3f.js";
-import "./arrow-right-CxHmVZMd.js";
+import { b as useBackend, u as useAuth, e as useQueryClient, r as reactExports, f as useQuery, j as jsxRuntimeExports, o as CircleDollarSign, B as Button, L as LogIn, i as LoadingSpinner, g as ue } from "./index-KX85IDYM.js";
+import { L as LoaderCircle, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-Deh_h-YY.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-puS7oQEW.js";
+import { H as HelpCallout } from "./HelpCallout-DHdfSA8r.js";
+import { B as Badge } from "./badge-BdSaAu0y.js";
+import { R as RefreshCw, C as Card, c as CardContent } from "./card-BLINR29j.js";
+import { u as useMutation } from "./index-ymCy4oYw.js";
+import { C as Coins } from "./coins-CY3Tg7Yj.js";
+import { I as ImageOff } from "./media-DMaowCEL.js";
+import "./arrow-right-CZKstv_w.js";
 const E8S = 100000000n;
 const ICP_FEE = 10000n;
 const DIVIDEND_PAGE_SIZE = 50n;
@@ -24,6 +24,9 @@ function extractError(err) {
 }
 function dividendKey(item) {
   return `${item.nft.collectionId.toString()}:${item.nft.tokenId}`;
+}
+function activeListingSeller(detail) {
+  return detail.listing.__kind__ === "Fixed" ? detail.listing.Fixed.seller.toString() : detail.listing.Auction.seller.toString();
 }
 function DividendsPage() {
   const { actor, isFetching } = useBackend();
@@ -61,6 +64,19 @@ function DividendsPage() {
     enabled: !!actor && !isFetching && isAuthenticated && !!principal,
     refetchOnWindowFocus: false,
     staleTime: 6e4
+  });
+  const { data: listedDividendKeys = [] } = useQuery({
+    queryKey: ["myListedDividendNFTs", principalText],
+    queryFn: async () => {
+      if (!actor || !principalText) return [];
+      const details = await actor.getActiveListingDetails();
+      return details.filter((detail) => activeListingSeller(detail) === principalText).map(
+        (detail) => `${detail.nft.collectionId.toString()}:${detail.nft.tokenId}`
+      );
+    },
+    enabled: !!actor && !isFetching && isAuthenticated && !!principalText,
+    refetchOnWindowFocus: false,
+    staleTime: 3e4
   });
   const claimMutation = useMutation({
     mutationFn: async (item) => {
@@ -148,6 +164,10 @@ function DividendsPage() {
       ])
     );
   }, [mediaNFTs]);
+  const listedDividendKeySet = reactExports.useMemo(
+    () => new Set(listedDividendKeys),
+    [listedDividendKeys]
+  );
   if (!isAuthenticated) {
     return /* @__PURE__ */ jsxRuntimeExports.jsx(
       "div",
@@ -169,10 +189,12 @@ function DividendsPage() {
     );
   }
   const totalClaimable = dividends.reduce(
-    (sum, item) => sum + item.claimableE8s,
+    (sum, item) => listedDividendKeySet.has(dividendKey(item)) ? sum : sum + item.claimableE8s,
     0n
   );
-  const claimableItems = dividends.filter((item) => item.claimableE8s > 0n);
+  const claimableItems = dividends.filter(
+    (item) => item.claimableE8s > 0n && !listedDividendKeySet.has(dividendKey(item))
+  );
   return /* @__PURE__ */ jsxRuntimeExports.jsxs(jsxRuntimeExports.Fragment, { children: [
     /* @__PURE__ */ jsxRuntimeExports.jsxs(
       "div",
@@ -248,7 +270,8 @@ function DividendsPage() {
             const hydratedNFT = mediaByDividendKey.get(dividendKey(item));
             const nftName = item.nft.metadata.name ?? (hydratedNFT == null ? void 0 : hydratedNFT.metadata.name) ?? `NFT #${item.nft.tokenId}`;
             const imageSrc = item.nft.metadata.imageUrl ?? (hydratedNFT == null ? void 0 : hydratedNFT.metadata.imageUrl);
-            const canClaim = item.claimableE8s > ICP_FEE;
+            const isListed = listedDividendKeySet.has(dividendKey(item));
+            const canClaim = !isListed && item.claimableE8s > ICP_FEE;
             const isClaiming = claimMutation.isPending && claimMutation.variables != null && dividendKey(claimMutation.variables) === dividendKey(item);
             return /* @__PURE__ */ jsxRuntimeExports.jsx(
               Card,
@@ -288,7 +311,8 @@ function DividendsPage() {
                         )
                       ] }),
                       /* @__PURE__ */ jsxRuntimeExports.jsx("h2", { className: "font-display font-semibold text-foreground truncate mt-2", children: nftName }),
-                      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-muted-foreground truncate", children: item.collection.name })
+                      /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-sm text-muted-foreground truncate", children: item.collection.name }),
+                      isListed && /* @__PURE__ */ jsxRuntimeExports.jsx("p", { className: "text-xs text-amber-700 mt-2 leading-relaxed", children: "Listed on the marketplace. Dividends stay attached until the listing sells, settles, or is canceled." })
                     ] }),
                     /* @__PURE__ */ jsxRuntimeExports.jsxs(
                       Button,
@@ -299,7 +323,7 @@ function DividendsPage() {
                         "data-ocid": `dividends.claim_button.${index + 1}`,
                         children: [
                           isClaiming ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { className: "h-4 w-4 animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(Coins, { className: "h-4 w-4" }),
-                          canClaim ? "Collect ICP" : "Below Fee"
+                          isListed ? "Listed" : canClaim ? "Collect ICP" : "Below Fee"
                         ]
                       }
                     )
