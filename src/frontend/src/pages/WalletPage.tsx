@@ -2314,7 +2314,7 @@ export default function WalletPage() {
     hasNextPage: hasMoreNFTs,
     isFetchingNextPage: isFetchingMoreNFTs,
   } = useInfiniteQuery({
-    queryKey: ["userNFTs", principalText],
+    queryKey: ["userNFTs", "walletPages", principalText],
     initialPageParam: null as bigint | null,
     queryFn: async ({ pageParam }) => {
       if (!actor || !principal) {
@@ -2333,7 +2333,7 @@ export default function WalletPage() {
   const statsLoading = nftsLoading;
 
   const { data: collectionPages } = useInfiniteQuery({
-    queryKey: ["collections"],
+    queryKey: ["collections", "walletPages"],
     initialPageParam: null as bigint | null,
     queryFn: async ({ pageParam }) => {
       if (!actor) {
@@ -2384,7 +2384,11 @@ export default function WalletPage() {
   });
 
   const { data: activeListingDetails = [] } = useQuery<ActiveListingDetail[]>({
-    queryKey: ["activeListingDetails"],
+    queryKey: [
+      "activeListingDetails",
+      "wallet",
+      WALLET_LISTING_PAGE_SIZE.toString(),
+    ],
     queryFn: async () => {
       if (!actor) return [];
       const page = await actor.getActiveListingDetailsPage(
@@ -2397,7 +2401,12 @@ export default function WalletPage() {
   });
 
   const { data: myDividendNFTs = [] } = useQuery<NFTDividend[]>({
-    queryKey: ["myDividendNFTs", principalText],
+    queryKey: [
+      "myDividendNFTs",
+      "wallet",
+      principalText,
+      WALLET_DIVIDEND_PAGE_SIZE.toString(),
+    ],
     queryFn: async () => {
       if (!actor) return [];
       const page = await actor.getMyDividendNFTsPage(

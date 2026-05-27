@@ -2024,7 +2024,12 @@ function NFTBrowser({
     staleTime: 30_000,
   });
   const { data: activeListingDetails = [] } = useQuery<ActiveListingDetail[]>({
-    queryKey: ["activeListingDetails"],
+    queryKey: [
+      "activeListingDetails",
+      "collectionBrowser",
+      collection.id.toString(),
+      COLLECTIONS_LISTING_PAGE_SIZE.toString(),
+    ],
     queryFn: async () => {
       if (!actor) return [];
       const page = await actor.getActiveListingDetailsPage(
@@ -2855,7 +2860,11 @@ export default function CollectionsPage() {
   >(null);
 
   const { data: collections, isLoading } = useQuery<Collection[]>({
-    queryKey: ["collections"],
+    queryKey: [
+      "collections",
+      "collectionsPage",
+      COLLECTIONS_PAGE_SIZE.toString(),
+    ],
     queryFn: async () => {
       if (!actor) return [];
       const page = await actor.listCollectionsPage(null, COLLECTIONS_PAGE_SIZE);

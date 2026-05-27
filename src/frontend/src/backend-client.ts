@@ -1653,8 +1653,8 @@ type RawDividendDisbursementReceipt = {
   failures: Array<string>;
 };
 
-function fromRawOption<T>(value: [] | [T]): T | null {
-  return value.length === 0 ? null : value[0];
+function fromRawOption<T>(value: [] | [T] | null | undefined): T | null {
+  return value == null || value.length === 0 ? null : value[0];
 }
 
 function toRawOption<T>(value: T | null | undefined): [] | [T] {

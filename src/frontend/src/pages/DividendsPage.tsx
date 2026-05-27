@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import { isLowCyclesError } from "@/lib/cycles";
-import type { NFTDividend, WalletNFT } from "@/types";
+import type { ActiveListingDetail, NFTDividend, WalletNFT } from "@/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CircleDollarSign,
@@ -41,6 +41,12 @@ function extractError(err: unknown): string {
 
 function dividendKey(item: NFTDividend): string {
   return `${item.nft.collectionId.toString()}:${item.nft.tokenId}`;
+}
+
+function activeListingSeller(detail: ActiveListingDetail): string {
+  return detail.listing.__kind__ === "Fixed"
+    ? detail.listing.Fixed.seller.toString()
+    : detail.listing.Auction.seller.toString();
 }
 
 export default function DividendsPage() {
@@ -85,6 +91,23 @@ export default function DividendsPage() {
     enabled: !!actor && !isFetching && isAuthenticated && !!principal,
     refetchOnWindowFocus: false,
     staleTime: 60_000,
+  });
+
+  const { data: listedDividendKeys = [] } = useQuery<string[]>({
+    queryKey: ["myListedDividendNFTs", principalText],
+    queryFn: async () => {
+      if (!actor || !principalText) return [];
+      const details = await actor.getActiveListingDetails();
+      return details
+        .filter((detail) => activeListingSeller(detail) === principalText)
+        .map(
+          (detail) =>
+            `${detail.nft.collectionId.toString()}:${detail.nft.tokenId}`,
+        );
+    },
+    enabled: !!actor && !isFetching && isAuthenticated && !!principalText,
+    refetchOnWindowFocus: false,
+    staleTime: 30_000,
   });
 
   const claimMutation = useMutation({
@@ -178,6 +201,11 @@ export default function DividendsPage() {
     );
   }, [mediaNFTs]);
 
+  const listedDividendKeySet = useMemo(
+    () => new Set(listedDividendKeys),
+    [listedDividendKeys],
+  );
+
   if (!isAuthenticated) {
     return (
       <div
@@ -206,10 +234,16 @@ export default function DividendsPage() {
   }
 
   const totalClaimable = dividends.reduce(
-    (sum, item) => sum + item.claimableE8s,
+    (sum, item) =>
+      listedDividendKeySet.has(dividendKey(item))
+        ? sum
+        : sum + item.claimableE8s,
     0n,
   );
-  const claimableItems = dividends.filter((item) => item.claimableE8s > 0n);
+  const claimableItems = dividends.filter(
+    (item) =>
+      item.claimableE8s > 0n && !listedDividendKeySet.has(dividendKey(item)),
+  );
 
   return (
     <>
@@ -316,7 +350,8 @@ export default function DividendsPage() {
                 `NFT #${item.nft.tokenId}`;
               const imageSrc =
                 item.nft.metadata.imageUrl ?? hydratedNFT?.metadata.imageUrl;
-              const canClaim = item.claimableE8s > ICP_FEE;
+              const isListed = listedDividendKeySet.has(dividendKey(item));
+              const canClaim = !isListed && item.claimableE8s > ICP_FEE;
               const isClaiming =
                 claimMutation.isPending &&
                 claimMutation.variables != null &&
@@ -361,6 +396,12 @@ export default function DividendsPage() {
                         <p className="text-sm text-muted-foreground truncate">
                           {item.collection.name}
                         </p>
+                        {isListed && (
+                          <p className="text-xs text-amber-700 mt-2 leading-relaxed">
+                            Listed on the marketplace. Dividends stay attached
+                            until the listing sells, settles, or is canceled.
+                          </p>
+                        )}
                       </div>
                       <Button
                         className="mt-auto gap-2 self-start"
@@ -373,7 +414,11 @@ export default function DividendsPage() {
                         ) : (
                           <Coins className="h-4 w-4" />
                         )}
-                        {canClaim ? "Collect ICP" : "Below Fee"}
+                        {isListed
+                          ? "Listed"
+                          : canClaim
+                            ? "Collect ICP"
+                            : "Below Fee"}
                       </Button>
                     </div>
                   </CardContent>

@@ -54,6 +54,8 @@ mixin (
   transient let DIVIDEND_PAGE_DEFAULT : Nat = 50;
   transient let DIVIDEND_PAGE_MAX : Nat = 100;
   transient let MAX_DIVIDEND_SYNC_TOKEN_COUNT : Nat = 1_000;
+  transient let DIVIDEND_LISTING_PAUSED_MESSAGE : Text =
+    "Dividend collection is paused while this NFT is listed on the marketplace. The claimable balance stays attached to the NFT for the buyer or auction winner.";
   public shared func getCollectionDividendInfo(
     collectionId : CollectionTypes.CollectionId
   ) : async ?DividendTypes.CollectionDividendInfo {
@@ -521,6 +523,9 @@ mixin (
     if (not DividendsLib.collectionEnabled(collection)) {
       return #err("Dividends are not enabled for this collection");
     };
+    if (isActiveMarketplaceListingNFT(nft)) {
+      return #err(DIVIDEND_LISTING_PAUSED_MESSAGE);
+    };
     let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
     let feeE8s = await* IcpLib.getTransferFee(ledger);
     let verifiedNft = switch (await* verifyDividendClaimOwner(caller, collection, nft)) {
@@ -547,6 +552,11 @@ mixin (
     if (not MarketplaceLib.acquireListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId)) {
       DividendsLib.releaseClaim(dividendsState, key);
       return #err("This NFT is being listed or settled. Try collecting dividends again after the marketplace action finishes.");
+    };
+    if (isActiveMarketplaceListingNFT(nft)) {
+      MarketplaceLib.releaseListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId);
+      DividendsLib.releaseClaim(dividendsState, key);
+      return #err(DIVIDEND_LISTING_PAUSED_MESSAGE);
     };
 
     DividendsLib.setClaimable(dividendsState, nft.collectionId, nft.tokenId, 0);
@@ -596,7 +606,7 @@ mixin (
   ) : async* { #ok : WalletTypes.WalletNFT; #err : Text } {
     if (collection.kind != #Minted or nft.location != #Minted) {
       if (isActiveListingSeller(caller, nft.id)) {
-        return #ok(nft);
+        return #err(DIVIDEND_LISTING_PAUSED_MESSAGE);
       };
       if (not Principal.equal(nft.owner, caller)) {
         return #err("You are not the current owner of this NFT");
@@ -631,7 +641,7 @@ mixin (
             return #ok(repairDividendNFTOwner(caller, nft));
           };
           if (Principal.equal(token.owner, canisterId) and isActiveListingSeller(caller, nft.id)) {
-            return #ok(nft);
+            return #err(DIVIDEND_LISTING_PAUSED_MESSAGE);
           };
           return #err("You are not the current owner of this NFT");
         };
@@ -661,7 +671,7 @@ mixin (
         if (Principal.equal(account.owner, caller)) {
           #ok(repairDividendNFTOwner(caller, nft));
         } else if (Principal.equal(account.owner, canisterId) and isActiveListingSeller(caller, nft.id)) {
-          #ok(nft);
+          #err(DIVIDEND_LISTING_PAUSED_MESSAGE);
         } else {
           #err("You are not the current owner of this NFT");
         };
@@ -789,6 +799,13 @@ mixin (
       };
     };
     false;
+  };
+
+  func isActiveMarketplaceListingNFT(nft : WalletTypes.WalletNFT) : Bool {
+    switch (MarketplaceLib.findActiveEscrowedNFT(marketplaceState, nft.collectionId, nft.tokenId)) {
+      case (?_) true;
+      case null false;
+    };
   };
 
   func isDividendDefaultSubaccount(subaccount : ?Blob) : Bool {

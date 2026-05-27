@@ -847,6 +847,15 @@ function ListNFTModal({
           </p>
         </div>
 
+        <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 flex gap-2.5 items-start">
+          <Coins className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Dividend collection is paused while this NFT is listed at a fixed
+            price or in an auction. Any claimable ICP stays attached to the NFT
+            for the buyer or auction winner.
+          </p>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* NFT Selector */}
           <div className="space-y-2">
@@ -1286,7 +1295,11 @@ export default function MarketplacePage() {
   const { data: listingDetails = [], isLoading: listingsLoading } = useQuery<
     ActiveListingDetail[]
   >({
-    queryKey: ["activeListingDetails"],
+    queryKey: [
+      "activeListingDetails",
+      "marketplace",
+      MARKETPLACE_LISTING_PAGE_SIZE.toString(),
+    ],
     queryFn: async () => {
       if (!actor) return [];
       const page = await actor.getActiveListingDetailsPage(
@@ -1300,7 +1313,11 @@ export default function MarketplacePage() {
   });
 
   const { data: collections = [] } = useQuery<Collection[]>({
-    queryKey: ["collections"],
+    queryKey: [
+      "collections",
+      "marketplace",
+      MARKETPLACE_COLLECTION_PAGE_SIZE.toString(),
+    ],
     queryFn: async () => {
       if (!actor) return [];
       const page = await actor.listCollectionsPage(
