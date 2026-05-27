@@ -1,20 +1,20 @@
-import { c as createLucideIcon, r as reactExports, h as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, d as useAdmin, e as useQueryClient, f as useQuery, n as AnimatePresence, m as motion, B as Button, g as ue, o as CircleDollarSign, X, G as Grid3x3, P as Principal, i as LoadingSpinner } from "./index-Dq_se1c6.js";
-import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-B7KletWf.js";
-import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-DvH679uL.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-R3sXH1yn.js";
-import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-qLigS8ZL.js";
-import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-DDVPpv3p.js";
-import { B as Badge, I as Input } from "./badge-Bgu2zrlA.js";
-import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent } from "./card-C7H4xzFQ.js";
-import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./index-BgnyvDtN.js";
-import { u as useDirection } from "./index-B-TbJKfF.js";
-import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-r4-BXjrG.js";
-import { S as Skeleton, C as Copy } from "./skeleton-C8YDH4P6.js";
-import { S as Sparkles, u as useInfiniteQuery, c as compressModerationImage } from "./imageUtils-DtyAlXuR.js";
-import { r as resolveImageUrl, I as ImageOff } from "./media-CvoQXHxw.js";
-import { S as Search } from "./search-BmcZ4ayo.js";
-import { S as ShieldCheck } from "./shield-check-BAl8ZL9p.js";
-import "./arrow-right-D7fKNVWD.js";
+import { c as createLucideIcon, r as reactExports, h as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, d as useAdmin, e as useQueryClient, f as useQuery, n as AnimatePresence, m as motion, B as Button, g as ue, o as CircleDollarSign, X, G as Grid3x3, P as Principal, i as LoadingSpinner } from "./index-LYn3MfY9.js";
+import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-DJYX5p9j.js";
+import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-B99gcMI6.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-Cbaaoybp.js";
+import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-Kf3KeQAQ.js";
+import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-DMqGDHsQ.js";
+import { B as Badge, I as Input } from "./badge-C-461XJf.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent } from "./card-DRaFsK8K.js";
+import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./index-uKgVsXhM.js";
+import { u as useDirection } from "./index-BpS9reWx.js";
+import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-jbzYyRfm.js";
+import { S as Skeleton, C as Copy } from "./skeleton-DrBvBTEY.js";
+import { S as Sparkles, u as useInfiniteQuery, c as compressModerationImage } from "./imageUtils-DMJ5Gl7L.js";
+import { r as resolveImageUrl, I as ImageOff } from "./media-BqBE0Z3f.js";
+import { S as Search } from "./search-CRv-CkUL.js";
+import { S as ShieldCheck } from "./shield-check-D3dbbF5x.js";
+import "./arrow-right-CxHmVZMd.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *

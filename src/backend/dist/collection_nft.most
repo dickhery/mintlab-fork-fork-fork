@@ -4,9 +4,9 @@ type Data__791452850<K, V> =
 type Internal__8484328<K, V> =
   {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
 type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
-type MintedToken__289429076 =
+type MintedToken__156529978 =
   {
-    metadata : NFTMetadata__221413038;
+    metadata : NFTMetadata__605782097;
     mintedAt : Nat64;
     mintedBy : Principal;
     owner : Principal;
@@ -14,7 +14,7 @@ type MintedToken__289429076 =
     transferredAt : ?Nat64;
     transferredBy : ?Principal
   };
-type NFTMetadata__221413038 =
+type NFTMetadata__605782097 =
   {
     attributes : [(Text, Text)];
     description : ?Text;
@@ -40,7 +40,7 @@ actor {
   stable parentCanister : Principal;
   stable tokens :
     {
-      var root : Node__46230540<Nat, MintedToken__289429076>;
+      var root : Node__46230540<Nat, MintedToken__156529978>;
       var size : Nat__490723111
     }
 };
