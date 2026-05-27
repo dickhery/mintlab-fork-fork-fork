@@ -1654,7 +1654,7 @@ function AppHealthSection() {
       };
     },
     enabled: !!actor,
-    staleTime: 30_000,
+    staleTime: 120_000,
   });
 
   const health = healthResult?.__kind__ === "ok" ? healthResult.ok : [];

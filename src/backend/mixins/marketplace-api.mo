@@ -984,7 +984,7 @@ mixin (
     await getMarketplaceFeeConfig();
   };
 
-  public shared ({ caller }) func getMyPendingAuctionRefunds() : async [MarketplaceTypes.AuctionEscrow] {
+  public shared query ({ caller }) func getMyPendingAuctionRefunds() : async [MarketplaceTypes.AuctionEscrow] {
     if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
     MarketplaceLib.getPendingRefundsByBidder(marketplacePaymentState, caller);
   };

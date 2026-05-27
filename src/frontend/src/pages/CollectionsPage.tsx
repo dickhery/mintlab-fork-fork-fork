@@ -731,9 +731,7 @@ function CreateCollectionCard({
         MAX_ON_CHAIN_IMAGE_CHARS,
         ON_CHAIN_IMAGE_SIZE_MESSAGE,
       );
-      const compressed = moderationConfig?.enabled
-        ? await compressModerationImage(dataUrl)
-        : dataUrl;
+      const compressed = await compressModerationImage(dataUrl);
       setImageDataUrl(compressed);
       setImageFileName(file.name);
     } catch (err) {
@@ -2899,7 +2897,8 @@ export default function CollectionsPage() {
       !isFetching &&
       isAuthenticated &&
       myCreatedCollections.length > 0,
-    refetchInterval: 60_000,
+    staleTime: 120_000,
+    refetchInterval: 300_000,
   });
 
   const { data: pendingCreationRequests = [] } = useQuery<
@@ -2911,7 +2910,8 @@ export default function CollectionsPage() {
       return actor.getMyCollectionCreationRequests();
     },
     enabled: !!actor && !isFetching && isAuthenticated,
-    refetchInterval: 15_000,
+    staleTime: 30_000,
+    refetchInterval: 60_000,
   });
   const visiblePendingCreationRequests = useMemo(
     () => pendingCreationRequests.filter(isRepairableCollectionCreationRequest),

@@ -1056,7 +1056,7 @@ export const idlFactory = ({ IDL }) => {
             'err' : IDL.Text,
           }),
         ],
-        [],
+        ['query'],
       ),
     'getAllCollectionCreationRequestsPage' : IDL.Func(
         [IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
@@ -1066,7 +1066,7 @@ export const idlFactory = ({ IDL }) => {
             'err' : IDL.Text,
           }),
         ],
-        [],
+        ['query'],
       ),
     'getAppCanisterHealth' : IDL.Func(
         [IDL.Opt(IDL.Principal)],
@@ -1101,7 +1101,7 @@ export const idlFactory = ({ IDL }) => {
             'err' : IDL.Text,
           }),
         ],
-        [],
+        ['query'],
       ),
     'getCollectionCreator' : IDL.Func(
         [CollectionId],
@@ -1160,12 +1160,12 @@ export const idlFactory = ({ IDL }) => {
     'getMyCollectionCreationRequests' : IDL.Func(
         [],
         [IDL.Vec(CollectionCreationRequestView)],
-        [],
+        ['query'],
       ),
     'getMyCollectionCreationRequestsPage' : IDL.Func(
         [IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
         [CollectionCreationRequestPage],
-        [],
+        ['query'],
       ),
     'getMyCreatedCollections' : IDL.Func([], [IDL.Vec(Collection)], []),
     'getMyDividendNFTs' : IDL.Func([], [IDL.Vec(NFTDividend)], []),
@@ -1179,11 +1179,15 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(SettlementStatus)],
         ['query'],
       ),
-    'getMyPendingAuctionRefunds' : IDL.Func([], [IDL.Vec(AuctionEscrow)], []),
+    'getMyPendingAuctionRefunds' : IDL.Func(
+        [],
+        [IDL.Vec(AuctionEscrow)],
+        ['query'],
+      ),
     'getMyPendingMintPayments' : IDL.Func(
         [],
         [IDL.Vec(PendingMintPaymentView)],
-        [],
+        ['query'],
       ),
     'getNFTStats' : IDL.Func([IDL.Principal], [NFTStats], ['query']),
     'getRegistry' : IDL.Func(

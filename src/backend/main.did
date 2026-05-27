@@ -1092,12 +1092,12 @@ service : {
    (variant {
       err: text;
       ok: vec CollectionCreationRequestView;
-    });
+    }) query;
   getAllCollectionCreationRequestsPage: (cursor: opt nat, limit: opt nat) ->
    (variant {
       err: text;
       ok: CollectionCreationRequestPage;
-    });
+    }) query;
   getAppCanisterHealth: (frontendCanisterId: opt principal) ->
    (variant {
       err: text;
@@ -1115,7 +1115,7 @@ service : {
    (variant {
       err: text;
       ok: CollectionCreationDiagnostics;
-    });
+    }) query;
   getCollectionCreator: (collectionId: CollectionId) -> (opt principal) query;
   getCollectionDividendAccountId: (collectionId: CollectionId) ->
    (AccountIdentifier) query;
@@ -1141,16 +1141,16 @@ service : {
   getMyAuctionBidStatuses: (listingIds: vec ListingId) ->
    (vec AuctionBidStatus) query;
   getMyCollectionCanisterStatuses: () -> (vec CollectionCanisterStatus);
-  getMyCollectionCreationRequests: () -> (vec CollectionCreationRequestView);
+  getMyCollectionCreationRequests: () -> (vec CollectionCreationRequestView) query;
   getMyCollectionCreationRequestsPage: (cursor: opt nat, limit: opt nat) ->
-   (CollectionCreationRequestPage);
+   (CollectionCreationRequestPage) query;
   getMyCreatedCollections: () -> (vec Collection);
   getMyDividendNFTs: () -> (vec NFTDividend);
   getMyDividendNFTsPage: (cursor: opt nat, limit: opt nat) ->
    (NFTDividendPage);
   getMyMarketplaceSettlementStatuses: () -> (vec SettlementStatus) query;
-  getMyPendingAuctionRefunds: () -> (vec AuctionEscrow);
-  getMyPendingMintPayments: () -> (vec PendingMintPaymentView);
+  getMyPendingAuctionRefunds: () -> (vec AuctionEscrow) query;
+  getMyPendingMintPayments: () -> (vec PendingMintPaymentView) query;
   getNFTStats: (user: principal) -> (NFTStats) query;
   getRegistry: () -> (vec record {
                             EXTTokenIndex;

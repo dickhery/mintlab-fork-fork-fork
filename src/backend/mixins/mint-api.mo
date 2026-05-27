@@ -257,14 +257,19 @@ mixin (
 
   transient let MAX_ON_CHAIN_IMAGE_CHARS : Nat = 1_900_000;
   // Keep Base64 image moderation comfortably below IC outcall payload limits.
-  transient let MODERATION_MAX_IMAGE_DATA_URL_CHARS : Nat = 450_000;
-  transient let MODERATION_MAX_REQUEST_BODY_BYTES : Nat = 600_000;
+  transient let MODERATION_MAX_IMAGE_DATA_URL_CHARS : Nat = 320_000;
+  transient let MODERATION_MAX_REQUEST_BODY_BYTES : Nat = 380_000;
+  transient let MODERATION_MAX_RESPONSE_BYTES : Nat64 = 24_000;
+  transient let CMC_RATE_CACHE_TTL_NS : Nat64 = 60_000_000_000;
+  transient let CYCLE_DEBUG_LOGS_ENABLED : Bool = false;
   transient let PAYOUT_BASIS_POINTS_TOTAL : Nat = 10_000;
   transient let MINT_COOLDOWN_NS : Int = 10_000_000_000; // 10 seconds
   transient let COLLECTION_CREATION_COOLDOWN_NS : Int = 60_000_000_000; // 1 minute
   transient let COLLECTION_CREATION_PAGE_DEFAULT : Nat = 25;
   transient let COLLECTION_CREATION_PAGE_MAX : Nat = 100;
   transient var moderationImageNonce : Nat = 0;
+  transient var cachedCmcRate : ?IcpLib.IcpXdrConversionRate = null;
+  transient var cachedCmcRateFetchedAt : Nat64 = 0;
   transient let mintCooldowns = Map.empty<Principal, Int>();
   transient let collectionCreationCooldowns = Map.empty<Principal, Int>();
 
@@ -336,14 +341,16 @@ mixin (
       );
     };
 
-    Debug.print(
-      "MINTLAB cycles-attach-v7 preparing " #
-      operationLabel #
-      " attachCycles=" #
-      Nat.toText(amount) #
-      " backendBalanceBefore=" #
-      Nat.toText(backendBalance)
-    );
+    if (CYCLE_DEBUG_LOGS_ENABLED) {
+      Debug.print(
+        "MINTLAB cycles-attach-v7 preparing " #
+        operationLabel #
+        " attachCycles=" #
+        Nat.toText(amount) #
+        " backendBalanceBefore=" #
+        Nat.toText(backendBalance)
+      );
+    };
   };
 
   public query func getMintConfig() : async MintTypes.MintConfig {
@@ -564,14 +571,14 @@ mixin (
     statuses;
   };
 
-  public shared ({ caller }) func getMyCollectionCreationRequests() : async [MintTypes.CollectionCreationRequestView] {
+  public shared query ({ caller }) func getMyCollectionCreationRequests() : async [MintTypes.CollectionCreationRequestView] {
     if (Principal.isAnonymous(caller)) {
       return [];
     };
     MintLib.repairableCollectionCreationRequestsByOwner(collectionCreationState, caller);
   };
 
-  public shared ({ caller }) func getMyCollectionCreationRequestsPage(
+  public shared query ({ caller }) func getMyCollectionCreationRequestsPage(
     cursor : ?Nat,
     limit : ?Nat,
   ) : async MintTypes.CollectionCreationRequestPage {
@@ -589,7 +596,7 @@ mixin (
     );
   };
 
-  public shared ({ caller }) func getAllCollectionCreationRequests() : async {
+  public shared query ({ caller }) func getAllCollectionCreationRequests() : async {
     #ok : [MintTypes.CollectionCreationRequestView];
     #err : Text;
   } {
@@ -602,7 +609,7 @@ mixin (
     #ok(MintLib.repairableCollectionCreationRequests(collectionCreationState));
   };
 
-  public shared ({ caller }) func getAllCollectionCreationRequestsPage(
+  public shared query ({ caller }) func getAllCollectionCreationRequestsPage(
     cursor : ?Nat,
     limit : ?Nat,
   ) : async {
@@ -640,7 +647,7 @@ mixin (
     #ok(MintLib.collectionCreationRequestView(request));
   };
 
-  public shared ({ caller }) func getCollectionCreationDiagnostics(
+  public shared query ({ caller }) func getCollectionCreationDiagnostics(
     requestId : Nat
   ) : async { #ok : MintTypes.CollectionCreationDiagnostics; #err : Text } {
     if (Principal.isAnonymous(caller)) {
@@ -2029,7 +2036,7 @@ mixin (
     };
   };
 
-  public shared ({ caller }) func getMyPendingMintPayments() : async [MintTypes.PendingMintPaymentView] {
+  public shared query ({ caller }) func getMyPendingMintPayments() : async [MintTypes.PendingMintPaymentView] {
     if (Principal.isAnonymous(caller)) {
       return [];
     };
@@ -3262,7 +3269,7 @@ mixin (
     let request : HttpRequestArgs = {
       url = "https://api.openai.com/v1/moderations";
       method = #post;
-      max_response_bytes = ?80_000;
+      max_response_bytes = ?MODERATION_MAX_RESPONSE_BYTES;
       headers = [
         { name = "Host"; value = "api.openai.com" },
         { name = "Authorization"; value = "Bearer " # apiKey },
@@ -3284,16 +3291,18 @@ mixin (
     if (Cycles.balance() <= cost + minimumFactoryOperatingReserveCycles()) {
       Runtime.trap("The app canister does not have enough cycles to call OpenAI moderation.");
     };
-    Debug.print(
-      "OPENAI MODERATION OUTCALL" #
-      " requestBytes=" # Nat.toText(requestSize) #
-      " maxResponseBytes=" # (switch (request.max_response_bytes) { case (?b) Nat64.toText(b); case null "unlimited" }) #
-      " estimatedCycles=" # Nat.toText(cost) #
-      " canisterCycleBalance=" # Nat.toText(Cycles.balance()) #
-      " requestId=" # requestId #
-      " imageKind=" # moderationImageKind(imageUrl) #
-      " imageChars=" # Nat.toText(imageUrl.size())
-    );
+    if (CYCLE_DEBUG_LOGS_ENABLED) {
+      Debug.print(
+        "OPENAI MODERATION OUTCALL" #
+        " requestBytes=" # Nat.toText(requestSize) #
+        " maxResponseBytes=" # (switch (request.max_response_bytes) { case (?b) Nat64.toText(b); case null "unlimited" }) #
+        " estimatedCycles=" # Nat.toText(cost) #
+        " canisterCycleBalance=" # Nat.toText(Cycles.balance()) #
+        " requestId=" # requestId #
+        " imageKind=" # moderationImageKind(imageUrl) #
+        " imageChars=" # Nat.toText(imageUrl.size())
+      );
+    };
     assertCyclesForCall(cost, "OpenAI moderation HTTPS outcall");
     await (with cycles = cost) ic.http_request(request);
   };
@@ -3843,24 +3852,26 @@ mixin (
     source : Text,
   ) : async () {
     ignore MintLib.markCollectionCreationCanisterCreated(collectionCreationState, requestId, childCanisterId);
-    switch (await collectionCanisterStatus(childCanisterId)) {
-      case (?status) {
-        Debug.print(
-          "MINTLAB child canister created via " #
-          source #
-          " child=" #
-          childCanisterId.toText() #
-          " childCycles=" #
-          Nat.toText(status.cycles)
-        );
-      };
-      case null {
-        Debug.print(
-          "MINTLAB child canister created via " #
-          source #
-          " but status could not be read child=" #
-          childCanisterId.toText()
-        );
+    if (CYCLE_DEBUG_LOGS_ENABLED) {
+      switch (await collectionCanisterStatus(childCanisterId)) {
+        case (?status) {
+          Debug.print(
+            "MINTLAB child canister created via " #
+            source #
+            " child=" #
+            childCanisterId.toText() #
+            " childCycles=" #
+            Nat.toText(status.cycles)
+          );
+        };
+        case null {
+          Debug.print(
+            "MINTLAB child canister created via " #
+            source #
+            " but status could not be read child=" #
+            childCanisterId.toText()
+          );
+        };
       };
     };
   };
@@ -3887,14 +3898,16 @@ mixin (
         Nat.toText(backendBalance)
       );
     };
-    Debug.print(
-      "MINTLAB CMC create_canister v7 attaching cycles=" #
-      Nat.toText(attachCycles) #
-      " backendBalanceBefore=" #
-      Nat.toText(backendBalance) #
-      " owner=" #
-      owner.toText()
-    );
+    if (CYCLE_DEBUG_LOGS_ENABLED) {
+      Debug.print(
+        "MINTLAB CMC create_canister v7 attaching cycles=" #
+        Nat.toText(attachCycles) #
+        " backendBalanceBefore=" #
+        Nat.toText(backendBalance) #
+        " owner=" #
+        owner.toText()
+      );
+    };
     assertCyclesForCall(attachCycles, "CMC create collection canister");
     let cmc = actor (IcpLib.CYCLES_MINTING_CANISTER_ID) : IcpLib.CyclesMintingCanister;
     let createResult = await (with cycles = attachCycles) cmc.create_canister({
@@ -3904,12 +3917,14 @@ mixin (
     });
     switch (createResult) {
       case (#Ok(childCanisterId)) {
-        Debug.print(
-          "MINTLAB CMC create_canister v7 created child=" #
-          childCanisterId.toText() #
-          " backendBalanceAfter=" #
-          Nat.toText(Cycles.balance())
-        );
+        if (CYCLE_DEBUG_LOGS_ENABLED) {
+          Debug.print(
+            "MINTLAB CMC create_canister v7 created child=" #
+            childCanisterId.toText() #
+            " backendBalanceAfter=" #
+            Nat.toText(Cycles.balance())
+          );
+        };
         childCanisterId;
       };
       case (#Err(#Refunded({ refund_amount; create_error }))) {
@@ -4241,6 +4256,33 @@ mixin (
     10_000_000_000_000;
   };
 
+  func getCachedCmcRate() : ?IcpLib.IcpXdrConversionRate {
+    switch (cachedCmcRate) {
+      case (?rate) {
+        let now = IcpLib.nowNat64();
+        if (now >= cachedCmcRateFetchedAt and now - cachedCmcRateFetchedAt <= CMC_RATE_CACHE_TTL_NS) {
+          ?rate;
+        } else {
+          null;
+        };
+      };
+      case null null;
+    };
+  };
+
+  func getCmcRate() : async IcpLib.IcpXdrConversionRate {
+    switch (getCachedCmcRate()) {
+      case (?rate) rate;
+      case null {
+        let cmc = actor (IcpLib.CYCLES_MINTING_CANISTER_ID) : IcpLib.CyclesMintingCanister;
+        let rate = (await cmc.get_icp_xdr_conversion_rate()).data;
+        cachedCmcRate := ?rate;
+        cachedCmcRateFetchedAt := IcpLib.nowNat64();
+        rate;
+      };
+    };
+  };
+
   func splitAdminPayoutE8s(
     adminPayoutE8s : Nat64,
     secondaryBasisPoints : Nat,
@@ -4263,8 +4305,7 @@ mixin (
     secondaryPayoutBasisPoints : Nat,
   ) : async MintTypes.CollectionCreationQuote {
     validateCollectionCreationPayoutShares(primaryPayoutBasisPoints, secondaryPayoutBasisPoints);
-    let cmc = actor (IcpLib.CYCLES_MINTING_CANISTER_ID) : IcpLib.CyclesMintingCanister;
-    let rate = (await cmc.get_icp_xdr_conversion_rate()).data;
+    let rate = await getCmcRate();
     let collectionCanisterCycles = normalizedCollectionCanisterCycles(canisterCycles);
     let factoryReserveCycles = canisterCreationFeeCycles();
     let totalCyclesToConvert = collectionCanisterCycles + factoryReserveCycles;
@@ -4301,8 +4342,7 @@ mixin (
   func collectionCycleTopUpQuoteFor(
     cyclesToTopUp : Nat
   ) : async MintTypes.CollectionCycleTopUpQuote {
-    let cmc = actor (IcpLib.CYCLES_MINTING_CANISTER_ID) : IcpLib.CyclesMintingCanister;
-    let rate = (await cmc.get_icp_xdr_conversion_rate()).data;
+    let rate = await getCmcRate();
     let cycleCostE8s = IcpLib.cyclesToE8s(cyclesToTopUp, rate.xdr_permyriad_per_icp);
     {
       cyclesToTopUp;

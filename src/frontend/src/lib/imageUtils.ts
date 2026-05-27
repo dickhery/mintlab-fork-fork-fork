@@ -1,10 +1,10 @@
 /**
  * Compresses an image data URL for use with OpenAI moderation.
- * Resizes the longest side to at most 768px and exports as JPEG.
+ * Resizes the longest side to at most 640px and exports as JPEG.
  * Ensures the result stays under the backend moderation outcall limit.
  * Only supports JPG/PNG input formats.
  */
-export const MODERATION_MAX_IMAGE_DATA_URL_CHARS = 450_000;
+export const MODERATION_MAX_IMAGE_DATA_URL_CHARS = 320_000;
 
 export async function compressModerationImage(
   dataUrl: string,
@@ -22,12 +22,12 @@ export async function compressModerationImage(
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const MAX_SIDE = 768;
+      const MAX_SIDE = 640;
       const MIN_SIDE = 320;
       let scale = Math.min(1, MAX_SIDE / Math.max(img.width, img.height));
       let width = Math.max(1, Math.round(img.width * scale));
       let height = Math.max(1, Math.round(img.height * scale));
-      let quality = 0.82;
+      let quality = 0.78;
       let attempts = 0;
 
       while (attempts < 8) {
