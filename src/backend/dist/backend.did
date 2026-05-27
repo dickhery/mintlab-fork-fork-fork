@@ -1141,7 +1141,8 @@ service : {
   getMyAuctionBidStatuses: (listingIds: vec ListingId) ->
    (vec AuctionBidStatus) query;
   getMyCollectionCanisterStatuses: () -> (vec CollectionCanisterStatus);
-  getMyCollectionCreationRequests: () -> (vec CollectionCreationRequestView) query;
+  getMyCollectionCreationRequests: () ->
+   (vec CollectionCreationRequestView) query;
   getMyCollectionCreationRequestsPage: (cursor: opt nat, limit: opt nat) ->
    (CollectionCreationRequestPage) query;
   getMyCreatedCollections: () -> (vec Collection);

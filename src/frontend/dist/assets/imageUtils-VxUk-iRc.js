@@ -1,4 +1,4 @@
-import { c as createLucideIcon } from "./index-DrWYGNY7.js";
+import { c as createLucideIcon } from "./index-fB4eEJtO.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -19,7 +19,7 @@ const __iconNode = [
   ["path", { d: "M5 18H3", key: "zchphs" }]
 ];
 const Sparkles = createLucideIcon("sparkles", __iconNode);
-const MODERATION_MAX_IMAGE_DATA_URL_CHARS = 45e4;
+const MODERATION_MAX_IMAGE_DATA_URL_CHARS = 32e4;
 async function compressModerationImage(dataUrl) {
   if (!dataUrl.startsWith("data:image/jpeg") && !dataUrl.startsWith("data:image/jpg") && !dataUrl.startsWith("data:image/png")) {
     throw new Error(
@@ -29,12 +29,12 @@ async function compressModerationImage(dataUrl) {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const MAX_SIDE = 768;
+      const MAX_SIDE = 640;
       const MIN_SIDE = 320;
       let scale = Math.min(1, MAX_SIDE / Math.max(img.width, img.height));
       let width = Math.max(1, Math.round(img.width * scale));
       let height = Math.max(1, Math.round(img.height * scale));
-      let quality = 0.82;
+      let quality = 0.78;
       let attempts = 0;
       while (attempts < 8) {
         const canvas = document.createElement("canvas");
