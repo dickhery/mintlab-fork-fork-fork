@@ -9,18 +9,18 @@ import Types "../types/collections";
 module {
   public type CollectionsState = {
     collections : Map.Map<Types.CollectionId, Types.Collection>;
-    importMetas : Map.Map<Types.CollectionId, Types.CollectionImportMeta>;
-    importsByUser : Map.Map<Principal, [Types.CollectionId]>;
-    lastImportAtByUser : Map.Map<Principal, Int>;
+    var importMetas : ?Map.Map<Types.CollectionId, Types.CollectionImportMeta>;
+    var importsByUser : ?Map.Map<Principal, [Types.CollectionId]>;
+    var lastImportAtByUser : ?Map.Map<Principal, Int>;
     var nextId : Nat;
   };
 
   public func newState() : CollectionsState {
     {
       collections = Map.empty<Types.CollectionId, Types.Collection>();
-      importMetas = Map.empty<Types.CollectionId, Types.CollectionImportMeta>();
-      importsByUser = Map.empty<Principal, [Types.CollectionId]>();
-      lastImportAtByUser = Map.empty<Principal, Int>();
+      var importMetas = ?Map.empty<Types.CollectionId, Types.CollectionImportMeta>();
+      var importsByUser = ?Map.empty<Principal, [Types.CollectionId]>();
+      var lastImportAtByUser = ?Map.empty<Principal, Int>();
       var nextId = 1;
     };
   };
@@ -114,15 +114,48 @@ module {
     Map.get(state.collections, Nat.compare, id);
   };
 
+  func importMetas(state : CollectionsState) : Map.Map<Types.CollectionId, Types.CollectionImportMeta> {
+    switch (state.importMetas) {
+      case (?metas) metas;
+      case null {
+        let metas = Map.empty<Types.CollectionId, Types.CollectionImportMeta>();
+        state.importMetas := ?metas;
+        metas;
+      };
+    };
+  };
+
+  func importsByUser(state : CollectionsState) : Map.Map<Principal, [Types.CollectionId]> {
+    switch (state.importsByUser) {
+      case (?imports) imports;
+      case null {
+        let imports = Map.empty<Principal, [Types.CollectionId]>();
+        state.importsByUser := ?imports;
+        imports;
+      };
+    };
+  };
+
+  func lastImportAtByUser(state : CollectionsState) : Map.Map<Principal, Int> {
+    switch (state.lastImportAtByUser) {
+      case (?lastImports) lastImports;
+      case null {
+        let lastImports = Map.empty<Principal, Int>();
+        state.lastImportAtByUser := ?lastImports;
+        lastImports;
+      };
+    };
+  };
+
   public func getImportMeta(
     state : CollectionsState,
     collectionId : Types.CollectionId,
   ) : ?Types.CollectionImportMeta {
-    Map.get(state.importMetas, Nat.compare, collectionId);
+    Map.get(importMetas(state), Nat.compare, collectionId);
   };
 
   public func getImportMetas(state : CollectionsState) : [Types.CollectionImportMeta] {
-    Iter.toArray(Map.values(state.importMetas));
+    Iter.toArray(Map.values(importMetas(state)));
   };
 
   public func getImportMetasPage(
@@ -138,7 +171,7 @@ module {
     var metas : [Types.CollectionImportMeta] = [];
     var index : Nat = 0;
     var added : Nat = 0;
-    for ((_, meta) in Map.entries(state.importMetas)) {
+    for ((_, meta) in Map.entries(importMetas(state))) {
       if (index < start) {
         index += 1;
       } else if (added < pageSize) {
@@ -163,7 +196,8 @@ module {
     importedBy : Principal,
     trustStatus : Types.CollectionTrustStatus,
   ) : Types.CollectionImportMeta {
-    switch (Map.get(state.importMetas, Nat.compare, collectionId)) {
+    let metas = importMetas(state);
+    switch (Map.get(metas, Nat.compare, collectionId)) {
       case (?existing) existing;
       case null {
         let now = Time.now();
@@ -177,7 +211,7 @@ module {
           lastReportedAt = null;
           lastReportReason = null;
         };
-        Map.add(state.importMetas, Nat.compare, collectionId, meta);
+        Map.add(metas, Nat.compare, collectionId, meta);
         addImportForUser(state, importedBy, collectionId, now);
         meta;
       };
@@ -196,7 +230,7 @@ module {
     state : CollectionsState,
     importedBy : Principal,
   ) : ?Int {
-    Map.get(state.lastImportAtByUser, Principal.compare, importedBy);
+    Map.get(lastImportAtByUser(state), Principal.compare, importedBy);
   };
 
   public func recentImportCountForUser(
@@ -204,13 +238,13 @@ module {
     importedBy : Principal,
     since : Int,
   ) : Nat {
-    let ids = switch (Map.get(state.importsByUser, Principal.compare, importedBy)) {
+    let ids = switch (Map.get(importsByUser(state), Principal.compare, importedBy)) {
       case (?values) values;
       case null [];
     };
     var count : Nat = 0;
     for (collectionId in ids.values()) {
-      switch (Map.get(state.importMetas, Nat.compare, collectionId)) {
+      switch (Map.get(importMetas(state), Nat.compare, collectionId)) {
         case (?meta) {
           if (meta.createdAt >= since) {
             count += 1;
@@ -226,7 +260,7 @@ module {
     var count : Nat = 0;
     for ((collectionId, collection) in Map.entries(state.collections)) {
       if (collection.kind == #External and isPubliclyVisible(state, collection)) {
-        switch (Map.get(state.importMetas, Nat.compare, collectionId)) {
+        switch (Map.get(importMetas(state), Nat.compare, collectionId)) {
           case (?meta) {
             if (meta.trustStatus != #Verified) {
               count += 1;
@@ -246,7 +280,8 @@ module {
     collectionId : Types.CollectionId,
     status : Types.CollectionTrustStatus,
   ) : ?Types.CollectionImportMeta {
-    let current = switch (Map.get(state.importMetas, Nat.compare, collectionId)) {
+    let metas = importMetas(state);
+    let current = switch (Map.get(metas, Nat.compare, collectionId)) {
       case (?meta) meta;
       case null {
         switch (Map.get(state.collections, Nat.compare, collectionId)) {
@@ -260,7 +295,7 @@ module {
       trustStatus = status;
       reviewedAt = ?Time.now();
     };
-    Map.add(state.importMetas, Nat.compare, collectionId, updated);
+    Map.add(metas, Nat.compare, collectionId, updated);
     ?updated;
   };
 
@@ -269,7 +304,8 @@ module {
     collectionId : Types.CollectionId,
     reason : Text,
   ) : ?Types.CollectionImportMeta {
-    let current = switch (Map.get(state.importMetas, Nat.compare, collectionId)) {
+    let metas = importMetas(state);
+    let current = switch (Map.get(metas, Nat.compare, collectionId)) {
       case (?meta) meta;
       case null {
         switch (Map.get(state.collections, Nat.compare, collectionId)) {
@@ -290,7 +326,7 @@ module {
       lastReportedAt = ?Time.now();
       lastReportReason = ?reason;
     };
-    Map.add(state.importMetas, Nat.compare, collectionId, updated);
+    Map.add(metas, Nat.compare, collectionId, updated);
     ?updated;
   };
 
@@ -298,7 +334,7 @@ module {
     state : CollectionsState,
     collection : Types.Collection,
   ) : Bool {
-    switch (Map.get(state.importMetas, Nat.compare, collection.id)) {
+    switch (Map.get(importMetas(state), Nat.compare, collection.id)) {
       case (?meta) meta.trustStatus != #Blocked and meta.trustStatus != #SyncDisabled;
       case null true;
     };
@@ -308,7 +344,7 @@ module {
     state : CollectionsState,
     collection : Types.Collection,
   ) : Bool {
-    switch (Map.get(state.importMetas, Nat.compare, collection.id)) {
+    switch (Map.get(importMetas(state), Nat.compare, collection.id)) {
       case (?meta) meta.trustStatus != #Hidden and meta.trustStatus != #Blocked;
       case null true;
     };
@@ -337,17 +373,18 @@ module {
     collectionId : Types.CollectionId,
     now : Int,
   ) {
-    let existing = switch (Map.get(state.importsByUser, Principal.compare, importedBy)) {
+    let imports = importsByUser(state);
+    let existing = switch (Map.get(imports, Principal.compare, importedBy)) {
       case (?values) values;
       case null [];
     };
     Map.add(
-      state.importsByUser,
+      imports,
       Principal.compare,
       importedBy,
       appendUniqueNat(existing, collectionId),
     );
-    Map.add(state.lastImportAtByUser, Principal.compare, importedBy, now);
+    Map.add(lastImportAtByUser(state), Principal.compare, importedBy, now);
   };
 
   func appendUniqueNat(values : [Nat], value : Nat) : [Nat] {

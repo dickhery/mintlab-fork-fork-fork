@@ -1,4 +1,4 @@
-// Version: 1.0.0
+// Version: 3.0.0
 type AccountIdentifier__1012152309 = AccountIdentifier__675396873;
 type AccountIdentifier__675396873 = Blob;
 type AccountIdentifier__742051665 = AccountIdentifier__675396873;
@@ -290,6 +290,73 @@ type NoBidAuctionReturnStage__657306144 =
   {#CleanupPending; #NFTReturnPending; #WalletRegistrationPending};
 type Node__46230540<K, V> =
   {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
+type OldCollectionsState__367705394 =
+  {
+    collections :
+      Map__605269027<CollectionId__728255281, Collection__819405170>;
+    var nextId : Nat
+  };
+type OldListingReturnState__1019873687 =
+  {
+    returns :
+      Map__605269027<ListingId__1044341362,
+                      ListingReturnSettlement__675719716>
+  };
+type OldMarketplaceBidState__386455947 =
+  {
+    pendingBidDeposits :
+      Map__605269027<ListingId__1044341362, PendingBidDeposit__622239766>
+  };
+type OldMarketplacePaymentState__778052432 =
+  {
+    auctionEscrows :
+      Map__605269027<ListingId__1044341362, AuctionEscrow__348252087>;
+    listingLocks : Map__605269027<ListingId__1044341362, Bool>;
+    var mintlabFeeRecipient : ?AccountIdentifier__952944025;
+    var nextEscrowId : Nat;
+    pendingRefunds : Map__605269027<Nat, AuctionEscrow__348252087>
+  };
+type OldMarketplaceSettlementState__33294775 =
+  {
+    auctionSettlements :
+      Map__605269027<ListingId__1044341362, AuctionSettlement__999693424>;
+    fixedPurchaseSettlements :
+      Map__605269027<ListingId__1044341362,
+                      FixedPurchaseSettlement__535470204>
+  };
+type OldMarketplaceState__732604098 =
+  {
+    auctionListings :
+      Map__605269027<ListingId__1044341362, AuctionListing__689041975>;
+    bids : Map__605269027<ListingId__1044341362, [Bid__830417882]>;
+    escrowedNFTs :
+      Map__605269027<ListingId__1044341362, WalletNFT__587976579>;
+    fixedListings :
+      Map__605269027<ListingId__1044341362, FixedListing__476283189>;
+    var nextId : Nat
+  };
+type OldMintState__732593648 =
+  {
+    var collectionCanisterWasm : ?Blob;
+    var config : StoredMintConfig__369285023;
+    var nextTokenId : Nat;
+    var nextTransactionId : Nat;
+    pendingCollectionCreates : Map__605269027<Principal, Bool>;
+    tokens : Map__605269027<Nat, MintedToken__478554128>
+  };
+type OldNoBidAuctionReturnState__386681000 =
+  {
+    returns :
+      Map__605269027<ListingId__1044341362,
+                      NoBidAuctionReturnSettlement__74228367>
+  };
+type OldOwnershipIndexState__471014374 =
+  {
+    records : Map__605269027<Text, OwnershipIndexRecord__426474727>;
+    status :
+      Map__605269027<CollectionId__846229097,
+                      CollectionIndexStatus__939573993>
+  };
 type OwnershipIndexRecord__426474727 =
   {
     collectionId : CollectionId__846229097;
@@ -395,7 +462,78 @@ type WithdrawalJournalEntry__985970012 =
     updatedAt : Nat64
   };
 type WithdrawalStatus__733439347 = {#Completed; #Failed; #Pending};
-actor {
+actor ({
+  stable AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat;
+  stable AUTO_INDEX_PAGE_LIMIT : Nat;
+  stable IMPORT_COOLDOWN_NS : Int;
+  stable IMPORT_DAY_NS : Int;
+  stable IMPORT_INDEX_WARM_PAGE_LIMIT : Nat;
+  stable MAX_IMPORTS_PER_USER_PER_DAY : Nat;
+  stable MAX_UNVERIFIED_COLLECTIONS_VISIBLE : Nat;
+  stable authState : {var adminPrincipal : ?Principal};
+  stable collectionCreationPayoutSplitState :
+    {
+      var primaryPayoutBasisPoints : Nat;
+      requestPayouts :
+        Map__605269027<Nat, CollectionCreationRequestPayout__854387793>;
+      var secondaryPayoutAccount : ?AccountIdentifier__1012152309;
+      var secondaryPayoutBasisPoints : Nat
+    };
+  stable collectionCreationState :
+    {
+      var nextRequestId : Nat;
+      requests : Map__605269027<Nat, CollectionCreationRequest__1058482783>;
+      requestsByOwner : Map__605269027<Principal, [Nat]>
+    };
+  in collectionsState : OldCollectionsState__367705394;
+  stable dividendFeeState :
+    {
+      disbursementLocks : Map__605269027<CollectionId__728255281, Bool>;
+      feeReserveE8s : Map__605269027<CollectionId__728255281, Nat64>
+    };
+  stable dividendsState :
+    {
+      claimableE8s : Map__605269027<Text, Nat64>;
+      pendingClaims : Map__605269027<Text, Bool>;
+      processedBalanceE8s : Map__605269027<CollectionId__728255281, Nat64>
+    };
+  stable icpWithdrawalState :
+    {
+      var nextWithdrawalId : Nat;
+      withdrawals : Map__605269027<Text, WithdrawalJournalEntry__985970012>
+    };
+  in marketplaceBidState : OldMarketplaceBidState__386455947;
+  stable marketplaceFeeState : {var mintlabFeeBasisPoints : Nat};
+  stable marketplaceListingLockState :
+    {listingTokenLocks : Map__605269027<Text, Bool>};
+  in marketplaceListingReturnState : OldListingReturnState__1019873687;
+  in marketplaceNoBidAuctionReturnState :
+    OldNoBidAuctionReturnState__386681000;
+  in marketplacePaymentState : OldMarketplacePaymentState__778052432;
+  stable marketplaceRefundState :
+    {refundJournals : Map__605269027<Nat, PendingAuctionRefund__1044364063>};
+  in marketplaceSettlementState : OldMarketplaceSettlementState__33294775;
+  in marketplaceState : OldMarketplaceState__732604098;
+  stable marketplaceUserPaymentLockState :
+    {userPaymentLocks : Map__605269027<Principal, Bool>};
+  in mintState : OldMintState__732593648;
+  stable moderationState : {var config : ModerationConfig__770076956};
+  in ownershipIndexState : OldOwnershipIndexState__471014374;
+  stable pendingMintPaymentState :
+    {
+      var nextPaymentId : Nat;
+      payments : Map__605269027<Nat, PendingMintPayment__742129231>;
+      paymentsByCaller : Map__605269027<Principal, [Nat]>
+    };
+  stable walletState :
+    {
+      var nextId : Nat;
+      nfts : Map__605269027<NFTId__56202395, WalletNFT__587976579>;
+      pendingDeposits : Map__605269027<Text, DepositPreparation__61836182>;
+      tokenIndex : Map__605269027<Text, NFTId__56202395>;
+      userNFTs : Map__605269027<UserId__598058248, [NFTId__56202395]>
+    }
+}, {
   stable AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat;
   stable AUTO_INDEX_PAGE_LIMIT : Nat;
   stable IMPORT_COOLDOWN_NS : Int;
@@ -422,11 +560,12 @@ actor {
     {
       collections :
         Map__605269027<CollectionId__728255281, Collection__819405170>;
-      importMetas :
-        Map__605269027<CollectionId__728255281,
-                        CollectionImportMeta__678943757>;
-      importsByUser : Map__605269027<Principal, [CollectionId__728255281]>;
-      lastImportAtByUser : Map__605269027<Principal, Int>;
+      var importMetas :
+        ?Map__605269027<CollectionId__728255281,
+                         CollectionImportMeta__678943757>;
+      var importsByUser :
+        ?Map__605269027<Principal, [CollectionId__728255281]>;
+      var lastImportAtByUser : ?Map__605269027<Principal, Int>;
       var nextId : Nat
     };
   stable dividendFeeState :
@@ -449,8 +588,8 @@ actor {
     {
       pendingBidDeposits :
         Map__605269027<ListingId__1044341362, PendingBidDeposit__622239766>;
-      pendingBidIdsByUser :
-        Map__605269027<Principal, [ListingId__1044341362]>
+      var pendingBidIdsByUser :
+        ?Map__605269027<Principal, [ListingId__1044341362]>
     };
   stable marketplaceFeeState : {var mintlabFeeBasisPoints : Nat};
   stable marketplaceListingLockState :
@@ -460,16 +599,16 @@ actor {
       returns :
         Map__605269027<ListingId__1044341362,
                         ListingReturnSettlement__675719716>;
-      statusListingIdsByUser :
-        Map__605269027<Principal, [ListingId__1044341362]>
+      var statusListingIdsByUser :
+        ?Map__605269027<Principal, [ListingId__1044341362]>
     };
   stable marketplaceNoBidAuctionReturnState :
     {
       returns :
         Map__605269027<ListingId__1044341362,
                         NoBidAuctionReturnSettlement__74228367>;
-      statusListingIdsByUser :
-        Map__605269027<Principal, [ListingId__1044341362]>
+      var statusListingIdsByUser :
+        ?Map__605269027<Principal, [ListingId__1044341362]>
     };
   stable marketplacePaymentState :
     {
@@ -478,7 +617,7 @@ actor {
       listingLocks : Map__605269027<ListingId__1044341362, Bool>;
       var mintlabFeeRecipient : ?AccountIdentifier__952944025;
       var nextEscrowId : Nat;
-      pendingRefundIdsByUser : Map__605269027<Principal, [Nat]>;
+      var pendingRefundIdsByUser : ?Map__605269027<Principal, [Nat]>;
       pendingRefunds : Map__605269027<Nat, AuctionEscrow__348252087>
     };
   stable marketplaceRefundState :
@@ -490,16 +629,17 @@ actor {
       fixedPurchaseSettlements :
         Map__605269027<ListingId__1044341362,
                         FixedPurchaseSettlement__535470204>;
-      statusListingIdsByUser :
-        Map__605269027<Principal, [ListingId__1044341362]>
+      var statusListingIdsByUser :
+        ?Map__605269027<Principal, [ListingId__1044341362]>
     };
   stable marketplaceState :
     {
       auctionListings :
         Map__605269027<ListingId__1044341362, AuctionListing__689041975>;
-      bidSummaries :
-        Map__605269027<ListingId__1044341362, AuctionBidSummary__918488924>;
-      bidderStatuses : Map__605269027<Text, BidderAuctionStatus__127539905>;
+      var bidSummaries :
+        ?Map__605269027<ListingId__1044341362, AuctionBidSummary__918488924>;
+      var bidderStatuses :
+        ?Map__605269027<Text, BidderAuctionStatus__127539905>;
       bids : Map__605269027<ListingId__1044341362, [Bid__830417882]>;
       escrowedNFTs :
         Map__605269027<ListingId__1044341362, WalletNFT__587976579>;
@@ -517,15 +657,16 @@ actor {
       var nextTransactionId : Nat;
       pendingCollectionCreates : Map__605269027<Principal, Bool>;
       tokens : Map__605269027<Nat, MintedToken__478554128>;
-      tokensByCollection : Map__605269027<CollectionId__214298299, [Nat]>;
-      tokensByOwner : Map__605269027<Principal, [Nat]>;
-      tokensByOwnerCollection : Map__605269027<Text, [Nat]>
+      var tokensByCollection :
+        ?Map__605269027<CollectionId__214298299, [Nat]>;
+      var tokensByOwner : ?Map__605269027<Principal, [Nat]>;
+      var tokensByOwnerCollection : ?Map__605269027<Text, [Nat]>
     };
   stable moderationState : {var config : ModerationConfig__770076956};
   stable ownershipIndexState :
     {
       records : Map__605269027<Text, OwnershipIndexRecord__426474727>;
-      recordsByOwner : Map__605269027<Text, [Text]>;
+      var recordsByOwner : ?Map__605269027<Text, [Text]>;
       status :
         Map__605269027<CollectionId__846229097,
                         CollectionIndexStatus__939573993>
@@ -544,4 +685,4 @@ actor {
       tokenIndex : Map__605269027<Text, NFTId__56202395>;
       userNFTs : Map__605269027<UserId__598058248, [NFTId__56202395]>
     }
-};
+}) ;

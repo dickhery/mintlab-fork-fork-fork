@@ -24,8 +24,8 @@ module {
     fixedListings : Map.Map<Types.ListingId, Types.FixedListing>;
     auctionListings : Map.Map<Types.ListingId, Types.AuctionListing>;
     bids : Map.Map<Types.ListingId, [Types.Bid]>;
-    bidderStatuses : Map.Map<Text, Types.BidderAuctionStatus>;
-    bidSummaries : Map.Map<Types.ListingId, Types.AuctionBidSummary>;
+    var bidderStatuses : ?Map.Map<Text, Types.BidderAuctionStatus>;
+    var bidSummaries : ?Map.Map<Types.ListingId, Types.AuctionBidSummary>;
     escrowedNFTs : Map.Map<Types.ListingId, WalletTypes.WalletNFT>;
     var nextId : Nat;
   };
@@ -33,7 +33,7 @@ module {
   public type MarketplacePaymentState = {
     auctionEscrows : Map.Map<Types.ListingId, Types.AuctionEscrow>;
     pendingRefunds : Map.Map<Nat, Types.AuctionEscrow>;
-    pendingRefundIdsByUser : Map.Map<Principal, [Nat]>;
+    var pendingRefundIdsByUser : ?Map.Map<Principal, [Nat]>;
     listingLocks : Map.Map<Types.ListingId, Bool>;
     var nextEscrowId : Nat;
     var mintlabFeeRecipient : ?Types.AccountIdentifier;
@@ -54,22 +54,22 @@ module {
   public type MarketplaceSettlementState = {
     fixedPurchaseSettlements : Map.Map<Types.ListingId, Types.FixedPurchaseSettlement>;
     auctionSettlements : Map.Map<Types.ListingId, Types.AuctionSettlement>;
-    statusListingIdsByUser : Map.Map<Principal, [Types.ListingId]>;
+    var statusListingIdsByUser : ?Map.Map<Principal, [Types.ListingId]>;
   };
 
   public type NoBidAuctionReturnState = {
     returns : Map.Map<Types.ListingId, Types.NoBidAuctionReturnSettlement>;
-    statusListingIdsByUser : Map.Map<Principal, [Types.ListingId]>;
+    var statusListingIdsByUser : ?Map.Map<Principal, [Types.ListingId]>;
   };
 
   public type ListingReturnState = {
     returns : Map.Map<Types.ListingId, Types.ListingReturnSettlement>;
-    statusListingIdsByUser : Map.Map<Principal, [Types.ListingId]>;
+    var statusListingIdsByUser : ?Map.Map<Principal, [Types.ListingId]>;
   };
 
   public type MarketplaceBidState = {
     pendingBidDeposits : Map.Map<Types.ListingId, Types.PendingBidDeposit>;
-    pendingBidIdsByUser : Map.Map<Principal, [Types.ListingId]>;
+    var pendingBidIdsByUser : ?Map.Map<Principal, [Types.ListingId]>;
   };
 
   public type MarketplaceFeeState = {
@@ -81,8 +81,8 @@ module {
       fixedListings = Map.empty<Types.ListingId, Types.FixedListing>();
       auctionListings = Map.empty<Types.ListingId, Types.AuctionListing>();
       bids = Map.empty<Types.ListingId, [Types.Bid]>();
-      bidderStatuses = Map.empty<Text, Types.BidderAuctionStatus>();
-      bidSummaries = Map.empty<Types.ListingId, Types.AuctionBidSummary>();
+      var bidderStatuses = ?Map.empty<Text, Types.BidderAuctionStatus>();
+      var bidSummaries = ?Map.empty<Types.ListingId, Types.AuctionBidSummary>();
       escrowedNFTs = Map.empty<Types.ListingId, WalletTypes.WalletNFT>();
       var nextId = 1;
     };
@@ -92,7 +92,7 @@ module {
     {
       auctionEscrows = Map.empty<Types.ListingId, Types.AuctionEscrow>();
       pendingRefunds = Map.empty<Nat, Types.AuctionEscrow>();
-      pendingRefundIdsByUser = Map.empty<Principal, [Nat]>();
+      var pendingRefundIdsByUser = ?Map.empty<Principal, [Nat]>();
       listingLocks = Map.empty<Types.ListingId, Bool>();
       var nextEscrowId = 1;
       var mintlabFeeRecipient = null;
@@ -121,34 +121,111 @@ module {
     {
       fixedPurchaseSettlements = Map.empty<Types.ListingId, Types.FixedPurchaseSettlement>();
       auctionSettlements = Map.empty<Types.ListingId, Types.AuctionSettlement>();
-      statusListingIdsByUser = Map.empty<Principal, [Types.ListingId]>();
+      var statusListingIdsByUser = ?Map.empty<Principal, [Types.ListingId]>();
     };
   };
 
   public func newNoBidAuctionReturnState() : NoBidAuctionReturnState {
     {
       returns = Map.empty<Types.ListingId, Types.NoBidAuctionReturnSettlement>();
-      statusListingIdsByUser = Map.empty<Principal, [Types.ListingId]>();
+      var statusListingIdsByUser = ?Map.empty<Principal, [Types.ListingId]>();
     };
   };
 
   public func newListingReturnState() : ListingReturnState {
     {
       returns = Map.empty<Types.ListingId, Types.ListingReturnSettlement>();
-      statusListingIdsByUser = Map.empty<Principal, [Types.ListingId]>();
+      var statusListingIdsByUser = ?Map.empty<Principal, [Types.ListingId]>();
     };
   };
 
   public func newBidState() : MarketplaceBidState {
     {
       pendingBidDeposits = Map.empty<Types.ListingId, Types.PendingBidDeposit>();
-      pendingBidIdsByUser = Map.empty<Principal, [Types.ListingId]>();
+      var pendingBidIdsByUser = ?Map.empty<Principal, [Types.ListingId]>();
     };
   };
 
   public func newFeeState() : MarketplaceFeeState {
     {
       var mintlabFeeBasisPoints = DEFAULT_MINTLAB_FEE_BASIS_POINTS;
+    };
+  };
+
+  func bidderStatuses(state : MarketplaceState) : Map.Map<Text, Types.BidderAuctionStatus> {
+    switch (state.bidderStatuses) {
+      case (?index) index;
+      case null {
+        let index = Map.empty<Text, Types.BidderAuctionStatus>();
+        state.bidderStatuses := ?index;
+        index;
+      };
+    };
+  };
+
+  func bidSummaries(state : MarketplaceState) : Map.Map<Types.ListingId, Types.AuctionBidSummary> {
+    switch (state.bidSummaries) {
+      case (?index) index;
+      case null {
+        let index = Map.empty<Types.ListingId, Types.AuctionBidSummary>();
+        state.bidSummaries := ?index;
+        index;
+      };
+    };
+  };
+
+  func pendingRefundIdsByUser(state : MarketplacePaymentState) : Map.Map<Principal, [Nat]> {
+    switch (state.pendingRefundIdsByUser) {
+      case (?index) index;
+      case null {
+        let index = Map.empty<Principal, [Nat]>();
+        state.pendingRefundIdsByUser := ?index;
+        index;
+      };
+    };
+  };
+
+  func settlementStatusListingIdsByUser(state : MarketplaceSettlementState) : Map.Map<Principal, [Types.ListingId]> {
+    switch (state.statusListingIdsByUser) {
+      case (?index) index;
+      case null {
+        let index = Map.empty<Principal, [Types.ListingId]>();
+        state.statusListingIdsByUser := ?index;
+        index;
+      };
+    };
+  };
+
+  func noBidStatusListingIdsByUser(state : NoBidAuctionReturnState) : Map.Map<Principal, [Types.ListingId]> {
+    switch (state.statusListingIdsByUser) {
+      case (?index) index;
+      case null {
+        let index = Map.empty<Principal, [Types.ListingId]>();
+        state.statusListingIdsByUser := ?index;
+        index;
+      };
+    };
+  };
+
+  func listingReturnStatusListingIdsByUser(state : ListingReturnState) : Map.Map<Principal, [Types.ListingId]> {
+    switch (state.statusListingIdsByUser) {
+      case (?index) index;
+      case null {
+        let index = Map.empty<Principal, [Types.ListingId]>();
+        state.statusListingIdsByUser := ?index;
+        index;
+      };
+    };
+  };
+
+  func pendingBidIdsByUser(state : MarketplaceBidState) : Map.Map<Principal, [Types.ListingId]> {
+    switch (state.pendingBidIdsByUser) {
+      case (?index) index;
+      case null {
+        let index = Map.empty<Principal, [Types.ListingId]>();
+        state.pendingBidIdsByUser := ?index;
+        index;
+      };
     };
   };
 
@@ -279,8 +356,9 @@ module {
     settlement : Types.FixedPurchaseSettlement,
   ) {
     Map.add(state.fixedPurchaseSettlements, Nat.compare, settlement.listingId, settlement);
-    indexStatusListing(state.statusListingIdsByUser, settlement.buyer, settlement.listingId);
-    indexStatusListing(state.statusListingIdsByUser, settlement.seller, settlement.listingId);
+    let statusIndex = settlementStatusListingIdsByUser(state);
+    indexStatusListing(statusIndex, settlement.buyer, settlement.listingId);
+    indexStatusListing(statusIndex, settlement.seller, settlement.listingId);
   };
 
   public func getFixedPurchaseSettlement(
@@ -304,8 +382,9 @@ module {
     settlement : Types.AuctionSettlement,
   ) {
     Map.add(state.auctionSettlements, Nat.compare, settlement.listingId, settlement);
-    indexStatusListing(state.statusListingIdsByUser, settlement.winner, settlement.listingId);
-    indexStatusListing(state.statusListingIdsByUser, settlement.seller, settlement.listingId);
+    let statusIndex = settlementStatusListingIdsByUser(state);
+    indexStatusListing(statusIndex, settlement.winner, settlement.listingId);
+    indexStatusListing(statusIndex, settlement.seller, settlement.listingId);
   };
 
   public func getAuctionSettlement(
@@ -329,7 +408,7 @@ module {
     settlement : Types.NoBidAuctionReturnSettlement,
   ) {
     Map.add(state.returns, Nat.compare, settlement.listingId, settlement);
-    indexStatusListing(state.statusListingIdsByUser, settlement.seller, settlement.listingId);
+    indexStatusListing(noBidStatusListingIdsByUser(state), settlement.seller, settlement.listingId);
   };
 
   public func getNoBidAuctionReturn(
@@ -363,7 +442,7 @@ module {
     settlement : Types.ListingReturnSettlement,
   ) {
     Map.add(state.returns, Nat.compare, settlement.listingId, settlement);
-    indexStatusListing(state.statusListingIdsByUser, settlement.seller, settlement.listingId);
+    indexStatusListing(listingReturnStatusListingIdsByUser(state), settlement.seller, settlement.listingId);
   };
 
   public func getListingReturn(
@@ -428,7 +507,7 @@ module {
     pending : Types.PendingBidDeposit,
   ) {
     Map.add(state.pendingBidDeposits, Nat.compare, pending.listingId, pending);
-    indexStatusListing(state.pendingBidIdsByUser, pending.bidder, pending.listingId);
+    indexStatusListing(pendingBidIdsByUser(state), pending.bidder, pending.listingId);
   };
 
   public func getPendingBidDeposit(
@@ -452,7 +531,7 @@ module {
     escrow : Types.AuctionEscrow,
   ) {
     Map.add(state.pendingRefunds, Nat.compare, escrow.escrowId, escrow);
-    indexStatusListing(state.pendingRefundIdsByUser, escrow.bidder, escrow.escrowId);
+    indexStatusListing(pendingRefundIdsByUser(state), escrow.bidder, escrow.escrowId);
   };
 
   public func removePendingRefund(
@@ -529,35 +608,35 @@ module {
     state : MarketplaceSettlementState,
     user : Principal,
   ) : [Types.ListingId] {
-    lookupIndexedIds(state.statusListingIdsByUser, user);
+    lookupIndexedIds(settlementStatusListingIdsByUser(state), user);
   };
 
   public func getNoBidReturnListingIdsByUser(
     state : NoBidAuctionReturnState,
     user : Principal,
   ) : [Types.ListingId] {
-    lookupIndexedIds(state.statusListingIdsByUser, user);
+    lookupIndexedIds(noBidStatusListingIdsByUser(state), user);
   };
 
   public func getListingReturnIdsByUser(
     state : ListingReturnState,
     user : Principal,
   ) : [Types.ListingId] {
-    lookupIndexedIds(state.statusListingIdsByUser, user);
+    lookupIndexedIds(listingReturnStatusListingIdsByUser(state), user);
   };
 
   public func getPendingBidIdsByUser(
     state : MarketplaceBidState,
     user : Principal,
   ) : [Types.ListingId] {
-    lookupIndexedIds(state.pendingBidIdsByUser, user);
+    lookupIndexedIds(pendingBidIdsByUser(state), user);
   };
 
   public func getPendingRefundIdsByUser(
     state : MarketplacePaymentState,
     user : Principal,
   ) : [Nat] {
-    lookupIndexedIds(state.pendingRefundIdsByUser, user);
+    lookupIndexedIds(pendingRefundIdsByUser(state), user);
   };
 
   public func listFixedPurchaseSettlements(
@@ -1153,7 +1232,7 @@ module {
         var hasBid = false;
         var myHighestBid : ?Nat64 = null;
 
-        switch (Map.get(state.bidderStatuses, Text.compare, bidderListingKey(listingId, bidder))) {
+        switch (Map.get(bidderStatuses(state), Text.compare, bidderListingKey(listingId, bidder))) {
           case (?status) {
             hasBid := status.hasBid;
             myHighestBid := ?status.myHighestBid;
@@ -1362,12 +1441,13 @@ module {
 
   func recordBidderStatus(state : MarketplaceState, bid : Types.Bid) {
     let key = bidderListingKey(bid.listingId, bid.bidder);
-    let currentHighest = switch (Map.get(state.bidderStatuses, Text.compare, key)) {
+    let statusIndex = bidderStatuses(state);
+    let currentHighest = switch (Map.get(statusIndex, Text.compare, key)) {
       case (?status) status.myHighestBid;
       case null (0 : Nat64);
     };
     Map.add(
-      state.bidderStatuses,
+      statusIndex,
       Text.compare,
       key,
       {
@@ -1385,7 +1465,8 @@ module {
     listing : Types.AuctionListing,
     bid : Types.Bid,
   ) {
-    let previousCount = switch (Map.get(state.bidSummaries, Nat.compare, bid.listingId)) {
+    let summaryIndex = bidSummaries(state);
+    let previousCount = switch (Map.get(summaryIndex, Nat.compare, bid.listingId)) {
       case (?summary) summary.bidCount;
       case null {
         switch (Map.get(state.bids, Nat.compare, bid.listingId)) {
@@ -1397,7 +1478,7 @@ module {
       };
     };
     Map.add(
-      state.bidSummaries,
+      summaryIndex,
       Nat.compare,
       bid.listingId,
       {

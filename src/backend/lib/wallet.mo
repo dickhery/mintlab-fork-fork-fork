@@ -29,7 +29,7 @@ module {
 
   public type OwnershipIndexState = {
     records : Map.Map<Text, Types.OwnershipIndexRecord>;
-    recordsByOwner : Map.Map<Text, [Text]>;
+    var recordsByOwner : ?Map.Map<Text, [Text]>;
     status : Map.Map<Types.CollectionId, Types.CollectionIndexStatus>;
   };
 
@@ -46,7 +46,7 @@ module {
   public func newOwnershipIndexState() : OwnershipIndexState {
     {
       records = Map.empty<Text, Types.OwnershipIndexRecord>();
-      recordsByOwner = Map.empty<Text, [Text]>();
+      var recordsByOwner = ?Map.empty<Text, [Text]>();
       status = Map.empty<Types.CollectionId, Types.CollectionIndexStatus>();
     };
   };
@@ -323,6 +323,17 @@ module {
     Map.get(state.status, Nat.compare, collectionId);
   };
 
+  func recordsByOwner(state : OwnershipIndexState) : Map.Map<Text, [Text]> {
+    switch (state.recordsByOwner) {
+      case (?index) index;
+      case null {
+        let index = Map.empty<Text, [Text]>();
+        state.recordsByOwner := ?index;
+        index;
+      };
+    };
+  };
+
   public func putOwnershipIndexRecord(
     state : OwnershipIndexState,
     record : Types.OwnershipIndexRecord,
@@ -335,12 +346,13 @@ module {
       record,
     );
     let bucketKey = ownerIndexKey(record.collectionId, indexedOwnerKey(record.owner));
-    let current = switch (Map.get(state.recordsByOwner, Text.compare, bucketKey)) {
+    let ownerIndex = recordsByOwner(state);
+    let current = switch (Map.get(ownerIndex, Text.compare, bucketKey)) {
       case (?keys) keys;
       case null [];
     };
     Map.add(
-      state.recordsByOwner,
+      ownerIndex,
       Text.compare,
       bucketKey,
       appendUniqueText(current, recordKey),
@@ -1035,7 +1047,8 @@ module {
   ) : [Text] {
     var keys : [Text] = [];
     let principalKey = ownerIndexKey(collectionId, owner.toText());
-    switch (Map.get(state.recordsByOwner, Text.compare, principalKey)) {
+    let ownerIndex = recordsByOwner(state);
+    switch (Map.get(ownerIndex, Text.compare, principalKey)) {
       case (?values) {
         for (value in values.values()) {
           keys := appendUniqueText(keys, value);
@@ -1044,7 +1057,7 @@ module {
       case null {};
     };
     let accountKey = ownerIndexKey(collectionId, accountIdHex);
-    switch (Map.get(state.recordsByOwner, Text.compare, accountKey)) {
+    switch (Map.get(ownerIndex, Text.compare, accountKey)) {
       case (?values) {
         for (value in values.values()) {
           keys := appendUniqueText(keys, value);
@@ -1053,7 +1066,7 @@ module {
       case null {};
     };
     let principalHexKey = ownerIndexKey(collectionId, blobToHex(owner.toBlob()));
-    switch (Map.get(state.recordsByOwner, Text.compare, principalHexKey)) {
+    switch (Map.get(ownerIndex, Text.compare, principalHexKey)) {
       case (?values) {
         for (value in values.values()) {
           keys := appendUniqueText(keys, value);
