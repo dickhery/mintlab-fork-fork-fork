@@ -1,17 +1,17 @@
-type WalletSyncV2Result =
+type WalletSyncV2Result = 
  record {
    errors: vec text;
    newCount: nat;
    skipped: vec WalletSyncSkip;
  };
-type WalletSyncSkip =
+type WalletSyncSkip = 
  record {
    collectionId: CollectionId;
    collectionName: text;
    message: text;
    reason: text;
  };
-type WalletSyncPageResult =
+type WalletSyncPageResult = 
  record {
    checkedCollections: nat;
    complete: bool;
@@ -20,13 +20,13 @@ type WalletSyncPageResult =
    nextCursor: opt nat;
    skipped: vec WalletSyncSkip;
  };
-type WalletNFTPage =
+type WalletNFTPage = 
  record {
    nextCursor: opt nat;
    nfts: vec WalletNFT;
    totalCount: nat;
  };
-type WalletNFT =
+type WalletNFT = 
  record {
    collectionId: CollectionId;
    id: NFTId;
@@ -36,19 +36,19 @@ type WalletNFT =
    registeredAt: Timestamp;
    tokenId: text;
  };
-type WalletLocation =
+type WalletLocation = 
  variant {
    Minted;
    Registered;
    Vaulted;
  };
 type UserId = principal;
-type TransferResult =
+type TransferResult = 
  variant {
    Err: TransferError;
    Ok: nat64;
  };
-type TransferError =
+type TransferError = 
  variant {
    BadFee: record {expected_fee: Tokens;};
    InsufficientFunds: record {balance: Tokens;};
@@ -57,7 +57,7 @@ type TransferError =
    TxTooOld: record {allowed_window_nanos: nat64;};
  };
 type Tokens = record {e8s: nat64;};
-type TokenMetadataValue =
+type TokenMetadataValue = 
  variant {
    BlobContent: blob;
    BoolContent: bool;
@@ -73,7 +73,7 @@ type TokenMetadataValue =
    PrincipalContent: principal;
    TextContent: text;
  };
-type TokenMetadata =
+type TokenMetadata = 
  record {
    approved_at: opt nat64;
    approved_by: opt principal;
@@ -93,18 +93,24 @@ type TokenMetadata =
    transferred_by: opt principal;
  };
 type Timestamp = int;
-type SupportedStandard =
+type SupportedStandard = 
  record {
    name: text;
    url: text;
  };
-type SettlementStatusRole =
+type SettlementStatusRole = 
  variant {
    Bidder;
    Buyer;
    Seller;
  };
-type SettlementStatusKind =
+type SettlementStatusPage = 
+ record {
+   nextCursor: opt nat;
+   statuses: vec SettlementStatus;
+   totalCount: nat;
+ };
+type SettlementStatusKind = 
  variant {
    Auction;
    FixedPurchase;
@@ -113,7 +119,7 @@ type SettlementStatusKind =
    PendingAuctionRefund;
    PendingBidDeposit;
  };
-type SettlementStatus =
+type SettlementStatus = 
  record {
    kind: SettlementStatusKind;
    listingId: ListingId;
@@ -122,14 +128,14 @@ type SettlementStatus =
    stage: text;
    updatedAt: Timestamp;
  };
-type SettlementStage =
+type SettlementStage = 
  variant {
    MintlabFeePending;
    NFTTransferPending;
    PaymentPending;
    SellerPaymentPending;
  };
-type SettlementEscrowTopUpReceipt =
+type SettlementEscrowTopUpReceipt = 
  record {
    amount: nat64;
    blockIndex: nat64;
@@ -137,7 +143,7 @@ type SettlementEscrowTopUpReceipt =
    listingId: ListingId;
    quoteBefore: SettlementEscrowRepairQuote;
  };
-type SettlementEscrowRepairQuote =
+type SettlementEscrowRepairQuote = 
  record {
    escrowAccount: AccountIdentifier;
    escrowBalance: nat64;
@@ -154,12 +160,12 @@ type SettlementEscrowRepairQuote =
    topUpTotalDebit: nat64;
    topUpTransferFeeE8s: nat64;
  };
-type SettlementEscrowRepairKind =
+type SettlementEscrowRepairKind = 
  variant {
    Auction;
    FixedPurchase;
  };
-type PublicModerationConfig =
+type PublicModerationConfig = 
  record {
    apiKeyConfigured: bool;
    categories: ModerationCategorySettings;
@@ -167,7 +173,7 @@ type PublicModerationConfig =
    model: text;
    userMessage: text;
  };
-type PendingMintPaymentView =
+type PendingMintPaymentView = 
  record {
    amountE8s: nat64;
    collectionId: CollectionId;
@@ -179,14 +185,14 @@ type PendingMintPaymentView =
    status: PendingMintPaymentStatus;
    updatedAt: nat64;
  };
-type PendingMintPaymentStatus =
+type PendingMintPaymentStatus = 
  variant {
    Failed;
    Minted;
    PaymentPending;
    PaymentSent;
  };
-type PendingBidDeposit =
+type PendingBidDeposit = 
  record {
    amount: nat64;
    bidder: UserId;
@@ -201,7 +207,7 @@ type PendingBidDeposit =
    paymentCreatedAt: nat64;
    updatedAt: Timestamp;
  };
-type PendingAuctionRefund =
+type PendingAuctionRefund = 
  record {
    createdAt: Timestamp;
    escrow: AuctionEscrow;
@@ -211,13 +217,13 @@ type PendingAuctionRefund =
    refundFeeE8s: nat64;
    updatedAt: Timestamp;
  };
-type NoBidAuctionReturnStage =
+type NoBidAuctionReturnStage = 
  variant {
    CleanupPending;
    NFTReturnPending;
    WalletRegistrationPending;
  };
-type NoBidAuctionReturnSettlement =
+type NoBidAuctionReturnSettlement = 
  record {
    createdAt: Timestamp;
    listingId: ListingId;
@@ -228,7 +234,7 @@ type NoBidAuctionReturnSettlement =
    updatedAt: Timestamp;
    walletRegisteredAt: opt Timestamp;
  };
-type NFTStats =
+type NFTStats = 
  record {
    perCollection: vec record {
                         CollectionId;
@@ -236,14 +242,14 @@ type NFTStats =
                       };
    totalCount: nat;
  };
-type NFTStandard =
+type NFTStandard = 
  variant {
    DIP721;
    EXT;
    ICRC7;
    Other: text;
  };
-type NFTMetadata =
+type NFTMetadata = 
  record {
    attributes: vec record {
                      text;
@@ -254,19 +260,19 @@ type NFTMetadata =
    name: opt text;
  };
 type NFTId = nat;
-type NFTDividendPage =
+type NFTDividendPage = 
  record {
    dividends: vec NFTDividend;
    nextCursor: opt nat;
    totalCount: nat;
  };
-type NFTDividend =
+type NFTDividend = 
  record {
    claimableE8s: nat64;
    collection: Collection;
    nft: WalletNFT;
  };
-type ModerationCategorySettings =
+type ModerationCategorySettings = 
  record {
    explicitLanguage: bool;
    graphicViolence: bool;
@@ -277,7 +283,7 @@ type ModerationCategorySettings =
    otherNsfw: bool;
    selfHarm: bool;
  };
-type MintlabFeeRecoveryQuote =
+type MintlabFeeRecoveryQuote = 
  record {
    escrowAccount: AccountIdentifier;
    escrowBalance: nat64;
@@ -293,12 +299,12 @@ type MintlabFeeRecoveryQuote =
    sellerProceeds: nat64;
    shortfallBeforeMintlabFee: nat64;
  };
-type MintReceipt =
+type MintReceipt = 
  record {
    nft: WalletNFT;
    paymentBlock: nat64;
  };
-type MintConfig =
+type MintConfig = 
  record {
    collectionCanisterCycles: nat;
    collectionCanisterWasmUploaded: bool;
@@ -316,7 +322,7 @@ type MintConfig =
    mintPriceE8s: nat64;
    payoutAccount: opt AccountIdentifier;
  };
-type MarketplaceRecoverySnapshot =
+type MarketplaceRecoverySnapshot = 
  record {
    activeListingLocks: vec ListingId;
    activeListingTokenLocks: vec text;
@@ -329,21 +335,21 @@ type MarketplaceRecoverySnapshot =
    pendingRefunds: vec AuctionEscrow;
    refundJournals: vec PendingAuctionRefund;
  };
-type MarketplaceFeeConfig =
+type MarketplaceFeeConfig = 
  record {
    auctionBidFeeReserveE8s: nat64;
    ledgerFeeE8s: nat64;
    mintlabFeeBasisPoints: nat;
    mintlabFeeRecipient: opt AccountIdentifier;
  };
-type ListingStatus =
+type ListingStatus = 
  variant {
    Active;
    Cancelled;
    Settled;
    Sold;
  };
-type ListingReturnSettlement =
+type ListingReturnSettlement = 
  record {
    createdAt: Timestamp;
    listingId: ListingId;
@@ -356,13 +362,13 @@ type ListingReturnSettlement =
    updatedAt: Timestamp;
    walletRegisteredAt: opt Timestamp;
  };
-type ListingReturnReason =
+type ListingReturnReason = 
  variant {
    AuctionCancel;
    FixedCancel;
  };
 type ListingId = nat;
-type ICRC7Value =
+type ICRC7Value = 
  variant {
    Array: vec ICRC7Value;
    Blob: blob;
@@ -374,12 +380,12 @@ type ICRC7Value =
    Nat: nat;
    Text: text;
  };
-type ICRC7TransferResult =
+type ICRC7TransferResult = 
  variant {
    Err: ICRC7TransferError;
    Ok: nat;
  };
-type ICRC7TransferError =
+type ICRC7TransferError = 
  variant {
    CreatedInFuture: record {ledger_time: nat64;};
    Duplicate: record {duplicate_of: nat;};
@@ -396,7 +402,7 @@ type ICRC7TransferError =
    TooOld;
    Unauthorized;
  };
-type ICRC7TransferArg =
+type ICRC7TransferArg = 
  record {
    created_at_time: opt nat64;
    from_subaccount: opt blob;
@@ -404,34 +410,34 @@ type ICRC7TransferArg =
    to: ICRC7Account;
    token_id: nat;
  };
-type ICRC7TokenMetadata =
+type ICRC7TokenMetadata = 
  vec record {
        text;
        ICRC7Value;
      };
 type ICRC7Subaccount = blob;
-type ICRC7Account =
+type ICRC7Account = 
  record {
    owner: principal;
    subaccount: opt ICRC7Subaccount;
  };
-type HttpRequestResult =
+type HttpRequestResult = 
  record {
    body: blob;
    headers: vec HttpHeader;
    status: nat;
  };
-type HttpHeader =
+type HttpHeader = 
  record {
    name: text;
    value: text;
  };
-type HeaderField =
+type HeaderField = 
  record {
    text;
    text;
  };
-type FixedPurchaseSettlement =
+type FixedPurchaseSettlement = 
  record {
    buyer: UserId;
    createdAt: Timestamp;
@@ -454,7 +460,7 @@ type FixedPurchaseSettlement =
    stage: SettlementStage;
    updatedAt: Timestamp;
  };
-type FixedListing =
+type FixedListing = 
  record {
    createdAt: Timestamp;
    id: ListingId;
@@ -463,12 +469,12 @@ type FixedListing =
    seller: UserId;
    status: ListingStatus;
  };
-type EXTUser =
+type EXTUser = 
  variant {
    address: EXTAccountIdentifier;
    "principal": principal;
  };
-type EXTTransferResponse =
+type EXTTransferResponse = 
  variant {
    err:
     variant {
@@ -481,7 +487,7 @@ type EXTTransferResponse =
     };
    ok: EXTBalance;
  };
-type EXTTransferRequest =
+type EXTTransferRequest = 
  record {
    amount: EXTBalance;
    from: EXTUser;
@@ -491,7 +497,7 @@ type EXTTransferRequest =
    to: EXTUser;
    token: EXTTokenIdentifier;
  };
-type EXTTokensExtResult =
+type EXTTokensExtResult = 
  variant {
    err: EXTCommonError;
    ok: vec record {
@@ -504,7 +510,7 @@ type EXTTokenIndex = nat32;
 type EXTTokenIdentifier = text;
 type EXTTime = int;
 type EXTSubAccount = blob;
-type EXTMetadataValue =
+type EXTMetadataValue = 
  record {
    text;
    variant {
@@ -514,12 +520,12 @@ type EXTMetadataValue =
      "text": text;
    };
  };
-type EXTMetadataResult =
+type EXTMetadataResult = 
  variant {
    err: EXTCommonError;
    ok: EXTMetadata;
  };
-type EXTMetadataLegacy =
+type EXTMetadataLegacy = 
  variant {
    fungible:
     record {
@@ -530,13 +536,13 @@ type EXTMetadataLegacy =
     };
    nonfungible: record {metadata: opt blob;};
  };
-type EXTMetadataContainer =
+type EXTMetadataContainer = 
  variant {
    "blob": blob;
    data: vec EXTMetadataValue;
    json: text;
  };
-type EXTMetadata =
+type EXTMetadata = 
  variant {
    fungible:
     record {
@@ -554,30 +560,30 @@ type EXTMetadata =
     };
  };
 type EXTMemo = blob;
-type EXTListing =
+type EXTListing = 
  record {
    locked: opt EXTTime;
    price: nat64;
    seller: principal;
  };
-type EXTCommonError =
+type EXTCommonError = 
  variant {
    InvalidToken: EXTTokenIdentifier;
    Other: text;
  };
-type EXTBalanceResponse =
+type EXTBalanceResponse = 
  variant {
    err: EXTCommonError;
    ok: EXTBalance;
  };
-type EXTBalanceRequest =
+type EXTBalanceRequest = 
  record {
    token: EXTTokenIdentifier;
    user: EXTUser;
  };
 type EXTBalance = nat;
 type EXTAccountIdentifier = text;
-type DividendSyncReceipt =
+type DividendSyncReceipt = 
  record {
    balanceE8s: nat64;
    collectionId: CollectionId;
@@ -587,7 +593,7 @@ type DividendSyncReceipt =
    remainderE8s: nat64;
    shareE8s: nat64;
  };
-type DividendDisbursementReceipt =
+type DividendDisbursementReceipt = 
  record {
    collectionId: CollectionId;
    failures: vec text;
@@ -601,7 +607,7 @@ type DividendDisbursementReceipt =
    totalFeeE8s: nat64;
    totalPaidE8s: nat64;
  };
-type DividendDisbursementPreview =
+type DividendDisbursementPreview = 
  record {
    accountId: AccountIdentifier;
    balanceE8s: nat64;
@@ -624,7 +630,7 @@ type DividendDisbursementPreview =
    transferCount: nat;
    undistributedE8s: nat64;
  };
-type DividendClaimReceipt =
+type DividendClaimReceipt = 
  record {
    blockIndex: nat64;
    collection: Collection;
@@ -632,7 +638,7 @@ type DividendClaimReceipt =
    nft: WalletNFT;
    paidE8s: nat64;
  };
-type DividendBalancePage =
+type DividendBalancePage = 
  record {
    balances: vec record {
                    text;
@@ -641,22 +647,22 @@ type DividendBalancePage =
    nextCursor: opt nat;
    totalCount: nat;
  };
-type DIP721TokensResult =
+type DIP721TokensResult = 
  variant {
    Err: DIP721Error;
    Ok: vec nat;
  };
-type DIP721NatResult =
+type DIP721NatResult = 
  variant {
    Err: DIP721Error;
    Ok: nat;
  };
-type DIP721MetadataResult =
+type DIP721MetadataResult = 
  variant {
    Err: DIP721Error;
    Ok: TokenMetadata;
  };
-type DIP721Error =
+type DIP721Error = 
  variant {
    ExistedNFT;
    InvalidTokenId;
@@ -671,13 +677,23 @@ type DIP721Error =
    UnauthorizedOwner;
    ZeroAddress;
  };
-type CollectionPage =
+type CollectionTrustStatus = 
+ variant {
+   Blocked;
+   CommunityImported;
+   Hidden;
+   NeedsBrowseInfo;
+   Reported;
+   SyncDisabled;
+   Verified;
+ };
+type CollectionPage = 
  record {
    collections: vec Collection;
    nextCursor: opt nat;
    totalCount: nat;
  };
-type CollectionNFTPage =
+type CollectionNFTPage = 
  record {
    coverage: CollectionBrowseCoverage;
    nextCursor: opt text;
@@ -685,12 +701,12 @@ type CollectionNFTPage =
    note: text;
    totalCount: nat;
  };
-type CollectionKind =
+type CollectionKind = 
  variant {
    External;
    Minted;
  };
-type CollectionIndexStatus =
+type CollectionIndexStatus = 
  record {
    collectionId: CollectionId;
    complete: bool;
@@ -700,7 +716,7 @@ type CollectionIndexStatus =
    scanned: nat;
    updatedAt: Timestamp;
  };
-type CollectionIndexPageResult =
+type CollectionIndexPageResult = 
  record {
    collectionId: CollectionId;
    complete: bool;
@@ -709,8 +725,25 @@ type CollectionIndexPageResult =
    nextCursor: opt text;
    scanned: nat;
  };
+type CollectionImportMetaPage = 
+ record {
+   metas: vec CollectionImportMeta;
+   nextCursor: opt nat;
+   totalCount: nat;
+ };
+type CollectionImportMeta = 
+ record {
+   collectionId: CollectionId;
+   createdAt: int;
+   importedBy: principal;
+   lastReportReason: opt text;
+   lastReportedAt: opt int;
+   reportCount: nat;
+   reviewedAt: opt int;
+   trustStatus: CollectionTrustStatus;
+ };
 type CollectionId = nat;
-type CollectionDividendInfo =
+type CollectionDividendInfo = 
  record {
    accountId: AccountIdentifier;
    balanceE8s: nat64;
@@ -723,7 +756,7 @@ type CollectionDividendInfo =
    processedBalanceE8s: nat64;
  };
 type CollectionDividendConfig = record {enabled: bool;};
-type CollectionCycleTopUpReceipt =
+type CollectionCycleTopUpReceipt = 
  record {
    canisterId: principal;
    collectionId: CollectionId;
@@ -734,7 +767,7 @@ type CollectionCycleTopUpReceipt =
    paymentBlock: nat64;
    totalUserDebitE8s: nat64;
  };
-type CollectionCycleTopUpQuote =
+type CollectionCycleTopUpQuote = 
  record {
    cycleCostE8s: nat64;
    cyclesToTopUp: nat;
@@ -743,7 +776,7 @@ type CollectionCycleTopUpQuote =
    totalUserDebitE8s: nat64;
    xdrPermyriadPerIcp: nat64;
  };
-type CollectionCreationStatus =
+type CollectionCreationStatus = 
  variant {
    AdminPayoutPending;
    AdminPayoutSent;
@@ -755,7 +788,7 @@ type CollectionCreationStatus =
    Installed;
    Started;
  };
-type CollectionCreationRequestView =
+type CollectionCreationRequestView = 
  record {
    childCanisterId: opt principal;
    collectionId: opt CollectionId;
@@ -768,18 +801,18 @@ type CollectionCreationRequestView =
    symbol: text;
    updatedAt: nat64;
  };
-type CollectionCreationRequestPage =
+type CollectionCreationRequestPage = 
  record {
    nextCursor: opt nat;
    requests: vec CollectionCreationRequestView;
    totalCount: nat;
  };
-type CollectionCreationReceipt =
+type CollectionCreationReceipt = 
  record {
    collection: Collection;
    paymentBlock: nat64;
  };
-type CollectionCreationQuote =
+type CollectionCreationQuote = 
  record {
    adminPayoutE8s: nat64;
    adminPayoutFeeE8s: nat64;
@@ -797,7 +830,7 @@ type CollectionCreationQuote =
    totalUserDebitE8s: nat64;
    xdrPermyriadPerIcp: nat64;
  };
-type CollectionCreationDiagnostics =
+type CollectionCreationDiagnostics = 
  record {
    backendCycles: nat;
    buildVersion: text;
@@ -810,7 +843,7 @@ type CollectionCreationDiagnostics =
    requiredBackendCycles: nat;
    totalCyclesToConvert: nat;
  };
-type CollectionCanisterStatus =
+type CollectionCanisterStatus = 
  record {
    appCanisterId: principal;
    canisterId: principal;
@@ -821,14 +854,14 @@ type CollectionCanisterStatus =
    idleCyclesBurnedPerDay: nat;
    moduleInstalled: bool;
  };
-type CollectionCanisterControllers =
+type CollectionCanisterControllers = 
  record {
    appCanisterId: principal;
    canisterId: principal;
    collectionId: CollectionId;
    controllers: vec principal;
  };
-type CollectionBrowseStats =
+type CollectionBrowseStats = 
  record {
    collectionId: CollectionId;
    coverage: CollectionBrowseCoverage;
@@ -836,17 +869,17 @@ type CollectionBrowseStats =
    totalCount: nat;
    visibleCount: nat;
  };
-type CollectionBrowseInfo =
+type CollectionBrowseInfo = 
  record {
    tokenIndexOffset: opt nat;
    totalSupply: opt nat;
  };
-type CollectionBrowseCoverage =
+type CollectionBrowseCoverage = 
  variant {
    Full;
    Partial;
  };
-type Collection =
+type Collection = 
  record {
    browseInfo: opt CollectionBrowseInfo;
    canisterId: principal;
@@ -859,7 +892,7 @@ type Collection =
    standard: NFTStandard;
    symbol: text;
  };
-type AuctionSettlement =
+type AuctionSettlement = 
  record {
    createdAt: Timestamp;
    feeRecipient: opt AccountIdentifier;
@@ -881,7 +914,7 @@ type AuctionSettlement =
    winningEscrowDepositedBlock: nat64;
    winningEscrowId: nat;
  };
-type AuctionListing =
+type AuctionListing = 
  record {
    createdAt: Timestamp;
    endTime: Timestamp;
@@ -893,7 +926,7 @@ type AuctionListing =
    startingBid: nat64;
    status: ListingStatus;
  };
-type AuctionEscrow =
+type AuctionEscrow = 
  record {
    amount: nat64;
    bidder: UserId;
@@ -904,7 +937,7 @@ type AuctionEscrow =
    ledgerFeeE8s: nat64;
    listingId: ListingId;
  };
-type AuctionBidStatus =
+type AuctionBidStatus = 
  record {
    hasBid: bool;
    highestBid: nat64;
@@ -913,21 +946,21 @@ type AuctionBidStatus =
    listingId: ListingId;
    myHighestBid: opt nat64;
  };
-type AssetHttpResponse =
+type AssetHttpResponse = 
  record {
    body: blob;
    headers: vec HeaderField;
    status_code: nat16;
    upgrade: bool;
  };
-type AssetHttpRequest =
+type AssetHttpRequest = 
  record {
    body: blob;
    headers: vec HeaderField;
    method: text;
    url: text;
  };
-type AppCycleTopUpReceipt =
+type AppCycleTopUpReceipt = 
  record {
    canisterId: principal;
    cycleBalance: opt nat;
@@ -937,12 +970,12 @@ type AppCycleTopUpReceipt =
    paymentBlock: nat64;
    totalUserDebitE8s: nat64;
  };
-type AppCanisterKind =
+type AppCanisterKind = 
  variant {
    Backend;
    Frontend;
  };
-type AppCanisterHealth =
+type AppCanisterHealth = 
  record {
    canisterId: principal;
    cycles: opt nat;
@@ -952,24 +985,24 @@ type AppCanisterHealth =
    kind: AppCanisterKind;
    moduleInstalled: opt bool;
  };
-type ActiveListingPage =
+type ActiveListingPage = 
  record {
    listings: vec ActiveListing;
    nextCursor: opt nat;
    totalCount: nat;
  };
-type ActiveListingDetailPage =
+type ActiveListingDetailPage = 
  record {
    details: vec ActiveListingDetail;
    nextCursor: opt nat;
    totalCount: nat;
  };
-type ActiveListingDetail =
+type ActiveListingDetail = 
  record {
    listing: ActiveListing;
    nft: WalletNFT;
  };
-type ActiveListing =
+type ActiveListing = 
  variant {
    Auction: AuctionListing;
    Fixed: FixedListing;
@@ -990,17 +1023,37 @@ service : {
       err: text;
       ok: CollectionCreationReceipt;
     });
+  adminBlockCollection: (collectionId: CollectionId) ->
+   (variant {
+      err: text;
+      ok: CollectionImportMeta;
+    });
   adminDeleteCollectionCreationRequest: (requestId: nat) ->
    (variant {
       err: text;
       ok: bool;
     });
+  adminDisableCollectionSync: (collectionId: CollectionId) ->
+   (variant {
+      err: text;
+      ok: CollectionImportMeta;
+    });
   adminGetMintlabFeeRecoveryQuote: (listingId: ListingId) ->
    (MintlabFeeRecoveryQuote);
   adminGetSettlementEscrowRepairQuote: (listingId: ListingId) ->
    (SettlementEscrowRepairQuote);
+  adminHideCollection: (collectionId: CollectionId) ->
+   (variant {
+      err: text;
+      ok: CollectionImportMeta;
+    });
   adminListMarketplaceRecoveryState: () ->
    (MarketplaceRecoverySnapshot) query;
+  adminMarkCollectionNeedsBrowseInfo: (collectionId: CollectionId) ->
+   (variant {
+      err: text;
+      ok: CollectionImportMeta;
+    });
   adminMarkMintlabFeeBalanceVerified: (listingId: ListingId) ->
    (MintlabFeeRecoveryQuote);
   adminRecoverPaidCollectionCreation: (owner: principal, cyclePaymentBlock:
@@ -1018,6 +1071,11 @@ service : {
   adminRetryNoBidAuctionReturn: (listingId: ListingId) -> ();
   adminTopUpSettlementEscrow: (listingId: ListingId, amount: nat64) ->
    (SettlementEscrowTopUpReceipt);
+  adminVerifyCollection: (collectionId: CollectionId) ->
+   (variant {
+      err: text;
+      ok: CollectionImportMeta;
+    });
   balance: (request: EXTBalanceRequest) -> (EXTBalanceResponse) query;
   bootstrapAdmin: () -> ();
   buyFixedListing: (listingId: ListingId) -> ();
@@ -1045,7 +1103,7 @@ service : {
    mainMintPayoutAccount: opt AccountIdentifier, mainMintPriceE8s: nat64,
    mainMintEnabled: bool, mainMintDividendsEnabled: bool,
    collectionCanisterCycles: nat) -> (Collection);
-  configureModeration: (enabled: bool, apiKey: opt text, clearApiKey:
+  configureModeration: (enabled: bool, apiKey: opt text, clearApiKey: 
    bool, model: text, categories: ModerationCategorySettings, userMessage:
    text) -> (PublicModerationConfig);
   createAuctionListing: (nftId: NFTId, startingBid: nat64, endTime: int) ->
@@ -1128,6 +1186,8 @@ service : {
    opt nat, limit: opt nat) -> (DividendBalancePage) query;
   getCollectionDividendInfo: (collectionId: CollectionId) ->
    (opt CollectionDividendInfo);
+  getCollectionImportMeta: (collectionId: CollectionId) ->
+   (opt CollectionImportMeta) query;
   getCollectionIndexStatus: (collectionId: CollectionId) ->
    (opt CollectionIndexStatus) query;
   getCollectionNFT: (collectionId: CollectionId, tokenId: text) ->
@@ -1141,7 +1201,8 @@ service : {
   getMyAuctionBidStatuses: (listingIds: vec ListingId) ->
    (vec AuctionBidStatus) query;
   getMyCollectionCanisterStatuses: () -> (vec CollectionCanisterStatus);
-  getMyCollectionCreationRequests: () -> (vec CollectionCreationRequestView) query;
+  getMyCollectionCreationRequests: () ->
+   (vec CollectionCreationRequestView) query;
   getMyCollectionCreationRequestsPage: (cursor: opt nat, limit: opt nat) ->
    (CollectionCreationRequestPage) query;
   getMyCreatedCollections: () -> (vec Collection);
@@ -1149,6 +1210,8 @@ service : {
   getMyDividendNFTsPage: (cursor: opt nat, limit: opt nat) ->
    (NFTDividendPage);
   getMyMarketplaceSettlementStatuses: () -> (vec SettlementStatus) query;
+  getMyMarketplaceSettlementStatusesPage: (cursor: opt nat, limit:
+   opt nat) -> (SettlementStatusPage) query;
   getMyPendingAuctionRefunds: () -> (vec AuctionEscrow) query;
   getMyPendingMintPayments: () -> (vec PendingMintPaymentView) query;
   getNFTStats: (user: principal) -> (NFTStats) query;
@@ -1206,6 +1269,8 @@ service : {
   isAdmin: () -> (bool) query;
   isNFTInUserWallet: (collectionId: CollectionId, tokenId: text, user:
    UserId) -> (bool) query;
+  listCollectionImportMetasPage: (cursor: opt nat, limit: opt nat) ->
+   (CollectionImportMetaPage) query;
   listCollections: () -> (vec Collection) query;
   listCollectionsPage: (cursor: opt nat, limit: opt nat) ->
    (CollectionPage) query;
@@ -1280,6 +1345,11 @@ service : {
    (variant {
       err: text;
       ok: CollectionCreationRequestView;
+    });
+  reportCollection: (collectionId: CollectionId, reason: text) ->
+   (variant {
+      err: text;
+      ok: CollectionImportMeta;
     });
   retryAuctionRefund: (escrowId: nat) -> (bool);
   retryCollectionCreationRequest: (requestId: nat) ->

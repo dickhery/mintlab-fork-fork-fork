@@ -1,21 +1,21 @@
-import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useAdmin, e as useQueryClient, r as reactExports, f as useQuery, g as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-fB4eEJtO.js";
-import { P as Plus, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-Cc0diajz.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-YToxLWmO.js";
-import { M as MediaImage, E as EmptyState } from "./MediaImage-Civg5pde.js";
-import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-oOkBKRlZ.js";
-import { B as Badge, I as Input } from "./badge-BjkRMG15.js";
-import { I as ImageOff, r as resolveImageUrl } from "./media-Dh83-DF1.js";
-import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-BQBru4ZQ.js";
-import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-DyD36cRx.js";
-import { u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label } from "./index-u_tHWnWZ.js";
-import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-CQRONB5p.js";
-import { S as Skeleton, C as Copy } from "./skeleton-DK8TNp-i.js";
-import { S as Sparkles, c as compressModerationImage } from "./imageUtils-VxUk-iRc.js";
-import { C as CircleCheck } from "./circle-check-DD4JL3EA.js";
-import { C as Coins } from "./coins-DulLKrSJ.js";
-import { S as Send } from "./send-p9IaVddO.js";
-import "./arrow-right-DJp-M4z-.js";
-import "./index-CwNEsK_7.js";
+import { c as createLucideIcon, j as jsxRuntimeExports, m as motion, a as cn, u as useAuth, b as useBackend, d as useAdmin, e as useQueryClient, r as reactExports, f as useQuery, g as ue, W as Wallet, B as Button, L as LogIn, P as Principal } from "./index-Dq_se1c6.js";
+import { P as Plus, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-B7KletWf.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-aLU73OmN.js";
+import { M as MediaImage, E as EmptyState } from "./MediaImage-R3sXH1yn.js";
+import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-qLigS8ZL.js";
+import { B as Badge, I as Input } from "./badge-Bgu2zrlA.js";
+import { I as ImageOff, r as resolveImageUrl } from "./media-CvoQXHxw.js";
+import { P as PaymentConfirmationDialog, Z as ZoomableMediaImage, T as Tag } from "./ZoomableMediaImage-DDVPpv3p.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, c as CardContent } from "./card-C7H4xzFQ.js";
+import { u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label } from "./index-BgnyvDtN.js";
+import { L as Layers, C as Check, I as Info, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, E as ExternalLink } from "./textarea-r4-BXjrG.js";
+import { S as Skeleton, C as Copy } from "./skeleton-C8YDH4P6.js";
+import { u as useInfiniteQuery, S as Sparkles, c as compressModerationImage } from "./imageUtils-DtyAlXuR.js";
+import { C as CircleCheck } from "./circle-check-ByYUKxva.js";
+import { C as Coins } from "./coins-DyruyZMR.js";
+import { S as Send } from "./send-CgTCl1sw.js";
+import "./arrow-right-D7fKNVWD.js";
+import "./index-B-TbJKfF.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -159,9 +159,13 @@ const SYNC_TIMEOUT_MS = 45e3;
 const SYNC_STILL_RUNNING_MESSAGE = "Wallet sync is still checking imported collections. New NFTs found during sync will appear here shortly.";
 const SYNC_PAGE_TIMEOUT_MESSAGE = "This sync page is taking longer than expected. Mintlab saved progress and will continue on the next Sync.";
 const SYNC_PAGE_COLLECTION_LIMIT = 2n;
-const MAX_SYNC_PAGES_PER_CLICK = 20;
+const MAX_SYNC_PAGES_PER_CLICK = 5;
 const SYNC_SLOW_NOTICE_MS = 15e3;
 const SYNC_REFRESH_INTERVAL_MS = 6e3;
+const WALLET_NFT_PAGE_SIZE = 50n;
+const WALLET_COLLECTION_PAGE_SIZE = 50n;
+const WALLET_LISTING_PAGE_SIZE = 25n;
+const WALLET_DIVIDEND_PAGE_SIZE = 25n;
 function formatICP(e8s) {
   const whole = e8s / E8S;
   const frac = (e8s % E8S).toString().padStart(8, "0").replace(/0+$/, "");
@@ -172,6 +176,16 @@ function pendingMintStatusLabel(status) {
   if (status === "PaymentSent") return "Mint retry ready";
   if (status === "Minted") return "Minted";
   return "Needs review";
+}
+function buildLoadedNFTStats(nfts, totalCount) {
+  const counts = /* @__PURE__ */ new Map();
+  for (const nft of nfts) {
+    counts.set(nft.collectionId, (counts.get(nft.collectionId) ?? 0n) + 1n);
+  }
+  return {
+    totalCount,
+    perCollection: Array.from(counts.entries())
+  };
 }
 function parseAttributeLines(value) {
   const seen = /* @__PURE__ */ new Set();
@@ -1062,6 +1076,7 @@ function MintComposer({
   creatorCollections
 }) {
   const { actor } = useBackend();
+  const { principalText, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const [name, setName] = reactExports.useState("");
   const [description, setDescription] = reactExports.useState("");
@@ -1074,13 +1089,12 @@ function MintComposer({
   const mainMintAvailable = (mintConfig == null ? void 0 : mintConfig.mainMintEnabled) === true && mintConfig.collectionId != null && mainCollection != null;
   const { data: pendingMintPayments = [] } = useQuery(
     {
-      queryKey: ["pendingMintPayments"],
+      queryKey: ["pendingMintPayments", principalText],
       queryFn: async () => {
         if (!actor) return [];
         return actor.getMyPendingMintPayments();
       },
-      enabled: !!actor,
-      refetchInterval: 3e4
+      enabled: !!actor && isAuthenticated
     }
   );
   const retryPendingMintMutation = useMutation({
@@ -1960,6 +1974,7 @@ function CollectionSection({
   );
 }
 function WalletPage() {
+  var _a;
   const {
     isAuthenticated,
     isLoading: authLoading,
@@ -1988,33 +2003,41 @@ function WalletPage() {
     }
   }, [isAuthenticated, actor, isFetching, queryClient]);
   const {
-    data: userNFTs,
+    data: userNFTPages,
     isLoading: nftsLoading,
-    refetch: refetchNFTs
-  } = useQuery({
+    refetch: refetchNFTs,
+    fetchNextPage: fetchNextNFTPage,
+    hasNextPage: hasMoreNFTs,
+    isFetchingNextPage: isFetchingMoreNFTs
+  } = useInfiniteQuery({
     queryKey: ["userNFTs", principalText],
-    queryFn: async () => {
-      if (!actor || !principal) return [];
-      return actor.getUserNFTs(principal);
+    initialPageParam: null,
+    queryFn: async ({ pageParam }) => {
+      if (!actor || !principal) {
+        return { nfts: [], nextCursor: null, totalCount: 0n };
+      }
+      return actor.getUserNFTsPage(principal, pageParam, WALLET_NFT_PAGE_SIZE);
     },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? void 0,
     enabled: !!actor && !isFetching && isAuthenticated && !!principal
   });
-  const { data: userStats, isLoading: statsLoading } = useQuery({
-    queryKey: ["userStats", principalText],
-    queryFn: async () => {
-      if (!actor || !principal) throw new Error("No actor");
-      return actor.getNFTStats(principal);
-    },
-    enabled: !!actor && !isFetching && isAuthenticated && !!principal
-  });
-  const { data: collections } = useQuery({
+  const userNFTs = (userNFTPages == null ? void 0 : userNFTPages.pages.flatMap((page) => page.nfts)) ?? [];
+  const userNFTTotalCount = ((_a = userNFTPages == null ? void 0 : userNFTPages.pages[0]) == null ? void 0 : _a.totalCount) ?? BigInt(userNFTs.length);
+  const userStats = buildLoadedNFTStats(userNFTs, userNFTTotalCount);
+  const statsLoading = nftsLoading;
+  const { data: collectionPages } = useInfiniteQuery({
     queryKey: ["collections"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.listCollections();
+    initialPageParam: null,
+    queryFn: async ({ pageParam }) => {
+      if (!actor) {
+        return { collections: [], nextCursor: null, totalCount: 0n };
+      }
+      return actor.listCollectionsPage(pageParam, WALLET_COLLECTION_PAGE_SIZE);
     },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? void 0,
     enabled: !!actor && !isFetching && isAuthenticated
   });
+  const collections = (collectionPages == null ? void 0 : collectionPages.pages.flatMap((page) => page.collections)) ?? [];
   const { data: accountIdBytes } = useQuery({
     queryKey: ["userAccountId", principalText],
     queryFn: async () => {
@@ -2051,7 +2074,11 @@ function WalletPage() {
     queryKey: ["activeListingDetails"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getActiveListingDetails();
+      const page = await actor.getActiveListingDetailsPage(
+        null,
+        WALLET_LISTING_PAGE_SIZE
+      );
+      return page.details;
     },
     enabled: !!actor && !isFetching && isAuthenticated
   });
@@ -2059,12 +2086,15 @@ function WalletPage() {
     queryKey: ["myDividendNFTs", principalText],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.refreshMyDividendNFTs();
+      const page = await actor.getMyDividendNFTsPage(
+        null,
+        WALLET_DIVIDEND_PAGE_SIZE
+      );
+      return page.dividends;
     },
     enabled: !!actor && !isFetching && isAuthenticated,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    refetchInterval: 3e4
+    refetchOnWindowFocus: false,
+    staleTime: 6e4
   });
   const accountIdHex = accountIdBytes ? accountIdToHex(accountIdBytes) : null;
   const listedNFTKeys = new Set(
@@ -2407,7 +2437,7 @@ function WalletPage() {
   if (!isAuthenticated && !authLoading) {
     return /* @__PURE__ */ jsxRuntimeExports.jsx(UnauthHero, { login });
   }
-  if (authLoading || isAuthenticated && dataLoading && !userNFTs) {
+  if (authLoading || isAuthenticated && dataLoading && !userNFTPages) {
     return /* @__PURE__ */ jsxRuntimeExports.jsxs(
       "div",
       {
@@ -2519,18 +2549,29 @@ function WalletPage() {
               );
             }) })
           ] })
-        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "space-y-10", "data-ocid": "wallet.nft_list", children: collectionEntries.map(({ collection, nfts }, idx) => /* @__PURE__ */ jsxRuntimeExports.jsx(
-          CollectionSection,
-          {
-            collection,
-            nfts,
-            listedNFTKeys,
-            sectionIndex: idx,
-            isCreatorCollection: myCreatedCollectionIds.has(collection.id),
-            dividendBalances
-          },
-          collection.id.toString()
-        )) })
+        ] }) : /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "space-y-10", "data-ocid": "wallet.nft_list", children: [
+          collectionEntries.map(({ collection, nfts }, idx) => /* @__PURE__ */ jsxRuntimeExports.jsx(
+            CollectionSection,
+            {
+              collection,
+              nfts,
+              listedNFTKeys,
+              sectionIndex: idx,
+              isCreatorCollection: myCreatedCollectionIds.has(collection.id),
+              dividendBalances
+            },
+            collection.id.toString()
+          )),
+          hasMoreNFTs && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex justify-center pt-2", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+            Button,
+            {
+              variant: "outline",
+              onClick: () => void fetchNextNFTPage(),
+              disabled: isFetchingMoreNFTs,
+              children: isFetchingMoreNFTs ? "Loading..." : "Load more NFTs"
+            }
+          ) })
+        ] })
       ]
     }
   );

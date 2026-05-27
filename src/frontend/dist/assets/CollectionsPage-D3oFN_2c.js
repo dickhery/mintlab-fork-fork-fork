@@ -1,86 +1,20 @@
-import { Q as QueryObserver, n as infiniteQueryBehavior, o as hasPreviousPage, p as hasNextPage, q as useBaseQuery, c as createLucideIcon, r as reactExports, h as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, d as useAdmin, e as useQueryClient, f as useQuery, s as AnimatePresence, m as motion, B as Button, g as ue, t as CircleDollarSign, X, G as Grid3x3, P as Principal, i as LoadingSpinner } from "./index-fB4eEJtO.js";
-import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-Cc0diajz.js";
-import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-BcZfK0_e.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-Civg5pde.js";
-import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-oOkBKRlZ.js";
-import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-BQBru4ZQ.js";
-import { B as Badge, I as Input } from "./badge-BjkRMG15.js";
-import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent } from "./card-DyD36cRx.js";
-import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./index-u_tHWnWZ.js";
-import { u as useDirection } from "./index-CwNEsK_7.js";
-import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-CQRONB5p.js";
-import { S as Skeleton, C as Copy } from "./skeleton-DK8TNp-i.js";
-import { S as Sparkles, c as compressModerationImage } from "./imageUtils-VxUk-iRc.js";
-import { r as resolveImageUrl, I as ImageOff } from "./media-Dh83-DF1.js";
-import { S as Search, a as ShieldCheck } from "./shield-check-BviD_iFC.js";
-import "./arrow-right-DJp-M4z-.js";
-var InfiniteQueryObserver = class extends QueryObserver {
-  constructor(client, options) {
-    super(client, options);
-  }
-  bindMethods() {
-    super.bindMethods();
-    this.fetchNextPage = this.fetchNextPage.bind(this);
-    this.fetchPreviousPage = this.fetchPreviousPage.bind(this);
-  }
-  setOptions(options) {
-    super.setOptions({
-      ...options,
-      behavior: infiniteQueryBehavior()
-    });
-  }
-  getOptimisticResult(options) {
-    options.behavior = infiniteQueryBehavior();
-    return super.getOptimisticResult(options);
-  }
-  fetchNextPage(options) {
-    return this.fetch({
-      ...options,
-      meta: {
-        fetchMore: { direction: "forward" }
-      }
-    });
-  }
-  fetchPreviousPage(options) {
-    return this.fetch({
-      ...options,
-      meta: {
-        fetchMore: { direction: "backward" }
-      }
-    });
-  }
-  createResult(query, options) {
-    var _a, _b;
-    const { state } = query;
-    const parentResult = super.createResult(query, options);
-    const { isFetching, isRefetching, isError, isRefetchError } = parentResult;
-    const fetchDirection = (_b = (_a = state.fetchMeta) == null ? void 0 : _a.fetchMore) == null ? void 0 : _b.direction;
-    const isFetchNextPageError = isError && fetchDirection === "forward";
-    const isFetchingNextPage = isFetching && fetchDirection === "forward";
-    const isFetchPreviousPageError = isError && fetchDirection === "backward";
-    const isFetchingPreviousPage = isFetching && fetchDirection === "backward";
-    const result = {
-      ...parentResult,
-      fetchNextPage: this.fetchNextPage,
-      fetchPreviousPage: this.fetchPreviousPage,
-      hasNextPage: hasNextPage(options, state.data),
-      hasPreviousPage: hasPreviousPage(options, state.data),
-      isFetchNextPageError,
-      isFetchingNextPage,
-      isFetchPreviousPageError,
-      isFetchingPreviousPage,
-      isRefetchError: isRefetchError && !isFetchNextPageError && !isFetchPreviousPageError,
-      isRefetching: isRefetching && !isFetchingNextPage && !isFetchingPreviousPage
-    };
-    return result;
-  }
-};
-function useInfiniteQuery(options, queryClient) {
-  return useBaseQuery(
-    options,
-    InfiniteQueryObserver
-  );
-}
+import { c as createLucideIcon, r as reactExports, h as useComposedRefs, j as jsxRuntimeExports, a as cn, b as useBackend, u as useAuth, d as useAdmin, e as useQueryClient, f as useQuery, n as AnimatePresence, m as motion, B as Button, g as ue, o as CircleDollarSign, X, G as Grid3x3, P as Principal, i as LoadingSpinner } from "./index-Dq_se1c6.js";
+import { A as AppCanisterTopUpDialog, i as isLowCyclesError, L as LoaderCircle, P as Plus } from "./AppCanisterTopUpDialog-B7KletWf.js";
+import { r as recommendedCollectionCreationTopUpCycles, S as Switch, C as CollectionCreationDiagnosticsPanel, T as Trash2 } from "./switch-DvH679uL.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-R3sXH1yn.js";
+import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-qLigS8ZL.js";
+import { T as Tag, P as PaymentConfirmationDialog, Z as ZoomableMediaImage } from "./ZoomableMediaImage-DDVPpv3p.js";
+import { B as Badge, I as Input } from "./badge-Bgu2zrlA.js";
+import { R as RefreshCw, C as Card, a as CardHeader, b as CardTitle, d as CardDescription, c as CardContent } from "./card-C7H4xzFQ.js";
+import { P as Primitive, i as Presence, f as createContextScope, e as composeEventHandlers, h as useCallbackRef, m as useLayoutEffect2, u as useMutation, L as Label, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, k as DialogDescription, l as DialogFooter } from "./index-BgnyvDtN.js";
+import { u as useDirection } from "./index-B-TbJKfF.js";
+import { f as clamp, L as Layers, E as ExternalLink, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, T as Textarea, C as Check, I as Info } from "./textarea-r4-BXjrG.js";
+import { S as Skeleton, C as Copy } from "./skeleton-C8YDH4P6.js";
+import { S as Sparkles, u as useInfiniteQuery, c as compressModerationImage } from "./imageUtils-DtyAlXuR.js";
+import { r as resolveImageUrl, I as ImageOff } from "./media-CvoQXHxw.js";
+import { S as Search } from "./search-BmcZ4ayo.js";
+import { S as ShieldCheck } from "./shield-check-BAl8ZL9p.js";
+import "./arrow-right-D7fKNVWD.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -865,6 +799,8 @@ const MAX_ON_CHAIN_IMAGE_CHARS = 19e5;
 const MODERATION_IMAGE_ACCEPT = "image/png,image/jpeg";
 const COLLECTION_CREATION_REPAIR_GRACE_MS = 3 * 60 * 1e3;
 const ON_CHAIN_IMAGE_SIZE_MESSAGE = "Uploaded image is too large for on-chain storage";
+const COLLECTIONS_PAGE_SIZE = 50n;
+const COLLECTIONS_LISTING_PAGE_SIZE = 25n;
 function formatICP(e8s) {
   const whole = e8s / E8S;
   const fraction = (e8s % E8S).toString().padStart(8, "0").replace(/0+$/, "");
@@ -2405,7 +2341,7 @@ function NFTBrowser({
     data: browsePages,
     isLoading,
     isFetchingNextPage,
-    hasNextPage: hasNextPage2,
+    hasNextPage,
     fetchNextPage,
     isError: browsePageFailed,
     error: browsePageError,
@@ -2433,7 +2369,11 @@ function NFTBrowser({
     queryKey: ["activeListingDetails"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getActiveListingDetails();
+      const page = await actor.getActiveListingDetailsPage(
+        null,
+        COLLECTIONS_LISTING_PAGE_SIZE
+      );
+      return page.details;
     },
     enabled: !!actor && !isFetching
   });
@@ -2946,7 +2886,7 @@ function NFTBrowser({
         ))
       }
     ),
-    hasNextPage2 && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex justify-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
+    hasNextPage && /* @__PURE__ */ jsxRuntimeExports.jsx("div", { className: "flex justify-center", children: /* @__PURE__ */ jsxRuntimeExports.jsx(
       Button,
       {
         variant: "outline",
@@ -3161,7 +3101,8 @@ function CollectionsPage() {
     queryKey: ["collections"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listCollections();
+      const page = await actor.listCollectionsPage(null, COLLECTIONS_PAGE_SIZE);
+      return page.collections;
     },
     enabled: !!actor && !isFetching
   });

@@ -3,17 +3,24 @@ import Iter "mo:core/Iter";
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
 import Principal "mo:core/Principal";
+import Time "mo:core/Time";
 import Types "../types/collections";
 
 module {
   public type CollectionsState = {
     collections : Map.Map<Types.CollectionId, Types.Collection>;
+    importMetas : Map.Map<Types.CollectionId, Types.CollectionImportMeta>;
+    importsByUser : Map.Map<Principal, [Types.CollectionId]>;
+    lastImportAtByUser : Map.Map<Principal, Int>;
     var nextId : Nat;
   };
 
   public func newState() : CollectionsState {
     {
       collections = Map.empty<Types.CollectionId, Types.Collection>();
+      importMetas = Map.empty<Types.CollectionId, Types.CollectionImportMeta>();
+      importsByUser = Map.empty<Principal, [Types.CollectionId]>();
+      lastImportAtByUser = Map.empty<Principal, Int>();
       var nextId = 1;
     };
   };
@@ -56,6 +63,7 @@ module {
     state : CollectionsState,
     cursor : ?Nat,
     limit : Nat,
+    includeHidden : Bool,
   ) : Types.CollectionPage {
     let start = switch (cursor) {
       case (?value) value;
@@ -66,17 +74,19 @@ module {
     var index : Nat = 0;
     var added : Nat = 0;
     for ((_, collection) in Map.entries(state.collections)) {
-      if (index < start) {
-        index += 1;
-      } else if (added < pageSize) {
-        collections := Array.concat<Types.Collection>(collections, [collection]);
-        added += 1;
-        index += 1;
-      } else {
-        index += 1;
+      if (includeHidden or isPubliclyVisible(state, collection)) {
+        if (index < start) {
+          index += 1;
+        } else if (added < pageSize) {
+          collections := Array.concat<Types.Collection>(collections, [collection]);
+          added += 1;
+          index += 1;
+        } else {
+          index += 1;
+        };
       };
     };
-    let totalCount = Map.size(state.collections);
+    let totalCount = index;
     let next = start + added;
     {
       collections;
@@ -104,6 +114,206 @@ module {
     Map.get(state.collections, Nat.compare, id);
   };
 
+  public func getImportMeta(
+    state : CollectionsState,
+    collectionId : Types.CollectionId,
+  ) : ?Types.CollectionImportMeta {
+    Map.get(state.importMetas, Nat.compare, collectionId);
+  };
+
+  public func getImportMetas(state : CollectionsState) : [Types.CollectionImportMeta] {
+    Iter.toArray(Map.values(state.importMetas));
+  };
+
+  public func getImportMetasPage(
+    state : CollectionsState,
+    cursor : ?Nat,
+    limit : Nat,
+  ) : Types.CollectionImportMetaPage {
+    let start = switch (cursor) {
+      case (?value) value;
+      case null 0;
+    };
+    let pageSize = normalizePageLimit(limit);
+    var metas : [Types.CollectionImportMeta] = [];
+    var index : Nat = 0;
+    var added : Nat = 0;
+    for ((_, meta) in Map.entries(state.importMetas)) {
+      if (index < start) {
+        index += 1;
+      } else if (added < pageSize) {
+        metas := Array.concat<Types.CollectionImportMeta>(metas, [meta]);
+        added += 1;
+        index += 1;
+      } else {
+        index += 1;
+      };
+    };
+    let next = start + added;
+    {
+      metas;
+      nextCursor = if (next < index) ?next else null;
+      totalCount = index;
+    };
+  };
+
+  public func ensureImportMeta(
+    state : CollectionsState,
+    collectionId : Types.CollectionId,
+    importedBy : Principal,
+    trustStatus : Types.CollectionTrustStatus,
+  ) : Types.CollectionImportMeta {
+    switch (Map.get(state.importMetas, Nat.compare, collectionId)) {
+      case (?existing) existing;
+      case null {
+        let now = Time.now();
+        let meta : Types.CollectionImportMeta = {
+          collectionId;
+          importedBy;
+          trustStatus;
+          reportCount = 0;
+          createdAt = now;
+          reviewedAt = null;
+          lastReportedAt = null;
+          lastReportReason = null;
+        };
+        Map.add(state.importMetas, Nat.compare, collectionId, meta);
+        addImportForUser(state, importedBy, collectionId, now);
+        meta;
+      };
+    };
+  };
+
+  public func noteImportAttempt(
+    state : CollectionsState,
+    importedBy : Principal,
+    collectionId : Types.CollectionId,
+  ) {
+    addImportForUser(state, importedBy, collectionId, Time.now());
+  };
+
+  public func lastImportAt(
+    state : CollectionsState,
+    importedBy : Principal,
+  ) : ?Int {
+    Map.get(state.lastImportAtByUser, Principal.compare, importedBy);
+  };
+
+  public func recentImportCountForUser(
+    state : CollectionsState,
+    importedBy : Principal,
+    since : Int,
+  ) : Nat {
+    let ids = switch (Map.get(state.importsByUser, Principal.compare, importedBy)) {
+      case (?values) values;
+      case null [];
+    };
+    var count : Nat = 0;
+    for (collectionId in ids.values()) {
+      switch (Map.get(state.importMetas, Nat.compare, collectionId)) {
+        case (?meta) {
+          if (meta.createdAt >= since) {
+            count += 1;
+          };
+        };
+        case null {};
+      };
+    };
+    count;
+  };
+
+  public func visibleUnverifiedCollectionCount(state : CollectionsState) : Nat {
+    var count : Nat = 0;
+    for ((collectionId, collection) in Map.entries(state.collections)) {
+      if (collection.kind == #External and isPubliclyVisible(state, collection)) {
+        switch (Map.get(state.importMetas, Nat.compare, collectionId)) {
+          case (?meta) {
+            if (meta.trustStatus != #Verified) {
+              count += 1;
+            };
+          };
+          case null {
+            count += 1;
+          };
+        };
+      };
+    };
+    count;
+  };
+
+  public func setCollectionTrustStatus(
+    state : CollectionsState,
+    collectionId : Types.CollectionId,
+    status : Types.CollectionTrustStatus,
+  ) : ?Types.CollectionImportMeta {
+    let current = switch (Map.get(state.importMetas, Nat.compare, collectionId)) {
+      case (?meta) meta;
+      case null {
+        switch (Map.get(state.collections, Nat.compare, collectionId)) {
+          case null return null;
+          case (?_) ensureImportMeta(state, collectionId, Principal.fromText("2vxsx-fae"), #CommunityImported);
+        };
+      };
+    };
+    let updated : Types.CollectionImportMeta = {
+      current with
+      trustStatus = status;
+      reviewedAt = ?Time.now();
+    };
+    Map.add(state.importMetas, Nat.compare, collectionId, updated);
+    ?updated;
+  };
+
+  public func reportCollection(
+    state : CollectionsState,
+    collectionId : Types.CollectionId,
+    reason : Text,
+  ) : ?Types.CollectionImportMeta {
+    let current = switch (Map.get(state.importMetas, Nat.compare, collectionId)) {
+      case (?meta) meta;
+      case null {
+        switch (Map.get(state.collections, Nat.compare, collectionId)) {
+          case null return null;
+          case (?_) ensureImportMeta(state, collectionId, Principal.fromText("2vxsx-fae"), #CommunityImported);
+        };
+      };
+    };
+    let nextStatus = if (current.trustStatus == #Verified) {
+      #Verified;
+    } else {
+      #Reported;
+    };
+    let updated : Types.CollectionImportMeta = {
+      current with
+      trustStatus = nextStatus;
+      reportCount = current.reportCount + 1;
+      lastReportedAt = ?Time.now();
+      lastReportReason = ?reason;
+    };
+    Map.add(state.importMetas, Nat.compare, collectionId, updated);
+    ?updated;
+  };
+
+  public func collectionAllowsSync(
+    state : CollectionsState,
+    collection : Types.Collection,
+  ) : Bool {
+    switch (Map.get(state.importMetas, Nat.compare, collection.id)) {
+      case (?meta) meta.trustStatus != #Blocked and meta.trustStatus != #SyncDisabled;
+      case null true;
+    };
+  };
+
+  public func isPubliclyVisible(
+    state : CollectionsState,
+    collection : Types.Collection,
+  ) : Bool {
+    switch (Map.get(state.importMetas, Nat.compare, collection.id)) {
+      case (?meta) meta.trustStatus != #Hidden and meta.trustStatus != #Blocked;
+      case null true;
+    };
+  };
+
   public func findExternalCollectionByCanister(
     state : CollectionsState,
     canisterId : Principal,
@@ -119,6 +329,34 @@ module {
       };
     };
     null;
+  };
+
+  func addImportForUser(
+    state : CollectionsState,
+    importedBy : Principal,
+    collectionId : Types.CollectionId,
+    now : Int,
+  ) {
+    let existing = switch (Map.get(state.importsByUser, Principal.compare, importedBy)) {
+      case (?values) values;
+      case null [];
+    };
+    Map.add(
+      state.importsByUser,
+      Principal.compare,
+      importedBy,
+      appendUniqueNat(existing, collectionId),
+    );
+    Map.add(state.lastImportAtByUser, Principal.compare, importedBy, now);
+  };
+
+  func appendUniqueNat(values : [Nat], value : Nat) : [Nat] {
+    for (existing in values.values()) {
+      if (existing == value) {
+        return values;
+      };
+    };
+    Array.concat<Nat>(values, [value]);
   };
 
   public func findCollectionByCanister(

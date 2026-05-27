@@ -9,6 +9,15 @@ function getStandardLabel(standard: NFTStandard): string {
   return standard.Other ?? "Unknown";
 }
 
+function getTrustLabel(collection: Collection): string {
+  if (collection.kind === "Minted") return "Mintlab verified";
+  const needsRange =
+    (collection.standard.__kind__ === "EXT" ||
+      collection.standard.__kind__ === "DIP721") &&
+    collection.browseInfo?.totalSupply == null;
+  return needsRange ? "Needs token range" : "Community imported";
+}
+
 interface CollectionBadgeProps {
   collection: Collection;
   size?: "sm" | "md";
@@ -21,6 +30,7 @@ export function CollectionBadge({
   className,
 }: CollectionBadgeProps) {
   const standardLabel = getStandardLabel(collection.standard);
+  const trustLabel = getTrustLabel(collection);
   const imageUrl = resolveImageUrl(collection.imageUrl);
 
   return (
@@ -50,6 +60,17 @@ export function CollectionBadge({
         )}
       >
         {standardLabel}
+      </span>
+      <span
+        className={cn(
+          "shrink-0 px-1.5 py-0.5 rounded border",
+          collection.kind === "Minted"
+            ? "bg-accent/10 text-accent border-accent/20"
+            : "bg-muted/40 text-muted-foreground border-border/40",
+          size === "sm" ? "text-[10px]" : "text-xs",
+        )}
+      >
+        {trustLabel}
       </span>
     </div>
   );

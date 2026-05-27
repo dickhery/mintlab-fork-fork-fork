@@ -417,7 +417,6 @@ mixin (
       compactNFTMetadata(metadata),
       location,
     );
-    ignore MarketplaceLib.clearListingsForToken(marketplaceState, collectionId, tokenId);
     registered;
   };
 
@@ -675,7 +674,6 @@ mixin (
     nft : WalletTypes.WalletNFT,
   ) : WalletTypes.WalletNFT {
     if (Principal.equal(nft.owner, caller)) {
-      ignore MarketplaceLib.clearListingsForToken(marketplaceState, nft.collectionId, nft.tokenId);
       {
         nft with
         metadata = compactNFTMetadata(nft.metadata);

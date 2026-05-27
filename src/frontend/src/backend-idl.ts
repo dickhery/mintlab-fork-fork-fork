@@ -35,6 +35,30 @@ export const idlFactory = ({ IDL }) => {
     'canisterId' : IDL.Principal,
     'dividendConfig' : IDL.Opt(CollectionDividendConfig),
   });
+  const CollectionTrustStatus = IDL.Variant({
+    'Verified' : IDL.Null,
+    'Blocked' : IDL.Null,
+    'SyncDisabled' : IDL.Null,
+    'Hidden' : IDL.Null,
+    'NeedsBrowseInfo' : IDL.Null,
+    'Reported' : IDL.Null,
+    'CommunityImported' : IDL.Null,
+  });
+  const CollectionImportMeta = IDL.Record({
+    'collectionId' : CollectionId,
+    'trustStatus' : CollectionTrustStatus,
+    'reviewedAt' : IDL.Opt(IDL.Int),
+    'createdAt' : IDL.Int,
+    'lastReportReason' : IDL.Opt(IDL.Text),
+    'lastReportedAt' : IDL.Opt(IDL.Int),
+    'reportCount' : IDL.Nat,
+    'importedBy' : IDL.Principal,
+  });
+  const CollectionImportMetaPage = IDL.Record({
+    'metas' : IDL.Vec(CollectionImportMeta),
+    'nextCursor' : IDL.Opt(IDL.Nat),
+    'totalCount' : IDL.Nat,
+  });
   const CollectionCanisterControllers = IDL.Record({
     'controllers' : IDL.Vec(IDL.Principal),
     'collectionId' : CollectionId,
@@ -618,6 +642,11 @@ export const idlFactory = ({ IDL }) => {
     'stage' : IDL.Text,
     'message' : IDL.Text,
   });
+  const SettlementStatusPage = IDL.Record({
+    'statuses' : IDL.Vec(SettlementStatus),
+    'nextCursor' : IDL.Opt(IDL.Nat),
+    'totalCount' : IDL.Nat,
+  });
   const PendingMintPaymentStatus = IDL.Variant({
     'Failed' : IDL.Null,
     'Minted' : IDL.Null,
@@ -873,9 +902,19 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : CollectionCreationReceipt, 'err' : IDL.Text })],
         [],
       ),
+    'adminBlockCollection' : IDL.Func(
+        [CollectionId],
+        [IDL.Variant({ 'ok' : CollectionImportMeta, 'err' : IDL.Text })],
+        [],
+      ),
     'adminDeleteCollectionCreationRequest' : IDL.Func(
         [IDL.Nat],
         [IDL.Variant({ 'ok' : IDL.Bool, 'err' : IDL.Text })],
+        [],
+      ),
+    'adminDisableCollectionSync' : IDL.Func(
+        [CollectionId],
+        [IDL.Variant({ 'ok' : CollectionImportMeta, 'err' : IDL.Text })],
         [],
       ),
     'adminGetMintlabFeeRecoveryQuote' : IDL.Func(
@@ -888,10 +927,20 @@ export const idlFactory = ({ IDL }) => {
         [SettlementEscrowRepairQuote],
         [],
       ),
+    'adminHideCollection' : IDL.Func(
+        [CollectionId],
+        [IDL.Variant({ 'ok' : CollectionImportMeta, 'err' : IDL.Text })],
+        [],
+      ),
     'adminListMarketplaceRecoveryState' : IDL.Func(
         [],
         [MarketplaceRecoverySnapshot],
         ['query'],
+      ),
+    'adminMarkCollectionNeedsBrowseInfo' : IDL.Func(
+        [CollectionId],
+        [IDL.Variant({ 'ok' : CollectionImportMeta, 'err' : IDL.Text })],
+        [],
       ),
     'adminMarkMintlabFeeBalanceVerified' : IDL.Func(
         [ListingId],
@@ -923,6 +972,11 @@ export const idlFactory = ({ IDL }) => {
     'adminTopUpSettlementEscrow' : IDL.Func(
         [ListingId, IDL.Nat64],
         [SettlementEscrowTopUpReceipt],
+        [],
+      ),
+    'adminVerifyCollection' : IDL.Func(
+        [CollectionId],
+        [IDL.Variant({ 'ok' : CollectionImportMeta, 'err' : IDL.Text })],
         [],
       ),
     'balance' : IDL.Func([EXTBalanceRequest], [EXTBalanceResponse], ['query']),
@@ -1078,6 +1132,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(Collection)],
         ['query'],
       ),
+    'getCollectionImportMeta' : IDL.Func(
+        [CollectionId],
+        [IDL.Opt(CollectionImportMeta)],
+        ['query'],
+      ),
     'getCollectionBrowseStats' : IDL.Func(
         [CollectionId],
         [CollectionBrowseStats],
@@ -1177,6 +1236,11 @@ export const idlFactory = ({ IDL }) => {
     'getMyMarketplaceSettlementStatuses' : IDL.Func(
         [],
         [IDL.Vec(SettlementStatus)],
+        ['query'],
+      ),
+    'getMyMarketplaceSettlementStatusesPage' : IDL.Func(
+        [IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
+        [SettlementStatusPage],
         ['query'],
       ),
     'getMyPendingAuctionRefunds' : IDL.Func(
@@ -1287,6 +1351,11 @@ export const idlFactory = ({ IDL }) => {
     'isNFTInUserWallet' : IDL.Func(
         [CollectionId, IDL.Text, UserId],
         [IDL.Bool],
+        ['query'],
+      ),
+    'listCollectionImportMetasPage' : IDL.Func(
+        [IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
+        [CollectionImportMetaPage],
         ['query'],
       ),
     'listCollections' : IDL.Func([], [IDL.Vec(Collection)], ['query']),
@@ -1413,6 +1482,11 @@ export const idlFactory = ({ IDL }) => {
     'sendNFT' : IDL.Func(
         [NFTId, IDL.Principal],
         [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
+        [],
+      ),
+    'reportCollection' : IDL.Func(
+        [CollectionId, IDL.Text],
+        [IDL.Variant({ 'ok' : CollectionImportMeta, 'err' : IDL.Text })],
         [],
       ),
     'setCollectionCanisterWasm' : IDL.Func([IDL.Vec(IDL.Nat8)], [], []),

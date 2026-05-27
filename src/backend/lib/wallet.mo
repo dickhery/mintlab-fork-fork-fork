@@ -29,6 +29,7 @@ module {
 
   public type OwnershipIndexState = {
     records : Map.Map<Text, Types.OwnershipIndexRecord>;
+    recordsByOwner : Map.Map<Text, [Text]>;
     status : Map.Map<Types.CollectionId, Types.CollectionIndexStatus>;
   };
 
@@ -45,6 +46,7 @@ module {
   public func newOwnershipIndexState() : OwnershipIndexState {
     {
       records = Map.empty<Text, Types.OwnershipIndexRecord>();
+      recordsByOwner = Map.empty<Text, [Text]>();
       status = Map.empty<Types.CollectionId, Types.CollectionIndexStatus>();
     };
   };
@@ -325,11 +327,23 @@ module {
     state : OwnershipIndexState,
     record : Types.OwnershipIndexRecord,
   ) {
+    let recordKey = ownershipIndexKey(record.collectionId, record.tokenId);
     Map.add(
       state.records,
       Text.compare,
-      ownershipIndexKey(record.collectionId, record.tokenId),
+      recordKey,
       record,
+    );
+    let bucketKey = ownerIndexKey(record.collectionId, indexedOwnerKey(record.owner));
+    let current = switch (Map.get(state.recordsByOwner, Text.compare, bucketKey)) {
+      case (?keys) keys;
+      case null [];
+    };
+    Map.add(
+      state.recordsByOwner,
+      Text.compare,
+      bucketKey,
+      appendUniqueText(current, recordKey),
     );
   };
 
@@ -339,6 +353,10 @@ module {
     owner : Principal,
     accountIdHex : Text,
   ) : [Types.WalletNFT] {
+    let indexedKeys = indexedRecordKeysForOwner(state, collectionId, owner, accountIdHex);
+    if (indexedKeys.size() > 0) {
+      return indexedNFTsForOwnerKeys(state, indexedKeys, collectionId, owner, accountIdHex);
+    };
     var results : [Types.WalletNFT] = [];
     for (record in Map.values(state.records)) {
       if (record.collectionId == collectionId) {
@@ -995,6 +1013,107 @@ module {
 
   func ownershipIndexKey(collectionId : Types.CollectionId, tokenId : Text) : Text {
     Nat.toText(collectionId) # "#" # tokenId;
+  };
+
+  func ownerIndexKey(collectionId : Types.CollectionId, ownerKey : Text) : Text {
+    Nat.toText(collectionId) # ":" # Text.toLower(ownerKey);
+  };
+
+  func indexedOwnerKey(owner : Types.IndexedOwner) : Text {
+    switch (owner) {
+      case (#Principal(p)) p.toText();
+      case (#AccountIdText(account)) account;
+      case (#Unknown) "unknown";
+    };
+  };
+
+  func indexedRecordKeysForOwner(
+    state : OwnershipIndexState,
+    collectionId : Types.CollectionId,
+    owner : Principal,
+    accountIdHex : Text,
+  ) : [Text] {
+    var keys : [Text] = [];
+    let principalKey = ownerIndexKey(collectionId, owner.toText());
+    switch (Map.get(state.recordsByOwner, Text.compare, principalKey)) {
+      case (?values) {
+        for (value in values.values()) {
+          keys := appendUniqueText(keys, value);
+        };
+      };
+      case null {};
+    };
+    let accountKey = ownerIndexKey(collectionId, accountIdHex);
+    switch (Map.get(state.recordsByOwner, Text.compare, accountKey)) {
+      case (?values) {
+        for (value in values.values()) {
+          keys := appendUniqueText(keys, value);
+        };
+      };
+      case null {};
+    };
+    let principalHexKey = ownerIndexKey(collectionId, blobToHex(owner.toBlob()));
+    switch (Map.get(state.recordsByOwner, Text.compare, principalHexKey)) {
+      case (?values) {
+        for (value in values.values()) {
+          keys := appendUniqueText(keys, value);
+        };
+      };
+      case null {};
+    };
+    keys;
+  };
+
+  func indexedNFTsForOwnerKeys(
+    state : OwnershipIndexState,
+    recordKeys : [Text],
+    collectionId : Types.CollectionId,
+    owner : Principal,
+    accountIdHex : Text,
+  ) : [Types.WalletNFT] {
+    var results : [Types.WalletNFT] = [];
+    for (recordKey in recordKeys.values()) {
+      switch (Map.get(state.records, Text.compare, recordKey)) {
+        case (?record) {
+          if (record.collectionId == collectionId) {
+            let matches = switch (record.owner) {
+              case (#Principal(value)) Principal.equal(value, owner);
+              case (#AccountIdText(value)) {
+                extOwnerMatches(value, accountIdHex, owner.toText(), blobToHex(owner.toBlob()));
+              };
+              case (#Unknown) false;
+            };
+            if (matches) {
+              results := Array.concat<Types.WalletNFT>(
+                results,
+                [
+                  {
+                    id = 0;
+                    owner;
+                    collectionId = record.collectionId;
+                    tokenId = record.tokenId;
+                    metadata = record.metadata;
+                    location = #Registered;
+                    registeredAt = record.indexedAt;
+                  }
+                ],
+              );
+            };
+          };
+        };
+        case null {};
+      };
+    };
+    results;
+  };
+
+  func appendUniqueText(values : [Text], value : Text) : [Text] {
+    for (existing in values.values()) {
+      if (existing == value) {
+        return values;
+      };
+    };
+    Array.concat<Text>(values, [value]);
   };
 
   func updateIndexStatus(

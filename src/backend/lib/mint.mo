@@ -5,6 +5,7 @@ import Nat "mo:core/Nat";
 import Nat32 "mo:core/Nat32";
 import Nat64 "mo:core/Nat64";
 import Principal "mo:core/Principal";
+import Text "mo:core/Text";
 import Time "mo:core/Time";
 import NFTStandards "nft-standards";
 import Types "../types/mint";
@@ -13,6 +14,9 @@ import WalletTypes "../types/wallet";
 module {
   public type MintState = {
     tokens : Map.Map<Nat, Types.MintedToken>;
+    tokensByOwner : Map.Map<Principal, [Nat]>;
+    tokensByCollection : Map.Map<Types.CollectionId, [Nat]>;
+    tokensByOwnerCollection : Map.Map<Text, [Nat]>;
     pendingCollectionCreates : Map.Map<Principal, Bool>;
     var nextTokenId : Nat;
     var nextTransactionId : Nat;
@@ -54,6 +58,9 @@ module {
   public func newState() : MintState {
     {
       tokens = Map.empty<Nat, Types.MintedToken>();
+      tokensByOwner = Map.empty<Principal, [Nat]>();
+      tokensByCollection = Map.empty<Types.CollectionId, [Nat]>();
+      tokensByOwnerCollection = Map.empty<Text, [Nat]>();
       pendingCollectionCreates = Map.empty<Principal, Bool>();
       var nextTokenId = 1;
       var nextTransactionId = 0;
@@ -1251,6 +1258,7 @@ module {
       transferredBy = null;
     };
     Map.add(state.tokens, Nat.compare, tokenId, token);
+    indexMintedToken(state, token);
     token;
   };
 
@@ -1311,6 +1319,19 @@ module {
     collectionId : Types.CollectionId,
     legacyCollectionId : ?Types.CollectionId,
   ) : [Types.MintedToken] {
+    let indexedIds = switch (
+      Map.get(
+        state.tokensByOwnerCollection,
+        Text.compare,
+        ownerCollectionKey(owner, collectionId),
+      )
+    ) {
+      case (?ids) ids;
+      case null [];
+    };
+    if (indexedIds.size() > 0) {
+      return tokensFromIdsForOwnerCollection(state, indexedIds, owner, collectionId, legacyCollectionId);
+    };
     var tokens : [Types.MintedToken] = [];
     for (token in Map.values(state.tokens)) {
       if (
@@ -1328,6 +1349,13 @@ module {
     collectionId : Types.CollectionId,
     legacyCollectionId : ?Types.CollectionId,
   ) : [Types.MintedToken] {
+    let indexedIds = switch (Map.get(state.tokensByCollection, Nat.compare, collectionId)) {
+      case (?ids) ids;
+      case null [];
+    };
+    if (indexedIds.size() > 0) {
+      return tokensFromIdsForCollection(state, indexedIds, collectionId, legacyCollectionId);
+    };
     var tokens : [Types.MintedToken] = [];
     for (token in Map.values(state.tokens)) {
       if (tokenBelongsToCollection(token, collectionId, legacyCollectionId)) {
@@ -1357,6 +1385,7 @@ module {
           transferredBy = ?from;
         };
         Map.add(state.tokens, Nat.compare, tokenId, updated);
+        moveMintedTokenOwner(state, token, updated);
         #ok({
           token = updated;
           transactionId = allocateTransactionId(state);
@@ -1366,6 +1395,17 @@ module {
   };
 
   public func ownerTokenIds(state : MintState, owner : Principal) : [Nat32] {
+    let indexedIds = switch (Map.get(state.tokensByOwner, Principal.compare, owner)) {
+      case (?ids) ids;
+      case null [];
+    };
+    if (indexedIds.size() > 0) {
+      var indexedTokenIds : [Nat32] = [];
+      for (tokenId in indexedIds.values()) {
+        indexedTokenIds := Array.concat<Nat32>(indexedTokenIds, [Nat32.fromNat(tokenId)]);
+      };
+      return indexedTokenIds;
+    };
     var tokenIds : [Nat32] = [];
     for (token in Map.values(state.tokens)) {
       if (Principal.equal(token.owner, owner)) {
@@ -1376,6 +1416,13 @@ module {
   };
 
   public func ownerTokenIdsNat(state : MintState, owner : Principal) : [Nat] {
+    let indexedIds = switch (Map.get(state.tokensByOwner, Principal.compare, owner)) {
+      case (?ids) ids;
+      case null [];
+    };
+    if (indexedIds.size() > 0) {
+      return indexedIds;
+    };
     var tokenIds : [Nat] = [];
     for (token in Map.values(state.tokens)) {
       if (Principal.equal(token.owner, owner)) {
@@ -1546,6 +1593,159 @@ module {
     let transactionId = state.nextTransactionId;
     state.nextTransactionId += 1;
     transactionId;
+  };
+
+  func indexMintedToken(state : MintState, token : Types.MintedToken) {
+    appendTokenIdByOwner(state, token.owner, token.tokenId);
+    switch (tokenCollectionId(token, state.config.collectionId)) {
+      case (?collectionId) {
+        appendTokenIdByCollection(state, collectionId, token.tokenId);
+        appendTokenIdByOwnerCollection(state, token.owner, collectionId, token.tokenId);
+      };
+      case null {};
+    };
+  };
+
+  func moveMintedTokenOwner(
+    state : MintState,
+    previous : Types.MintedToken,
+    updated : Types.MintedToken,
+  ) {
+    if (Principal.equal(previous.owner, updated.owner)) {
+      return;
+    };
+    removeTokenIdByOwner(state, previous.owner, previous.tokenId);
+    appendTokenIdByOwner(state, updated.owner, updated.tokenId);
+    switch (tokenCollectionId(previous, state.config.collectionId)) {
+      case (?collectionId) {
+        removeTokenIdByOwnerCollection(state, previous.owner, collectionId, previous.tokenId);
+        appendTokenIdByOwnerCollection(state, updated.owner, collectionId, updated.tokenId);
+      };
+      case null {};
+    };
+  };
+
+  func appendTokenIdByOwner(state : MintState, owner : Principal, tokenId : Nat) {
+    let current = switch (Map.get(state.tokensByOwner, Principal.compare, owner)) {
+      case (?ids) ids;
+      case null [];
+    };
+    Map.add(state.tokensByOwner, Principal.compare, owner, appendUniqueNat(current, tokenId));
+  };
+
+  func removeTokenIdByOwner(state : MintState, owner : Principal, tokenId : Nat) {
+    let current = switch (Map.get(state.tokensByOwner, Principal.compare, owner)) {
+      case (?ids) ids;
+      case null [];
+    };
+    Map.add(state.tokensByOwner, Principal.compare, owner, removeNat(current, tokenId));
+  };
+
+  func appendTokenIdByCollection(
+    state : MintState,
+    collectionId : Types.CollectionId,
+    tokenId : Nat,
+  ) {
+    let current = switch (Map.get(state.tokensByCollection, Nat.compare, collectionId)) {
+      case (?ids) ids;
+      case null [];
+    };
+    Map.add(state.tokensByCollection, Nat.compare, collectionId, appendUniqueNat(current, tokenId));
+  };
+
+  func appendTokenIdByOwnerCollection(
+    state : MintState,
+    owner : Principal,
+    collectionId : Types.CollectionId,
+    tokenId : Nat,
+  ) {
+    let key = ownerCollectionKey(owner, collectionId);
+    let current = switch (Map.get(state.tokensByOwnerCollection, Text.compare, key)) {
+      case (?ids) ids;
+      case null [];
+    };
+    Map.add(state.tokensByOwnerCollection, Text.compare, key, appendUniqueNat(current, tokenId));
+  };
+
+  func removeTokenIdByOwnerCollection(
+    state : MintState,
+    owner : Principal,
+    collectionId : Types.CollectionId,
+    tokenId : Nat,
+  ) {
+    let key = ownerCollectionKey(owner, collectionId);
+    let current = switch (Map.get(state.tokensByOwnerCollection, Text.compare, key)) {
+      case (?ids) ids;
+      case null [];
+    };
+    Map.add(state.tokensByOwnerCollection, Text.compare, key, removeNat(current, tokenId));
+  };
+
+  func tokensFromIdsForOwnerCollection(
+    state : MintState,
+    ids : [Nat],
+    owner : Principal,
+    collectionId : Types.CollectionId,
+    legacyCollectionId : ?Types.CollectionId,
+  ) : [Types.MintedToken] {
+    var tokens : [Types.MintedToken] = [];
+    for (tokenId in ids.values()) {
+      switch (Map.get(state.tokens, Nat.compare, tokenId)) {
+        case (?token) {
+          if (
+            Principal.equal(token.owner, owner) and
+            tokenBelongsToCollection(token, collectionId, legacyCollectionId)
+          ) {
+            tokens := Array.concat<Types.MintedToken>(tokens, [token]);
+          };
+        };
+        case null {};
+      };
+    };
+    tokens;
+  };
+
+  func tokensFromIdsForCollection(
+    state : MintState,
+    ids : [Nat],
+    collectionId : Types.CollectionId,
+    legacyCollectionId : ?Types.CollectionId,
+  ) : [Types.MintedToken] {
+    var tokens : [Types.MintedToken] = [];
+    for (tokenId in ids.values()) {
+      switch (Map.get(state.tokens, Nat.compare, tokenId)) {
+        case (?token) {
+          if (tokenBelongsToCollection(token, collectionId, legacyCollectionId)) {
+            tokens := Array.concat<Types.MintedToken>(tokens, [token]);
+          };
+        };
+        case null {};
+      };
+    };
+    tokens;
+  };
+
+  func ownerCollectionKey(owner : Principal, collectionId : Types.CollectionId) : Text {
+    owner.toText() # ":" # Nat.toText(collectionId);
+  };
+
+  func appendUniqueNat(values : [Nat], value : Nat) : [Nat] {
+    for (existing in values.values()) {
+      if (existing == value) {
+        return values;
+      };
+    };
+    Array.concat<Nat>(values, [value]);
+  };
+
+  func removeNat(values : [Nat], value : Nat) : [Nat] {
+    var next : [Nat] = [];
+    for (existing in values.values()) {
+      if (existing != value) {
+        next := Array.concat<Nat>(next, [existing]);
+      };
+    };
+    next;
   };
 
   func publicAttributes(attributes : [(Text, Text)]) : [(Text, Text)] {

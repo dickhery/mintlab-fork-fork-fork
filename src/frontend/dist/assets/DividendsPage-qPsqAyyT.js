@@ -1,15 +1,17 @@
-import { b as useBackend, u as useAuth, e as useQueryClient, r as reactExports, f as useQuery, j as jsxRuntimeExports, t as CircleDollarSign, B as Button, L as LogIn, i as LoadingSpinner, g as ue } from "./index-fB4eEJtO.js";
-import { L as LoaderCircle, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-Cc0diajz.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-Civg5pde.js";
-import { H as HelpCallout } from "./HelpCallout-oOkBKRlZ.js";
-import { B as Badge } from "./badge-BjkRMG15.js";
-import { R as RefreshCw, C as Card, c as CardContent } from "./card-DyD36cRx.js";
-import { u as useMutation } from "./index-u_tHWnWZ.js";
-import { C as Coins } from "./coins-DulLKrSJ.js";
-import { I as ImageOff } from "./media-Dh83-DF1.js";
-import "./arrow-right-DJp-M4z-.js";
+import { b as useBackend, u as useAuth, e as useQueryClient, r as reactExports, f as useQuery, j as jsxRuntimeExports, o as CircleDollarSign, B as Button, L as LogIn, i as LoadingSpinner, g as ue } from "./index-Dq_se1c6.js";
+import { L as LoaderCircle, A as AppCanisterTopUpDialog, i as isLowCyclesError } from "./AppCanisterTopUpDialog-B7KletWf.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-R3sXH1yn.js";
+import { H as HelpCallout } from "./HelpCallout-qLigS8ZL.js";
+import { B as Badge } from "./badge-Bgu2zrlA.js";
+import { R as RefreshCw, C as Card, c as CardContent } from "./card-C7H4xzFQ.js";
+import { u as useMutation } from "./index-BgnyvDtN.js";
+import { C as Coins } from "./coins-DyruyZMR.js";
+import { I as ImageOff } from "./media-CvoQXHxw.js";
+import "./arrow-right-D7fKNVWD.js";
 const E8S = 100000000n;
 const ICP_FEE = 10000n;
+const DIVIDEND_PAGE_SIZE = 50n;
+const DIVIDEND_MEDIA_PAGE_SIZE = 50n;
 function formatICP(e8s) {
   const whole = e8s / E8S;
   const fraction = (e8s % E8S).toString().padStart(8, "0").replace(/0+$/, "");
@@ -38,23 +40,27 @@ function DividendsPage() {
     queryKey: ["myDividendNFTs", principalText],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.refreshMyDividendNFTs();
+      const page = await actor.getMyDividendNFTsPage(null, DIVIDEND_PAGE_SIZE);
+      return page.dividends;
     },
     enabled: !!actor && !isFetching && isAuthenticated,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    refetchInterval: 3e4
+    refetchOnWindowFocus: false,
+    staleTime: 6e4
   });
   const { data: mediaNFTs = [] } = useQuery({
     queryKey: ["userNFTs", principalText],
     queryFn: async () => {
       if (!actor || !principal) return [];
-      return actor.getUserNFTs(principal);
+      const page = await actor.getUserNFTsPage(
+        principal,
+        null,
+        DIVIDEND_MEDIA_PAGE_SIZE
+      );
+      return page.nfts;
     },
     enabled: !!actor && !isFetching && isAuthenticated && !!principal,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    refetchInterval: 3e4
+    refetchOnWindowFocus: false,
+    staleTime: 6e4
   });
   const claimMutation = useMutation({
     mutationFn: async (item) => {

@@ -77,6 +77,11 @@ const DEFAULT_MINTLAB_FEE_BPS = 200n;
 const BPS_DENOMINATOR = 10_000n;
 const MIN_AUCTION_STARTING_BID_E8S = 1_000_000n;
 const MIN_AUCTION_BID_INCREMENT_E8S = 1_000_000n;
+const MARKETPLACE_LISTING_PAGE_SIZE = 25n;
+const MARKETPLACE_COLLECTION_PAGE_SIZE = 50n;
+const MARKETPLACE_WALLET_PAGE_SIZE = 50n;
+const MARKETPLACE_DIVIDEND_PAGE_SIZE = 50n;
+const MARKETPLACE_STATUS_PAGE_SIZE = 25n;
 
 function marketplaceFee(amount: bigint, feeBps: bigint): bigint {
   return (amount * feeBps) / BPS_DENOMINATOR;
@@ -1284,7 +1289,11 @@ export default function MarketplacePage() {
     queryKey: ["activeListingDetails"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getActiveListingDetails();
+      const page = await actor.getActiveListingDetailsPage(
+        null,
+        MARKETPLACE_LISTING_PAGE_SIZE,
+      );
+      return page.details;
     },
     enabled: !!actor && !actorLoading,
     refetchInterval: 30_000,
@@ -1294,7 +1303,11 @@ export default function MarketplacePage() {
     queryKey: ["collections"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listCollections();
+      const page = await actor.listCollectionsPage(
+        null,
+        MARKETPLACE_COLLECTION_PAGE_SIZE,
+      );
+      return page.collections;
     },
     enabled: !!actor && !actorLoading,
   });
@@ -1313,7 +1326,12 @@ export default function MarketplacePage() {
     queryKey: ["userNFTs", principal?.toString()],
     queryFn: async () => {
       if (!actor || !principal) return [];
-      return actor.getUserNFTs(principal);
+      const page = await actor.getUserNFTsPage(
+        principal,
+        null,
+        MARKETPLACE_WALLET_PAGE_SIZE,
+      );
+      return page.nfts;
     },
     enabled: !!actor && !actorLoading && isAuthenticated && !!principal,
   });
@@ -1322,7 +1340,11 @@ export default function MarketplacePage() {
     queryKey: ["myMarketplaceSettlementStatuses", principal?.toString()],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getMyMarketplaceSettlementStatuses();
+      const page = await actor.getMyMarketplaceSettlementStatusesPage(
+        null,
+        MARKETPLACE_STATUS_PAGE_SIZE,
+      );
+      return page.statuses;
     },
     enabled: !!actor && !actorLoading && isAuthenticated,
     refetchInterval: 30_000,
@@ -1351,8 +1373,12 @@ export default function MarketplacePage() {
       for (const collectionId of collectionIds) {
         const collection = collectionMap.get(collectionId);
         if (!collection?.dividendConfig?.enabled) continue;
-        const balances =
-          await actor.refreshCollectionDividendBalances(collectionId);
+        const page = await actor.refreshCollectionDividendBalancesPage(
+          collectionId,
+          null,
+          MARKETPLACE_DIVIDEND_PAGE_SIZE,
+        );
+        const balances = page.balances;
         for (const [tokenId, balance] of balances) {
           entries.push([`${collectionId.toString()}:${tokenId}`, balance]);
         }
@@ -1360,9 +1386,8 @@ export default function MarketplacePage() {
       return entries;
     },
     enabled: !!actor && !actorLoading && listingDetails.length > 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    refetchInterval: 30_000,
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
   });
 
   const listingDividendMap = new Map<string, bigint>(listingDividendBalances);

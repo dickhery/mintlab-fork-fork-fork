@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-Da8XfHZN.js","assets/AppCanisterTopUpDialog-Cc0diajz.js","assets/index-u_tHWnWZ.js","assets/badge-BjkRMG15.js","assets/external-nft-transfer-YToxLWmO.js","assets/media-Dh83-DF1.js","assets/MediaImage-Civg5pde.js","assets/HelpCallout-oOkBKRlZ.js","assets/arrow-right-DJp-M4z-.js","assets/ZoomableMediaImage-BQBru4ZQ.js","assets/index-CwNEsK_7.js","assets/card-DyD36cRx.js","assets/textarea-CQRONB5p.js","assets/skeleton-DK8TNp-i.js","assets/imageUtils-VxUk-iRc.js","assets/circle-check-DD4JL3EA.js","assets/coins-DulLKrSJ.js","assets/send-p9IaVddO.js","assets/MarketplacePage-BUJxTOrV.js","assets/icp-BXjZNIYq.js","assets/AdminPage-C3lr5LyI.js","assets/switch-BcZfK0_e.js","assets/circle-alert-DjNsqyHF.js","assets/ICPAccountPage-DrDccZdN.js","assets/CollectionsPage-BEmNN5kE.js","assets/shield-check-BviD_iFC.js","assets/DividendsPage-D-Az4zSu.js","assets/HelpPage-DpTAYfBN.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-C_MERtA7.js","assets/AppCanisterTopUpDialog-B7KletWf.js","assets/index-BgnyvDtN.js","assets/badge-Bgu2zrlA.js","assets/external-nft-transfer-aLU73OmN.js","assets/media-CvoQXHxw.js","assets/MediaImage-R3sXH1yn.js","assets/HelpCallout-qLigS8ZL.js","assets/arrow-right-D7fKNVWD.js","assets/ZoomableMediaImage-DDVPpv3p.js","assets/index-B-TbJKfF.js","assets/card-C7H4xzFQ.js","assets/textarea-r4-BXjrG.js","assets/skeleton-C8YDH4P6.js","assets/imageUtils-DtyAlXuR.js","assets/circle-check-ByYUKxva.js","assets/coins-DyruyZMR.js","assets/send-CgTCl1sw.js","assets/MarketplacePage-ei3s4cAY.js","assets/icp-BXjZNIYq.js","assets/AdminPage-Dd3Jl-0L.js","assets/switch-DvH679uL.js","assets/circle-alert-MiEN4_js.js","assets/shield-check-BAl8ZL9p.js","assets/ICPAccountPage-C6Jviz3F.js","assets/CollectionsPage-D3oFN_2c.js","assets/search-BmcZ4ayo.js","assets/DividendsPage-qPsqAyyT.js","assets/HelpPage-ifB9YNWt.js"])))=>i.map(i=>d[i]);
 var __defProp = Object.defineProperty;
 var __typeError = (msg) => {
   throw TypeError(msg);
@@ -15595,7 +15595,7 @@ function mergeLoginOptions(loginOptions, otherLoginOptions) {
   };
 }
 const ONE_HOUR_IN_NANOSECONDS = BigInt(36e11);
-const DEFAULT_IDENTITY_PROVIDER = "https://id.ai";
+const DEFAULT_IDENTITY_PROVIDER = "https://identity.internetcomputer.org/";
 const InternetIdentityReactContext = reactExports.createContext(void 0);
 async function createAuthClient(createOptions) {
   const config = await loadConfig();
@@ -30089,6 +30089,30 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "canisterId": IDL2.Principal,
     "dividendConfig": IDL2.Opt(CollectionDividendConfig)
   });
+  const CollectionTrustStatus = IDL2.Variant({
+    "Verified": IDL2.Null,
+    "Blocked": IDL2.Null,
+    "SyncDisabled": IDL2.Null,
+    "Hidden": IDL2.Null,
+    "NeedsBrowseInfo": IDL2.Null,
+    "Reported": IDL2.Null,
+    "CommunityImported": IDL2.Null
+  });
+  const CollectionImportMeta = IDL2.Record({
+    "collectionId": CollectionId,
+    "trustStatus": CollectionTrustStatus,
+    "reviewedAt": IDL2.Opt(IDL2.Int),
+    "createdAt": IDL2.Int,
+    "lastReportReason": IDL2.Opt(IDL2.Text),
+    "lastReportedAt": IDL2.Opt(IDL2.Int),
+    "reportCount": IDL2.Nat,
+    "importedBy": IDL2.Principal
+  });
+  const CollectionImportMetaPage = IDL2.Record({
+    "metas": IDL2.Vec(CollectionImportMeta),
+    "nextCursor": IDL2.Opt(IDL2.Nat),
+    "totalCount": IDL2.Nat
+  });
   const CollectionCanisterControllers = IDL2.Record({
     "controllers": IDL2.Vec(IDL2.Principal),
     "collectionId": CollectionId,
@@ -30672,6 +30696,11 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "stage": IDL2.Text,
     "message": IDL2.Text
   });
+  const SettlementStatusPage = IDL2.Record({
+    "statuses": IDL2.Vec(SettlementStatus),
+    "nextCursor": IDL2.Opt(IDL2.Nat),
+    "totalCount": IDL2.Nat
+  });
   const PendingMintPaymentStatus = IDL2.Variant({
     "Failed": IDL2.Null,
     "Minted": IDL2.Null,
@@ -30927,9 +30956,19 @@ const idlFactory = ({ IDL: IDL2 }) => {
       [IDL2.Variant({ "ok": CollectionCreationReceipt, "err": IDL2.Text })],
       []
     ),
+    "adminBlockCollection": IDL2.Func(
+      [CollectionId],
+      [IDL2.Variant({ "ok": CollectionImportMeta, "err": IDL2.Text })],
+      []
+    ),
     "adminDeleteCollectionCreationRequest": IDL2.Func(
       [IDL2.Nat],
       [IDL2.Variant({ "ok": IDL2.Bool, "err": IDL2.Text })],
+      []
+    ),
+    "adminDisableCollectionSync": IDL2.Func(
+      [CollectionId],
+      [IDL2.Variant({ "ok": CollectionImportMeta, "err": IDL2.Text })],
       []
     ),
     "adminGetMintlabFeeRecoveryQuote": IDL2.Func(
@@ -30942,10 +30981,20 @@ const idlFactory = ({ IDL: IDL2 }) => {
       [SettlementEscrowRepairQuote],
       []
     ),
+    "adminHideCollection": IDL2.Func(
+      [CollectionId],
+      [IDL2.Variant({ "ok": CollectionImportMeta, "err": IDL2.Text })],
+      []
+    ),
     "adminListMarketplaceRecoveryState": IDL2.Func(
       [],
       [MarketplaceRecoverySnapshot],
       ["query"]
+    ),
+    "adminMarkCollectionNeedsBrowseInfo": IDL2.Func(
+      [CollectionId],
+      [IDL2.Variant({ "ok": CollectionImportMeta, "err": IDL2.Text })],
+      []
     ),
     "adminMarkMintlabFeeBalanceVerified": IDL2.Func(
       [ListingId],
@@ -30977,6 +31026,11 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "adminTopUpSettlementEscrow": IDL2.Func(
       [ListingId, IDL2.Nat64],
       [SettlementEscrowTopUpReceipt],
+      []
+    ),
+    "adminVerifyCollection": IDL2.Func(
+      [CollectionId],
+      [IDL2.Variant({ "ok": CollectionImportMeta, "err": IDL2.Text })],
       []
     ),
     "balance": IDL2.Func([EXTBalanceRequest], [EXTBalanceResponse], ["query"]),
@@ -31132,6 +31186,11 @@ const idlFactory = ({ IDL: IDL2 }) => {
       [IDL2.Opt(Collection)],
       ["query"]
     ),
+    "getCollectionImportMeta": IDL2.Func(
+      [CollectionId],
+      [IDL2.Opt(CollectionImportMeta)],
+      ["query"]
+    ),
     "getCollectionBrowseStats": IDL2.Func(
       [CollectionId],
       [CollectionBrowseStats],
@@ -31231,6 +31290,11 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "getMyMarketplaceSettlementStatuses": IDL2.Func(
       [],
       [IDL2.Vec(SettlementStatus)],
+      ["query"]
+    ),
+    "getMyMarketplaceSettlementStatusesPage": IDL2.Func(
+      [IDL2.Opt(IDL2.Nat), IDL2.Opt(IDL2.Nat)],
+      [SettlementStatusPage],
       ["query"]
     ),
     "getMyPendingAuctionRefunds": IDL2.Func(
@@ -31341,6 +31405,11 @@ const idlFactory = ({ IDL: IDL2 }) => {
     "isNFTInUserWallet": IDL2.Func(
       [CollectionId, IDL2.Text, UserId],
       [IDL2.Bool],
+      ["query"]
+    ),
+    "listCollectionImportMetasPage": IDL2.Func(
+      [IDL2.Opt(IDL2.Nat), IDL2.Opt(IDL2.Nat)],
+      [CollectionImportMetaPage],
       ["query"]
     ),
     "listCollections": IDL2.Func([], [IDL2.Vec(Collection)], ["query"]),
@@ -31469,6 +31538,11 @@ const idlFactory = ({ IDL: IDL2 }) => {
       [IDL2.Variant({ "ok": IDL2.Text, "err": IDL2.Text })],
       []
     ),
+    "reportCollection": IDL2.Func(
+      [CollectionId, IDL2.Text],
+      [IDL2.Variant({ "ok": CollectionImportMeta, "err": IDL2.Text })],
+      []
+    ),
     "setCollectionCanisterWasm": IDL2.Func([IDL2.Vec(IDL2.Nat8)], [], []),
     "settleAuction": IDL2.Func([ListingId], [], []),
     "supply": IDL2.Func(
@@ -31590,6 +31664,15 @@ function fromRawCollectionKind(value) {
   if ("External" in value) return "External";
   return "Minted";
 }
+function fromRawCollectionTrustStatus(value) {
+  if ("Verified" in value) return "Verified";
+  if ("Hidden" in value) return "Hidden";
+  if ("Blocked" in value) return "Blocked";
+  if ("SyncDisabled" in value) return "SyncDisabled";
+  if ("NeedsBrowseInfo" in value) return "NeedsBrowseInfo";
+  if ("Reported" in value) return "Reported";
+  return "CommunityImported";
+}
 function fromRawCollectionBrowseCoverage(value) {
   if ("Full" in value) return "Full";
   return "Partial";
@@ -31693,6 +31776,25 @@ function fromRawWalletNFTPage(value) {
 function fromRawCollectionPage(value) {
   return {
     collections: value.collections.map(fromRawCollection),
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount
+  };
+}
+function fromRawCollectionImportMeta(value) {
+  return {
+    collectionId: value.collectionId,
+    importedBy: value.importedBy,
+    trustStatus: fromRawCollectionTrustStatus(value.trustStatus),
+    reportCount: value.reportCount,
+    createdAt: value.createdAt,
+    reviewedAt: fromRawOption(value.reviewedAt),
+    lastReportedAt: fromRawOption(value.lastReportedAt),
+    lastReportReason: fromRawOption(value.lastReportReason)
+  };
+}
+function fromRawCollectionImportMetaPage(value) {
+  return {
+    metas: value.metas.map(fromRawCollectionImportMeta),
     nextCursor: fromRawOption(value.nextCursor),
     totalCount: value.totalCount
   };
@@ -31895,6 +31997,13 @@ function fromRawSettlementStatus(value) {
     stage: value.stage,
     message: value.message,
     updatedAt: value.updatedAt
+  };
+}
+function fromRawSettlementStatusPage(value) {
+  return {
+    statuses: value.statuses.map(fromRawSettlementStatus),
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount
   };
 }
 function fromRawMintConfig(value) {
@@ -32309,6 +32418,12 @@ function fromCollectionResult(value) {
   }
   return { __kind__: "err", err: value.err };
 }
+function fromCollectionImportMetaResult(value) {
+  if ("ok" in value) {
+    return { __kind__: "ok", ok: fromRawCollectionImportMeta(value.ok) };
+  }
+  return { __kind__: "err", err: value.err };
+}
 function fromCollectionCanisterControllersResult(value) {
   if ("ok" in value) {
     return {
@@ -32500,6 +32615,11 @@ class Backend {
       )
     );
   }
+  async adminBlockCollection(collectionId) {
+    return fromCollectionImportMetaResult(
+      await this.run(() => this.actor.adminBlockCollection(collectionId))
+    );
+  }
   async adminDeleteCollectionCreationRequest(requestId) {
     return fromBooleanResult(
       await this.run(
@@ -32507,10 +32627,27 @@ class Backend {
       )
     );
   }
+  async adminDisableCollectionSync(collectionId) {
+    return fromCollectionImportMetaResult(
+      await this.run(() => this.actor.adminDisableCollectionSync(collectionId))
+    );
+  }
   async adminGetSettlementEscrowRepairQuote(listingId) {
     return fromRawSettlementEscrowRepairQuote(
       await this.run(
         () => this.actor.adminGetSettlementEscrowRepairQuote(listingId)
+      )
+    );
+  }
+  async adminHideCollection(collectionId) {
+    return fromCollectionImportMetaResult(
+      await this.run(() => this.actor.adminHideCollection(collectionId))
+    );
+  }
+  async adminMarkCollectionNeedsBrowseInfo(collectionId) {
+    return fromCollectionImportMetaResult(
+      await this.run(
+        () => this.actor.adminMarkCollectionNeedsBrowseInfo(collectionId)
       )
     );
   }
@@ -32554,6 +32691,11 @@ class Backend {
       await this.run(
         () => this.actor.adminTopUpSettlementEscrow(listingId, amount)
       )
+    );
+  }
+  async adminVerifyCollection(collectionId) {
+    return fromCollectionImportMetaResult(
+      await this.run(() => this.actor.adminVerifyCollection(collectionId))
     );
   }
   async createAuctionListing(nftId, startingBid, endTime) {
@@ -32710,6 +32852,16 @@ class Backend {
     );
     return result.map(fromRawSettlementStatus);
   }
+  async getMyMarketplaceSettlementStatusesPage(cursor, limit) {
+    return fromRawSettlementStatusPage(
+      await this.run(
+        () => this.actor.getMyMarketplaceSettlementStatusesPage(
+          toRawOption(cursor),
+          toRawOption(limit)
+        )
+      )
+    );
+  }
   async getMyAuctionBidStatuses(listingIds) {
     const result = await this.run(
       () => this.actor.getMyAuctionBidStatuses(listingIds)
@@ -32723,6 +32875,14 @@ class Backend {
     const result = await this.run(() => this.actor.getCollection(id2));
     const value = fromRawOption(result);
     return value == null ? null : fromRawCollection(value);
+  }
+  async getCollectionImportMeta(collectionId) {
+    const value = fromRawOption(
+      await this.run(
+        () => this.actor.getCollectionImportMeta(collectionId)
+      )
+    );
+    return value == null ? null : fromRawCollectionImportMeta(value);
   }
   async getCollectionBrowseStats(collectionId) {
     return fromRawCollectionBrowseStats(
@@ -33020,6 +33180,16 @@ class Backend {
       () => this.actor.isNFTInUserWallet(collectionId, tokenId, user)
     );
   }
+  async listCollectionImportMetasPage(cursor, limit) {
+    return fromRawCollectionImportMetaPage(
+      await this.run(
+        () => this.actor.listCollectionImportMetasPage(
+          toRawOption(cursor),
+          toRawOption(limit)
+        )
+      )
+    );
+  }
   async listCollections() {
     const collections = [];
     let cursor = null;
@@ -33170,6 +33340,11 @@ class Backend {
   async sendNFT(nftId, recipient) {
     return fromTextResult(
       await this.run(() => this.actor.sendNFT(nftId, recipient))
+    );
+  }
+  async reportCollection(collectionId, reason) {
+    return fromCollectionImportMetaResult(
+      await this.run(() => this.actor.reportCollection(collectionId, reason))
     );
   }
   async syncExternalNFTOwner(collectionId, tokenId, owner) {
@@ -47376,14 +47551,14 @@ const Toaster = ({ ...props }) => {
     }
   );
 };
-const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-Da8XfHZN.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]) : void 0));
-const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-BUJxTOrV.js"), true ? __vite__mapDeps([18,4,5,6,7,2,8,9,10,3,19,16]) : void 0));
-const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-C3lr5LyI.js"), true ? __vite__mapDeps([20,1,2,3,21,12,10,11,13,5,22]) : void 0));
-const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-DrDccZdN.js"), true ? __vite__mapDeps([23,7,2,8,3,11,13,19,17,22,15]) : void 0));
-const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-BoRp0AMQ.js"), true ? [] : void 0));
-const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-BEmNN5kE.js"), true ? __vite__mapDeps([24,1,2,3,21,12,10,6,5,7,8,9,11,13,14,25]) : void 0));
-const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-D-Az4zSu.js"), true ? __vite__mapDeps([26,1,2,3,6,5,7,8,11,16]) : void 0));
-const HelpPage = reactExports.lazy(() => __vitePreload(() => import("./HelpPage-DpTAYfBN.js"), true ? __vite__mapDeps([27,3,25,8,15]) : void 0));
+const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-C_MERtA7.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]) : void 0));
+const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-ei3s4cAY.js"), true ? __vite__mapDeps([18,4,5,6,7,2,8,9,10,3,19,16]) : void 0));
+const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-Dd3Jl-0L.js"), true ? __vite__mapDeps([20,1,2,3,21,12,10,11,13,5,22,23]) : void 0));
+const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-C6Jviz3F.js"), true ? __vite__mapDeps([24,7,2,8,3,11,13,19,17,22,15]) : void 0));
+const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-BZnxXq0g.js"), true ? [] : void 0));
+const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-D3oFN_2c.js"), true ? __vite__mapDeps([25,1,2,3,21,12,10,6,5,7,8,9,11,13,14,26,23]) : void 0));
+const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-qPsqAyyT.js"), true ? __vite__mapDeps([27,1,2,3,6,5,7,8,11,16]) : void 0));
+const HelpPage = reactExports.lazy(() => __vitePreload(() => import("./HelpPage-ifB9YNWt.js"), true ? __vite__mapDeps([28,3,26,8,15,23]) : void 0));
 const rootRoute = createRootRoute({
   component: () => /* @__PURE__ */ jsxRuntimeExports.jsx(Layout, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(
     reactExports.Suspense,
@@ -47496,13 +47671,13 @@ export {
   useNavigate as k,
   Shield as l,
   motion as m,
-  infiniteQueryBehavior as n,
-  hasPreviousPage as o,
-  hasNextPage as p,
-  useBaseQuery as q,
+  AnimatePresence as n,
+  CircleDollarSign as o,
+  infiniteQueryBehavior as p,
+  hasPreviousPage as q,
   reactExports as r,
-  AnimatePresence as s,
-  CircleDollarSign as t,
+  hasNextPage as s,
+  useBaseQuery as t,
   useAuth as u,
   reactDomExports as v,
   buttonVariants as w,

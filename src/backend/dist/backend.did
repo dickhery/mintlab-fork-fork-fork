@@ -104,6 +104,12 @@ type SettlementStatusRole =
    Buyer;
    Seller;
  };
+type SettlementStatusPage = 
+ record {
+   nextCursor: opt nat;
+   statuses: vec SettlementStatus;
+   totalCount: nat;
+ };
 type SettlementStatusKind = 
  variant {
    Auction;
@@ -671,6 +677,16 @@ type DIP721Error =
    UnauthorizedOwner;
    ZeroAddress;
  };
+type CollectionTrustStatus = 
+ variant {
+   Blocked;
+   CommunityImported;
+   Hidden;
+   NeedsBrowseInfo;
+   Reported;
+   SyncDisabled;
+   Verified;
+ };
 type CollectionPage = 
  record {
    collections: vec Collection;
@@ -708,6 +724,23 @@ type CollectionIndexPageResult =
    indexed: nat;
    nextCursor: opt text;
    scanned: nat;
+ };
+type CollectionImportMetaPage = 
+ record {
+   metas: vec CollectionImportMeta;
+   nextCursor: opt nat;
+   totalCount: nat;
+ };
+type CollectionImportMeta = 
+ record {
+   collectionId: CollectionId;
+   createdAt: int;
+   importedBy: principal;
+   lastReportReason: opt text;
+   lastReportedAt: opt int;
+   reportCount: nat;
+   reviewedAt: opt int;
+   trustStatus: CollectionTrustStatus;
  };
 type CollectionId = nat;
 type CollectionDividendInfo = 
@@ -990,17 +1023,37 @@ service : {
       err: text;
       ok: CollectionCreationReceipt;
     });
+  adminBlockCollection: (collectionId: CollectionId) ->
+   (variant {
+      err: text;
+      ok: CollectionImportMeta;
+    });
   adminDeleteCollectionCreationRequest: (requestId: nat) ->
    (variant {
       err: text;
       ok: bool;
     });
+  adminDisableCollectionSync: (collectionId: CollectionId) ->
+   (variant {
+      err: text;
+      ok: CollectionImportMeta;
+    });
   adminGetMintlabFeeRecoveryQuote: (listingId: ListingId) ->
    (MintlabFeeRecoveryQuote);
   adminGetSettlementEscrowRepairQuote: (listingId: ListingId) ->
    (SettlementEscrowRepairQuote);
+  adminHideCollection: (collectionId: CollectionId) ->
+   (variant {
+      err: text;
+      ok: CollectionImportMeta;
+    });
   adminListMarketplaceRecoveryState: () ->
    (MarketplaceRecoverySnapshot) query;
+  adminMarkCollectionNeedsBrowseInfo: (collectionId: CollectionId) ->
+   (variant {
+      err: text;
+      ok: CollectionImportMeta;
+    });
   adminMarkMintlabFeeBalanceVerified: (listingId: ListingId) ->
    (MintlabFeeRecoveryQuote);
   adminRecoverPaidCollectionCreation: (owner: principal, cyclePaymentBlock:
@@ -1018,6 +1071,11 @@ service : {
   adminRetryNoBidAuctionReturn: (listingId: ListingId) -> ();
   adminTopUpSettlementEscrow: (listingId: ListingId, amount: nat64) ->
    (SettlementEscrowTopUpReceipt);
+  adminVerifyCollection: (collectionId: CollectionId) ->
+   (variant {
+      err: text;
+      ok: CollectionImportMeta;
+    });
   balance: (request: EXTBalanceRequest) -> (EXTBalanceResponse) query;
   bootstrapAdmin: () -> ();
   buyFixedListing: (listingId: ListingId) -> ();
@@ -1128,6 +1186,8 @@ service : {
    opt nat, limit: opt nat) -> (DividendBalancePage) query;
   getCollectionDividendInfo: (collectionId: CollectionId) ->
    (opt CollectionDividendInfo);
+  getCollectionImportMeta: (collectionId: CollectionId) ->
+   (opt CollectionImportMeta) query;
   getCollectionIndexStatus: (collectionId: CollectionId) ->
    (opt CollectionIndexStatus) query;
   getCollectionNFT: (collectionId: CollectionId, tokenId: text) ->
@@ -1150,6 +1210,8 @@ service : {
   getMyDividendNFTsPage: (cursor: opt nat, limit: opt nat) ->
    (NFTDividendPage);
   getMyMarketplaceSettlementStatuses: () -> (vec SettlementStatus) query;
+  getMyMarketplaceSettlementStatusesPage: (cursor: opt nat, limit:
+   opt nat) -> (SettlementStatusPage) query;
   getMyPendingAuctionRefunds: () -> (vec AuctionEscrow) query;
   getMyPendingMintPayments: () -> (vec PendingMintPaymentView) query;
   getNFTStats: (user: principal) -> (NFTStats) query;
@@ -1207,6 +1269,8 @@ service : {
   isAdmin: () -> (bool) query;
   isNFTInUserWallet: (collectionId: CollectionId, tokenId: text, user:
    UserId) -> (bool) query;
+  listCollectionImportMetasPage: (cursor: opt nat, limit: opt nat) ->
+   (CollectionImportMetaPage) query;
   listCollections: () -> (vec Collection) query;
   listCollectionsPage: (cursor: opt nat, limit: opt nat) ->
    (CollectionPage) query;
@@ -1281,6 +1345,11 @@ service : {
    (variant {
       err: text;
       ok: CollectionCreationRequestView;
+    });
+  reportCollection: (collectionId: CollectionId, reason: text) ->
+   (variant {
+      err: text;
+      ok: CollectionImportMeta;
     });
   retryAuctionRefund: (escrowId: nat) -> (bool);
   retryCollectionCreationRequest: (requestId: nat) ->

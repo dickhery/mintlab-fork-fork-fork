@@ -1,6 +1,7 @@
 import type {
   backendInterface,
   Collection,
+  CollectionImportMeta,
   WalletNFT,
   ActiveListing,
   ActiveListingDetail,
@@ -83,6 +84,20 @@ const sampleCollections: Collection[] = [
     dividendConfig: { enabled: true },
   },
 ];
+
+const sampleCollectionImportMetas: CollectionImportMeta[] =
+  sampleCollections
+    .filter((collection) => collection.kind === "External")
+    .map((collection, index) => ({
+      collectionId: collection.id,
+      importedBy: samplePrincipal,
+      trustStatus: index === 0 ? "Verified" : "CommunityImported",
+      reportCount: 0n,
+      createdAt: BigInt(Date.now()) * BigInt(1_000_000),
+      reviewedAt: index === 0 ? BigInt(Date.now()) * BigInt(1_000_000) : null,
+      lastReportedAt: null,
+      lastReportReason: null,
+    }));
 
 const sampleNFTs: WalletNFT[] = [
   {
@@ -359,6 +374,26 @@ function sampleCollectionDividendBalances(
     : [];
 }
 
+function mockCollectionMeta(
+  collectionId: bigint,
+  trustStatus: CollectionImportMeta["trustStatus"],
+): CollectionImportMeta {
+  return (
+    sampleCollectionImportMetas.find(
+      (meta) => meta.collectionId === collectionId,
+    ) ?? {
+      collectionId,
+      importedBy: samplePrincipal,
+      trustStatus,
+      reportCount: 0n,
+      createdAt: BigInt(Date.now()) * BigInt(1_000_000),
+      reviewedAt: null,
+      lastReportedAt: null,
+      lastReportReason: null,
+    }
+  );
+}
+
 export const mockBackend: backendInterface = {
   getAgent: (): Agent => {
     throw new Error("Mock backend does not provide an authenticated agent");
@@ -385,6 +420,26 @@ export const mockBackend: backendInterface = {
   bootstrapAdmin: async () => undefined,
   buyFixedListing: async () => undefined,
   cancelListing: async () => undefined,
+  adminBlockCollection: async (collectionId) => ({
+    __kind__: "ok" as const,
+    ok: mockCollectionMeta(collectionId, "Blocked"),
+  }),
+  adminDisableCollectionSync: async (collectionId) => ({
+    __kind__: "ok" as const,
+    ok: mockCollectionMeta(collectionId, "SyncDisabled"),
+  }),
+  adminHideCollection: async (collectionId) => ({
+    __kind__: "ok" as const,
+    ok: mockCollectionMeta(collectionId, "Hidden"),
+  }),
+  adminMarkCollectionNeedsBrowseInfo: async (collectionId) => ({
+    __kind__: "ok" as const,
+    ok: mockCollectionMeta(collectionId, "NeedsBrowseInfo"),
+  }),
+  adminVerifyCollection: async (collectionId) => ({
+    __kind__: "ok" as const,
+    ok: mockCollectionMeta(collectionId, "Verified"),
+  }),
   adminGetSettlementEscrowRepairQuote: async (listingId) => ({
     listingId,
     kind: "Auction" as const,
@@ -585,6 +640,11 @@ export const mockBackend: backendInterface = {
     };
   },
   getMyMarketplaceSettlementStatuses: async () => [],
+  getMyMarketplaceSettlementStatusesPage: async () => ({
+    statuses: [],
+    nextCursor: null,
+    totalCount: 0n,
+  }),
   getMyAuctionBidStatuses: async (listingIds) =>
     listingIds.flatMap((listingId) => {
       const active = sampleActiveListings.find(
@@ -608,6 +668,10 @@ export const mockBackend: backendInterface = {
     }),
   getAdminPrincipal: async () => samplePrincipal,
   getCollection: async (id) => sampleCollections.find((c) => c.id === id) ?? null,
+  getCollectionImportMeta: async (collectionId) =>
+    sampleCollectionImportMetas.find(
+      (meta) => meta.collectionId === collectionId,
+    ) ?? null,
   getCollectionBrowseStats: async (collectionId) => {
     const collection = sampleCollections.find((c) => c.id === collectionId);
     const visibleCount = BigInt(sampleCollectionNFTs(collectionId).length);
@@ -977,6 +1041,14 @@ export const mockBackend: backendInterface = {
   getVaultPrincipal: async () => samplePrincipal,
   isAdmin: async () => true,
   listCollections: async () => sampleCollections,
+  listCollectionImportMetasPage: async (cursor, limit) => {
+    const page = paginateMock(sampleCollectionImportMetas, cursor, limit);
+    return {
+      metas: page.items,
+      nextCursor: page.nextCursor,
+      totalCount: page.totalCount,
+    };
+  },
   listCollectionsPage: async (cursor, limit) => {
     const page = paginateMock(sampleCollections, cursor, limit);
     return {
@@ -1134,6 +1206,16 @@ export const mockBackend: backendInterface = {
       sampleCollections[0],
   }),
   sendNFT: async () => ({ __kind__: "ok" as const, ok: "mock-tx-id" }),
+  reportCollection: async (collectionId, reason) => ({
+    __kind__: "ok" as const,
+    ok: {
+      ...mockCollectionMeta(collectionId, "Reported"),
+      trustStatus: "Reported" as const,
+      reportCount: 1n,
+      lastReportedAt: BigInt(Date.now()) * BigInt(1_000_000),
+      lastReportReason: reason,
+    },
+  }),
   syncExternalNFTOwner: async (collectionId, tokenId, owner) => ({
     __kind__: "ok" as const,
     ok: {

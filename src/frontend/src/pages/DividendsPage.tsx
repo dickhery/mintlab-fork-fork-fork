@@ -24,6 +24,8 @@ import { toast } from "sonner";
 
 const E8S = 100_000_000n;
 const ICP_FEE = 10_000n;
+const DIVIDEND_PAGE_SIZE = 50n;
+const DIVIDEND_MEDIA_PAGE_SIZE = 50n;
 
 function formatICP(e8s: bigint): string {
   const whole = e8s / E8S;
@@ -61,24 +63,28 @@ export default function DividendsPage() {
     queryKey: ["myDividendNFTs", principalText],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.refreshMyDividendNFTs();
+      const page = await actor.getMyDividendNFTsPage(null, DIVIDEND_PAGE_SIZE);
+      return page.dividends;
     },
     enabled: !!actor && !isFetching && isAuthenticated,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    refetchInterval: 30_000,
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
   });
 
   const { data: mediaNFTs = [] } = useQuery<WalletNFT[]>({
     queryKey: ["userNFTs", principalText],
     queryFn: async () => {
       if (!actor || !principal) return [];
-      return actor.getUserNFTs(principal);
+      const page = await actor.getUserNFTsPage(
+        principal,
+        null,
+        DIVIDEND_MEDIA_PAGE_SIZE,
+      );
+      return page.nfts;
     },
     enabled: !!actor && !isFetching && isAuthenticated && !!principal,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    refetchInterval: 30_000,
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
   });
 
   const claimMutation = useMutation({

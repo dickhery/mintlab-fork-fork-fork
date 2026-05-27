@@ -110,6 +110,8 @@ const MODERATION_IMAGE_ACCEPT = "image/png,image/jpeg";
 const COLLECTION_CREATION_REPAIR_GRACE_MS = 3 * 60 * 1000;
 const ON_CHAIN_IMAGE_SIZE_MESSAGE =
   "Uploaded image is too large for on-chain storage";
+const COLLECTIONS_PAGE_SIZE = 50n;
+const COLLECTIONS_LISTING_PAGE_SIZE = 25n;
 
 function formatICP(e8s: bigint): string {
   const whole = e8s / E8S;
@@ -2025,7 +2027,11 @@ function NFTBrowser({
     queryKey: ["activeListingDetails"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getActiveListingDetails();
+      const page = await actor.getActiveListingDetailsPage(
+        null,
+        COLLECTIONS_LISTING_PAGE_SIZE,
+      );
+      return page.details;
     },
     enabled: !!actor && !isFetching,
   });
@@ -2852,7 +2858,8 @@ export default function CollectionsPage() {
     queryKey: ["collections"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listCollections();
+      const page = await actor.listCollectionsPage(null, COLLECTIONS_PAGE_SIZE);
+      return page.collections;
     },
     enabled: !!actor && !isFetching,
   });

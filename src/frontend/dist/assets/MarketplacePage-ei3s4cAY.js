@@ -1,15 +1,15 @@
-import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, h as useComposedRefs, a as cn, b as useBackend, u as useAuth, e as useQueryClient, f as useQuery, B as Button, S as ShoppingBag, i as LoadingSpinner, m as motion, X, g as ue } from "./index-fB4eEJtO.js";
-import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-YToxLWmO.js";
-import { E as EmptyState, M as MediaImage } from "./MediaImage-Civg5pde.js";
-import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-oOkBKRlZ.js";
-import { T as Tag, Z as ZoomableMediaImage, P as PaymentConfirmationDialog } from "./ZoomableMediaImage-BQBru4ZQ.js";
-import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-CwNEsK_7.js";
-import { B as Badge, I as Input } from "./badge-BjkRMG15.js";
-import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label } from "./index-u_tHWnWZ.js";
+import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, h as useComposedRefs, a as cn, b as useBackend, u as useAuth, e as useQueryClient, f as useQuery, B as Button, S as ShoppingBag, i as LoadingSpinner, m as motion, X, g as ue } from "./index-Dq_se1c6.js";
+import { C as CollectionBadge, P as PriceDisplay, t as transferRegisteredNFT } from "./external-nft-transfer-aLU73OmN.js";
+import { E as EmptyState, M as MediaImage } from "./MediaImage-R3sXH1yn.js";
+import { H as HelpCallout, a as HelpTooltip } from "./HelpCallout-qLigS8ZL.js";
+import { T as Tag, Z as ZoomableMediaImage, P as PaymentConfirmationDialog } from "./ZoomableMediaImage-DDVPpv3p.js";
+import { c as createCollection, u as useDirection, A as AlertDialog, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-B-TbJKfF.js";
+import { B as Badge, I as Input } from "./badge-Bgu2zrlA.js";
+import { d as useId, P as Primitive, e as composeEventHandlers, f as createContextScope, g as useControllableState, h as useCallbackRef, i as Presence, u as useMutation, D as Dialog, a as DialogContent, b as DialogHeader, c as DialogTitle, L as Label } from "./index-BgnyvDtN.js";
 import { f as formatICPAmount, p as parseICPToE8s } from "./icp-BXjZNIYq.js";
-import { C as Coins } from "./coins-DulLKrSJ.js";
-import { I as ImageOff } from "./media-Dh83-DF1.js";
-import "./arrow-right-DJp-M4z-.js";
+import { C as Coins } from "./coins-DyruyZMR.js";
+import { I as ImageOff } from "./media-CvoQXHxw.js";
+import "./arrow-right-D7fKNVWD.js";
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -502,6 +502,11 @@ const DEFAULT_MINTLAB_FEE_BPS = 200n;
 const BPS_DENOMINATOR = 10000n;
 const MIN_AUCTION_STARTING_BID_E8S = 1000000n;
 const MIN_AUCTION_BID_INCREMENT_E8S = 1000000n;
+const MARKETPLACE_LISTING_PAGE_SIZE = 25n;
+const MARKETPLACE_COLLECTION_PAGE_SIZE = 50n;
+const MARKETPLACE_WALLET_PAGE_SIZE = 50n;
+const MARKETPLACE_DIVIDEND_PAGE_SIZE = 50n;
+const MARKETPLACE_STATUS_PAGE_SIZE = 25n;
 function marketplaceFee(amount, feeBps) {
   return amount * feeBps / BPS_DENOMINATOR;
 }
@@ -1443,7 +1448,11 @@ function MarketplacePage() {
     queryKey: ["activeListingDetails"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getActiveListingDetails();
+      const page = await actor.getActiveListingDetailsPage(
+        null,
+        MARKETPLACE_LISTING_PAGE_SIZE
+      );
+      return page.details;
     },
     enabled: !!actor && !actorLoading,
     refetchInterval: 3e4
@@ -1452,7 +1461,11 @@ function MarketplacePage() {
     queryKey: ["collections"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listCollections();
+      const page = await actor.listCollectionsPage(
+        null,
+        MARKETPLACE_COLLECTION_PAGE_SIZE
+      );
+      return page.collections;
     },
     enabled: !!actor && !actorLoading
   });
@@ -1469,7 +1482,12 @@ function MarketplacePage() {
     queryKey: ["userNFTs", principal == null ? void 0 : principal.toString()],
     queryFn: async () => {
       if (!actor || !principal) return [];
-      return actor.getUserNFTs(principal);
+      const page = await actor.getUserNFTsPage(
+        principal,
+        null,
+        MARKETPLACE_WALLET_PAGE_SIZE
+      );
+      return page.nfts;
     },
     enabled: !!actor && !actorLoading && isAuthenticated && !!principal
   });
@@ -1477,7 +1495,11 @@ function MarketplacePage() {
     queryKey: ["myMarketplaceSettlementStatuses", principal == null ? void 0 : principal.toString()],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getMyMarketplaceSettlementStatuses();
+      const page = await actor.getMyMarketplaceSettlementStatusesPage(
+        null,
+        MARKETPLACE_STATUS_PAGE_SIZE
+      );
+      return page.statuses;
     },
     enabled: !!actor && !actorLoading && isAuthenticated,
     refetchInterval: 3e4
@@ -1501,7 +1523,12 @@ function MarketplacePage() {
       for (const collectionId of collectionIds) {
         const collection = collectionMap.get(collectionId);
         if (!((_a2 = collection == null ? void 0 : collection.dividendConfig) == null ? void 0 : _a2.enabled)) continue;
-        const balances = await actor.refreshCollectionDividendBalances(collectionId);
+        const page = await actor.refreshCollectionDividendBalancesPage(
+          collectionId,
+          null,
+          MARKETPLACE_DIVIDEND_PAGE_SIZE
+        );
+        const balances = page.balances;
         for (const [tokenId, balance] of balances) {
           entries.push([`${collectionId.toString()}:${tokenId}`, balance]);
         }
@@ -1509,9 +1536,8 @@ function MarketplacePage() {
       return entries;
     },
     enabled: !!actor && !actorLoading && listingDetails.length > 0,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    refetchInterval: 3e4
+    refetchOnWindowFocus: false,
+    staleTime: 6e4
   });
   const listingDividendMap = new Map(listingDividendBalances);
   const ledgerFeeE8s = (marketplaceFeeConfig == null ? void 0 : marketplaceFeeConfig.ledgerFeeE8s) ?? DEFAULT_ICP_LEDGER_FEE_E8S;

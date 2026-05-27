@@ -2,10 +2,12 @@ import CollectionsLib "../lib/collections";
 import AuthLib "../lib/auth";
 import WalletLib "../lib/wallet";
 import CollectionTypes "../types/collections";
+import Array "mo:core/Array";
 import Nat "mo:core/Nat";
 import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
 import Text "mo:core/Text";
+import Time "mo:core/Time";
 
 mixin (
   collectionsState : CollectionsLib.CollectionsState,
@@ -13,6 +15,10 @@ mixin (
   ownershipIndexState : WalletLib.OwnershipIndexState,
 ) {
   let IMPORT_INDEX_WARM_PAGE_LIMIT : Nat = 25;
+  let MAX_IMPORTS_PER_USER_PER_DAY : Nat = 5;
+  let IMPORT_COOLDOWN_NS : Int = 60_000_000_000;
+  let IMPORT_DAY_NS : Int = 86_400_000_000_000;
+  let MAX_UNVERIFIED_COLLECTIONS_VISIBLE : Nat = 500;
 
   /// Public: import a supported external NFT collection into the shared app directory
   public shared ({ caller }) func addCollection(
@@ -37,8 +43,16 @@ mixin (
       case (#Other(_)) Runtime.trap("Only EXT, DIP721, and ICRC-7 collections are supported");
       case (_) {};
     };
+    enforceImportRateLimits(caller);
     let (collection, shouldWarmIndex) = switch (CollectionsLib.findExternalCollectionByCanister(collectionsState, canisterId, standard)) {
       case (?existing) {
+        ignore CollectionsLib.ensureImportMeta(
+          collectionsState,
+          existing.id,
+          caller,
+          #CommunityImported,
+        );
+        CollectionsLib.noteImportAttempt(collectionsState, caller, existing.id);
         let mergedBrowseInfo = mergeBrowseInfo(existing.browseInfo, browseInfo);
         if (mergedBrowseInfo == existing.browseInfo) {
           (existing, false);
@@ -64,8 +78,10 @@ mixin (
         };
       };
       case null {
-        (
-          CollectionsLib.addCollection(
+        if (CollectionsLib.visibleUnverifiedCollectionCount(collectionsState) >= MAX_UNVERIFIED_COLLECTIONS_VISIBLE) {
+          Runtime.trap("Community collection import is temporarily full. Ask an admin to verify or hide older imports first.");
+        };
+        let created = CollectionsLib.addCollection(
             collectionsState,
             name,
             description,
@@ -76,23 +92,35 @@ mixin (
             #External,
             browseInfo,
             null,
-          ),
-          true,
+          );
+        ignore CollectionsLib.ensureImportMeta(
+          collectionsState,
+          created.id,
+          caller,
+          #CommunityImported,
         );
+        (created, false);
       };
     };
-    if (shouldWarmIndex) {
+    if (shouldWarmIndex and isVerifiedImport(collection.id)) {
       await* warmImportedCollectionIndex(collection);
     };
     collection;
   };
 
   /// Return all registered collections
-  public query func listCollections() : async [CollectionTypes.Collection] {
-    CollectionsLib.getCollections(collectionsState);
+  public shared query ({ caller }) func listCollections() : async [CollectionTypes.Collection] {
+    let includeHidden = AuthLib.isAdmin(authState, caller);
+    var collections : [CollectionTypes.Collection] = [];
+    for (collection in CollectionsLib.getCollections(collectionsState).values()) {
+      if (includeHidden or CollectionsLib.isPubliclyVisible(collectionsState, collection)) {
+        collections := Array.concat<CollectionTypes.Collection>(collections, [collection]);
+      };
+    };
+    collections;
   };
 
-  public query func listCollectionsPage(
+  public shared query ({ caller }) func listCollectionsPage(
     cursor : ?Nat,
     limit : ?Nat,
   ) : async CollectionTypes.CollectionPage {
@@ -103,7 +131,89 @@ mixin (
         case (?value) value;
         case null 0;
       },
+      AuthLib.isAdmin(authState, caller),
     );
+  };
+
+  public query func getCollectionImportMeta(
+    collectionId : CollectionTypes.CollectionId
+  ) : async ?CollectionTypes.CollectionImportMeta {
+    CollectionsLib.getImportMeta(collectionsState, collectionId);
+  };
+
+  public query func listCollectionImportMetasPage(
+    cursor : ?Nat,
+    limit : ?Nat,
+  ) : async CollectionTypes.CollectionImportMetaPage {
+    CollectionsLib.getImportMetasPage(
+      collectionsState,
+      cursor,
+      switch (limit) {
+        case (?value) value;
+        case null 0;
+      },
+    );
+  };
+
+  public shared ({ caller }) func reportCollection(
+    collectionId : CollectionTypes.CollectionId,
+    reason : Text,
+  ) : async { #ok : CollectionTypes.CollectionImportMeta; #err : Text } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("Anonymous caller not allowed");
+    };
+    if (Text.size(reason) > 500) {
+      return #err("Report reason is too long");
+    };
+    switch (CollectionsLib.reportCollection(collectionsState, collectionId, reason)) {
+      case (?meta) #ok(meta);
+      case null #err("Collection not found");
+    };
+  };
+
+  public shared ({ caller }) func adminVerifyCollection(
+    collectionId : CollectionTypes.CollectionId
+  ) : async { #ok : CollectionTypes.CollectionImportMeta; #err : Text } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("Anonymous caller not allowed");
+    };
+    if (not AuthLib.isAdmin(authState, caller)) {
+      return #err("Unauthorized: admin only");
+    };
+    let collection = switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
+      case null return #err("Collection not found");
+      case (?value) value;
+    };
+    let meta = switch (CollectionsLib.setCollectionTrustStatus(collectionsState, collectionId, #Verified)) {
+      case (?value) value;
+      case null return #err("Collection not found");
+    };
+    await* warmImportedCollectionIndex(collection);
+    #ok(meta);
+  };
+
+  public shared ({ caller }) func adminHideCollection(
+    collectionId : CollectionTypes.CollectionId
+  ) : async { #ok : CollectionTypes.CollectionImportMeta; #err : Text } {
+    adminSetCollectionTrustStatus(caller, collectionId, #Hidden);
+  };
+
+  public shared ({ caller }) func adminBlockCollection(
+    collectionId : CollectionTypes.CollectionId
+  ) : async { #ok : CollectionTypes.CollectionImportMeta; #err : Text } {
+    adminSetCollectionTrustStatus(caller, collectionId, #Blocked);
+  };
+
+  public shared ({ caller }) func adminDisableCollectionSync(
+    collectionId : CollectionTypes.CollectionId
+  ) : async { #ok : CollectionTypes.CollectionImportMeta; #err : Text } {
+    adminSetCollectionTrustStatus(caller, collectionId, #SyncDisabled);
+  };
+
+  public shared ({ caller }) func adminMarkCollectionNeedsBrowseInfo(
+    collectionId : CollectionTypes.CollectionId
+  ) : async { #ok : CollectionTypes.CollectionImportMeta; #err : Text } {
+    adminSetCollectionTrustStatus(caller, collectionId, #NeedsBrowseInfo);
   };
 
   /// Return a single collection by id
@@ -184,6 +294,50 @@ mixin (
       cursor,
       IMPORT_INDEX_WARM_PAGE_LIMIT,
     );
+  };
+
+  func adminSetCollectionTrustStatus(
+    caller : Principal,
+    collectionId : CollectionTypes.CollectionId,
+    status : CollectionTypes.CollectionTrustStatus,
+  ) : { #ok : CollectionTypes.CollectionImportMeta; #err : Text } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("Anonymous caller not allowed");
+    };
+    if (not AuthLib.isAdmin(authState, caller)) {
+      return #err("Unauthorized: admin only");
+    };
+    switch (CollectionsLib.setCollectionTrustStatus(collectionsState, collectionId, status)) {
+      case (?meta) #ok(meta);
+      case null #err("Collection not found");
+    };
+  };
+
+  func isVerifiedImport(collectionId : CollectionTypes.CollectionId) : Bool {
+    switch (CollectionsLib.getImportMeta(collectionsState, collectionId)) {
+      case (?meta) meta.trustStatus == #Verified;
+      case null false;
+    };
+  };
+
+  func enforceImportRateLimits(caller : Principal) {
+    let now = Time.now();
+    switch (CollectionsLib.lastImportAt(collectionsState, caller)) {
+      case (?lastImportAt) {
+        if (now - lastImportAt < IMPORT_COOLDOWN_NS) {
+          Runtime.trap("Please wait one minute between collection imports");
+        };
+      };
+      case null {};
+    };
+    let recent = CollectionsLib.recentImportCountForUser(
+      collectionsState,
+      caller,
+      now - IMPORT_DAY_NS,
+    );
+    if (recent >= MAX_IMPORTS_PER_USER_PER_DAY) {
+      Runtime.trap("Daily collection import limit reached");
+    };
   };
 
   func warmIndexHasBrowseRange(collection : CollectionTypes.Collection) : Bool {

@@ -599,6 +599,36 @@ mixin (
     };
   };
 
+  func settlementStatusPage(
+    statuses : [MarketplaceTypes.SettlementStatus],
+    start : Nat,
+    limit : Nat,
+  ) : MarketplaceTypes.SettlementStatusPage {
+    var page : [MarketplaceTypes.SettlementStatus] = [];
+    var index : Nat = 0;
+    var added : Nat = 0;
+    for (status in statuses.values()) {
+      if (index < start) {
+        index += 1;
+      } else if (added < limit) {
+        page := Array.concat<MarketplaceTypes.SettlementStatus>(page, [status]);
+        added += 1;
+        index += 1;
+      } else {
+        return {
+          statuses = page;
+          nextCursor = ?index;
+          totalCount = statuses.size();
+        };
+      };
+    };
+    {
+      statuses = page;
+      nextCursor = null;
+      totalCount = statuses.size();
+    };
+  };
+
   func sliceActiveListings(
     listings : [MarketplaceTypes.ActiveListing],
     start : Nat,
@@ -878,6 +908,111 @@ mixin (
     if (Principal.isAnonymous(caller)) {
       return [];
     };
+    myMarketplaceSettlementStatuses(caller);
+  };
+
+  public shared query ({ caller }) func getMyMarketplaceSettlementStatusesPage(
+    cursor : ?Nat,
+    limit : ?Nat,
+  ) : async MarketplaceTypes.SettlementStatusPage {
+    if (Principal.isAnonymous(caller)) {
+      return { statuses = []; nextCursor = null; totalCount = 0 };
+    };
+    settlementStatusPage(
+      myMarketplaceSettlementStatuses(caller),
+      cursorOrZero(cursor),
+      normalizeMarketplacePageSize(limit),
+    );
+  };
+
+  func myMarketplaceSettlementStatuses(caller : Principal) : [MarketplaceTypes.SettlementStatus] {
+    let indexedStatuses = myMarketplaceSettlementStatusesFromIndexes(caller);
+    if (indexedStatuses.size() > 0) {
+      return indexedStatuses;
+    };
+    myMarketplaceSettlementStatusesByScan(caller);
+  };
+
+  func myMarketplaceSettlementStatusesFromIndexes(
+    caller : Principal
+  ) : [MarketplaceTypes.SettlementStatus] {
+    var statuses : [MarketplaceTypes.SettlementStatus] = [];
+
+    for (listingId in MarketplaceLib.getSettlementListingIdsByUser(marketplaceSettlementState, caller).values()) {
+      switch (MarketplaceLib.getFixedPurchaseSettlement(marketplaceSettlementState, listingId)) {
+        case (?settlement) {
+          if (Principal.equal(settlement.buyer, caller)) {
+            statuses := Array.concat<MarketplaceTypes.SettlementStatus>(statuses, [fixedSettlementStatus(settlement, #Buyer)]);
+          };
+          if (Principal.equal(settlement.seller, caller)) {
+            statuses := Array.concat<MarketplaceTypes.SettlementStatus>(statuses, [fixedSettlementStatus(settlement, #Seller)]);
+          };
+        };
+        case null {};
+      };
+      switch (MarketplaceLib.getAuctionSettlement(marketplaceSettlementState, listingId)) {
+        case (?settlement) {
+          if (Principal.equal(settlement.winner, caller)) {
+            statuses := Array.concat<MarketplaceTypes.SettlementStatus>(statuses, [auctionSettlementStatus(settlement, #Buyer)]);
+          };
+          if (Principal.equal(settlement.seller, caller)) {
+            statuses := Array.concat<MarketplaceTypes.SettlementStatus>(statuses, [auctionSettlementStatus(settlement, #Seller)]);
+          };
+        };
+        case null {};
+      };
+    };
+
+    for (listingId in MarketplaceLib.getNoBidReturnListingIdsByUser(marketplaceNoBidAuctionReturnState, caller).values()) {
+      switch (MarketplaceLib.getNoBidAuctionReturn(marketplaceNoBidAuctionReturnState, listingId)) {
+        case (?settlement) {
+          if (Principal.equal(settlement.seller, caller)) {
+            statuses := Array.concat<MarketplaceTypes.SettlementStatus>(statuses, [noBidReturnStatus(settlement)]);
+          };
+        };
+        case null {};
+      };
+    };
+
+    for (listingId in MarketplaceLib.getListingReturnIdsByUser(marketplaceListingReturnState, caller).values()) {
+      switch (MarketplaceLib.getListingReturn(marketplaceListingReturnState, listingId)) {
+        case (?settlement) {
+          if (Principal.equal(settlement.seller, caller)) {
+            statuses := Array.concat<MarketplaceTypes.SettlementStatus>(statuses, [listingReturnStatus(settlement)]);
+          };
+        };
+        case null {};
+      };
+    };
+
+    for (listingId in MarketplaceLib.getPendingBidIdsByUser(marketplaceBidState, caller).values()) {
+      switch (MarketplaceLib.getPendingBidDeposit(marketplaceBidState, listingId)) {
+        case (?pending) {
+          if (Principal.equal(pending.bidder, caller)) {
+            statuses := Array.concat<MarketplaceTypes.SettlementStatus>(statuses, [pendingBidStatus(pending)]);
+          };
+        };
+        case null {};
+      };
+    };
+
+    for (escrowId in MarketplaceLib.getPendingRefundIdsByUser(marketplacePaymentState, caller).values()) {
+      switch (MarketplaceLib.getPendingRefund(marketplacePaymentState, escrowId)) {
+        case (?refund) {
+          if (Principal.equal(refund.bidder, caller)) {
+            statuses := Array.concat<MarketplaceTypes.SettlementStatus>(statuses, [pendingRefundStatus(refund)]);
+          };
+        };
+        case null {};
+      };
+    };
+
+    statuses;
+  };
+
+  func myMarketplaceSettlementStatusesByScan(
+    caller : Principal
+  ) : [MarketplaceTypes.SettlementStatus] {
     var statuses : [MarketplaceTypes.SettlementStatus] = [];
     for (settlement in MarketplaceLib.listFixedPurchaseSettlements(marketplaceSettlementState).values()) {
       if (Principal.equal(settlement.buyer, caller)) {

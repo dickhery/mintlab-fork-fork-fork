@@ -1,14 +1,54 @@
-import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, a as cn, k as useNavigate, d as useAdmin, b as useBackend, e as useQueryClient, f as useQuery, l as Shield, g as ue, B as Button, P as Principal, A as Actor } from "./index-fB4eEJtO.js";
-import { L as LoaderCircle, A as AppCanisterTopUpDialog, P as Plus, F as Fuel } from "./AppCanisterTopUpDialog-Cc0diajz.js";
-import { S as Switch, r as recommendedCollectionCreationTopUpCycles, T as Trash2, C as CollectionCreationDiagnosticsPanel } from "./switch-BcZfK0_e.js";
-import { A as AlertDialog, i as AlertDialogTrigger, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-CwNEsK_7.js";
-import { I as Input, B as Badge } from "./badge-BjkRMG15.js";
-import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, R as RefreshCw, c as CardContent } from "./card-DyD36cRx.js";
-import { j as Primitive, u as useMutation, L as Label } from "./index-u_tHWnWZ.js";
-import { L as Layers, e as ChevronDown, T as Textarea, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, E as ExternalLink, C as Check, I as Info } from "./textarea-CQRONB5p.js";
-import { S as Skeleton, C as Copy } from "./skeleton-DK8TNp-i.js";
-import { r as resolveImageUrl, I as ImageOff } from "./media-Dh83-DF1.js";
-import { C as CircleAlert } from "./circle-alert-DjNsqyHF.js";
+import { c as createLucideIcon, r as reactExports, j as jsxRuntimeExports, a as cn, k as useNavigate, d as useAdmin, b as useBackend, e as useQueryClient, f as useQuery, l as Shield, g as ue, B as Button, P as Principal, A as Actor } from "./index-Dq_se1c6.js";
+import { L as LoaderCircle, A as AppCanisterTopUpDialog, P as Plus, F as Fuel } from "./AppCanisterTopUpDialog-B7KletWf.js";
+import { S as Switch, r as recommendedCollectionCreationTopUpCycles, T as Trash2, C as CollectionCreationDiagnosticsPanel } from "./switch-DvH679uL.js";
+import { A as AlertDialog, i as AlertDialogTrigger, a as AlertDialogContent, b as AlertDialogHeader, d as AlertDialogTitle, e as AlertDialogDescription, f as AlertDialogFooter, g as AlertDialogCancel, h as AlertDialogAction } from "./index-B-TbJKfF.js";
+import { I as Input, B as Badge } from "./badge-Bgu2zrlA.js";
+import { C as Card, a as CardHeader, b as CardTitle, d as CardDescription, R as RefreshCw, c as CardContent } from "./card-C7H4xzFQ.js";
+import { j as Primitive, u as useMutation, L as Label } from "./index-BgnyvDtN.js";
+import { L as Layers, e as ChevronDown, T as Textarea, S as Select, a as SelectTrigger, b as SelectValue, c as SelectContent, d as SelectItem, E as ExternalLink, C as Check, I as Info } from "./textarea-r4-BXjrG.js";
+import { S as Skeleton, C as Copy } from "./skeleton-C8YDH4P6.js";
+import { r as resolveImageUrl, I as ImageOff } from "./media-CvoQXHxw.js";
+import { C as CircleAlert } from "./circle-alert-MiEN4_js.js";
+import { S as ShieldCheck } from "./shield-check-BAl8ZL9p.js";
+/**
+ * @license lucide-react v0.511.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+const __iconNode$4 = [
+  [
+    "path",
+    {
+      d: "M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2",
+      key: "169zse"
+    }
+  ]
+];
+const Activity = createLucideIcon("activity", __iconNode$4);
+/**
+ * @license lucide-react v0.511.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+const __iconNode$3 = [
+  ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
+  ["path", { d: "m4.9 4.9 14.2 14.2", key: "1m5liu" }]
+];
+const Ban = createLucideIcon("ban", __iconNode$3);
+/**
+ * @license lucide-react v0.511.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+const __iconNode$2 = [
+  ["circle", { cx: "12", cy: "12", r: "10", key: "1mglay" }],
+  ["line", { x1: "10", x2: "10", y1: "15", y2: "9", key: "c1nkhi" }],
+  ["line", { x1: "14", x2: "14", y1: "15", y2: "9", key: "h65svq" }]
+];
+const CirclePause = createLucideIcon("circle-pause", __iconNode$2);
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -19,12 +59,21 @@ const __iconNode$1 = [
   [
     "path",
     {
-      d: "M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2",
-      key: "169zse"
+      d: "M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49",
+      key: "ct8e1f"
     }
-  ]
+  ],
+  ["path", { d: "M14.084 14.158a3 3 0 0 1-4.242-4.242", key: "151rxh" }],
+  [
+    "path",
+    {
+      d: "M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143",
+      key: "13bj9a"
+    }
+  ],
+  ["path", { d: "m2 2 20 20", key: "1ooewy" }]
 ];
-const Activity = createLucideIcon("activity", __iconNode$1);
+const EyeOff = createLucideIcon("eye-off", __iconNode$1);
 /**
  * @license lucide-react v0.511.0 - ISC
  *
@@ -134,6 +183,33 @@ function standardVariant(s) {
   if (s.__kind__ === "EXT") return "default";
   if (s.__kind__ === "DIP721") return "secondary";
   if (s.__kind__ === "ICRC7") return "secondary";
+  return "outline";
+}
+function collectionTrustLabel(status) {
+  switch (status) {
+    case "Verified":
+      return "Mintlab verified";
+    case "Hidden":
+      return "Hidden";
+    case "Blocked":
+      return "Blocked";
+    case "SyncDisabled":
+      return "Sync disabled";
+    case "NeedsBrowseInfo":
+      return "Needs range";
+    case "Reported":
+      return "Reported";
+    case "CommunityImported":
+      return "Community imported";
+    default:
+      return "Legacy external";
+  }
+}
+function collectionTrustVariant(status) {
+  if (status === "Verified") return "secondary";
+  if (status === "Hidden" || status === "Blocked" || status === "Reported") {
+    return "destructive";
+  }
   return "outline";
 }
 function collectionCreationStatusLabel(status) {
@@ -1023,6 +1099,7 @@ function MarketplaceEscrowRepairPanel() {
 }
 function CollectionRow({
   collection,
+  importMeta,
   index,
   onRemove
 }) {
@@ -1038,6 +1115,7 @@ function CollectionRow({
   );
   const pid = collection.canisterId.toString();
   const imageUrl = resolveImageUrl(collection.imageUrl);
+  const isExternalCollection = collection.kind === "External";
   const browseMutation = useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error("Backend not ready");
@@ -1057,6 +1135,39 @@ function CollectionRow({
     },
     onError: (err) => {
       ue.error(`Failed to update browse settings: ${extractError(err)}`);
+    }
+  });
+  const trustMutation = useMutation({
+    mutationFn: async (status) => {
+      if (!actor) throw new Error("Backend not ready");
+      const result = await (async () => {
+        switch (status) {
+          case "Verified":
+            return actor.adminVerifyCollection(collection.id);
+          case "Hidden":
+            return actor.adminHideCollection(collection.id);
+          case "Blocked":
+            return actor.adminBlockCollection(collection.id);
+          case "SyncDisabled":
+            return actor.adminDisableCollectionSync(collection.id);
+          case "NeedsBrowseInfo":
+            return actor.adminMarkCollectionNeedsBrowseInfo(collection.id);
+          default:
+            return actor.adminHideCollection(collection.id);
+        }
+      })();
+      if (result.__kind__ === "err") throw new Error(result.err);
+      return result.ok;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["collections"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["collectionImportMetas"]
+      });
+      ue.success("Collection trust status updated.");
+    },
+    onError: (err) => {
+      ue.error(`Failed to update trust status: ${extractError(err)}`);
     }
   });
   reactExports.useEffect(() => {
@@ -1099,6 +1210,14 @@ function CollectionRow({
                   variant: standardVariant(collection.standard),
                   className: "text-xs shrink-0",
                   children: standardLabel(collection.standard)
+                }
+              ),
+              isExternalCollection && /* @__PURE__ */ jsxRuntimeExports.jsx(
+                Badge,
+                {
+                  variant: collectionTrustVariant(importMeta == null ? void 0 : importMeta.trustStatus),
+                  className: "text-xs shrink-0",
+                  children: collectionTrustLabel(importMeta == null ? void 0 : importMeta.trustStatus)
                 }
               )
             ] }),
@@ -1178,6 +1297,83 @@ function CollectionRow({
               children: [
                 browseMutation.isPending ? /* @__PURE__ */ jsxRuntimeExports.jsx(LoaderCircle, { size: 14, className: "animate-spin" }) : /* @__PURE__ */ jsxRuntimeExports.jsx(RefreshCw, { size: 14 }),
                 "Save Range"
+              ]
+            }
+          )
+        ] }),
+        isExternalCollection && /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: "flex flex-wrap gap-2 border-t border-border pt-3", children: [
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            Button,
+            {
+              size: "sm",
+              variant: "secondary",
+              className: "gap-2",
+              onClick: () => trustMutation.mutate("Verified"),
+              disabled: trustMutation.isPending,
+              "data-ocid": `admin.collection.verify.${index}`,
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(ShieldCheck, { size: 14 }),
+                "Verify"
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            Button,
+            {
+              size: "sm",
+              variant: "outline",
+              className: "gap-2",
+              onClick: () => trustMutation.mutate("NeedsBrowseInfo"),
+              disabled: trustMutation.isPending,
+              "data-ocid": `admin.collection.needs_range.${index}`,
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(CircleAlert, { size: 14 }),
+                "Needs Range"
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            Button,
+            {
+              size: "sm",
+              variant: "outline",
+              className: "gap-2",
+              onClick: () => trustMutation.mutate("SyncDisabled"),
+              disabled: trustMutation.isPending,
+              "data-ocid": `admin.collection.sync_disabled.${index}`,
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(CirclePause, { size: 14 }),
+                "Disable Sync"
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            Button,
+            {
+              size: "sm",
+              variant: "outline",
+              className: "gap-2",
+              onClick: () => trustMutation.mutate("Hidden"),
+              disabled: trustMutation.isPending,
+              "data-ocid": `admin.collection.hide.${index}`,
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(EyeOff, { size: 14 }),
+                "Hide"
+              ]
+            }
+          ),
+          /* @__PURE__ */ jsxRuntimeExports.jsxs(
+            Button,
+            {
+              size: "sm",
+              variant: "destructive",
+              className: "gap-2",
+              onClick: () => trustMutation.mutate("Blocked"),
+              disabled: trustMutation.isPending,
+              "data-ocid": `admin.collection.block.${index}`,
+              children: [
+                /* @__PURE__ */ jsxRuntimeExports.jsx(Ban, { size: 14 }),
+                "Block"
               ]
             }
           )
@@ -2982,6 +3178,28 @@ function AdminPage() {
     },
     enabled: !!actor && !isFetching
   });
+  const { data: collectionImportMetas = [] } = useQuery({
+    queryKey: ["collectionImportMetas"],
+    queryFn: async () => {
+      if (!actor) return [];
+      const metas = [];
+      let cursor = null;
+      do {
+        const page = await actor.listCollectionImportMetasPage(cursor, 100n);
+        metas.push(...page.metas);
+        cursor = page.nextCursor;
+      } while (cursor !== null);
+      return metas;
+    },
+    enabled: !!actor && !isFetching && isAdmin
+  });
+  const collectionImportMetaById = reactExports.useMemo(() => {
+    const map = /* @__PURE__ */ new Map();
+    for (const meta of collectionImportMetas) {
+      map.set(meta.collectionId.toString(), meta);
+    }
+    return map;
+  }, [collectionImportMetas]);
   const removeMutation = useMutation({
     mutationFn: async (id) => {
       if (!actor) throw new Error("Backend not ready");
@@ -3053,6 +3271,7 @@ function AdminPage() {
             CollectionRow,
             {
               collection: col,
+              importMeta: collectionImportMetaById.get(col.id.toString()),
               index: i + 1,
               onRemove: (id) => removeMutation.mutate(id)
             },

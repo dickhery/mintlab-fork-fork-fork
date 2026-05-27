@@ -45,6 +45,8 @@ import type {
   CollectionBrowseInfo,
   CollectionCreationDiagnostics,
   CollectionCreationRequestView,
+  CollectionImportMeta,
+  CollectionTrustStatus,
   MintlabFeeRecoveryQuote,
   ModerationCategorySettings,
   NFTStandard,
@@ -57,19 +59,23 @@ import { useNavigate } from "@tanstack/react-router";
 import {
   Activity,
   AlertCircle,
+  Ban,
   Check,
   ChevronDown,
   Copy,
   ExternalLink,
+  EyeOff,
   Fuel,
   ImageOff,
   Info,
   Layers,
   LoaderCircle,
+  PauseCircle,
   Plus,
   RefreshCw,
   Server,
   Shield,
+  ShieldCheck,
   Trash2,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -139,6 +145,37 @@ function standardVariant(s: NFTStandard): "default" | "secondary" | "outline" {
   if (s.__kind__ === "EXT") return "default";
   if (s.__kind__ === "DIP721") return "secondary";
   if (s.__kind__ === "ICRC7") return "secondary";
+  return "outline";
+}
+
+function collectionTrustLabel(status?: CollectionTrustStatus): string {
+  switch (status) {
+    case "Verified":
+      return "Mintlab verified";
+    case "Hidden":
+      return "Hidden";
+    case "Blocked":
+      return "Blocked";
+    case "SyncDisabled":
+      return "Sync disabled";
+    case "NeedsBrowseInfo":
+      return "Needs range";
+    case "Reported":
+      return "Reported";
+    case "CommunityImported":
+      return "Community imported";
+    default:
+      return "Legacy external";
+  }
+}
+
+function collectionTrustVariant(
+  status?: CollectionTrustStatus,
+): "default" | "secondary" | "outline" | "destructive" {
+  if (status === "Verified") return "secondary";
+  if (status === "Hidden" || status === "Blocked" || status === "Reported") {
+    return "destructive";
+  }
   return "outline";
 }
 
@@ -1139,10 +1176,12 @@ function MarketplaceEscrowRepairPanel() {
 
 function CollectionRow({
   collection,
+  importMeta,
   index,
   onRemove,
 }: {
   collection: Collection;
+  importMeta?: CollectionImportMeta;
   index: number;
   onRemove: (id: bigint) => void;
 }) {
@@ -1157,6 +1196,7 @@ function CollectionRow({
   );
   const pid = collection.canisterId.toString();
   const imageUrl = resolveImageUrl(collection.imageUrl);
+  const isExternalCollection = collection.kind === "External";
 
   const browseMutation = useMutation({
     mutationFn: async () => {
@@ -1177,6 +1217,40 @@ function CollectionRow({
     },
     onError: (err: unknown) => {
       toast.error(`Failed to update browse settings: ${extractError(err)}`);
+    },
+  });
+
+  const trustMutation = useMutation({
+    mutationFn: async (status: CollectionTrustStatus) => {
+      if (!actor) throw new Error("Backend not ready");
+      const result = await (async () => {
+        switch (status) {
+          case "Verified":
+            return actor.adminVerifyCollection(collection.id);
+          case "Hidden":
+            return actor.adminHideCollection(collection.id);
+          case "Blocked":
+            return actor.adminBlockCollection(collection.id);
+          case "SyncDisabled":
+            return actor.adminDisableCollectionSync(collection.id);
+          case "NeedsBrowseInfo":
+            return actor.adminMarkCollectionNeedsBrowseInfo(collection.id);
+          default:
+            return actor.adminHideCollection(collection.id);
+        }
+      })();
+      if (result.__kind__ === "err") throw new Error(result.err);
+      return result.ok;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["collections"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["collectionImportMetas"],
+      });
+      toast.success("Collection trust status updated.");
+    },
+    onError: (err: unknown) => {
+      toast.error(`Failed to update trust status: ${extractError(err)}`);
     },
   });
 
@@ -1225,6 +1299,14 @@ function CollectionRow({
             >
               {standardLabel(collection.standard)}
             </Badge>
+            {isExternalCollection && (
+              <Badge
+                variant={collectionTrustVariant(importMeta?.trustStatus)}
+                className="text-xs shrink-0"
+              >
+                {collectionTrustLabel(importMeta?.trustStatus)}
+              </Badge>
+            )}
           </div>
           <p className="text-xs text-muted-foreground font-mono truncate flex items-center gap-1">
             {truncatePrincipal(pid)}
@@ -1313,6 +1395,66 @@ function CollectionRow({
           Save Range
         </Button>
       </div>
+
+      {isExternalCollection && (
+        <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+          <Button
+            size="sm"
+            variant="secondary"
+            className="gap-2"
+            onClick={() => trustMutation.mutate("Verified")}
+            disabled={trustMutation.isPending}
+            data-ocid={`admin.collection.verify.${index}`}
+          >
+            <ShieldCheck size={14} />
+            Verify
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2"
+            onClick={() => trustMutation.mutate("NeedsBrowseInfo")}
+            disabled={trustMutation.isPending}
+            data-ocid={`admin.collection.needs_range.${index}`}
+          >
+            <AlertCircle size={14} />
+            Needs Range
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2"
+            onClick={() => trustMutation.mutate("SyncDisabled")}
+            disabled={trustMutation.isPending}
+            data-ocid={`admin.collection.sync_disabled.${index}`}
+          >
+            <PauseCircle size={14} />
+            Disable Sync
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2"
+            onClick={() => trustMutation.mutate("Hidden")}
+            disabled={trustMutation.isPending}
+            data-ocid={`admin.collection.hide.${index}`}
+          >
+            <EyeOff size={14} />
+            Hide
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            className="gap-2"
+            onClick={() => trustMutation.mutate("Blocked")}
+            disabled={trustMutation.isPending}
+            data-ocid={`admin.collection.block.${index}`}
+          >
+            <Ban size={14} />
+            Block
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
@@ -3397,6 +3539,30 @@ export default function AdminPage() {
     enabled: !!actor && !isFetching,
   });
 
+  const { data: collectionImportMetas = [] } = useQuery({
+    queryKey: ["collectionImportMetas"],
+    queryFn: async () => {
+      if (!actor) return [];
+      const metas: CollectionImportMeta[] = [];
+      let cursor: bigint | null = null;
+      do {
+        const page = await actor.listCollectionImportMetasPage(cursor, 100n);
+        metas.push(...page.metas);
+        cursor = page.nextCursor;
+      } while (cursor !== null);
+      return metas;
+    },
+    enabled: !!actor && !isFetching && isAdmin,
+  });
+
+  const collectionImportMetaById = useMemo(() => {
+    const map = new Map<string, CollectionImportMeta>();
+    for (const meta of collectionImportMetas) {
+      map.set(meta.collectionId.toString(), meta);
+    }
+    return map;
+  }, [collectionImportMetas]);
+
   const removeMutation = useMutation({
     mutationFn: async (id: bigint) => {
       if (!actor) throw new Error("Backend not ready");
@@ -3504,6 +3670,7 @@ export default function AdminPage() {
               <CollectionRow
                 key={col.id.toString()}
                 collection={col}
+                importMeta={collectionImportMetaById.get(col.id.toString())}
                 index={i + 1}
                 onRemove={(id) => removeMutation.mutate(id)}
               />

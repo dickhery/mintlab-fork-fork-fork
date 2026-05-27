@@ -1,10 +1,16 @@
-import { j as jsxRuntimeExports, a as cn, A as Actor } from "./index-fB4eEJtO.js";
-import { r as resolveImageUrl } from "./media-Dh83-DF1.js";
+import { j as jsxRuntimeExports, a as cn, A as Actor } from "./index-Dq_se1c6.js";
+import { r as resolveImageUrl } from "./media-CvoQXHxw.js";
 function getStandardLabel(standard) {
   if (standard.__kind__ === "EXT") return "EXT";
   if (standard.__kind__ === "DIP721") return "DIP-721";
   if (standard.__kind__ === "ICRC7") return "ICRC-7";
   return standard.Other ?? "Unknown";
+}
+function getTrustLabel(collection) {
+  var _a;
+  if (collection.kind === "Minted") return "Mintlab verified";
+  const needsRange = (collection.standard.__kind__ === "EXT" || collection.standard.__kind__ === "DIP721") && ((_a = collection.browseInfo) == null ? void 0 : _a.totalSupply) == null;
+  return needsRange ? "Needs token range" : "Community imported";
 }
 function CollectionBadge({
   collection,
@@ -12,6 +18,7 @@ function CollectionBadge({
   className
 }) {
   const standardLabel = getStandardLabel(collection.standard);
+  const trustLabel = getTrustLabel(collection);
   const imageUrl = resolveImageUrl(collection.imageUrl);
   return /* @__PURE__ */ jsxRuntimeExports.jsxs("div", { className: cn("flex items-center gap-1.5 min-w-0", className), children: [
     imageUrl && /* @__PURE__ */ jsxRuntimeExports.jsx(
@@ -43,6 +50,17 @@ function CollectionBadge({
           size === "sm" ? "text-[10px]" : "text-xs"
         ),
         children: standardLabel
+      }
+    ),
+    /* @__PURE__ */ jsxRuntimeExports.jsx(
+      "span",
+      {
+        className: cn(
+          "shrink-0 px-1.5 py-0.5 rounded border",
+          collection.kind === "Minted" ? "bg-accent/10 text-accent border-accent/20" : "bg-muted/40 text-muted-foreground border-border/40",
+          size === "sm" ? "text-[10px]" : "text-xs"
+        ),
+        children: trustLabel
       }
     )
   ] });

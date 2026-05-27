@@ -170,7 +170,6 @@ mixin (
         case (#External) #Registered;
       },
     );
-    ignore MarketplaceLib.clearListingsForToken(marketplaceState, collectionId, canonicalTokenId);
     #ok(nft);
   };
 
@@ -243,7 +242,6 @@ mixin (
           #Vaulted,
         );
         WalletLib.clearPreparedDeposit(walletState, collectionId, canonicalTokenId);
-        ignore MarketplaceLib.clearListingsForToken(marketplaceState, collectionId, canonicalTokenId);
         #ok(nft);
       };
     };
@@ -287,9 +285,7 @@ mixin (
           collection,
         );
         switch (result) {
-          case (#ok(_)) {
-            ignore MarketplaceLib.clearListingsForToken(marketplaceState, nft.collectionId, nft.tokenId);
-          };
+          case (#ok(_)) {};
           case (#err(_)) {};
         };
         result;
@@ -305,10 +301,7 @@ mixin (
             case (#ok(_)) {
               switch (WalletLib.transferManagedNFT(walletState, nftId, caller, recipient, #Minted)) {
                 case (#err(message)) #err(message);
-                case (#ok(_)) {
-                  ignore MarketplaceLib.clearListingsForToken(marketplaceState, nft.collectionId, nft.tokenId);
-                  #ok("Minted NFT transferred successfully");
-                };
+                case (#ok(_)) #ok("Minted NFT transferred successfully");
               };
             };
           };
@@ -324,10 +317,7 @@ mixin (
             case (#ok(_)) {
               switch (WalletLib.transferManagedNFT(walletState, nftId, caller, recipient, #Minted)) {
                 case (#err(message)) #err(message);
-                case (#ok(_)) {
-                  ignore MarketplaceLib.clearListingsForToken(marketplaceState, nft.collectionId, nft.tokenId);
-                  #ok("Minted NFT transferred successfully");
-                };
+                case (#ok(_)) #ok("Minted NFT transferred successfully");
               };
             };
           };
@@ -410,7 +400,6 @@ mixin (
             onChainMetadata,
             #Registered,
           );
-          ignore MarketplaceLib.clearListingsForToken(marketplaceState, collectionId, canonicalTokenId);
           #ok(nft);
         };
       };
@@ -735,6 +724,36 @@ mixin (
     var errors : [Text] = [];
     var skipped : [WalletTypes.WalletSyncSkip] = [];
 
+    if (not CollectionLib.isPubliclyVisible(collectionsState, collection)) {
+      return {
+        newCount;
+        errors;
+        skipped = [
+          {
+            collectionId = collection.id;
+            collectionName = collection.name;
+            reason = "COLLECTION_HIDDEN";
+            message = "This community import is hidden or blocked while it is reviewed.";
+          }
+        ];
+      };
+    };
+
+    if (not CollectionLib.collectionAllowsSync(collectionsState, collection)) {
+      return {
+        newCount;
+        errors;
+        skipped = [
+          {
+            collectionId = collection.id;
+            collectionName = collection.name;
+            reason = "SYNC_DISABLED";
+            message = "Automatic wallet sync is disabled for this collection. Import a known token ID directly or wait for admin review.";
+          }
+        ];
+      };
+    };
+
     switch (collection.kind) {
       case (#Minted) {
         let synced = await* syncMintedCollection(caller, collection, userAccountId);
@@ -995,7 +1014,6 @@ mixin (
         MintLib.publicMetadata(token.metadata),
         #Minted,
       );
-      ignore MarketplaceLib.clearListingsForToken(marketplaceState, collection.id, tokenId);
     };
 
     for (existing in WalletLib.getUserNFTs(walletState, caller).values()) {
@@ -1054,7 +1072,6 @@ mixin (
           item.metadata,
           #Minted,
         );
-        ignore MarketplaceLib.clearListingsForToken(marketplaceState, collection.id, tokenId);
       };
 
       if (page.size() < pageSize) {
@@ -1141,7 +1158,6 @@ mixin (
                   metadata,
                   #Minted,
                 );
-                ignore MarketplaceLib.clearListingsForToken(marketplaceState, collection.id, tokenIdText);
               };
             };
             case null {};
@@ -1264,7 +1280,6 @@ mixin (
         previewNFT.metadata,
         location,
       );
-      ignore MarketplaceLib.clearListingsForToken(marketplaceState, collection.id, previewNFT.tokenId);
     };
     { newCount; tokenIds };
   };
@@ -1323,21 +1338,14 @@ mixin (
       };
     };
 
-    let resolvedCollectionId = switch (collectionId) {
+    switch (collectionId) {
       case null return #err("Minted NFT collection not found");
-      case (?value) value;
+      case (?_) {};
     };
 
     switch (MintLib.transferToken(mintState, tokenId, caller, recipient)) {
       case (#err(message)) #err(message);
-      case (#ok(_)) {
-        ignore MarketplaceLib.clearListingsForToken(
-          marketplaceState,
-          resolvedCollectionId,
-          Nat.toText(tokenId),
-        );
-        #ok("Minted NFT transferred successfully");
-      };
+      case (#ok(_)) #ok("Minted NFT transferred successfully");
     };
   };
 

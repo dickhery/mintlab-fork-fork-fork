@@ -47,6 +47,22 @@ module {
     myHighestBid : ?Nat64;
   };
 
+  public type BidderAuctionStatus = {
+    listingId : ListingId;
+    bidder : UserId;
+    hasBid : Bool;
+    myHighestBid : Nat64;
+    updatedAt : Timestamp;
+  };
+
+  public type AuctionBidSummary = {
+    listingId : ListingId;
+    bidCount : Nat;
+    highestBid : Nat64;
+    highestBidder : ?UserId;
+    lastBidAt : Timestamp;
+  };
+
   public type AuctionEscrow = {
     escrowId : Nat;
     listingId : ListingId;
@@ -280,5 +296,11 @@ module {
     stage : Text;
     message : Text;
     updatedAt : Timestamp;
+  };
+
+  public type SettlementStatusPage = {
+    statuses : [SettlementStatus];
+    nextCursor : ?Nat;
+    totalCount : Nat;
   };
 };

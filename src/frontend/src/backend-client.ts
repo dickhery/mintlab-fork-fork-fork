@@ -104,6 +104,32 @@ export interface CollectionPage {
   totalCount: bigint;
 }
 
+export type CollectionTrustStatus =
+  | "CommunityImported"
+  | "Verified"
+  | "Hidden"
+  | "Blocked"
+  | "SyncDisabled"
+  | "NeedsBrowseInfo"
+  | "Reported";
+
+export interface CollectionImportMeta {
+  collectionId: CollectionId;
+  importedBy: Principal;
+  trustStatus: CollectionTrustStatus;
+  reportCount: bigint;
+  createdAt: Timestamp;
+  reviewedAt: Timestamp | null;
+  lastReportedAt: Timestamp | null;
+  lastReportReason: string | null;
+}
+
+export interface CollectionImportMetaPage {
+  metas: Array<CollectionImportMeta>;
+  nextCursor: bigint | null;
+  totalCount: bigint;
+}
+
 export interface WalletSyncSkip {
   collectionId: CollectionId;
   collectionName: string;
@@ -214,6 +240,12 @@ export interface SettlementStatus {
   stage: string;
   message: string;
   updatedAt: Timestamp;
+}
+
+export interface SettlementStatusPage {
+  statuses: Array<SettlementStatus>;
+  nextCursor: bigint | null;
+  totalCount: bigint;
 }
 
 export interface AuctionEscrow {
@@ -703,14 +735,38 @@ export interface backendInterface {
     | { __kind__: "ok"; ok: CollectionCreationReceipt }
     | { __kind__: "err"; err: string }
   >;
+  adminBlockCollection(
+    collectionId: CollectionId,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionImportMeta }
+    | { __kind__: "err"; err: string }
+  >;
   adminDeleteCollectionCreationRequest(
     requestId: bigint,
   ): Promise<
     { __kind__: "ok"; ok: boolean } | { __kind__: "err"; err: string }
   >;
+  adminDisableCollectionSync(
+    collectionId: CollectionId,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionImportMeta }
+    | { __kind__: "err"; err: string }
+  >;
   adminGetSettlementEscrowRepairQuote(
     listingId: ListingId,
   ): Promise<SettlementEscrowRepairQuote>;
+  adminHideCollection(
+    collectionId: CollectionId,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionImportMeta }
+    | { __kind__: "err"; err: string }
+  >;
+  adminMarkCollectionNeedsBrowseInfo(
+    collectionId: CollectionId,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionImportMeta }
+    | { __kind__: "err"; err: string }
+  >;
   adminGetMintlabFeeRecoveryQuote(
     listingId: ListingId,
   ): Promise<MintlabFeeRecoveryQuote>;
@@ -728,6 +784,12 @@ export interface backendInterface {
     listingId: ListingId,
     amount: bigint,
   ): Promise<SettlementEscrowTopUpReceipt>;
+  adminVerifyCollection(
+    collectionId: CollectionId,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionImportMeta }
+    | { __kind__: "err"; err: string }
+  >;
   createAuctionListing(
     nftId: NFTId,
     startingBid: bigint,
@@ -803,6 +865,10 @@ export interface backendInterface {
     limit: bigint | null,
   ): Promise<ActiveListingPage>;
   getMyMarketplaceSettlementStatuses(): Promise<Array<SettlementStatus>>;
+  getMyMarketplaceSettlementStatusesPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<SettlementStatusPage>;
   getMyAuctionBidStatuses(
     listingIds: Array<ListingId>,
   ): Promise<Array<AuctionBidStatus>>;
@@ -823,6 +889,9 @@ export interface backendInterface {
     cursor: bigint | null,
     limit: bigint | null,
   ): Promise<DividendBalancePage>;
+  getCollectionImportMeta(
+    collectionId: CollectionId,
+  ): Promise<CollectionImportMeta | null>;
   refreshCollectionDividendBalances(
     collectionId: CollectionId,
   ): Promise<Array<[string, bigint]>>;
@@ -920,6 +989,10 @@ export interface backendInterface {
     tokenId: string,
     user: UserId,
   ): Promise<boolean>;
+  listCollectionImportMetasPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<CollectionImportMetaPage>;
   listCollections(): Promise<Array<Collection>>;
   listCollectionsPage(
     cursor: bigint | null,
@@ -1025,6 +1098,13 @@ export interface backendInterface {
     nftId: NFTId,
     recipient: Principal,
   ): Promise<{ __kind__: "ok"; ok: string } | { __kind__: "err"; err: string }>;
+  reportCollection(
+    collectionId: CollectionId,
+    reason: string,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionImportMeta }
+    | { __kind__: "err"; err: string }
+  >;
   syncExternalNFTOwner(
     collectionId: CollectionId,
     tokenId: string,
@@ -1073,6 +1153,14 @@ type RawNFTStandard =
   | { Other: string };
 type RawCollectionKind = { External: null } | { Minted: null };
 type RawCollectionBrowseCoverage = { Full: null } | { Partial: null };
+type RawCollectionTrustStatus =
+  | { CommunityImported: null }
+  | { Verified: null }
+  | { Hidden: null }
+  | { Blocked: null }
+  | { SyncDisabled: null }
+  | { NeedsBrowseInfo: null }
+  | { Reported: null };
 type RawWalletLocation =
   | { Minted: null }
   | { Registered: null }
@@ -1115,6 +1203,11 @@ type RawSettlementStatus = {
   message: string;
   updatedAt: Timestamp;
 };
+type RawSettlementStatusPage = {
+  statuses: Array<RawSettlementStatus>;
+  nextCursor: [] | [bigint];
+  totalCount: bigint;
+};
 type RawTransferError =
   | { TxTooOld: { allowed_window_nanos: bigint } }
   | { BadFee: { expected_fee: Tokens } }
@@ -1150,6 +1243,21 @@ type RawWalletNFTPage = {
 };
 type RawCollectionPage = {
   collections: Array<RawCollection>;
+  nextCursor: [] | [bigint];
+  totalCount: bigint;
+};
+type RawCollectionImportMeta = {
+  collectionId: CollectionId;
+  importedBy: Principal;
+  trustStatus: RawCollectionTrustStatus;
+  reportCount: bigint;
+  createdAt: Timestamp;
+  reviewedAt: [] | [Timestamp];
+  lastReportedAt: [] | [Timestamp];
+  lastReportReason: [] | [string];
+};
+type RawCollectionImportMetaPage = {
+  metas: Array<RawCollectionImportMeta>;
   nextCursor: [] | [bigint];
   totalCount: bigint;
 };
@@ -1572,6 +1680,18 @@ function fromRawCollectionKind(value: RawCollectionKind): CollectionKind {
   return "Minted";
 }
 
+function fromRawCollectionTrustStatus(
+  value: RawCollectionTrustStatus,
+): CollectionTrustStatus {
+  if ("Verified" in value) return "Verified";
+  if ("Hidden" in value) return "Hidden";
+  if ("Blocked" in value) return "Blocked";
+  if ("SyncDisabled" in value) return "SyncDisabled";
+  if ("NeedsBrowseInfo" in value) return "NeedsBrowseInfo";
+  if ("Reported" in value) return "Reported";
+  return "CommunityImported";
+}
+
 function fromRawCollectionBrowseCoverage(
   value: RawCollectionBrowseCoverage,
 ): CollectionBrowseCoverage {
@@ -1704,6 +1824,31 @@ function fromRawWalletNFTPage(value: RawWalletNFTPage): WalletNFTPage {
 function fromRawCollectionPage(value: RawCollectionPage): CollectionPage {
   return {
     collections: value.collections.map(fromRawCollection),
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount,
+  };
+}
+
+function fromRawCollectionImportMeta(
+  value: RawCollectionImportMeta,
+): CollectionImportMeta {
+  return {
+    collectionId: value.collectionId,
+    importedBy: value.importedBy,
+    trustStatus: fromRawCollectionTrustStatus(value.trustStatus),
+    reportCount: value.reportCount,
+    createdAt: value.createdAt,
+    reviewedAt: fromRawOption(value.reviewedAt),
+    lastReportedAt: fromRawOption(value.lastReportedAt),
+    lastReportReason: fromRawOption(value.lastReportReason),
+  };
+}
+
+function fromRawCollectionImportMetaPage(
+  value: RawCollectionImportMetaPage,
+): CollectionImportMetaPage {
+  return {
+    metas: value.metas.map(fromRawCollectionImportMeta),
     nextCursor: fromRawOption(value.nextCursor),
     totalCount: value.totalCount,
   };
@@ -1958,6 +2103,16 @@ function fromRawSettlementStatus(value: RawSettlementStatus): SettlementStatus {
     stage: value.stage,
     message: value.message,
     updatedAt: value.updatedAt,
+  };
+}
+
+function fromRawSettlementStatusPage(
+  value: RawSettlementStatusPage,
+): SettlementStatusPage {
+  return {
+    statuses: value.statuses.map(fromRawSettlementStatus),
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount,
   };
 }
 
@@ -2501,6 +2656,17 @@ function fromCollectionResult(
   return { __kind__: "err", err: value.err };
 }
 
+function fromCollectionImportMetaResult(
+  value: { ok: RawCollectionImportMeta } | { err: string },
+):
+  | { __kind__: "ok"; ok: CollectionImportMeta }
+  | { __kind__: "err"; err: string } {
+  if ("ok" in value) {
+    return { __kind__: "ok", ok: fromRawCollectionImportMeta(value.ok) };
+  }
+  return { __kind__: "err", err: value.err };
+}
+
 function fromCollectionCanisterControllersResult(
   value: { ok: RawCollectionCanisterControllers } | { err: string },
 ):
@@ -2811,6 +2977,17 @@ export class Backend implements backendInterface {
     );
   }
 
+  async adminBlockCollection(
+    collectionId: CollectionId,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionImportMeta }
+    | { __kind__: "err"; err: string }
+  > {
+    return fromCollectionImportMetaResult(
+      await this.run(() => this.actor.adminBlockCollection(collectionId)),
+    );
+  }
+
   async adminDeleteCollectionCreationRequest(
     requestId: bigint,
   ): Promise<
@@ -2823,12 +3000,47 @@ export class Backend implements backendInterface {
     );
   }
 
+  async adminDisableCollectionSync(
+    collectionId: CollectionId,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionImportMeta }
+    | { __kind__: "err"; err: string }
+  > {
+    return fromCollectionImportMetaResult(
+      await this.run(() => this.actor.adminDisableCollectionSync(collectionId)),
+    );
+  }
+
   async adminGetSettlementEscrowRepairQuote(
     listingId: ListingId,
   ): Promise<SettlementEscrowRepairQuote> {
     return fromRawSettlementEscrowRepairQuote(
       await this.run(() =>
         this.actor.adminGetSettlementEscrowRepairQuote(listingId),
+      ),
+    );
+  }
+
+  async adminHideCollection(
+    collectionId: CollectionId,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionImportMeta }
+    | { __kind__: "err"; err: string }
+  > {
+    return fromCollectionImportMetaResult(
+      await this.run(() => this.actor.adminHideCollection(collectionId)),
+    );
+  }
+
+  async adminMarkCollectionNeedsBrowseInfo(
+    collectionId: CollectionId,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionImportMeta }
+    | { __kind__: "err"; err: string }
+  > {
+    return fromCollectionImportMetaResult(
+      await this.run(() =>
+        this.actor.adminMarkCollectionNeedsBrowseInfo(collectionId),
       ),
     );
   }
@@ -2889,6 +3101,17 @@ export class Backend implements backendInterface {
       await this.run(() =>
         this.actor.adminTopUpSettlementEscrow(listingId, amount),
       ),
+    );
+  }
+
+  async adminVerifyCollection(
+    collectionId: CollectionId,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionImportMeta }
+    | { __kind__: "err"; err: string }
+  > {
+    return fromCollectionImportMetaResult(
+      await this.run(() => this.actor.adminVerifyCollection(collectionId)),
     );
   }
 
@@ -3121,6 +3344,20 @@ export class Backend implements backendInterface {
     return result.map(fromRawSettlementStatus);
   }
 
+  async getMyMarketplaceSettlementStatusesPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<SettlementStatusPage> {
+    return fromRawSettlementStatusPage(
+      (await this.run(() =>
+        this.actor.getMyMarketplaceSettlementStatusesPage(
+          toRawOption(cursor),
+          toRawOption(limit),
+        ),
+      )) as RawSettlementStatusPage,
+    );
+  }
+
   async getMyAuctionBidStatuses(
     listingIds: Array<ListingId>,
   ): Promise<Array<AuctionBidStatus>> {
@@ -3140,6 +3377,17 @@ export class Backend implements backendInterface {
       | [RawCollection];
     const value = fromRawOption(result);
     return value == null ? null : fromRawCollection(value);
+  }
+
+  async getCollectionImportMeta(
+    collectionId: CollectionId,
+  ): Promise<CollectionImportMeta | null> {
+    const value = fromRawOption(
+      (await this.run(() =>
+        this.actor.getCollectionImportMeta(collectionId),
+      )) as [] | [RawCollectionImportMeta],
+    );
+    return value == null ? null : fromRawCollectionImportMeta(value);
   }
 
   async getCollectionBrowseStats(
@@ -3556,6 +3804,20 @@ export class Backend implements backendInterface {
     );
   }
 
+  async listCollectionImportMetasPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<CollectionImportMetaPage> {
+    return fromRawCollectionImportMetaPage(
+      await this.run(() =>
+        this.actor.listCollectionImportMetasPage(
+          toRawOption(cursor),
+          toRawOption(limit),
+        ),
+      ),
+    );
+  }
+
   async listCollections(): Promise<Array<Collection>> {
     const collections: Array<Collection> = [];
     let cursor: bigint | null = null;
@@ -3817,6 +4079,18 @@ export class Backend implements backendInterface {
   > {
     return fromTextResult(
       await this.run(() => this.actor.sendNFT(nftId, recipient)),
+    );
+  }
+
+  async reportCollection(
+    collectionId: CollectionId,
+    reason: string,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionImportMeta }
+    | { __kind__: "err"; err: string }
+  > {
+    return fromCollectionImportMetaResult(
+      await this.run(() => this.actor.reportCollection(collectionId, reason)),
     );
   }
 

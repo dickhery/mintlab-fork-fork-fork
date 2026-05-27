@@ -49,7 +49,12 @@ import type {
   WalletSyncV2Result,
 } from "@/types";
 import { Principal } from "@icp-sdk/core/principal";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   ArrowUpRight,
   Check,
@@ -121,9 +126,13 @@ const SYNC_STILL_RUNNING_MESSAGE =
 const SYNC_PAGE_TIMEOUT_MESSAGE =
   "This sync page is taking longer than expected. Mintlab saved progress and will continue on the next Sync.";
 const SYNC_PAGE_COLLECTION_LIMIT = 2n;
-const MAX_SYNC_PAGES_PER_CLICK = 20;
+const MAX_SYNC_PAGES_PER_CLICK = 5;
 const SYNC_SLOW_NOTICE_MS = 15_000;
 const SYNC_REFRESH_INTERVAL_MS = 6_000;
+const WALLET_NFT_PAGE_SIZE = 50n;
+const WALLET_COLLECTION_PAGE_SIZE = 50n;
+const WALLET_LISTING_PAGE_SIZE = 25n;
+const WALLET_DIVIDEND_PAGE_SIZE = 25n;
 
 function formatICP(e8s: bigint): string {
   const whole = e8s / E8S;
@@ -136,6 +145,17 @@ function pendingMintStatusLabel(status: PendingMintPaymentView["status"]) {
   if (status === "PaymentSent") return "Mint retry ready";
   if (status === "Minted") return "Minted";
   return "Needs review";
+}
+
+function buildLoadedNFTStats(nfts: WalletNFT[], totalCount: bigint): NFTStats {
+  const counts = new Map<bigint, bigint>();
+  for (const nft of nfts) {
+    counts.set(nft.collectionId, (counts.get(nft.collectionId) ?? 0n) + 1n);
+  }
+  return {
+    totalCount,
+    perCollection: Array.from(counts.entries()),
+  };
 }
 
 function parseAttributeLines(value: string): Array<[string, string]> {
@@ -1201,6 +1221,7 @@ function MintComposer({
   creatorCollections: Collection[];
 }) {
   const { actor } = useBackend();
+  const { principalText, isAuthenticated } = useAuth();
   const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -1218,13 +1239,12 @@ function MintComposer({
 
   const { data: pendingMintPayments = [] } = useQuery<PendingMintPaymentView[]>(
     {
-      queryKey: ["pendingMintPayments"],
+      queryKey: ["pendingMintPayments", principalText],
       queryFn: async () => {
         if (!actor) return [];
         return actor.getMyPendingMintPayments();
       },
-      enabled: !!actor,
-      refetchInterval: 30_000,
+      enabled: !!actor && isAuthenticated,
     },
   );
 
@@ -2287,35 +2307,45 @@ export default function WalletPage() {
   // ── queries ──────────────────────────────────────────────────────────────
 
   const {
-    data: userNFTs,
+    data: userNFTPages,
     isLoading: nftsLoading,
     refetch: refetchNFTs,
-  } = useQuery<WalletNFT[]>({
+    fetchNextPage: fetchNextNFTPage,
+    hasNextPage: hasMoreNFTs,
+    isFetchingNextPage: isFetchingMoreNFTs,
+  } = useInfiniteQuery({
     queryKey: ["userNFTs", principalText],
-    queryFn: async () => {
-      if (!actor || !principal) return [];
-      return actor.getUserNFTs(principal);
+    initialPageParam: null as bigint | null,
+    queryFn: async ({ pageParam }) => {
+      if (!actor || !principal) {
+        return { nfts: [], nextCursor: null, totalCount: 0n };
+      }
+      return actor.getUserNFTsPage(principal, pageParam, WALLET_NFT_PAGE_SIZE);
     },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: !!actor && !isFetching && isAuthenticated && !!principal,
   });
 
-  const { data: userStats, isLoading: statsLoading } = useQuery<NFTStats>({
-    queryKey: ["userStats", principalText],
-    queryFn: async () => {
-      if (!actor || !principal) throw new Error("No actor");
-      return actor.getNFTStats(principal);
-    },
-    enabled: !!actor && !isFetching && isAuthenticated && !!principal,
-  });
+  const userNFTs = userNFTPages?.pages.flatMap((page) => page.nfts) ?? [];
+  const userNFTTotalCount =
+    userNFTPages?.pages[0]?.totalCount ?? BigInt(userNFTs.length);
+  const userStats = buildLoadedNFTStats(userNFTs, userNFTTotalCount);
+  const statsLoading = nftsLoading;
 
-  const { data: collections } = useQuery<Collection[]>({
+  const { data: collectionPages } = useInfiniteQuery({
     queryKey: ["collections"],
-    queryFn: async () => {
-      if (!actor) return [];
-      return actor.listCollections();
+    initialPageParam: null as bigint | null,
+    queryFn: async ({ pageParam }) => {
+      if (!actor) {
+        return { collections: [], nextCursor: null, totalCount: 0n };
+      }
+      return actor.listCollectionsPage(pageParam, WALLET_COLLECTION_PAGE_SIZE);
     },
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: !!actor && !isFetching && isAuthenticated,
   });
+  const collections =
+    collectionPages?.pages.flatMap((page) => page.collections) ?? [];
 
   const { data: accountIdBytes } = useQuery<Uint8Array>({
     queryKey: ["userAccountId", principalText],
@@ -2357,7 +2387,11 @@ export default function WalletPage() {
     queryKey: ["activeListingDetails"],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getActiveListingDetails();
+      const page = await actor.getActiveListingDetailsPage(
+        null,
+        WALLET_LISTING_PAGE_SIZE,
+      );
+      return page.details;
     },
     enabled: !!actor && !isFetching && isAuthenticated,
   });
@@ -2366,12 +2400,15 @@ export default function WalletPage() {
     queryKey: ["myDividendNFTs", principalText],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.refreshMyDividendNFTs();
+      const page = await actor.getMyDividendNFTsPage(
+        null,
+        WALLET_DIVIDEND_PAGE_SIZE,
+      );
+      return page.dividends;
     },
     enabled: !!actor && !isFetching && isAuthenticated,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    refetchInterval: 30_000,
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
   });
 
   // ── derived data ─────────────────────────────────────────────────────────
@@ -2821,7 +2858,7 @@ export default function WalletPage() {
 
   // ── render: loading ───────────────────────────────────────────────────────
 
-  if (authLoading || (isAuthenticated && dataLoading && !userNFTs)) {
+  if (authLoading || (isAuthenticated && dataLoading && !userNFTPages)) {
     return (
       <div
         className="px-4 md:px-8 py-8 space-y-8 max-w-7xl mx-auto"
@@ -2964,6 +3001,17 @@ export default function WalletPage() {
               dividendBalances={dividendBalances}
             />
           ))}
+          {hasMoreNFTs && (
+            <div className="flex justify-center pt-2">
+              <Button
+                variant="outline"
+                onClick={() => void fetchNextNFTPage()}
+                disabled={isFetchingMoreNFTs}
+              >
+                {isFetchingMoreNFTs ? "Loading..." : "Load more NFTs"}
+              </Button>
+            </div>
+          )}
         </div>
       )}
     </div>
