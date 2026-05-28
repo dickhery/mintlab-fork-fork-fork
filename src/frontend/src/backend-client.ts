@@ -787,6 +787,7 @@ export interface backendInterface {
   adminMarkMintlabFeeBalanceVerified(
     listingId: ListingId,
   ): Promise<MintlabFeeRecoveryQuote>;
+  adminResolvePendingBid(listingId: ListingId): Promise<void>;
   adminRetryListingReturn(listingId: ListingId): Promise<void>;
   adminRetryNoBidAuctionReturn(listingId: ListingId): Promise<void>;
   adminRetryAuctionSettlement(listingId: ListingId): Promise<void>;
@@ -1021,6 +1022,7 @@ export interface backendInterface {
     { __kind__: "ok"; ok: MintReceipt } | { __kind__: "err"; err: string }
   >;
   placeBid(listingId: ListingId, amount: bigint): Promise<AuctionListing>;
+  cancelStalePendingBid(listingId: ListingId): Promise<void>;
   retryPendingBid(listingId: ListingId): Promise<AuctionListing>;
   retryPendingMintPayment(
     paymentId: bigint,
@@ -3132,6 +3134,12 @@ export class Backend implements backendInterface {
     );
   }
 
+  async adminResolvePendingBid(listingId: ListingId): Promise<void> {
+    unwrapMarketplaceAction(
+      await this.run(() => this.actor.adminResolvePendingBid(listingId)),
+    );
+  }
+
   async adminRetryListingReturn(listingId: ListingId): Promise<void> {
     unwrapMarketplaceAction(
       await this.run(() => this.actor.adminRetryListingReturn(listingId)),
@@ -3937,6 +3945,12 @@ export class Backend implements backendInterface {
   ): Promise<AuctionListing> {
     return fromMarketplaceBidResult(
       await this.run(() => this.actor.placeBid(listingId, amount)),
+    );
+  }
+
+  async cancelStalePendingBid(listingId: ListingId): Promise<void> {
+    unwrapMarketplaceAction(
+      await this.run(() => this.actor.cancelStalePendingBid(listingId)),
     );
   }
 

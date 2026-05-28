@@ -50,6 +50,7 @@ import {
   Gavel,
   ImageOff,
   Lock,
+  RefreshCw,
   ShoppingBag,
   Tag,
   X,
@@ -1613,6 +1614,34 @@ export default function MarketplacePage() {
     },
   });
 
+  const { mutate: retryPendingBid, isPending: isRetryingPendingBid } =
+    useMutation({
+      mutationFn: async (id: ListingId) => {
+        if (!actor) throw new Error("Not connected");
+        return actor.retryPendingBid(id);
+      },
+      onSuccess: () => {
+        toast.success("Pending bid recovered.");
+        refreshMarketplace();
+      },
+      onError: (e: Error) => toast.error(`Retry failed: ${e.message}`),
+    });
+
+  const {
+    mutate: cancelStalePendingBid,
+    isPending: isCancellingStalePendingBid,
+  } = useMutation({
+    mutationFn: async (id: ListingId) => {
+      if (!actor) throw new Error("Not connected");
+      return actor.cancelStalePendingBid(id);
+    },
+    onSuccess: () => {
+      toast.success("Pending bid recovery resolved.");
+      refreshMarketplace();
+    },
+    onError: (e: Error) => toast.error(`Recovery failed: ${e.message}`),
+  });
+
   const { mutate: settleAuction, isPending: isSettling } = useMutation({
     mutationFn: async (id: ListingId) => {
       if (!actor) throw new Error("Not connected");
@@ -1762,6 +1791,42 @@ export default function MarketplacePage() {
                   <p className="mt-1 text-xs text-muted-foreground">
                     {status.message}
                   </p>
+                  {status.kind === "PendingBidDeposit" && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="h-7 text-xs"
+                        disabled={isRetryingPendingBid}
+                        onClick={() => retryPendingBid(status.listingId)}
+                        data-ocid={`marketplace.pending_bid.retry.${status.listingId.toString()}`}
+                      >
+                        {isRetryingPendingBid ? (
+                          <LoadingSpinner size="sm" />
+                        ) : (
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        )}
+                        Retry bid
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs"
+                        disabled={isCancellingStalePendingBid}
+                        onClick={() => cancelStalePendingBid(status.listingId)}
+                        data-ocid={`marketplace.pending_bid.cancel_stale.${status.listingId.toString()}`}
+                      >
+                        {isCancellingStalePendingBid ? (
+                          <LoadingSpinner size="sm" />
+                        ) : (
+                          <X className="h-3.5 w-3.5" />
+                        )}
+                        Cancel stale bid
+                      </Button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

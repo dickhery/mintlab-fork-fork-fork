@@ -849,6 +849,21 @@ function MarketplaceEscrowRepairPanel() {
     },
   });
 
+  const resolvePendingBidMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      const listingId = parseWholeBigInt(listingIdInput);
+      if (listingId === null) throw new Error("Enter a valid listing ID");
+      await actor.adminResolvePendingBid(listingId);
+    },
+    onSuccess: () => {
+      toast.success("Pending bid resolution started.");
+    },
+    onError: (err: unknown) => {
+      toast.error(extractError(err));
+    },
+  });
+
   const shortfallText = quote
     ? `${formatICP(quote.shortfall)} ICP`
     : "No quote";
@@ -1136,6 +1151,21 @@ function MarketplaceEscrowRepairPanel() {
         )}
 
         <div className="flex flex-wrap justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-2"
+            disabled={resolvePendingBidMutation.isPending}
+            onClick={() => resolvePendingBidMutation.mutate()}
+            data-ocid="admin.marketplace_repair.resolve_pending_bid_button"
+          >
+            {resolvePendingBidMutation.isPending ? (
+              <LoaderCircle size={15} className="animate-spin" />
+            ) : (
+              <RefreshCw size={15} />
+            )}
+            Resolve Pending Bid
+          </Button>
           <Button
             type="button"
             variant="outline"

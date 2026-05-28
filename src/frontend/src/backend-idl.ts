@@ -983,6 +983,11 @@ export const idlFactory = ({ IDL }) => {
         [MintlabFeeRecoveryQuote],
         [],
       ),
+    'adminResolvePendingBid' : IDL.Func(
+        [ListingId],
+        [MarketplaceActionResult],
+        [],
+      ),
     'adminRetryAuctionSettlement' : IDL.Func(
         [ListingId],
         [MarketplaceActionResult],
@@ -1016,6 +1021,11 @@ export const idlFactory = ({ IDL }) => {
     'balance' : IDL.Func([EXTBalanceRequest], [EXTBalanceResponse], ['query']),
     'bootstrapAdmin' : IDL.Func([], [], []),
     'buyFixedListing' : IDL.Func(
+        [ListingId],
+        [MarketplaceActionResult],
+        [],
+      ),
+    'cancelStalePendingBid' : IDL.Func(
         [ListingId],
         [MarketplaceActionResult],
         [],

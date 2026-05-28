@@ -74,6 +74,20 @@ assertIncludes(
 );
 assertIncludes(pendingBid, "return #err(", "pending bid deposit");
 
+const pendingBidRecovery = section(
+  "func resolvePendingBidDeposit",
+  "func startPendingBidDeposit",
+);
+for (const needle of [
+  "pendingBidTimedOut",
+  "escrowBalance >= pending.escrowDeposit",
+  "removePendingBidDeposit",
+  "recoverFundedPendingBidDeposit",
+  "refundPartialStalePendingBidDeposit",
+]) {
+  assertIncludes(pendingBidRecovery, needle, "stale pending bid recovery");
+}
+
 const auction = section("func continueAuctionSettlement", "func resolveWinningEscrow");
 for (const variant of ["#badFee", "#insufficientFunds", "#tooOld", "#createdInFuture"]) {
   assertIncludes(auction, variant, "auction settlement");
@@ -101,7 +115,9 @@ for (const signature of [
   "type MarketplaceActionResult",
   "type MarketplaceBidResult",
   "buyFixedListing: (listingId: ListingId) -> (MarketplaceActionResult)",
+  "cancelStalePendingBid: (listingId: ListingId) -> (MarketplaceActionResult)",
   "cancelListing: (listingId: ListingId) -> (MarketplaceActionResult)",
+  "adminResolvePendingBid: (listingId: ListingId) -> (MarketplaceActionResult)",
   "placeBid: (listingId: ListingId, amount: nat64) -> (MarketplaceBidResult)",
   "retryAuctionRefund: (escrowId: nat) -> (MarketplaceActionResult)",
   "retryPendingBid: (listingId: ListingId) -> (MarketplaceBidResult)",

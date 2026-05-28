@@ -1085,6 +1085,7 @@ service : {
     });
   adminResetUnresolvedMintlabFeeAttempt: (listingId: ListingId) ->
    (MintlabFeeRecoveryQuote);
+  adminResolvePendingBid: (listingId: ListingId) -> (MarketplaceActionResult);
   adminRetryAuctionSettlement: (listingId: ListingId) ->
    (MarketplaceActionResult);
   adminRetryFixedPurchaseSettlement: (listingId: ListingId) ->
@@ -1104,6 +1105,7 @@ service : {
   bootstrapAdmin: () -> ();
   buyFixedListing: (listingId: ListingId) -> (MarketplaceActionResult);
   cancelListing: (listingId: ListingId) -> (MarketplaceActionResult);
+  cancelStalePendingBid: (listingId: ListingId) -> (MarketplaceActionResult);
   claimNFTDividend: (nftId: NFTId) ->
    (variant {
       err: text;

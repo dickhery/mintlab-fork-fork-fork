@@ -68,6 +68,11 @@ mixin (
     #err : Text;
   };
 
+  type PendingBidResolutionMode = {
+    #PublicRecovery;
+    #AdminResolve;
+  };
+
   type MarketplaceICRC7Account = {
     owner : Principal;
     subaccount : ?Blob;
@@ -77,6 +82,8 @@ mixin (
     mintlab_transfer_from : (Principal, Principal, Nat) -> async MarketplaceChildTransferResult;
     mintlab_owner_of : ([Nat]) -> async [?MarketplaceICRC7Account];
   };
+
+  let PENDING_BID_TIMEOUT_NS : Int = 5 * 60 * 1_000_000_000;
 
   func requireMarketplaceAdmin(caller : Principal) {
     if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
@@ -253,6 +260,24 @@ mixin (
     switch (listing.highestBidder) {
       case (?_) true;
       case null false;
+    };
+  };
+
+  func pendingBidAttemptReference(pending : MarketplaceTypes.PendingBidDeposit) : Int {
+    switch (pending.paymentAttemptedAt) {
+      case (?timestamp) timestamp;
+      case null pending.createdAt;
+    };
+  };
+
+  func pendingBidTimedOut(pending : MarketplaceTypes.PendingBidDeposit) : Bool {
+    switch (pending.paymentBlock) {
+      case (?_) false;
+      case null {
+        let attemptedAt = pendingBidAttemptReference(pending);
+        let now = Time.now();
+        now > attemptedAt and now - attemptedAt > PENDING_BID_TIMEOUT_NS;
+      };
     };
   };
 
@@ -787,8 +812,8 @@ mixin (
       listingId = pending.listingId;
       kind = #PendingBidDeposit;
       role = #Bidder;
-      stage = "bid deposit pending";
-      message = "Your bid deposit is still being recorded. Retry the pending bid instead of placing a duplicate bid.";
+      stage = "bid pending recovery";
+      message = "Your bid deposit is still being recorded. Retry the bid, or cancel it after 5 minutes if escrow is unfunded.";
       updatedAt = pending.updatedAt;
     };
   };
@@ -1896,25 +1921,37 @@ mixin (
     };
     var paymentLockOwner : ?Principal = null;
     try {
+      var shouldStartBid = false;
       switch (MarketplaceLib.getPendingBidDeposit(marketplaceBidState, listingId)) {
         case null {
-          acquireUserPaymentLockOrTrap(caller);
-          paymentLockOwner := ?caller;
-          ignore await* startPendingBidDeposit(listingId, caller, amount);
+          shouldStartBid := true;
         };
         case (?pending) {
           let isCallerAdmin = AuthLib.isAdmin(authState, caller);
           if (not Principal.equal(pending.bidder, caller) and not isCallerAdmin) {
-            Runtime.trap("This auction already has a pending bid deposit being recovered");
-          };
-          if (pending.amount != amount and not isCallerAdmin) {
-            Runtime.trap("Retry the pending bid with the same amount");
-          };
-          if (pending.paymentBlock == null) {
-            acquireUserPaymentLockOrTrap(pending.bidder);
-            paymentLockOwner := ?pending.bidder;
+            switch (await* resolvePendingBidDeposit(listingId, #PublicRecovery)) {
+              case (#ok(_)) {
+                shouldStartBid := true;
+              };
+              case (#err(message)) {
+                return #err(message);
+              };
+            };
+          } else {
+            if (pending.amount != amount and not isCallerAdmin) {
+              Runtime.trap("Retry the pending bid with the same amount");
+            };
+            if (pending.paymentBlock == null) {
+              acquireUserPaymentLockOrTrap(pending.bidder);
+              paymentLockOwner := ?pending.bidder;
+            };
           };
         };
+      };
+      if (shouldStartBid) {
+        acquireUserPaymentLockOrTrap(caller);
+        paymentLockOwner := ?caller;
+        ignore await* startPendingBidDeposit(listingId, caller, amount);
       };
       return await* continuePendingBidDeposit(listingId);
     } finally {
@@ -1948,6 +1985,153 @@ mixin (
     } finally {
       releaseMarketplaceUserPaymentLock(paymentLockOwner);
       MarketplaceLib.releaseListingLock(marketplacePaymentState, listingId);
+    };
+  };
+
+  public shared ({ caller }) func cancelStalePendingBid(
+    listingId : MarketplaceTypes.ListingId
+  ) : async MarketplaceActionResult {
+    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (not MarketplaceLib.acquireListingLock(marketplacePaymentState, listingId)) {
+      Runtime.trap("Auction is processing another payment. Try again shortly.");
+    };
+    try {
+      await* resolvePendingBidDeposit(listingId, #PublicRecovery);
+    } finally {
+      MarketplaceLib.releaseListingLock(marketplacePaymentState, listingId);
+    };
+  };
+
+  public shared ({ caller }) func adminResolvePendingBid(
+    listingId : MarketplaceTypes.ListingId
+  ) : async MarketplaceActionResult {
+    requireMarketplaceAdmin(caller);
+    if (not MarketplaceLib.acquireListingLock(marketplacePaymentState, listingId)) {
+      Runtime.trap("Auction is processing another payment. Try again shortly.");
+    };
+    try {
+      await* resolvePendingBidDeposit(listingId, #AdminResolve);
+    } finally {
+      MarketplaceLib.releaseListingLock(marketplacePaymentState, listingId);
+    };
+  };
+
+  func recoverFundedPendingBidDeposit(
+    pending : MarketplaceTypes.PendingBidDeposit
+  ) : async* MarketplaceActionResult {
+    let updated = switch (pending.paymentBlock) {
+      case (?_) pending;
+      case null {
+        {
+          pending with
+          paymentBlock = ?(0 : Nat64);
+          updatedAt = Time.now();
+        };
+      };
+    };
+    MarketplaceLib.putPendingBidDeposit(marketplaceBidState, updated);
+    switch (await* continuePendingBidDeposit(pending.listingId)) {
+      case (#ok(_)) #ok(true);
+      case (#err(message)) {
+        #err("Pending bid escrow is funded, but recovery needs another retry: " # message);
+      };
+    };
+  };
+
+  func refundPartialStalePendingBidDeposit(
+    ledger : IcpLib.Ledger,
+    pending : MarketplaceTypes.PendingBidDeposit,
+    escrowBalance : Nat64,
+  ) : async* MarketplaceActionResult {
+    let currentFee = await* IcpLib.getTransferFee(ledger);
+    if (escrowBalance <= currentFee) {
+      ignore MarketplaceLib.removePendingBidDeposit(marketplaceBidState, pending.listingId);
+      return #ok(true);
+    };
+
+    let escrowSub = IcpLib.marketplaceEscrowSubaccount(pending.escrowId);
+    let bidderSub = IcpLib.principalToSubaccount(pending.bidder);
+    let bidderAccount = IcpLib.accountIdentifier(canisterId, bidderSub);
+    let refundAmount = escrowBalance - currentFee;
+    let refundResult = await* IcpLib.transferOutWithFeeAt(
+      ledger,
+      ?escrowSub,
+      bidderAccount,
+      refundAmount,
+      Nat64.fromNat(pending.listingId),
+      currentFee,
+      ledgerTimestampNow(),
+    );
+    switch (transferBlockResult(refundResult)) {
+      case (#ok(_)) {
+        ignore MarketplaceLib.removePendingBidDeposit(marketplaceBidState, pending.listingId);
+        #ok(true);
+      };
+      case (#badFee(expectedFee)) {
+        #err(
+          "Partial pending bid refund failed: ledger fee changed to " #
+          Nat64.toText(expectedFee) # " e8s; retry admin pending bid resolution"
+        );
+      };
+      case (#insufficientFunds(balance)) {
+        if (balance == 0) {
+          ignore MarketplaceLib.removePendingBidDeposit(marketplaceBidState, pending.listingId);
+          #ok(true);
+        } else {
+          #err(
+            "Partial pending bid refund failed: escrow balance changed to " #
+            Nat64.toText(balance) # " e8s; retry admin pending bid resolution"
+          );
+        };
+      };
+      case (#tooOld) #err("Partial pending bid refund timestamp expired; retry admin pending bid resolution");
+      case (#createdInFuture) #err("Partial pending bid refund timestamp was in the future; retry shortly");
+    };
+  };
+
+  func resolvePendingBidDeposit(
+    listingId : MarketplaceTypes.ListingId,
+    mode : PendingBidResolutionMode,
+  ) : async* MarketplaceActionResult {
+    let pending = switch (MarketplaceLib.getPendingBidDeposit(marketplaceBidState, listingId)) {
+      case null Runtime.trap("Pending bid deposit not found");
+      case (?value) value;
+    };
+
+    switch (pending.paymentBlock) {
+      case (?_) {
+        return await* recoverFundedPendingBidDeposit(pending);
+      };
+      case null {};
+    };
+
+    let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
+    let escrowSub = IcpLib.marketplaceEscrowSubaccount(pending.escrowId);
+    let escrowAccount = IcpLib.accountIdentifier(canisterId, escrowSub);
+    let escrowBalance = await* IcpLib.getBalance(ledger, escrowAccount);
+
+    if (escrowBalance >= pending.escrowDeposit) {
+      return await* recoverFundedPendingBidDeposit(pending);
+    };
+
+    if (not pendingBidTimedOut(pending)) {
+      return #err("Pending bid is not stale yet. Retry the bid or wait 5 minutes before cancelling an unfunded escrow.");
+    };
+
+    if (escrowBalance == 0) {
+      ignore MarketplaceLib.removePendingBidDeposit(marketplaceBidState, listingId);
+      return #ok(true);
+    };
+
+    switch (mode) {
+      case (#PublicRecovery) {
+        #err(
+          "Pending bid escrow contains ICP but is below the required bid deposit. An admin must resolve this pending bid."
+        );
+      };
+      case (#AdminResolve) {
+        await* refundPartialStalePendingBidDeposit(ledger, pending, escrowBalance);
+      };
     };
   };
 
@@ -2206,7 +2390,12 @@ mixin (
     try {
       switch (MarketplaceLib.getPendingBidDeposit(marketplaceBidState, listingId)) {
         case null {};
-        case (?_) Runtime.trap("Auction has a pending bid deposit; retry or resolve it before settling");
+        case (?_) {
+          switch (await* resolvePendingBidDeposit(listingId, #PublicRecovery)) {
+            case (#ok(_)) {};
+            case (#err(message)) return #err(message);
+          };
+        };
       };
       switch (MarketplaceLib.getNoBidAuctionReturn(marketplaceNoBidAuctionReturnState, listingId)) {
         case (?_) {
@@ -2945,9 +3134,18 @@ mixin (
           };
           switch (MarketplaceLib.getPendingBidDeposit(marketplaceBidState, listingId)) {
             case null {};
-            case (?_) return #err("Auction has a pending bid deposit; retry or resolve it before cancelling");
+            case (?_) {
+              switch (await* resolvePendingBidDeposit(listingId, #PublicRecovery)) {
+                case (#ok(_)) {};
+                case (#err(message)) return #err(message);
+              };
+            };
           };
-          if (auctionListingHasAcceptedBid(listing)) {
+          let currentListing = switch (MarketplaceLib.getAuctionListing(marketplaceState, listingId)) {
+            case null Runtime.trap("Auction listing not found");
+            case (?value) value;
+          };
+          if (auctionListingHasAcceptedBid(currentListing)) {
             return #err("Auction cannot be cancelled after a bid has been placed");
           };
           switch (MarketplaceLib.getAuctionEscrow(marketplacePaymentState, listingId)) {
@@ -2960,7 +3158,7 @@ mixin (
           };
           ignore startListingReturnSettlement(
             listingId,
-            listing.seller,
+            currentListing.seller,
             escrowedNFT,
             #AuctionCancel,
             null,

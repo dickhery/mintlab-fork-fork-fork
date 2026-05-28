@@ -501,6 +501,7 @@ export const mockBackend: backendInterface = {
     feeRecipient: mockAccountId,
     previousMintlabFeeCreatedAt: 1_700_000_000_000_000_000n,
   }),
+  adminResolvePendingBid: async () => undefined,
   adminRetryListingReturn: async () => undefined,
   adminRetryNoBidAuctionReturn: async () => undefined,
   adminRetryAuctionSettlement: async () => undefined,
@@ -1101,6 +1102,7 @@ export const mockBackend: backendInterface = {
     ...auctionListing,
     id: listingId,
   }),
+  cancelStalePendingBid: async () => undefined,
   retryPendingMintPayment: async () => ({
     __kind__: "err" as const,
     err: "No pending mock mint payment found",

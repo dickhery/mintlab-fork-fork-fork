@@ -146,6 +146,10 @@ export interface _SERVICE {
     [ListingId],
     MintlabFeeRecoveryQuote
   >,
+  'adminResolvePendingBid' : ActorMethod<
+    [ListingId],
+    MarketplaceActionResult
+  >,
   'adminRetryListingReturn' : ActorMethod<[ListingId], MarketplaceActionResult>,
   'adminRetryNoBidAuctionReturn' : ActorMethod<
     [ListingId],
@@ -165,6 +169,10 @@ export interface _SERVICE {
   >,
   'bootstrapAdmin' : ActorMethod<[], undefined>,
   'buyFixedListing' : ActorMethod<[ListingId], MarketplaceActionResult>,
+  'cancelStalePendingBid' : ActorMethod<
+    [ListingId],
+    MarketplaceActionResult
+  >,
   'cancelListing' : ActorMethod<[ListingId], MarketplaceActionResult>,
   'createAuctionListing' : ActorMethod<[NFTId, bigint, bigint], AuctionListing>,
   'createFixedListing' : ActorMethod<[NFTId, bigint], FixedListing>,
