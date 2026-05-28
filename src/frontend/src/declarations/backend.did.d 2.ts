@@ -24,6 +24,10 @@ export interface AuctionListing {
   'nftId' : NFTId,
   'startingBid' : bigint,
 }
+export type MarketplaceActionResult = { 'ok' : boolean } |
+  { 'err' : string };
+export type MarketplaceBidResult = { 'ok' : AuctionListing } |
+  { 'err' : string };
 export type SettlementEscrowRepairKind = { 'FixedPurchase' : null } |
   { 'Auction' : null };
 export interface SettlementEscrowRepairQuote {
@@ -142,17 +146,26 @@ export interface _SERVICE {
     [ListingId],
     MintlabFeeRecoveryQuote
   >,
-  'adminRetryListingReturn' : ActorMethod<[ListingId], undefined>,
-  'adminRetryNoBidAuctionReturn' : ActorMethod<[ListingId], undefined>,
-  'adminRetryAuctionSettlement' : ActorMethod<[ListingId], undefined>,
-  'adminRetryFixedPurchaseSettlement' : ActorMethod<[ListingId], undefined>,
+  'adminRetryListingReturn' : ActorMethod<[ListingId], MarketplaceActionResult>,
+  'adminRetryNoBidAuctionReturn' : ActorMethod<
+    [ListingId],
+    MarketplaceActionResult
+  >,
+  'adminRetryAuctionSettlement' : ActorMethod<
+    [ListingId],
+    MarketplaceActionResult
+  >,
+  'adminRetryFixedPurchaseSettlement' : ActorMethod<
+    [ListingId],
+    MarketplaceActionResult
+  >,
   'adminTopUpSettlementEscrow' : ActorMethod<
     [ListingId, bigint],
     SettlementEscrowTopUpReceipt
   >,
   'bootstrapAdmin' : ActorMethod<[], undefined>,
-  'buyFixedListing' : ActorMethod<[ListingId], undefined>,
-  'cancelListing' : ActorMethod<[ListingId], undefined>,
+  'buyFixedListing' : ActorMethod<[ListingId], MarketplaceActionResult>,
+  'cancelListing' : ActorMethod<[ListingId], MarketplaceActionResult>,
   'createAuctionListing' : ActorMethod<[NFTId, bigint, bigint], AuctionListing>,
   'createFixedListing' : ActorMethod<[NFTId, bigint], FixedListing>,
   'getActiveListings' : ActorMethod<[], Array<ActiveListing>>,
@@ -167,8 +180,8 @@ export interface _SERVICE {
   'isAdmin' : ActorMethod<[], boolean>,
   'isNFTInUserWallet' : ActorMethod<[CollectionId, string, UserId], boolean>,
   'listCollections' : ActorMethod<[], Array<Collection>>,
-  'placeBid' : ActorMethod<[ListingId, bigint], AuctionListing>,
-  'retryPendingBid' : ActorMethod<[ListingId], AuctionListing>,
+  'placeBid' : ActorMethod<[ListingId, bigint], MarketplaceBidResult>,
+  'retryPendingBid' : ActorMethod<[ListingId], MarketplaceBidResult>,
   'registerNFT' : ActorMethod<
     [CollectionId, string, NFTMetadata],
     { 'ok' : WalletNFT } |
@@ -180,7 +193,7 @@ export interface _SERVICE {
     { 'ok' : string } |
       { 'err' : string }
   >,
-  'settleAuction' : ActorMethod<[ListingId], undefined>,
+  'settleAuction' : ActorMethod<[ListingId], MarketplaceActionResult>,
   'syncUserNFTs' : ActorMethod<
     [],
     { 'ok' : { 'errors' : Array<string>, 'newCount' : bigint } } |

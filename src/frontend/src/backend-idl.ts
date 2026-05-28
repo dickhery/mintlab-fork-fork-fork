@@ -327,6 +327,14 @@ export const idlFactory = ({ IDL }) => {
     'nftId' : NFTId,
     'startingBid' : IDL.Nat64,
   });
+  const MarketplaceBidResult = IDL.Variant({
+    'ok' : AuctionListing,
+    'err' : IDL.Text,
+  });
+  const MarketplaceActionResult = IDL.Variant({
+    'ok' : IDL.Bool,
+    'err' : IDL.Text,
+  });
   const FixedListing = IDL.Record({
     'id' : ListingId,
     'status' : ListingStatus,
@@ -975,10 +983,26 @@ export const idlFactory = ({ IDL }) => {
         [MintlabFeeRecoveryQuote],
         [],
       ),
-    'adminRetryAuctionSettlement' : IDL.Func([ListingId], [], []),
-    'adminRetryFixedPurchaseSettlement' : IDL.Func([ListingId], [], []),
-    'adminRetryListingReturn' : IDL.Func([ListingId], [], []),
-    'adminRetryNoBidAuctionReturn' : IDL.Func([ListingId], [], []),
+    'adminRetryAuctionSettlement' : IDL.Func(
+        [ListingId],
+        [MarketplaceActionResult],
+        [],
+      ),
+    'adminRetryFixedPurchaseSettlement' : IDL.Func(
+        [ListingId],
+        [MarketplaceActionResult],
+        [],
+      ),
+    'adminRetryListingReturn' : IDL.Func(
+        [ListingId],
+        [MarketplaceActionResult],
+        [],
+      ),
+    'adminRetryNoBidAuctionReturn' : IDL.Func(
+        [ListingId],
+        [MarketplaceActionResult],
+        [],
+      ),
     'adminTopUpSettlementEscrow' : IDL.Func(
         [ListingId, IDL.Nat64],
         [SettlementEscrowTopUpReceipt],
@@ -991,8 +1015,16 @@ export const idlFactory = ({ IDL }) => {
       ),
     'balance' : IDL.Func([EXTBalanceRequest], [EXTBalanceResponse], ['query']),
     'bootstrapAdmin' : IDL.Func([], [], []),
-    'buyFixedListing' : IDL.Func([ListingId], [], []),
-    'cancelListing' : IDL.Func([ListingId], [], []),
+    'buyFixedListing' : IDL.Func(
+        [ListingId],
+        [MarketplaceActionResult],
+        [],
+      ),
+    'cancelListing' : IDL.Func(
+        [ListingId],
+        [MarketplaceActionResult],
+        [],
+      ),
     'claimNFTDividend' : IDL.Func(
         [NFTId],
         [IDL.Variant({ 'ok' : DividendClaimReceipt, 'err' : IDL.Text })],
@@ -1389,7 +1421,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : MintReceipt, 'err' : IDL.Text })],
         [],
       ),
-    'placeBid' : IDL.Func([ListingId, IDL.Nat64], [AuctionListing], []),
+    'placeBid' : IDL.Func([ListingId, IDL.Nat64], [MarketplaceBidResult], []),
     'prepareVaultDeposit' : IDL.Func(
         [CollectionId, IDL.Text],
         [IDL.Variant({ 'ok' : IDL.Text, 'err' : IDL.Text })],
@@ -1472,7 +1504,11 @@ export const idlFactory = ({ IDL }) => {
         ],
         [],
       ),
-    'retryAuctionRefund' : IDL.Func([IDL.Nat], [IDL.Bool], []),
+    'retryAuctionRefund' : IDL.Func(
+        [IDL.Nat],
+        [MarketplaceActionResult],
+        [],
+      ),
     'retryCollectionCreationRequest' : IDL.Func(
         [IDL.Nat],
         [IDL.Variant({ 'ok' : CollectionCreationReceipt, 'err' : IDL.Text })],
@@ -1483,7 +1519,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : Collection, 'err' : IDL.Text })],
         [],
       ),
-    'retryPendingBid' : IDL.Func([ListingId], [AuctionListing], []),
+    'retryPendingBid' : IDL.Func([ListingId], [MarketplaceBidResult], []),
     'retryPendingMintPayment' : IDL.Func(
         [IDL.Nat],
         [IDL.Variant({ 'ok' : MintReceipt, 'err' : IDL.Text })],
@@ -1500,7 +1536,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'setCollectionCanisterWasm' : IDL.Func([IDL.Vec(IDL.Nat8)], [], []),
-    'settleAuction' : IDL.Func([ListingId], [], []),
+    'settleAuction' : IDL.Func(
+        [ListingId],
+        [MarketplaceActionResult],
+        [],
+      ),
     'supply' : IDL.Func(
         [EXTTokenIdentifier],
         [IDL.Variant({ 'ok' : EXTBalance, 'err' : EXTCommonError })],

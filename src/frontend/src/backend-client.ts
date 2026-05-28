@@ -1478,6 +1478,8 @@ type RawAuctionListing = {
   nftId: NFTId;
   startingBid: bigint;
 };
+type RawMarketplaceActionResult = { ok: boolean } | { err: string };
+type RawMarketplaceBidResult = { ok: RawAuctionListing } | { err: string };
 type RawAuctionBidStatus = {
   listingId: ListingId;
   hasBid: boolean;
@@ -2622,6 +2624,21 @@ function fromBooleanResult(
   return { __kind__: "err", err: value.err };
 }
 
+function unwrapResult<T>(value: { ok: T } | { err: string }): T {
+  if ("ok" in value) return value.ok;
+  throw new Error(value.err);
+}
+
+function unwrapMarketplaceAction(value: RawMarketplaceActionResult): void {
+  unwrapResult(value);
+}
+
+function fromMarketplaceBidResult(
+  value: RawMarketplaceBidResult,
+): AuctionListing {
+  return fromRawAuctionListing(unwrapResult(value));
+}
+
 function fromCollectionCycleTopUpResult(
   value: { ok: RawCollectionCycleTopUpReceipt } | { err: string },
 ):
@@ -2857,11 +2874,15 @@ export class Backend implements backendInterface {
   }
 
   async buyFixedListing(listingId: ListingId): Promise<void> {
-    return this.run(() => this.actor.buyFixedListing(listingId));
+    unwrapMarketplaceAction(
+      await this.run(() => this.actor.buyFixedListing(listingId)),
+    );
   }
 
   async cancelListing(listingId: ListingId): Promise<void> {
-    return this.run(() => this.actor.cancelListing(listingId));
+    unwrapMarketplaceAction(
+      await this.run(() => this.actor.cancelListing(listingId)),
+    );
   }
 
   async claimVaultDeposit(
@@ -3112,20 +3133,28 @@ export class Backend implements backendInterface {
   }
 
   async adminRetryListingReturn(listingId: ListingId): Promise<void> {
-    return this.run(() => this.actor.adminRetryListingReturn(listingId));
+    unwrapMarketplaceAction(
+      await this.run(() => this.actor.adminRetryListingReturn(listingId)),
+    );
   }
 
   async adminRetryNoBidAuctionReturn(listingId: ListingId): Promise<void> {
-    return this.run(() => this.actor.adminRetryNoBidAuctionReturn(listingId));
+    unwrapMarketplaceAction(
+      await this.run(() => this.actor.adminRetryNoBidAuctionReturn(listingId)),
+    );
   }
 
   async adminRetryAuctionSettlement(listingId: ListingId): Promise<void> {
-    return this.run(() => this.actor.adminRetryAuctionSettlement(listingId));
+    unwrapMarketplaceAction(
+      await this.run(() => this.actor.adminRetryAuctionSettlement(listingId)),
+    );
   }
 
   async adminRetryFixedPurchaseSettlement(listingId: ListingId): Promise<void> {
-    return this.run(() =>
-      this.actor.adminRetryFixedPurchaseSettlement(listingId),
+    unwrapMarketplaceAction(
+      await this.run(() =>
+        this.actor.adminRetryFixedPurchaseSettlement(listingId),
+      ),
     );
   }
 
@@ -3906,13 +3935,13 @@ export class Backend implements backendInterface {
     listingId: ListingId,
     amount: bigint,
   ): Promise<AuctionListing> {
-    return fromRawAuctionListing(
+    return fromMarketplaceBidResult(
       await this.run(() => this.actor.placeBid(listingId, amount)),
     );
   }
 
   async retryPendingBid(listingId: ListingId): Promise<AuctionListing> {
-    return fromRawAuctionListing(
+    return fromMarketplaceBidResult(
       await this.run(() => this.actor.retryPendingBid(listingId)),
     );
   }
@@ -4017,7 +4046,9 @@ export class Backend implements backendInterface {
   }
 
   async retryAuctionRefund(escrowId: bigint): Promise<boolean> {
-    return this.run(() => this.actor.retryAuctionRefund(escrowId));
+    return unwrapResult(
+      await this.run(() => this.actor.retryAuctionRefund(escrowId)),
+    );
   }
 
   async retryCollectionCreationRequest(
@@ -4149,7 +4180,9 @@ export class Backend implements backendInterface {
   }
 
   async settleAuction(listingId: ListingId): Promise<void> {
-    return this.run(() => this.actor.settleAuction(listingId));
+    unwrapMarketplaceAction(
+      await this.run(() => this.actor.settleAuction(listingId)),
+    );
   }
 
   async syncUserNFTs(): Promise<
