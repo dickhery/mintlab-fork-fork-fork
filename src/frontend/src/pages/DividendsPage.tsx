@@ -111,6 +111,17 @@ export default function DividendsPage() {
     staleTime: 30_000,
   });
 
+  const { data: marketplaceFeeConfig } = useQuery({
+    queryKey: ["marketplaceFeeConfig"],
+    queryFn: async () => {
+      if (!actor) return null;
+      return actor.getMarketplaceFeeConfig();
+    },
+    enabled: !!actor && !isFetching && isAuthenticated,
+    refetchOnWindowFocus: false,
+    staleTime: 60_000,
+  });
+
   const claimMutation = useMutation({
     mutationFn: async (item: NFTDividend) => {
       if (!actor) throw new Error("Backend not connected");
@@ -206,6 +217,7 @@ export default function DividendsPage() {
     () => new Set(listedDividendKeys),
     [listedDividendKeys],
   );
+  const dividendLedgerFee = marketplaceFeeConfig?.ledgerFeeE8s ?? ICP_FEE;
 
   if (!isAuthenticated) {
     return (
@@ -243,7 +255,14 @@ export default function DividendsPage() {
   );
   const claimableItems = dividends.filter(
     (item) =>
-      item.claimableE8s > 0n && !listedDividendKeySet.has(dividendKey(item)),
+      item.claimableE8s > dividendLedgerFee &&
+      !listedDividendKeySet.has(dividendKey(item)),
+  );
+  const belowFeeItems = dividends.filter(
+    (item) =>
+      item.claimableE8s > 0n &&
+      item.claimableE8s <= dividendLedgerFee &&
+      !listedDividendKeySet.has(dividendKey(item)),
   );
 
   return (
@@ -287,7 +306,9 @@ export default function DividendsPage() {
           ocid="dividends.help_callout"
         >
           Dividend-enabled collection deposits are checked here, then claimable
-          ICP can be collected from the NFTs you currently hold.
+          ICP can be collected from the NFTs you currently hold. The ICP ledger
+          fee is deducted from each collection, so an NFT must have more than{" "}
+          {formatICP(dividendLedgerFee)} ICP before collection is available.
         </HelpCallout>
 
         <TermsAgreementNotice actionLabel="checking deposits or collecting dividend ICP" />
@@ -325,6 +346,19 @@ export default function DividendsPage() {
           </Card>
         </div>
 
+        {belowFeeItems.length > 0 && (
+          <div
+            className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-800"
+            data-ocid="dividends.below_fee_notice"
+          >
+            {belowFeeItems.length} dividend{" "}
+            {belowFeeItems.length === 1 ? "balance is" : "balances are"} below
+            the current ICP transfer fee of {formatICP(dividendLedgerFee)} ICP.
+            They remain attached to the NFT and can be collected once the
+            balance grows above that fee.
+          </div>
+        )}
+
         {isLoading ? (
           <div className="min-h-[32vh] flex items-center justify-center">
             <LoadingSpinner size="lg" label="Loading dividends..." />
@@ -354,7 +388,8 @@ export default function DividendsPage() {
               const imageSrc =
                 item.nft.metadata.imageUrl ?? hydratedNFT?.metadata.imageUrl;
               const isListed = listedDividendKeySet.has(dividendKey(item));
-              const canClaim = !isListed && item.claimableE8s > ICP_FEE;
+              const canClaim =
+                !isListed && item.claimableE8s > dividendLedgerFee;
               const isClaiming =
                 claimMutation.isPending &&
                 claimMutation.variables != null &&
@@ -405,6 +440,16 @@ export default function DividendsPage() {
                             until the listing sells, settles, or is canceled.
                           </p>
                         )}
+                        {!isListed &&
+                          item.claimableE8s > 0n &&
+                          item.claimableE8s <= dividendLedgerFee && (
+                            <p className="text-xs text-amber-700 mt-2 leading-relaxed">
+                              Below the current ICP transfer fee of{" "}
+                              {formatICP(dividendLedgerFee)} ICP. This balance
+                              stays attached to the NFT until more dividends
+                              accrue.
+                            </p>
+                          )}
                       </div>
                       <Button
                         className="mt-auto gap-2 self-start"

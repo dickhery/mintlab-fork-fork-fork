@@ -47,6 +47,12 @@ module {
     var nextPaymentId : Nat;
   };
 
+  public type TokenIdPage = {
+    tokenIds : [Nat];
+    nextCursor : ?Nat;
+    totalCount : Nat;
+  };
+
   public func defaultCollectionCreationPrimaryPayoutBasisPoints() : Nat {
     10_000;
   };
@@ -1365,6 +1371,79 @@ module {
     tokens;
   };
 
+  public func tokenCountForCollection(
+    state : MintState,
+    collectionId : Types.CollectionId,
+    legacyCollectionId : ?Types.CollectionId,
+  ) : Nat {
+    let indexedIds = switch (Map.get(tokensByCollection(state), Nat.compare, collectionId)) {
+      case (?ids) ids;
+      case null [];
+    };
+    if (indexedIds.size() > 0) {
+      var indexedCount : Nat = 0;
+      for (tokenId in indexedIds.values()) {
+        switch (Map.get(state.tokens, Nat.compare, tokenId)) {
+          case (?token) {
+            if (tokenBelongsToCollection(token, collectionId, legacyCollectionId)) {
+              indexedCount += 1;
+            };
+          };
+          case null {};
+        };
+      };
+      return indexedCount;
+    };
+    var count : Nat = 0;
+    for (token in Map.values(state.tokens)) {
+      if (tokenBelongsToCollection(token, collectionId, legacyCollectionId)) {
+        count += 1;
+      };
+    };
+    count;
+  };
+
+  public func tokenIdsForCollectionPage(
+    state : MintState,
+    collectionId : Types.CollectionId,
+    legacyCollectionId : ?Types.CollectionId,
+    cursor : ?Nat,
+    limit : Nat,
+  ) : TokenIdPage {
+    let pageSize = if (limit == 0) 1 else limit;
+    let indexedIds = switch (Map.get(tokensByCollection(state), Nat.compare, collectionId)) {
+      case (?ids) ids;
+      case null [];
+    };
+    if (indexedIds.size() > 0) {
+      return tokenIdPageFromIds(state, indexedIds, collectionId, legacyCollectionId, cursor, pageSize);
+    };
+    var ids : [Nat] = [];
+    var totalCount : Nat = 0;
+    var added : Nat = 0;
+    var lastAdded : ?Nat = null;
+    var hasMore = false;
+    for ((tokenId, token) in Map.entries(state.tokens)) {
+      if (tokenBelongsToCollection(token, collectionId, legacyCollectionId)) {
+        totalCount += 1;
+        if (isAfterTokenCursor(tokenId, cursor)) {
+          if (added < pageSize) {
+            ids := Array.concat<Nat>(ids, [tokenId]);
+            lastAdded := ?tokenId;
+            added += 1;
+          } else {
+            hasMore := true;
+          };
+        };
+      };
+    };
+    {
+      tokenIds = ids;
+      nextCursor = if (hasMore) lastAdded else null;
+      totalCount;
+    };
+  };
+
   public func transferToken(
     state : MintState,
     tokenId : Nat,
@@ -1761,6 +1840,52 @@ module {
       };
     };
     tokens;
+  };
+
+  func tokenIdPageFromIds(
+    state : MintState,
+    candidateIds : [Nat],
+    collectionId : Types.CollectionId,
+    legacyCollectionId : ?Types.CollectionId,
+    cursor : ?Nat,
+    limit : Nat,
+  ) : TokenIdPage {
+    var ids : [Nat] = [];
+    var totalCount : Nat = 0;
+    var added : Nat = 0;
+    var lastAdded : ?Nat = null;
+    var hasMore = false;
+    for (tokenId in candidateIds.values()) {
+      switch (Map.get(state.tokens, Nat.compare, tokenId)) {
+        case (?token) {
+          if (tokenBelongsToCollection(token, collectionId, legacyCollectionId)) {
+            totalCount += 1;
+            if (isAfterTokenCursor(tokenId, cursor)) {
+              if (added < limit) {
+                ids := Array.concat<Nat>(ids, [tokenId]);
+                lastAdded := ?tokenId;
+                added += 1;
+              } else {
+                hasMore := true;
+              };
+            };
+          };
+        };
+        case null {};
+      };
+    };
+    {
+      tokenIds = ids;
+      nextCursor = if (hasMore) lastAdded else null;
+      totalCount;
+    };
+  };
+
+  func isAfterTokenCursor(tokenId : Nat, cursor : ?Nat) : Bool {
+    switch (cursor) {
+      case null true;
+      case (?previous) tokenId > previous;
+    };
   };
 
   func ownerCollectionKey(owner : Principal, collectionId : Types.CollectionId) : Text {

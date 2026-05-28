@@ -39,6 +39,7 @@ persistent actor Backend {
   let marketplaceFeeState = MarketplaceLib.newFeeState();
   let icpWithdrawalState = IcpLib.newWithdrawalState();
   let dividendsState = DividendsLib.newState();
+  let dividendAccumulatorState = DividendsLib.newAccumulatorState();
   let dividendFeeState = DividendsLib.newFeeState();
 
   // ── Mixin composition ─────────────────────────────────────────────────────
@@ -54,6 +55,7 @@ persistent actor Backend {
     walletState,
     authState,
     marketplaceUserPaymentLockState,
+    dividendAccumulatorState,
     Principal.fromActor(Backend),
   );
   include WalletApi(
@@ -90,6 +92,7 @@ persistent actor Backend {
   );
   include DividendsApi(
     dividendsState,
+    dividendAccumulatorState,
     dividendFeeState,
     collectionsState,
     walletState,

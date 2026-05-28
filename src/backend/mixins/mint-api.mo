@@ -9,6 +9,7 @@ import HttpMedia "../lib/http-media";
 import IcpLib "../lib/icp";
 import MarketplaceLib "../lib/marketplace";
 import MintLib "../lib/mint";
+import DividendsLib "../lib/dividends";
 import WalletLib "../lib/wallet";
 import AuthLib "../lib/auth";
 import CommonTypes "../types/common";
@@ -37,6 +38,7 @@ mixin (
   walletState : WalletLib.WalletState,
   authState : AuthLib.AdminState,
   marketplaceUserPaymentLockState : MarketplaceLib.MarketplaceUserPaymentLockState,
+  dividendAccumulatorState : DividendsLib.DividendAccumulatorState,
   canisterId : Principal,
 ) {
   type CanisterSettings = {
@@ -2135,6 +2137,7 @@ mixin (
       MintLib.publicMetadata(token.metadata),
       #Minted,
     );
+    initializeDividendTokenSnapshot(collection.id, Nat.toText(token.tokenId));
     {
       receipt = {
         nft;
@@ -2142,6 +2145,13 @@ mixin (
       };
       tokenId = token.tokenId;
     };
+  };
+
+  func initializeDividendTokenSnapshot(
+    collectionId : CollectionTypes.CollectionId,
+    tokenId : Text,
+  ) {
+    DividendsLib.initializeTokenSnapshot(dividendAccumulatorState, collectionId, tokenId);
   };
 
   public shared ({ caller }) func mintCollectionNFT(
@@ -2205,28 +2215,37 @@ mixin (
         MintLib.publicMetadata(token.metadata),
         #Minted,
       );
+      initializeDividendTokenSnapshot(collection.id, Nat.toText(token.tokenId));
       return #ok(nft);
     };
 
     let child : ChildCollectionActor = actor (collection.canisterId.toText());
-    let mintResult = try {
-      await child.mintlab_mint(caller, metadata);
-    } catch (error) {
-      return #err("Collection canister mint failed: " # Error.message(error));
+    if (not DividendsLib.acquireCollectionOperation(dividendAccumulatorState, collection.id)) {
+      return #err("This collection is checking dividend deposits. Try minting again in a moment.");
     };
-    switch (mintResult) {
-      case (#err(message)) #err(message);
-      case (#ok(receipt)) {
-        let nft = WalletLib.registerNFT(
-          walletState,
-          caller,
-          collection.id,
-          Nat.toText(receipt.tokenId),
-          metadata,
-          #Minted,
-        );
-        #ok(nft);
+    try {
+      let mintResult = try {
+        await child.mintlab_mint(caller, metadata);
+      } catch (error) {
+        return #err("Collection canister mint failed: " # Error.message(error));
       };
+      switch (mintResult) {
+        case (#err(message)) #err(message);
+        case (#ok(receipt)) {
+          let nft = WalletLib.registerNFT(
+            walletState,
+            caller,
+            collection.id,
+            Nat.toText(receipt.tokenId),
+            metadata,
+            #Minted,
+          );
+          initializeDividendTokenSnapshot(collection.id, Nat.toText(receipt.tokenId));
+          #ok(nft);
+        };
+      };
+    } finally {
+      DividendsLib.releaseCollectionOperation(dividendAccumulatorState, collection.id);
     };
   };
 
