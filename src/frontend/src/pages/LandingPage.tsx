@@ -20,7 +20,7 @@ const features = [
     icon: Zap,
     title: "Open Marketplace",
     description:
-      "Mint, list, auction, transfer, and trade NFTs while keeping full on-chain custody.",
+      "Mint, list, auction, withdraw, and trade NFTs with custody clearly labeled before each action.",
   },
 ];
 

@@ -32,6 +32,14 @@ import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import { transferRegisteredNFT } from "@/lib/external-nft-transfer";
 import { formatICPAmount, parseICPToE8s } from "@/lib/icp";
+import {
+  VAULTED_PURCHASE_NOTICE,
+  WITHDRAW_TO_EXTERNAL_WALLET_LABEL,
+  isVaultedInMintlab,
+  nftCustodyClass,
+  nftCustodyDescription,
+  nftCustodyLabel,
+} from "@/lib/nft-custody";
 import type {
   ActiveListing,
   ActiveListingDetail,
@@ -44,6 +52,7 @@ import type {
   WalletNFT,
 } from "@/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import {
   Clock,
   Coins,
@@ -192,6 +201,7 @@ function FixedListingCard({
   const name = nft?.metadata.name ?? `NFT #${nft?.tokenId ?? "?"}`;
   const sellerText = listing.seller.toString();
   const isOwner = currentPrincipal === sellerText;
+  const custodyLabel = nft ? nftCustodyLabel(nft.location) : null;
 
   return (
     <motion.div
@@ -231,6 +241,14 @@ function FixedListingCard({
         </div>
 
         {collection && <CollectionBadge collection={collection} size="sm" />}
+        {nft && custodyLabel && (
+          <Badge
+            variant="secondary"
+            className={`w-fit max-w-full whitespace-normal break-words text-left text-[10px] leading-tight border ${nftCustodyClass(nft.location)}`}
+          >
+            {custodyLabel}
+          </Badge>
+        )}
         {dividendE8s > 0n && (
           <Badge className="w-fit bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[10px]">
             {formatICPAmount(dividendE8s)} ICP dividends
@@ -334,6 +352,8 @@ function ListingDetailModal({
         Math.max(0, Number(auction.endTime / 1_000_000n) - Date.now()),
       )
     : "";
+  const custodyLabel = nftCustodyLabel(nft.location);
+  const custodyDescription = nftCustodyDescription(nft, collection);
 
   return (
     <Dialog open={!!detail} onOpenChange={(value) => !value && onClose()}>
@@ -371,6 +391,12 @@ function ListingDetailModal({
                 {collection && (
                   <CollectionBadge collection={collection} size="sm" />
                 )}
+                <Badge
+                  variant="secondary"
+                  className={`border text-xs ${nftCustodyClass(nft.location)}`}
+                >
+                  {custodyLabel}
+                </Badge>
                 {dividendE8s > 0n && (
                   <Badge className="bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
                     <Coins className="w-3 h-3 mr-1" />
@@ -391,6 +417,20 @@ function ListingDetailModal({
                 {nft.metadata.description}
               </p>
             )}
+
+            <div className="rounded-lg border border-border/60 bg-muted/25 p-3">
+              <p className="text-xs font-semibold text-foreground">
+                {custodyLabel}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                {custodyDescription}
+              </p>
+              {isVaultedInMintlab(nft) && (
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {VAULTED_PURCHASE_NOTICE}
+                </p>
+              )}
+            </div>
 
             <div className="grid grid-cols-1 gap-2">
               <div className="rounded-lg border border-border/50 bg-muted/35 px-3 py-2">
@@ -575,6 +615,7 @@ function AuctionListingCard({
   const isWinner = isViewerWinningAuction(listing, currentPrincipal, bidStatus);
   const hasBeenOutbid = !!bidStatus?.hasBid && !isWinner;
   const hasBid = auctionHasBid(listing);
+  const custodyLabel = nft ? nftCustodyLabel(nft.location) : null;
 
   return (
     <motion.div
@@ -620,6 +661,14 @@ function AuctionListingCard({
         </div>
 
         {collection && <CollectionBadge collection={collection} size="sm" />}
+        {nft && custodyLabel && (
+          <Badge
+            variant="secondary"
+            className={`w-fit max-w-full whitespace-normal break-words text-left text-[10px] leading-tight border ${nftCustodyClass(nft.location)}`}
+          >
+            {custodyLabel}
+          </Badge>
+        )}
         {dividendE8s > 0n && (
           <Badge className="w-fit bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[10px]">
             {formatICPAmount(dividendE8s)} ICP dividends
@@ -843,9 +892,10 @@ function ListNFTModal({
             <span className="text-accent text-[10px] font-bold">!</span>
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            External registered NFTs are deposited into the app vault before
-            listing. The buyer receives the vaulted NFT in their Mintlab wallet
-            when the sale completes.
+            Registered external wallet NFTs are deposited into the app vault
+            before listing. Buyers of vaulted external NFTs receive a Mintlab
+            wallet record first; the original NFT stays vaulted in Mintlab until
+            they withdraw it to an external wallet.
           </p>
         </div>
 
@@ -905,8 +955,11 @@ function ListNFTModal({
                       <p className="px-1.5 py-1 text-[10px] font-mono text-foreground/80 truncate">
                         {nftName}
                       </p>
-                      <p className="px-1.5 pb-1 text-[9px] font-mono text-muted-foreground truncate">
-                        {nft.location}
+                      <p
+                        className="px-1.5 pb-1 text-[9px] font-mono text-muted-foreground truncate"
+                        title={nftCustodyLabel(nft.location)}
+                      >
+                        {nftCustodyLabel(nft.location)}
                       </p>
                     </button>
                   );
@@ -1157,6 +1210,25 @@ function PlaceBidModal({
           </DialogHeader>
 
           <p className="text-sm text-muted-foreground -mt-1">{name}</p>
+          {nft && (
+            <div className="rounded-lg border border-border bg-muted/30 p-3">
+              <Badge
+                variant="secondary"
+                className={`border text-[10px] ${nftCustodyClass(nft.location)}`}
+              >
+                {nftCustodyLabel(nft.location)}
+              </Badge>
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                {nftCustodyDescription(nft)}
+              </p>
+              {isVaultedInMintlab(nft) && (
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  If you win, the NFT remains vaulted in Mintlab until you
+                  withdraw it to an external wallet.
+                </p>
+              )}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-4 mt-1">
             <div className="rounded-lg bg-muted/40 border border-border p-3 flex items-center justify-between">
@@ -1242,7 +1314,11 @@ function PlaceBidModal({
         open={confirmBidOpen}
         onOpenChange={setConfirmBidOpen}
         title="Fund Auction Escrow"
-        description="Your bid is held in escrow until you are outbid or the auction settles. Outbid refunds return the bid and unused reserve, but ledger transfers into escrow and back still cost a small amount of ICP."
+        description={
+          isVaultedInMintlab(nft)
+            ? "Your bid is held in escrow until you are outbid or the auction settles. If you win, this vaulted NFT stays in Mintlab custody until you withdraw it."
+            : "Your bid is held in escrow until you are outbid or the auction settles. Outbid refunds return the bid and unused reserve, but ledger transfers into escrow and back still cost a small amount of ICP."
+        }
         lines={[
           {
             label: "Bid amount",
@@ -1285,6 +1361,8 @@ export default function MarketplacePage() {
   const { actor, isFetching: actorLoading } = useBackend();
   const { isAuthenticated, principal, login } = useAuth();
   const qc = useQueryClient();
+  const navigate = useNavigate();
+  const principalStr = principal?.toString() ?? null;
 
   const [activeTab, setActiveTab] = useState<"fixed" | "auctions">("fixed");
   const [buyTarget, setBuyTarget] = useState<ListingId | null>(null);
@@ -1293,6 +1371,23 @@ export default function MarketplacePage() {
   const [listModalOpen, setListModalOpen] = useState(false);
   const [detailTarget, setDetailTarget] =
     useState<ListingDetailModalProps["detail"]>(null);
+
+  const showVaultedPurchaseToast = useCallback(
+    (title: string) => {
+      toast.success(title, {
+        description:
+          "This vaulted NFT is now in your Mintlab wallet. Use Withdraw to external wallet when you are ready to move the original NFT out of Mintlab custody.",
+        action: {
+          label: WITHDRAW_TO_EXTERNAL_WALLET_LABEL,
+          onClick: () => {
+            void navigate({ to: "/wallet" });
+          },
+        },
+        duration: 9000,
+      });
+    },
+    [navigate],
+  );
 
   // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -1572,8 +1667,15 @@ export default function MarketplacePage() {
       if (!actor) throw new Error("Not connected");
       return actor.buyFixedListing(id);
     },
-    onSuccess: () => {
-      toast.success("NFT purchased successfully!");
+    onSuccess: (_result, id) => {
+      const purchasedDetail = fixedListings.find(
+        ({ listing }) => listing.id === id,
+      );
+      if (isVaultedInMintlab(purchasedDetail?.nft)) {
+        showVaultedPurchaseToast("Vaulted NFT purchased");
+      } else {
+        toast.success("NFT purchased successfully!");
+      }
       setBuyTarget(null);
       refreshMarketplace();
     },
@@ -1647,8 +1749,19 @@ export default function MarketplacePage() {
       if (!actor) throw new Error("Not connected");
       return actor.settleAuction(id);
     },
-    onSuccess: () => {
-      toast.success("Auction settled!");
+    onSuccess: (_result, id) => {
+      const settledDetail = auctionListings.find(
+        ({ listing }) => listing.id === id,
+      );
+      const bidStatus = myAuctionBidStatusMap.get(id.toString());
+      const viewerIsWinner =
+        settledDetail != null &&
+        isViewerWinningAuction(settledDetail.listing, principalStr, bidStatus);
+      if (viewerIsWinner && isVaultedInMintlab(settledDetail?.nft)) {
+        showVaultedPurchaseToast("Vaulted auction NFT collected");
+      } else {
+        toast.success("Auction settled!");
+      }
       refreshMarketplace();
     },
     onError: (e: Error) => toast.error(`Settle failed: ${e.message}`),
@@ -1706,7 +1819,6 @@ export default function MarketplacePage() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  const principalStr = principal?.toString() ?? null;
   const buyPrice = buyListingDetail?.listing.price ?? 0n;
   const buyMintlabFee = marketplaceFee(buyPrice, mintlabFeeBps);
   const buySellerProceeds = buyPrice - buyMintlabFee;
@@ -1759,8 +1871,9 @@ export default function MarketplacePage() {
           ocid="marketplace.help_callout"
         >
           Fixed purchases and auction bids use your in-app ICP balance. External
-          registered NFTs are vaulted before listing so Mintlab can settle the
-          sale on-chain.
+          registered wallet NFTs are vaulted before listing. Buying a vaulted
+          NFT keeps it in Mintlab custody until the owner withdraws it to an
+          external wallet.
         </HelpCallout>
 
         {settlementStatuses.length > 0 && (
@@ -2033,6 +2146,15 @@ export default function MarketplacePage() {
                 </span>
               </div>
               <div className="flex items-center justify-between gap-4">
+                <span className="text-muted-foreground">NFT custody</span>
+                <Badge
+                  variant="secondary"
+                  className={`border text-[10px] ${nftCustodyClass(buyListingDetail.nft.location)}`}
+                >
+                  {nftCustodyLabel(buyListingDetail.nft.location)}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between gap-4">
                 <span className="text-muted-foreground">
                   Mintlab fee
                   <span className="block text-[11px] leading-snug">
@@ -2074,6 +2196,18 @@ export default function MarketplacePage() {
                   {formatICPAmount(buyPrice + buyTotalLedgerFees)} ICP
                 </span>
               </div>
+            </div>
+          )}
+          {isVaultedInMintlab(buyListingDetail?.nft) && (
+            <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs leading-relaxed text-muted-foreground">
+              <p className="font-semibold text-foreground">
+                Vaulted in Mintlab
+              </p>
+              <p className="mt-1">
+                {VAULTED_PURCHASE_NOTICE} After purchase, use{" "}
+                {WITHDRAW_TO_EXTERNAL_WALLET_LABEL} from Wallet to move the
+                original NFT to your principal.
+              </p>
             </div>
           )}
           <TermsAgreementNotice actionLabel="confirming this purchase" />

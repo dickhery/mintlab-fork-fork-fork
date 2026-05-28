@@ -125,7 +125,7 @@ export const helpSections: HelpSection[] = [
       "Click Sync after receiving NFTs so Mintlab checks on-chain ownership across supported collections.",
       "Use Import NFT when you know a token ID from an imported external collection that automatic sync has not found yet.",
       "Mint NFTs from Wallet by choosing the main app collection or one of your own Mintlab collections.",
-      "Minted and vaulted NFTs can be sent or listed from their detail actions.",
+      "Mintlab-created NFTs can be sent or listed from their detail actions. Vaulted in Mintlab NFTs can also be withdrawn to an external wallet.",
     ],
     risks: [
       "Minting into the main app collection can require an admin-set ICP price and uses your in-app ICP balance.",
@@ -187,13 +187,14 @@ export const helpSections: HelpSection[] = [
     highlights: [
       "Click List Your NFT to choose an eligible wallet NFT and select Fixed Price or Auction.",
       "Fixed-price buyers pay from their in-app ICP balance and receive the NFT in their Mintlab wallet.",
+      "Buying a vaulted external NFT keeps the original NFT in Mintlab custody until the buyer withdraws it to an external wallet.",
       "Auction bids must meet the minimum bid and increment rules shown in the bid dialog.",
       "Bids are funded into escrow with fee reserves, then returned when outbid or used when the auction settles.",
       "Auctions can run from 1 hour to 30 days and extend by 5 minutes when late bids arrive.",
       "An auction cannot be canceled after the first bid is placed.",
     ],
     risks: [
-      "External registered NFTs are deposited into the app vault before listing so Mintlab can settle the sale.",
+      "Registered external wallet NFTs are deposited into the app vault before listing so Mintlab can settle the sale.",
       "Ledger transfers into escrow and back can cost network fees even when a bid is later refunded.",
       "Sellers should review price, duration, and listing type carefully before confirming.",
     ],
@@ -365,7 +366,7 @@ export const glossaryItems: GlossaryItem[] = [
   {
     term: "Vaulted NFT",
     definition:
-      "An NFT held by the Mintlab vault so marketplace settlement can transfer it to a buyer.",
+      "An external NFT held by the Mintlab vault. A sale changes Mintlab's in-app owner record first; the buyer can withdraw the original NFT to an external wallet later.",
   },
 ];
 

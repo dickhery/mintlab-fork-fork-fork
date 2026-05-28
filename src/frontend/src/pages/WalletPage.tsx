@@ -34,6 +34,12 @@ import { isLowCyclesError } from "@/lib/cycles";
 import { transferRegisteredNFT } from "@/lib/external-nft-transfer";
 import { compressModerationImage } from "@/lib/imageUtils";
 import { resolveImageUrl } from "@/lib/media";
+import {
+  WITHDRAW_TO_EXTERNAL_WALLET_LABEL,
+  nftCustodyClass,
+  nftCustodyDescription,
+  nftCustodyLabel,
+} from "@/lib/nft-custody";
 import type {
   ActiveListingDetail,
   Collection,
@@ -322,6 +328,10 @@ function SendNFTModal({ open, onClose, nft, collection }: SendNFTModalProps) {
 
   const nftName = nft.metadata.name ?? `NFT #${nft.tokenId}`;
   const isRegisteredExternal = nft.location === "Registered";
+  const isVaultedExternal = nft.location === "Vaulted";
+  const actionLabel = isVaultedExternal
+    ? WITHDRAW_TO_EXTERNAL_WALLET_LABEL
+    : "Send NFT";
 
   function validateRecipient(value: string): string {
     if (!value.trim()) return "Recipient Principal ID is required";
@@ -383,7 +393,11 @@ function SendNFTModal({ open, onClose, nft, collection }: SendNFTModalProps) {
       return result.ok;
     },
     onSuccess: (txId) => {
-      toast.success(txId || "NFT sent successfully");
+      toast.success(
+        isVaultedExternal
+          ? "NFT withdrawn to external wallet"
+          : txId || "NFT sent successfully",
+      );
       const principalKey = principal?.toString();
       if (principalKey) {
         queryClient.setQueryData<WalletNFT[]>(
@@ -433,7 +447,7 @@ function SendNFTModal({ open, onClose, nft, collection }: SendNFTModalProps) {
         <DialogHeader>
           <DialogTitle className="font-display text-foreground flex items-center gap-2">
             <Send className="w-4 h-4 text-accent" />
-            Send NFT
+            {actionLabel}
           </DialogTitle>
         </DialogHeader>
 
@@ -468,6 +482,12 @@ function SendNFTModal({ open, onClose, nft, collection }: SendNFTModalProps) {
                   className="mt-1"
                 />
               )}
+              <Badge
+                variant="secondary"
+                className={`mt-1 w-fit border text-[10px] ${nftCustodyClass(nft.location)}`}
+              >
+                {nftCustodyLabel(nft.location)}
+              </Badge>
             </div>
           </div>
 
@@ -478,7 +498,9 @@ function SendNFTModal({ open, onClose, nft, collection }: SendNFTModalProps) {
               <strong>This action cannot be undone.</strong>{" "}
               {isRegisteredExternal
                 ? "This NFT will be sent directly from your connected wallet on the original collection canister."
-                : "The NFT will be permanently transferred to the recipient's wallet."}{" "}
+                : isVaultedExternal
+                  ? "This vaulted NFT is held by the Mintlab vault. Withdrawing transfers the original NFT from Mintlab custody to the recipient principal on the external collection canister."
+                  : "The Mintlab-created NFT will be permanently transferred to the recipient's wallet."}{" "}
               Double-check the Principal ID before sending.
             </p>
           </div>
@@ -514,12 +536,18 @@ function SendNFTModal({ open, onClose, nft, collection }: SendNFTModalProps) {
               </p>
             )}
             <p className="text-xs text-muted-foreground">
-              The recipient must have a Principal ID (not an Account ID). NFT
-              wallets on ICP use Principal IDs for NFT transfers.
+              The recipient must have a Principal ID (not an Account ID).
+              {isVaultedExternal
+                ? " Withdrawals from Mintlab custody are sent to that external wallet principal."
+                : " NFT wallets on ICP use Principal IDs for NFT transfers."}
             </p>
           </div>
 
-          <TermsAgreementNotice actionLabel="sending this NFT" />
+          <TermsAgreementNotice
+            actionLabel={
+              isVaultedExternal ? "withdrawing this NFT" : "sending this NFT"
+            }
+          />
 
           <div className="flex items-center justify-end gap-2 pt-1">
             <Button
@@ -544,7 +572,7 @@ function SendNFTModal({ open, onClose, nft, collection }: SendNFTModalProps) {
               ) : (
                 <>
                   <Send className="w-3.5 h-3.5" />
-                  Send NFT
+                  {actionLabel}
                 </>
               )}
             </Button>
@@ -586,20 +614,9 @@ function NFTDetailsModal({
     ? `https://dashboard.internetcomputer.org/canister/${canisterId}`
     : null;
 
-  const locationLabel = isListed
-    ? "Listed on Market"
-    : nft.location === "Registered"
-      ? "Registered"
-      : nft.location === "Vaulted"
-        ? "Vaulted"
-        : "Minted";
-  const locationClass = isListed
-    ? "bg-amber-500/10 text-amber-700 border-amber-500/20"
-    : nft.location === "Registered"
-      ? "bg-muted/80 text-muted-foreground border-border/60"
-      : nft.location === "Vaulted"
-        ? "bg-primary/10 text-primary border-primary/20"
-        : "bg-accent/10 text-accent border-accent/20";
+  const custodyLabel = nftCustodyLabel(nft.location);
+  const custodyClass = nftCustodyClass(nft.location);
+  const custodyDescription = nftCustodyDescription(nft, collection);
 
   return (
     <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
@@ -629,11 +646,16 @@ function NFTDetailsModal({
           <div className="min-h-0 overflow-y-auto p-5 space-y-4">
             <DialogHeader className="space-y-2 text-left">
               <div className="flex items-center gap-2 flex-wrap">
+                {isListed && (
+                  <Badge className="border text-xs bg-amber-500/10 text-amber-700 border-amber-500/20">
+                    Listed on Market
+                  </Badge>
+                )}
                 <Badge
                   variant="secondary"
-                  className={`border text-xs ${locationClass}`}
+                  className={`border text-xs ${custodyClass}`}
                 >
-                  {locationLabel}
+                  {custodyLabel}
                 </Badge>
                 {collection && (
                   <CollectionBadge collection={collection} size="sm" />
@@ -658,6 +680,18 @@ function NFTDetailsModal({
                 {nft.metadata.description}
               </p>
             )}
+
+            <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/25 p-3">
+              <Info className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-foreground">
+                  {custodyLabel}
+                </p>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  {custodyDescription}
+                </p>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 gap-3">
               <CopyField
@@ -730,7 +764,9 @@ function NFTDetailsModal({
                   data-ocid="wallet.nft_details.send_button"
                 >
                   <Send className="w-3.5 h-3.5" />
-                  Send NFT
+                  {nft.location === "Vaulted"
+                    ? WITHDRAW_TO_EXTERNAL_WALLET_LABEL
+                    : "Send NFT"}
                 </Button>
               )}
             </div>
@@ -2218,12 +2254,12 @@ function CollectionSection({
                 setSendNft(nft);
               }}
               data-ocid={`wallet.send_nft_button.${sectionIndex * 100 + i + 1}`}
-              aria-label={`Send ${nft.metadata.name ?? `NFT #${nft.tokenId}`}`}
+              aria-label={`${nft.location === "Vaulted" ? WITHDRAW_TO_EXTERNAL_WALLET_LABEL : "Send NFT"} ${nft.metadata.name ?? `NFT #${nft.tokenId}`}`}
               disabled={isNFTListed(nft)}
               hidden={isNFTListed(nft)}
             >
               <Send className="w-3 h-3" />
-              Send
+              {nft.location === "Vaulted" ? "Withdraw" : "Send"}
             </button>
           </div>
         ))}

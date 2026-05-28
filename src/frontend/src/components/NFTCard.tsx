@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { nftCustodyClass, nftCustodyLabel } from "@/lib/nft-custody";
 import { cn } from "@/lib/utils";
 import type { Collection, WalletNFT } from "@/types";
 import { ImageOff } from "lucide-react";
@@ -32,20 +33,8 @@ export function NFTCard({
 }: NFTCardProps) {
   const name = nft.metadata.name ?? `NFT #${nft.tokenId}`;
   const description = nft.metadata.description;
-  const locationLabel = isListed
-    ? "Listed"
-    : nft.location === "Registered"
-      ? "Registered"
-      : nft.location === "Vaulted"
-        ? "Vaulted"
-        : "Minted";
-  const locationClass = isListed
-    ? "bg-amber-500/10 text-amber-700 border-amber-500/20"
-    : nft.location === "Registered"
-      ? "bg-muted/80 text-muted-foreground border-border/60"
-      : nft.location === "Vaulted"
-        ? "bg-primary/10 text-primary border-primary/20"
-        : "bg-accent/10 text-accent border-accent/20";
+  const custodyLabel = nftCustodyLabel(nft.location);
+  const custodyClass = nftCustodyClass(nft.location);
 
   return (
     <motion.div
@@ -98,11 +87,20 @@ export function NFTCard({
         {collection && <CollectionBadge collection={collection} size="sm" />}
 
         <div className="flex flex-wrap gap-1.5">
+          {isListed && (
+            <Badge className="text-[10px] border bg-amber-500/10 text-amber-700 border-amber-500/20">
+              Listed
+            </Badge>
+          )}
           <Badge
             variant="secondary"
-            className={cn("text-[10px] border", locationClass)}
+            className={cn(
+              "max-w-full whitespace-normal break-words text-left text-[10px] leading-tight border",
+              custodyClass,
+            )}
+            title={custodyLabel}
           >
-            {locationLabel}
+            {custodyLabel}
           </Badge>
           {dividendE8s !== undefined && dividendE8s > 0n && (
             <Badge className="text-[10px] border bg-emerald-500/10 text-emerald-700 border-emerald-500/20">

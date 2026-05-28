@@ -60,7 +60,7 @@ export const termsSections: TermsSection[] = [
     title: "6. Marketplace, Vault, Escrow, Bids, and Settlements",
     bullets: [
       "Marketplace listings and auctions are peer-to-peer transactions coordinated by Mintlab canisters according to the deployed code.",
-      "External registered NFTs may be transferred into a Mintlab vault before listing so that the app can settle a sale. Vault transfers and direct NFT transfers may be irreversible.",
+      "Registered external wallet NFTs may be transferred into a Mintlab vault before listing so that the app can settle a sale. Buying a vaulted external NFT keeps the original NFT in Mintlab custody until the buyer withdraws it to an external wallet.",
       "Fixed purchases, auction bids, fee reserves, seller payouts, Mintlab fees, refunds, no-bid returns, and settlement retries depend on canister state, ICP ledger fees, and successful asynchronous calls.",
       "Auction bids may be held in escrow, may extend auctions near closing time, and may require refund or recovery flows. Auctions with bids may not be cancelable.",
       "You are responsible for reviewing listing type, price, bid amount, duration, fees, escrow reserves, and settlement status before confirming.",

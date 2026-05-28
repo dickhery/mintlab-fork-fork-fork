@@ -10,12 +10,12 @@ function getStandardLabel(standard: NFTStandard): string {
 }
 
 function getTrustLabel(collection: Collection): string {
-  if (collection.kind === "Minted") return "Mintlab verified";
+  if (collection.kind === "Minted") return "Mintlab-created";
   const needsRange =
     (collection.standard.__kind__ === "EXT" ||
       collection.standard.__kind__ === "DIP721") &&
     collection.browseInfo?.totalSupply == null;
-  return needsRange ? "Needs token range" : "Community imported";
+  return needsRange ? "Needs token range" : "External collection";
 }
 
 interface CollectionBadgeProps {

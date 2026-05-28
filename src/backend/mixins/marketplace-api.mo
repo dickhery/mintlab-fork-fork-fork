@@ -3341,6 +3341,8 @@ mixin (
         };
       };
       case (#Vaulted) {
+        // Vaulted external NFTs stay in Mintlab custody during settlement.
+        // The buyer receives the in-app wallet record and can later withdraw.
         ignore to;
         switch (await* ensureEscrowedNFTReadyResult(nft)) {
           case (#ok(_)) #ok(#Vaulted);
