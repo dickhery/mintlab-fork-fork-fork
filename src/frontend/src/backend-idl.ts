@@ -960,6 +960,16 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : CollectionCreationReceipt, 'err' : IDL.Text })],
         [],
       ),
+    'adminReleaseDividendClaimLock' : IDL.Func(
+        [CollectionId, IDL.Text],
+        [IDL.Variant({ 'ok' : IDL.Bool, 'err' : IDL.Text })],
+        [],
+      ),
+    'adminReleaseDividendDisbursementLock' : IDL.Func(
+        [CollectionId],
+        [IDL.Variant({ 'ok' : IDL.Bool, 'err' : IDL.Text })],
+        [],
+      ),
     'adminResetUnresolvedMintlabFeeAttempt' : IDL.Func(
         [ListingId],
         [MintlabFeeRecoveryQuote],

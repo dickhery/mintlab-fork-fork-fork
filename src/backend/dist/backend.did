@@ -1063,6 +1063,16 @@ service : {
       err: text;
       ok: CollectionCreationReceipt;
     });
+  adminReleaseDividendClaimLock: (collectionId: CollectionId, tokenId:
+   text) -> (variant {
+               err: text;
+               ok: bool;
+             });
+  adminReleaseDividendDisbursementLock: (collectionId: CollectionId) ->
+   (variant {
+      err: text;
+      ok: bool;
+    });
   adminResetUnresolvedMintlabFeeAttempt: (listingId: ListingId) ->
    (MintlabFeeRecoveryQuote);
   adminRetryAuctionSettlement: (listingId: ListingId) -> ();

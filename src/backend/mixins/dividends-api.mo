@@ -5,6 +5,7 @@ import Map "mo:core/Map";
 import Nat "mo:core/Nat";
 import Nat64 "mo:core/Nat64";
 import Principal "mo:core/Principal";
+import AuthLib "../lib/auth";
 import CollectionsLib "../lib/collections";
 import DividendsLib "../lib/dividends";
 import IcpLib "../lib/icp";
@@ -26,6 +27,7 @@ mixin (
   marketplaceListingLockState : MarketplaceLib.MarketplaceListingLockState,
   marketplaceUserPaymentLockState : MarketplaceLib.MarketplaceUserPaymentLockState,
   mintState : MintLib.MintState,
+  authState : AuthLib.AdminState,
   canisterId : Principal,
 ) {
   type ChildCollectionOwnerActor = actor {
@@ -506,6 +508,36 @@ mixin (
     #err("Batch dividend disbursement is disabled. NFT owners must collect dividends individually.");
   };
 
+  public shared ({ caller }) func adminReleaseDividendClaimLock(
+    collectionId : CollectionTypes.CollectionId,
+    tokenId : Text,
+  ) : async { #ok : Bool; #err : Text } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("Anonymous caller not allowed");
+    };
+    if (not AuthLib.isAdmin(authState, caller)) {
+      return #err("Unauthorized: admin only");
+    };
+    let key = DividendsLib.nftKey(collectionId, tokenId);
+    let wasLocked = DividendsLib.isClaimPending(dividendsState, key);
+    DividendsLib.releaseClaim(dividendsState, key);
+    #ok(wasLocked);
+  };
+
+  public shared ({ caller }) func adminReleaseDividendDisbursementLock(
+    collectionId : CollectionTypes.CollectionId
+  ) : async { #ok : Bool; #err : Text } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("Anonymous caller not allowed");
+    };
+    if (not AuthLib.isAdmin(authState, caller)) {
+      return #err("Unauthorized: admin only");
+    };
+    let wasLocked = DividendsLib.isDisbursementPending(dividendFeeState, collectionId);
+    DividendsLib.releaseDisbursement(dividendFeeState, collectionId);
+    #ok(wasLocked);
+  };
+
   public shared ({ caller }) func claimNFTDividend(
     nftId : WalletTypes.NFTId
   ) : async { #ok : DividendTypes.DividendClaimReceipt; #err : Text } {
@@ -544,58 +576,60 @@ mixin (
       );
     };
     let payoutE8s = claimable - feeE8s;
+    let receiptNFT = compactDividendNFT(verifiedNft);
+    let receiptCollection = compactDividendCollection(collection);
 
     let key = DividendsLib.nftKey(nft.collectionId, nft.tokenId);
     if (not DividendsLib.acquireClaim(dividendsState, key)) {
       return #err("A dividend claim is already processing for this NFT");
     };
-    if (not MarketplaceLib.acquireListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId)) {
-      DividendsLib.releaseClaim(dividendsState, key);
-      return #err("This NFT is being listed or settled. Try collecting dividends again after the marketplace action finishes.");
-    };
-    if (isActiveMarketplaceListingNFT(nft)) {
-      MarketplaceLib.releaseListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId);
-      DividendsLib.releaseClaim(dividendsState, key);
-      return #err(DIVIDEND_LISTING_PAUSED_MESSAGE);
-    };
-
-    DividendsLib.setClaimable(dividendsState, nft.collectionId, nft.tokenId, 0);
+    var listingLockAcquired = false;
     try {
-      let userAccount = IcpLib.accountIdentifier(canisterId, IcpLib.principalToSubaccount(caller));
-      let result = await* IcpLib.transferOutWithFee(
-        ledger,
-        ?IcpLib.collectionDividendSubaccount(nft.collectionId),
-        userAccount,
-        payoutE8s,
-        Nat64.fromNat(nft.id),
-        feeE8s,
-      );
-      switch (result) {
-        case (#Ok(blockIndex)) {
-          DividendsLib.reduceProcessedBalance(dividendsState, nft.collectionId, claimable);
-          MarketplaceLib.releaseListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId);
-          DividendsLib.releaseClaim(dividendsState, key);
-          #ok({
-            nft = compactDividendNFT(verifiedNft);
-            collection = compactDividendCollection(collection);
-            paidE8s = payoutE8s;
-            feeE8s;
-            blockIndex;
-          });
-        };
-        case (#Err(error)) {
-          ignore error;
-          DividendsLib.addClaimable(dividendsState, nft.collectionId, nft.tokenId, claimable);
-          MarketplaceLib.releaseListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId);
-          DividendsLib.releaseClaim(dividendsState, key);
-          #err("ICP dividend transfer failed");
-        };
+      if (not MarketplaceLib.acquireListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId)) {
+        return #err("This NFT is being listed or settled. Try collecting dividends again after the marketplace action finishes.");
       };
-    } catch (e) {
-      DividendsLib.addClaimable(dividendsState, nft.collectionId, nft.tokenId, claimable);
-      MarketplaceLib.releaseListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId);
+      listingLockAcquired := true;
+      if (isActiveMarketplaceListingNFT(nft)) {
+        return #err(DIVIDEND_LISTING_PAUSED_MESSAGE);
+      };
+
+      DividendsLib.setClaimable(dividendsState, nft.collectionId, nft.tokenId, 0);
+      try {
+        let userAccount = IcpLib.accountIdentifier(canisterId, IcpLib.principalToSubaccount(caller));
+        let result = await* IcpLib.transferOutWithFee(
+          ledger,
+          ?IcpLib.collectionDividendSubaccount(nft.collectionId),
+          userAccount,
+          payoutE8s,
+          Nat64.fromNat(nft.id),
+          feeE8s,
+        );
+        switch (result) {
+          case (#Ok(blockIndex)) {
+            DividendsLib.reduceProcessedBalance(dividendsState, nft.collectionId, claimable);
+            #ok({
+              nft = receiptNFT;
+              collection = receiptCollection;
+              paidE8s = payoutE8s;
+              feeE8s;
+              blockIndex;
+            });
+          };
+          case (#Err(error)) {
+            ignore error;
+            DividendsLib.addClaimable(dividendsState, nft.collectionId, nft.tokenId, claimable);
+            #err("ICP dividend transfer failed");
+          };
+        };
+      } catch (e) {
+        DividendsLib.addClaimable(dividendsState, nft.collectionId, nft.tokenId, claimable);
+        #err("ICP dividend transfer failed: " # Error.message(e));
+      };
+    } finally {
+      if (listingLockAcquired) {
+        MarketplaceLib.releaseListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId);
+      };
       DividendsLib.releaseClaim(dividendsState, key);
-      #err("ICP dividend transfer failed: " # Error.message(e));
     };
   };
 

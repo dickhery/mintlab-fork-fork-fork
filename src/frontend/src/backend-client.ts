@@ -746,6 +746,17 @@ export interface backendInterface {
   ): Promise<
     { __kind__: "ok"; ok: boolean } | { __kind__: "err"; err: string }
   >;
+  adminReleaseDividendClaimLock(
+    collectionId: CollectionId,
+    tokenId: string,
+  ): Promise<
+    { __kind__: "ok"; ok: boolean } | { __kind__: "err"; err: string }
+  >;
+  adminReleaseDividendDisbursementLock(
+    collectionId: CollectionId,
+  ): Promise<
+    { __kind__: "ok"; ok: boolean } | { __kind__: "err"; err: string }
+  >;
   adminDisableCollectionSync(
     collectionId: CollectionId,
   ): Promise<
@@ -2996,6 +3007,31 @@ export class Backend implements backendInterface {
     return fromBooleanResult(
       await this.run(() =>
         this.actor.adminDeleteCollectionCreationRequest(requestId),
+      ),
+    );
+  }
+
+  async adminReleaseDividendClaimLock(
+    collectionId: CollectionId,
+    tokenId: string,
+  ): Promise<
+    { __kind__: "ok"; ok: boolean } | { __kind__: "err"; err: string }
+  > {
+    return fromBooleanResult(
+      await this.run(() =>
+        this.actor.adminReleaseDividendClaimLock(collectionId, tokenId),
+      ),
+    );
+  }
+
+  async adminReleaseDividendDisbursementLock(
+    collectionId: CollectionId,
+  ): Promise<
+    { __kind__: "ok"; ok: boolean } | { __kind__: "err"; err: string }
+  > {
+    return fromBooleanResult(
+      await this.run(() =>
+        this.actor.adminReleaseDividendDisbursementLock(collectionId),
       ),
     );
   }

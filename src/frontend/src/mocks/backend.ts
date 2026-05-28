@@ -838,6 +838,14 @@ export const mockBackend: backendInterface = {
     __kind__: "ok" as const,
     ok: true,
   }),
+  adminReleaseDividendClaimLock: async () => ({
+    __kind__: "ok" as const,
+    ok: true,
+  }),
+  adminReleaseDividendDisbursementLock: async () => ({
+    __kind__: "ok" as const,
+    ok: true,
+  }),
   quoteCollectionCreationCost: async (
     collectionCanisterCycles,
     collectionCreationPriceE8s,

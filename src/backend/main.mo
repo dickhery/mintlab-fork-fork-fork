@@ -97,6 +97,7 @@ persistent actor Backend {
     marketplaceListingLockState,
     marketplaceUserPaymentLockState,
     mintState,
+    authState,
     Principal.fromActor(Backend),
   );
   include BrowseApi(

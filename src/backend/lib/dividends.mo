@@ -221,6 +221,13 @@ module {
     Map.remove(state.pendingClaims, Text.compare, key);
   };
 
+  public func isClaimPending(state : DividendsState, key : Text) : Bool {
+    switch (Map.get(state.pendingClaims, Text.compare, key)) {
+      case (?_) true;
+      case null false;
+    };
+  };
+
   public func acquireDisbursement(
     state : DividendFeeState,
     collectionId : CollectionTypes.CollectionId,
@@ -239,5 +246,15 @@ module {
     collectionId : CollectionTypes.CollectionId,
   ) {
     Map.remove(state.disbursementLocks, Nat.compare, collectionId);
+  };
+
+  public func isDisbursementPending(
+    state : DividendFeeState,
+    collectionId : CollectionTypes.CollectionId,
+  ) : Bool {
+    switch (Map.get(state.disbursementLocks, Nat.compare, collectionId)) {
+      case (?_) true;
+      case null false;
+    };
   };
 };
