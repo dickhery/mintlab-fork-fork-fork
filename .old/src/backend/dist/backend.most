@@ -119,6 +119,14 @@ type CollectionCreationStatus__117391809 =
     #Installed;
     #Started
   };
+type CollectionDividendAccumulator__45433497 =
+  {
+    var accDividendPerTokenScaled : Nat;
+    collectionId : CollectionId__674876002;
+    var remainderE8s : Nat64;
+    var totalDistributedE8s : Nat64;
+    var totalReceivedE8s : Nat64
+  };
 type CollectionDividendConfig__135318206 = {enabled : Bool};
 type CollectionId__413579528 = CollectionId__674876002;
 type CollectionId__519062255 = CollectionId__674876002;
@@ -366,6 +374,13 @@ type StoredMintConfig__154708401 =
   };
 type Timestamp__301639476 = Int;
 type Timestamp__534280185 = Timestamp__301639476;
+type TokenDividendSnapshot__844801814 =
+  {
+    var claimedAccumulatorScaled : Nat;
+    collectionId : CollectionId__674876002;
+    var pendingCarryE8s : Nat64;
+    tokenId : Text
+  };
 type UserId__158757552 = Principal;
 type UserId__166399690 = UserId__158757552;
 type UserId__74810557 = UserId__158757552;
@@ -429,6 +444,16 @@ actor {
         ?Map__605269027<Principal, [CollectionId__674876002]>;
       var lastImportAtByUser : ?Map__605269027<Principal, Int>;
       var nextId : Nat
+    };
+  stable dividendAccumulatorState :
+    {
+      accumulators :
+        Map__605269027<CollectionId__674876002,
+                        CollectionDividendAccumulator__45433497>;
+      operationLocks : Map__605269027<CollectionId__674876002, Bool>;
+      pendingSyncMints : Map__605269027<CollectionId__674876002, [Text]>;
+      syncLocks : Map__605269027<CollectionId__674876002, Bool>;
+      tokenSnapshots : Map__605269027<Text, TokenDividendSnapshot__844801814>
     };
   stable dividendFeeState :
     {
