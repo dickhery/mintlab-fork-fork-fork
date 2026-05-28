@@ -418,6 +418,7 @@ actor {
   stable IMPORT_INDEX_WARM_PAGE_LIMIT : Nat;
   stable MAX_IMPORTS_PER_USER_PER_DAY : Nat;
   stable MAX_UNVERIFIED_COLLECTIONS_VISIBLE : Nat;
+  stable PENDING_BID_TIMEOUT_NS : Int;
   stable authState : {var adminPrincipal : ?Principal};
   stable collectionCreationPayoutSplitState :
     {
