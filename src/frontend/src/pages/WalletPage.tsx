@@ -5,6 +5,7 @@ import { HelpCallout, HelpTooltip } from "@/components/HelpCallout";
 import { MediaImage } from "@/components/MediaImage";
 import { NFTCard } from "@/components/NFTCard";
 import { PaymentConfirmationDialog } from "@/components/PaymentConfirmationDialog";
+import { TermsAgreementNotice } from "@/components/TermsAcceptance";
 import { ZoomableMediaImage } from "@/components/ZoomableMediaImage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -517,6 +518,8 @@ function SendNFTModal({ open, onClose, nft, collection }: SendNFTModalProps) {
               wallets on ICP use Principal IDs for NFT transfers.
             </p>
           </div>
+
+          <TermsAgreementNotice actionLabel="sending this NFT" />
 
           <div className="flex items-center justify-end gap-2 pt-1">
             <Button
@@ -1648,6 +1651,8 @@ function MintComposer({
                   />
                 </div>
               )}
+
+              <TermsAgreementNotice actionLabel="minting this NFT" />
 
               <div className="flex justify-end">
                 <Button

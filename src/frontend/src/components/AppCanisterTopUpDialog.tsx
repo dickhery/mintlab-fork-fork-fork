@@ -1,4 +1,5 @@
 import type { CollectionCycleTopUpQuote } from "@/backend-client";
+import { TermsAgreementNotice } from "@/components/TermsAcceptance";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -207,6 +208,8 @@ export function AppCanisterTopUpDialog({
             )}
           </div>
         </div>
+
+        <TermsAgreementNotice actionLabel="confirming this cycle top-up" />
 
         <DialogFooter className="gap-2">
           <Button

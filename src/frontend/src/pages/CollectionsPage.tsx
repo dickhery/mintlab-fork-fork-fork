@@ -8,6 +8,7 @@ import { HelpCallout, HelpTooltip } from "@/components/HelpCallout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { MediaImage } from "@/components/MediaImage";
 import { PaymentConfirmationDialog } from "@/components/PaymentConfirmationDialog";
+import { TermsAgreementNotice } from "@/components/TermsAcceptance";
 import { ZoomableMediaImage } from "@/components/ZoomableMediaImage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -592,6 +593,8 @@ function ImportCollectionCard({
           </div>
         )}
 
+        <TermsAgreementNotice actionLabel="adding this external collection" />
+
         <div className="flex justify-end">
           <Button
             onClick={() => importMutation.mutate()}
@@ -911,6 +914,8 @@ function CreateCollectionCard({
               Sign in with Internet Identity to create a collection.
             </div>
           )}
+
+          <TermsAgreementNotice actionLabel="creating this collection" />
 
           <div className="flex justify-end">
             <Button
@@ -1381,6 +1386,8 @@ function CollectionTopUpDialog({
             )}
           </div>
         </div>
+
+        <TermsAgreementNotice actionLabel="confirming this collection cycle top-up" />
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={onClose}>

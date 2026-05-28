@@ -3,6 +3,7 @@ import { EmptyState } from "@/components/EmptyState";
 import { HelpCallout } from "@/components/HelpCallout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { MediaImage } from "@/components/MediaImage";
+import { TermsAgreementNotice } from "@/components/TermsAcceptance";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -288,6 +289,8 @@ export default function DividendsPage() {
           Dividend-enabled collection deposits are checked here, then claimable
           ICP can be collected from the NFTs you currently hold.
         </HelpCallout>
+
+        <TermsAgreementNotice actionLabel="checking deposits or collecting dividend ICP" />
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Card className="border-border bg-card">

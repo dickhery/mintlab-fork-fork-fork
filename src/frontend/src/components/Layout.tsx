@@ -236,6 +236,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
             >
               Help
             </Link>
+            <Link
+              to="/terms"
+              className="text-accent transition-colors hover:text-accent/80"
+              data-ocid="footer.terms.link"
+            >
+              Terms
+            </Link>
             <span className="font-mono text-xs">
               Built on Internet Computer
             </span>

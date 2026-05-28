@@ -5,6 +5,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { MediaImage } from "@/components/MediaImage";
 import { PaymentConfirmationDialog } from "@/components/PaymentConfirmationDialog";
 import { PriceDisplay } from "@/components/PriceDisplay";
+import { TermsAgreementNotice } from "@/components/TermsAcceptance";
 import { ZoomableMediaImage } from "@/components/ZoomableMediaImage";
 import {
   AlertDialog,
@@ -1055,6 +1056,8 @@ function ListNFTModal({
             </div>
           )}
 
+          <TermsAgreementNotice actionLabel="listing this NFT" />
+
           <div className="flex gap-2 pt-1">
             <Button
               type="button"
@@ -2008,6 +2011,7 @@ export default function MarketplacePage() {
               </div>
             </div>
           )}
+          <TermsAgreementNotice actionLabel="confirming this purchase" />
           <AlertDialogFooter>
             <AlertDialogCancel
               className="border-border"
@@ -2057,6 +2061,7 @@ export default function MarketplacePage() {
                 : "Are you sure you want to cancel this listing? Your NFT will be returned to your wallet."}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <TermsAgreementNotice actionLabel="canceling this listing" />
           <AlertDialogFooter>
             <AlertDialogCancel
               className="border-border"

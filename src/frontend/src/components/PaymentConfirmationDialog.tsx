@@ -1,4 +1,5 @@
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { TermsAgreementNotice } from "@/components/TermsAcceptance";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,6 +67,7 @@ export function PaymentConfirmationDialog({
             </div>
           ))}
         </div>
+        <TermsAgreementNotice />
         <AlertDialogFooter>
           <AlertDialogCancel className="border-border" disabled={isPending}>
             Cancel

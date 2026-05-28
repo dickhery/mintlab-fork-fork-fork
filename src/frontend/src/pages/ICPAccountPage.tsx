@@ -1,5 +1,6 @@
 import type { AccountIdentifier, TransferResult } from "@/backend-client";
 import { HelpCallout } from "@/components/HelpCallout";
+import { TermsAgreementNotice } from "@/components/TermsAcceptance";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -658,6 +659,8 @@ export default function ICPAccountPage() {
               </>
             )}
           </div>
+
+          <TermsAgreementNotice actionLabel="confirming this ICP transfer" />
 
           <DialogFooter className="gap-2">
             <Button

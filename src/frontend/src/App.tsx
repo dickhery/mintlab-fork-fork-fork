@@ -1,5 +1,6 @@
 import { Layout } from "@/components/Layout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { TermsGate } from "@/components/TermsAcceptance";
 import { Toaster } from "@/components/ui/sonner";
 import {
   Outlet,
@@ -18,6 +19,7 @@ const LandingPage = lazy(() => import("@/pages/LandingPage"));
 const CollectionsPage = lazy(() => import("@/pages/CollectionsPage"));
 const DividendsPage = lazy(() => import("@/pages/DividendsPage"));
 const HelpPage = lazy(() => import("@/pages/HelpPage"));
+const TermsPage = lazy(() => import("@/pages/TermsPage"));
 
 const rootRoute = createRootRoute({
   component: () => (
@@ -31,6 +33,7 @@ const rootRoute = createRootRoute({
       >
         <Outlet />
       </Suspense>
+      <TermsGate />
     </Layout>
   ),
 });
@@ -83,6 +86,12 @@ const helpRoute = createRoute({
   component: HelpPage,
 });
 
+const termsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/terms",
+  component: TermsPage,
+});
+
 const routeTree = rootRoute.addChildren([
   indexRoute,
   walletRoute,
@@ -92,6 +101,7 @@ const routeTree = rootRoute.addChildren([
   collectionsRoute,
   dividendsRoute,
   helpRoute,
+  termsRoute,
 ]);
 
 const router = createRouter({ routeTree });
