@@ -1,4 +1,4 @@
-const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-BrUWL7u8.js","assets/AppCanisterTopUpDialog-Deh_h-YY.js","assets/index-ymCy4oYw.js","assets/badge-BdSaAu0y.js","assets/external-nft-transfer-BsLtPysQ.js","assets/media-DMaowCEL.js","assets/MediaImage-puS7oQEW.js","assets/HelpCallout-DHdfSA8r.js","assets/arrow-right-CZKstv_w.js","assets/ZoomableMediaImage-ojOXx35X.js","assets/index-CfTgUWut.js","assets/card-BLINR29j.js","assets/textarea-Ch6q2_Ac.js","assets/skeleton-8BbINgiI.js","assets/imageUtils-DyCWioqB.js","assets/circle-check-BwYP7K3V.js","assets/coins-CY3Tg7Yj.js","assets/send-D70xhrGR.js","assets/MarketplacePage-EeLnS_T8.js","assets/icp-BXjZNIYq.js","assets/AdminPage-AWViKVhy.js","assets/switch-BFGKTV-M.js","assets/circle-alert-CG-54lKk.js","assets/shield-check-BYS08QSG.js","assets/ICPAccountPage-BTxZCq08.js","assets/CollectionsPage-rmNJ2V8y.js","assets/search-BVt4QLCO.js","assets/DividendsPage-B_5jOe7Z.js","assets/HelpPage-CUnVkNbo.js"])))=>i.map(i=>d[i]);
+const __vite__mapDeps=(i,m=__vite__mapDeps,d=(m.f||(m.f=["assets/WalletPage-Dk4L7jaM.js","assets/AppCanisterTopUpDialog-CDiDrWfu.js","assets/index-D4O0G5XX.js","assets/badge-CdWFQjqS.js","assets/external-nft-transfer-C6KOJdUu.js","assets/media-CRgpZMnW.js","assets/MediaImage-BAUNB9BQ.js","assets/HelpCallout-CxEPUbyh.js","assets/arrow-right-BBuBmAHr.js","assets/ZoomableMediaImage-Cw6t_DjZ.js","assets/index-DUsZWVab.js","assets/card-BSj5cyJT.js","assets/textarea-2m3Z646I.js","assets/skeleton-CiTGpCf-.js","assets/imageUtils-D-wDgGeJ.js","assets/circle-check-Bgs5nSTg.js","assets/coins-DdyrKLau.js","assets/send-BsPGHrJN.js","assets/MarketplacePage-DBEZXRYO.js","assets/icp-BXjZNIYq.js","assets/AdminPage-DoJNKk_A.js","assets/switch-B10Lavjp.js","assets/circle-alert-Plgdu9zH.js","assets/shield-check-DfDvuSMl.js","assets/ICPAccountPage-sOZuZMTO.js","assets/CollectionsPage-scSD5PsN.js","assets/search-PgqglyVd.js","assets/DividendsPage-Dv4K5spn.js","assets/HelpPage-DZf8lGzO.js"])))=>i.map(i=>d[i]);
 var __defProp = Object.defineProperty;
 var __typeError = (msg) => {
   throw TypeError(msg);
@@ -31014,6 +31014,16 @@ const idlFactory = ({ IDL: IDL2 }) => {
       [IDL2.Variant({ "ok": CollectionCreationReceipt, "err": IDL2.Text })],
       []
     ),
+    "adminReleaseDividendClaimLock": IDL2.Func(
+      [CollectionId, IDL2.Text],
+      [IDL2.Variant({ "ok": IDL2.Bool, "err": IDL2.Text })],
+      []
+    ),
+    "adminReleaseDividendDisbursementLock": IDL2.Func(
+      [CollectionId],
+      [IDL2.Variant({ "ok": IDL2.Bool, "err": IDL2.Text })],
+      []
+    ),
     "adminResetUnresolvedMintlabFeeAttempt": IDL2.Func(
       [ListingId],
       [MintlabFeeRecoveryQuote],
@@ -32624,6 +32634,20 @@ class Backend {
     return fromBooleanResult(
       await this.run(
         () => this.actor.adminDeleteCollectionCreationRequest(requestId)
+      )
+    );
+  }
+  async adminReleaseDividendClaimLock(collectionId, tokenId) {
+    return fromBooleanResult(
+      await this.run(
+        () => this.actor.adminReleaseDividendClaimLock(collectionId, tokenId)
+      )
+    );
+  }
+  async adminReleaseDividendDisbursementLock(collectionId) {
+    return fromBooleanResult(
+      await this.run(
+        () => this.actor.adminReleaseDividendDisbursementLock(collectionId)
       )
     );
   }
@@ -47551,14 +47575,14 @@ const Toaster = ({ ...props }) => {
     }
   );
 };
-const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-BrUWL7u8.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]) : void 0));
-const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-EeLnS_T8.js"), true ? __vite__mapDeps([18,4,5,6,7,2,8,9,10,3,19,16]) : void 0));
-const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-AWViKVhy.js"), true ? __vite__mapDeps([20,1,2,3,21,12,10,11,13,5,22,23]) : void 0));
-const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-BTxZCq08.js"), true ? __vite__mapDeps([24,7,2,8,3,11,13,19,17,22,15]) : void 0));
-const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-BeZ7U-ZZ.js"), true ? [] : void 0));
-const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-rmNJ2V8y.js"), true ? __vite__mapDeps([25,1,2,3,21,12,10,6,5,7,8,9,11,13,14,26,23]) : void 0));
-const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-B_5jOe7Z.js"), true ? __vite__mapDeps([27,1,2,3,6,5,7,8,11,16]) : void 0));
-const HelpPage = reactExports.lazy(() => __vitePreload(() => import("./HelpPage-CUnVkNbo.js"), true ? __vite__mapDeps([28,3,26,8,15,23]) : void 0));
+const WalletPage = reactExports.lazy(() => __vitePreload(() => import("./WalletPage-Dk4L7jaM.js"), true ? __vite__mapDeps([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17]) : void 0));
+const MarketplacePage = reactExports.lazy(() => __vitePreload(() => import("./MarketplacePage-DBEZXRYO.js"), true ? __vite__mapDeps([18,4,5,6,7,2,8,9,10,3,19,16]) : void 0));
+const AdminPage = reactExports.lazy(() => __vitePreload(() => import("./AdminPage-DoJNKk_A.js"), true ? __vite__mapDeps([20,1,2,3,21,12,10,11,13,5,22,23]) : void 0));
+const ICPAccountPage = reactExports.lazy(() => __vitePreload(() => import("./ICPAccountPage-sOZuZMTO.js"), true ? __vite__mapDeps([24,7,2,8,3,11,13,19,17,22,15]) : void 0));
+const LandingPage = reactExports.lazy(() => __vitePreload(() => import("./LandingPage-DWQA0tf8.js"), true ? [] : void 0));
+const CollectionsPage = reactExports.lazy(() => __vitePreload(() => import("./CollectionsPage-scSD5PsN.js"), true ? __vite__mapDeps([25,1,2,3,21,12,10,6,5,7,8,9,11,13,14,26,23]) : void 0));
+const DividendsPage = reactExports.lazy(() => __vitePreload(() => import("./DividendsPage-Dv4K5spn.js"), true ? __vite__mapDeps([27,1,2,3,6,5,7,8,11,16]) : void 0));
+const HelpPage = reactExports.lazy(() => __vitePreload(() => import("./HelpPage-DZf8lGzO.js"), true ? __vite__mapDeps([28,3,26,8,15,23]) : void 0));
 const rootRoute = createRootRoute({
   component: () => /* @__PURE__ */ jsxRuntimeExports.jsx(Layout, { children: /* @__PURE__ */ jsxRuntimeExports.jsx(
     reactExports.Suspense,

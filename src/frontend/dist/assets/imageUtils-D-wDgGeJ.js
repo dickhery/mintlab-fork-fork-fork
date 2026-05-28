@@ -1,4 +1,4 @@
-import { Q as QueryObserver, p as infiniteQueryBehavior, q as hasPreviousPage, s as hasNextPage, t as useBaseQuery, c as createLucideIcon } from "./index-KX85IDYM.js";
+import { Q as QueryObserver, p as infiniteQueryBehavior, q as hasPreviousPage, s as hasNextPage, t as useBaseQuery, c as createLucideIcon } from "./index-C7bI1kTu.js";
 var InfiniteQueryObserver = class extends QueryObserver {
   constructor(client, options) {
     super(client, options);
