@@ -20,6 +20,10 @@ mixin (
   mintState : MintLib.MintState,
   canisterId : Principal,
 ) {
+  let DEFAULT_COLLECTION_PAGE_SIZE : Nat = 24;
+  let MAX_COLLECTION_PAGE_SIZE : Nat = 40;
+  let MAX_RICH_METADATA_PAGE_SIZE : Nat = 8;
+
   public func getCollectionBrowseStats(
     collectionId : CollectionTypes.CollectionId
   ) : async BrowseTypes.CollectionBrowseStats {
@@ -55,7 +59,7 @@ mixin (
       };
       case (?value) value;
     };
-    await* loadCollectionNFTPage(collection, cursor, normalizePageSize(limit));
+    await* loadCollectionNFTPage(collection, cursor, normalizeCollectionPageSize(collection, limit));
   };
 
   public func getCollectionNFTs(
@@ -69,8 +73,21 @@ mixin (
     var cursor : ?Text = null;
     var allNFTs : [WalletTypes.WalletNFT] = [];
 
+    if (collectionUsesRichMetadataPages(collection)) {
+      let page = await* loadCollectionNFTPage(
+        collection,
+        null,
+        normalizeCollectionPageSize(collection, ?MAX_COLLECTION_PAGE_SIZE),
+      );
+      return page.nfts;
+    };
+
     label paginate loop {
-      let page = await* loadCollectionNFTPage(collection, cursor, normalizePageSize(?40));
+      let page = await* loadCollectionNFTPage(
+        collection,
+        cursor,
+        normalizeCollectionPageSize(collection, ?MAX_COLLECTION_PAGE_SIZE),
+      );
       allNFTs := Array.concat<WalletTypes.WalletNFT>(allNFTs, page.nfts);
       switch (page.nextCursor) {
         case null break paginate;
@@ -683,14 +700,38 @@ mixin (
 
   func normalizePageSize(limit : ?Nat) : Nat {
     switch (limit) {
-      case null 24;
+      case null DEFAULT_COLLECTION_PAGE_SIZE;
       case (?value) {
         if (value == 0) {
           1;
-        } else if (value > 40) {
-          40;
+        } else if (value > MAX_COLLECTION_PAGE_SIZE) {
+          MAX_COLLECTION_PAGE_SIZE;
         } else {
           value;
+        };
+      };
+    };
+  };
+
+  func normalizeCollectionPageSize(
+    collection : CollectionTypes.Collection,
+    limit : ?Nat,
+  ) : Nat {
+    let pageSize = normalizePageSize(limit);
+    if (collectionUsesRichMetadataPages(collection) and pageSize > MAX_RICH_METADATA_PAGE_SIZE) {
+      MAX_RICH_METADATA_PAGE_SIZE;
+    } else {
+      pageSize;
+    };
+  };
+
+  func collectionUsesRichMetadataPages(collection : CollectionTypes.Collection) : Bool {
+    switch (collection.kind) {
+      case (#Minted) true;
+      case (#External) {
+        switch (collection.standard) {
+          case (#ICRC7) true;
+          case (_) false;
         };
       };
     };

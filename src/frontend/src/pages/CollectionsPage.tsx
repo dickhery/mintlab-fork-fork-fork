@@ -126,6 +126,8 @@ const ON_CHAIN_IMAGE_SIZE_MESSAGE =
   "Uploaded image is too large for on-chain storage";
 const COLLECTIONS_PAGE_SIZE = 50n;
 const COLLECTIONS_LISTING_PAGE_SIZE = 25n;
+const DEFAULT_COLLECTION_NFT_PAGE_SIZE = 24n;
+const RICH_COLLECTION_NFT_PAGE_SIZE = 8n;
 
 function formatICP(e8s: bigint): string {
   const whole = e8s / E8S;
@@ -162,6 +164,16 @@ function makeStandard(value: string): Collection["standard"] {
   if (value === "EXT") return { __kind__: "EXT", EXT: null };
   if (value === "DIP721") return { __kind__: "DIP721", DIP721: null };
   return { __kind__: "ICRC7", ICRC7: null };
+}
+
+function collectionNFTPageSize(collection: Collection): bigint {
+  if (
+    collection.kind === "Minted" ||
+    collection.standard.__kind__ === "ICRC7"
+  ) {
+    return RICH_COLLECTION_NFT_PAGE_SIZE;
+  }
+  return DEFAULT_COLLECTION_NFT_PAGE_SIZE;
 }
 
 function parseOptionalNat(value: string): bigint | null {
@@ -2058,7 +2070,11 @@ function NFTBrowser({
           note: "Mintlab is preparing this collection browser.",
         };
       }
-      return actor.getCollectionNFTPage(collection.id, pageParam, 24n);
+      return actor.getCollectionNFTPage(
+        collection.id,
+        pageParam,
+        collectionNFTPageSize(collection),
+      );
     },
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     enabled: !!actor && !isFetching,
