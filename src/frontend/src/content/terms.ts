@@ -1,6 +1,6 @@
-export const TERMS_VERSION = "2026-05-28";
-export const TERMS_LAST_UPDATED = "May 28, 2026";
-export const TERMS_EFFECTIVE_DATE = "May 28, 2026";
+export const TERMS_VERSION = "2026-05-29";
+export const TERMS_LAST_UPDATED = "May 29, 2026";
+export const TERMS_EFFECTIVE_DATE = "May 29, 2026";
 
 export interface TermsSection {
   title: string;
@@ -88,6 +88,9 @@ export const termsSections: TermsSection[] = [
       "You may not upload, mint, list, trade, or promote content that is illegal, harmful, misleading, infringing, abusive, exploitative, or otherwise violates these Terms.",
       "You may not use Mintlab for fraud, money laundering, terrorist financing, sanctions evasion, market manipulation, wash trading, bug exploitation, spam, phishing, or other unlawful or abusive conduct.",
       "Mintlab may use automated moderation, including AI-assisted image or metadata review. Moderation can produce false positives or false negatives, and passing moderation is not legal approval of content.",
+      "Mintlab may sample imported external collections or early marketplace listings for moderation instead of reviewing every NFT in a collection.",
+      "Mintlab may hide, block, or remove imported NFT collections that include images, text, metadata, or other content currently blocked by the app moderation settings.",
+      "Users should report inappropriate NFTs, suspected counterfeit collections, misleading metadata, or other unsafe imported collection issues through the reporting controls in the app.",
       "The operator may hide, block, restrict, or remove access to content or wallet principals through the frontend or app-admin tools when reasonably needed for security, legal, operational, or policy reasons.",
     ],
   },
@@ -106,6 +109,7 @@ export const termsSections: TermsSection[] = [
       "Canisters, ledgers, external NFT standards, gateways, browser wallets, Internet Identity, and frontend infrastructure can fail, change, trap, run out of cycles, be exploited, or become unavailable.",
       "Upgrades, migrations, admin actions, emergency fixes, dependency changes, or network events may alter behavior, pause features, or require recovery steps.",
       "External collection imports rely on third-party canisters and metadata. Mintlab does not control those canisters and cannot guarantee their standards, availability, ownership data, media, or token behavior.",
+      "Unverified external collections can be counterfeit, impersonate higher-value collections, expose unsafe content, disappear, change behavior, or report inaccurate metadata.",
     ],
   },
   {

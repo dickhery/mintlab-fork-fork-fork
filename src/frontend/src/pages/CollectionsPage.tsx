@@ -44,6 +44,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAdmin } from "@/hooks/use-admin";
 import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
+import {
+  COMMUNITY_COLLECTION_NOTICE,
+  collectionMetaMap,
+  collectionTrustBadgeClass,
+  collectionTrustDescription,
+  collectionTrustLabel,
+  collectionTrustStatus,
+  isMintlabVerifiedCollection,
+} from "@/lib/collection-trust";
 import { isLowCyclesError } from "@/lib/cycles";
 import { compressModerationImage } from "@/lib/imageUtils";
 import { resolveImageUrl } from "@/lib/media";
@@ -57,6 +66,8 @@ import type {
   CollectionCreationDiagnostics,
   CollectionCreationRequestView,
   CollectionCycleTopUpQuote,
+  CollectionImportMeta,
+  CollectionTrustStatus,
   MintConfig,
   NFTMetadata,
   PublicModerationConfig,
@@ -75,6 +86,7 @@ import {
   CircleDollarSign,
   Copy,
   ExternalLink,
+  Flag,
   Grid3X3,
   ImageOff,
   Info,
@@ -1018,6 +1030,7 @@ function CreateCollectionCard({
 
 interface CollectionCardProps {
   collection: Collection;
+  trustStatus: CollectionTrustStatus;
   browseStats?: CollectionBrowseStats;
   cycleStatus?: CollectionCanisterStatus;
   index: number;
@@ -1029,12 +1042,14 @@ interface CollectionCardProps {
   onUpgrade?: (collection: Collection) => void;
   onRetryInstall?: (collection: Collection) => void;
   onManageControllers?: (collection: Collection) => void;
+  onReport?: (collection: Collection) => void;
   isUpgrading?: boolean;
   isRetryingInstall?: boolean;
 }
 
 function CollectionCard({
   collection,
+  trustStatus,
   browseStats,
   cycleStatus,
   index,
@@ -1046,6 +1061,7 @@ function CollectionCard({
   onUpgrade,
   onRetryInstall,
   onManageControllers,
+  onReport,
   isUpgrading = false,
   isRetryingInstall = false,
 }: CollectionCardProps) {
@@ -1085,6 +1101,20 @@ function CollectionCard({
         <Badge className="absolute top-2 right-2 bg-card/80 backdrop-blur-sm border border-border/60 text-foreground font-mono text-xs">
           {standardLabel(collection.standard)}
         </Badge>
+        {onReport && (
+          <button
+            type="button"
+            className="absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 bg-card/85 text-muted-foreground opacity-0 shadow-sm backdrop-blur-sm transition-opacity hover:text-foreground group-hover:opacity-100 focus:opacity-100"
+            title="Report this collection"
+            aria-label="Report this collection"
+            onClick={(event) => {
+              event.stopPropagation();
+              onReport(collection);
+            }}
+          >
+            <Flag className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Info */}
@@ -1113,6 +1143,14 @@ function CollectionCard({
                   Dividends
                 </Badge>
               )}
+              <Badge
+                className={`border text-[10px] ${collectionTrustBadgeClass(
+                  trustStatus,
+                )}`}
+                title={collectionTrustDescription(trustStatus)}
+              >
+                {collectionTrustLabel(trustStatus)}
+              </Badge>
             </div>
           </div>
           <Badge
@@ -2878,6 +2916,18 @@ export default function CollectionsPage() {
     enabled: !!actor && !isFetching,
   });
 
+  const { data: collectionImportMetas = [] } = useQuery<CollectionImportMeta[]>(
+    {
+      queryKey: ["collectionImportMetas", "collectionsPage"],
+      queryFn: async () => {
+        if (!actor) return [];
+        const page = await actor.listCollectionImportMetasPage(null, 100n);
+        return page.metas;
+      },
+      enabled: !!actor && !isFetching,
+    },
+  );
+
   const { data: mintConfig } = useQuery<MintConfig | null>({
     queryKey: ["mintConfig"],
     queryFn: async () => {
@@ -3043,6 +3093,7 @@ export default function CollectionsPage() {
 
   const browseStats =
     browseStatsQuery.data ?? new Map<string, CollectionBrowseStats>();
+  const importMetaMap = collectionMetaMap(collectionImportMetas);
   const myCreatedCollectionIds = new Set(
     myCreatedCollections.map((collection) => collection.id.toString()),
   );
@@ -3052,6 +3103,54 @@ export default function CollectionsPage() {
       status,
     ]),
   );
+  const collectionEntries = (collections ?? []).map((collection) => ({
+    collection,
+    trustStatus: collectionTrustStatus(
+      collection,
+      importMetaMap.get(collection.id.toString()),
+    ),
+  }));
+  const verifiedCollectionEntries = collectionEntries.filter(({ collection }) =>
+    isMintlabVerifiedCollection(
+      collection,
+      importMetaMap.get(collection.id.toString()),
+    ),
+  );
+  const communityCollectionEntries = collectionEntries.filter(
+    ({ collection }) =>
+      !isMintlabVerifiedCollection(
+        collection,
+        importMetaMap.get(collection.id.toString()),
+      ),
+  );
+
+  const reportCollectionMutation = useMutation({
+    mutationFn: async (collection: Collection) => {
+      if (!actor) throw new Error("Backend not connected");
+      const result = await actor.reportCollection(
+        collection.id,
+        `Collections page report for ${collection.name}`,
+      );
+      if (result.__kind__ === "err") throw new Error(result.err);
+      return result.ok;
+    },
+    onSuccess: () => {
+      toast.success("Report sent to Mintlab admins.");
+      void queryClient.invalidateQueries({
+        queryKey: ["collectionImportMetas"],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["collections"] });
+    },
+    onError: (err: Error) => toast.error(`Report failed: ${err.message}`),
+  });
+
+  function handleReportCollection(collection: Collection) {
+    if (!isAuthenticated) {
+      toast("Sign in to report this collection.");
+      return;
+    }
+    reportCollectionMutation.mutate(collection);
+  }
 
   return (
     <div
@@ -3224,51 +3323,129 @@ export default function CollectionsPage() {
 
             {/* Collection grid */}
             {!isLoading && (collections ?? []).length > 0 && (
-              <div
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"
-                data-ocid="collections.grid"
-              >
-                {(collections ?? []).map((collection, index) => {
-                  const isCreatorCollection = myCreatedCollectionIds.has(
-                    collection.id.toString(),
-                  );
-                  const isMainAppCollection =
-                    mintConfig?.collectionId?.toString() ===
-                    collection.id.toString();
-                  const canManageCollection =
-                    isCreatorCollection ||
-                    (isAdmin && collection.kind === "Minted");
+              <div className="space-y-8" data-ocid="collections.grid">
+                {verifiedCollectionEntries.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {verifiedCollectionEntries.map(
+                      ({ collection, trustStatus }, index) => {
+                        const isCreatorCollection = myCreatedCollectionIds.has(
+                          collection.id.toString(),
+                        );
+                        const isMainAppCollection =
+                          mintConfig?.collectionId?.toString() ===
+                          collection.id.toString();
+                        const canManageCollection =
+                          isCreatorCollection ||
+                          (isAdmin && collection.kind === "Minted");
 
-                  return (
-                    <CollectionCard
-                      key={collection.id.toString()}
-                      collection={collection}
-                      browseStats={browseStats.get(collection.id.toString())}
-                      cycleStatus={canisterStatusMap.get(
-                        collection.id.toString(),
+                        return (
+                          <CollectionCard
+                            key={collection.id.toString()}
+                            collection={collection}
+                            trustStatus={trustStatus}
+                            browseStats={browseStats.get(
+                              collection.id.toString(),
+                            )}
+                            cycleStatus={canisterStatusMap.get(
+                              collection.id.toString(),
+                            )}
+                            index={index}
+                            isCreatorCollection={isCreatorCollection}
+                            canManageCollection={canManageCollection}
+                            isMainAppCollection={isMainAppCollection}
+                            onClick={() => setSelectedCollection(collection)}
+                            onTopUp={setTopUpCollection}
+                            onUpgrade={(target) =>
+                              upgradeMutation.mutate(target)
+                            }
+                            onRetryInstall={(target) =>
+                              retryInstallMutation.mutate(target)
+                            }
+                            onManageControllers={setControllersCollection}
+                            onReport={handleReportCollection}
+                            isUpgrading={
+                              upgradeMutation.isPending &&
+                              upgradeMutation.variables?.id === collection.id
+                            }
+                            isRetryingInstall={
+                              retryInstallMutation.isPending &&
+                              retryInstallMutation.variables?.id ===
+                                collection.id
+                            }
+                          />
+                        );
+                      },
+                    )}
+                  </div>
+                )}
+
+                {communityCollectionEntries.length > 0 && (
+                  <section className="space-y-5">
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+                      <p className="text-sm font-semibold text-foreground">
+                        Unverified community collections
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        {COMMUNITY_COLLECTION_NOTICE} Check canister IDs before
+                        buying or listing, and report suspected counterfeits or
+                        unsafe content.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                      {communityCollectionEntries.map(
+                        ({ collection, trustStatus }, index) => {
+                          const isCreatorCollection =
+                            myCreatedCollectionIds.has(
+                              collection.id.toString(),
+                            );
+                          const isMainAppCollection =
+                            mintConfig?.collectionId?.toString() ===
+                            collection.id.toString();
+                          const canManageCollection =
+                            isCreatorCollection ||
+                            (isAdmin && collection.kind === "Minted");
+
+                          return (
+                            <CollectionCard
+                              key={collection.id.toString()}
+                              collection={collection}
+                              trustStatus={trustStatus}
+                              browseStats={browseStats.get(
+                                collection.id.toString(),
+                              )}
+                              cycleStatus={canisterStatusMap.get(
+                                collection.id.toString(),
+                              )}
+                              index={verifiedCollectionEntries.length + index}
+                              isCreatorCollection={isCreatorCollection}
+                              canManageCollection={canManageCollection}
+                              isMainAppCollection={isMainAppCollection}
+                              onClick={() => setSelectedCollection(collection)}
+                              onTopUp={setTopUpCollection}
+                              onUpgrade={(target) =>
+                                upgradeMutation.mutate(target)
+                              }
+                              onRetryInstall={(target) =>
+                                retryInstallMutation.mutate(target)
+                              }
+                              onManageControllers={setControllersCollection}
+                              onReport={handleReportCollection}
+                              isUpgrading={
+                                upgradeMutation.isPending &&
+                                upgradeMutation.variables?.id === collection.id
+                              }
+                              isRetryingInstall={
+                                retryInstallMutation.isPending &&
+                                retryInstallMutation.variables?.id ===
+                                  collection.id
+                              }
+                            />
+                          );
+                        },
                       )}
-                      index={index}
-                      isCreatorCollection={isCreatorCollection}
-                      canManageCollection={canManageCollection}
-                      isMainAppCollection={isMainAppCollection}
-                      onClick={() => setSelectedCollection(collection)}
-                      onTopUp={setTopUpCollection}
-                      onUpgrade={(target) => upgradeMutation.mutate(target)}
-                      onRetryInstall={(target) =>
-                        retryInstallMutation.mutate(target)
-                      }
-                      onManageControllers={setControllersCollection}
-                      isUpgrading={
-                        upgradeMutation.isPending &&
-                        upgradeMutation.variables?.id === collection.id
-                      }
-                      isRetryingInstall={
-                        retryInstallMutation.isPending &&
-                        retryInstallMutation.variables?.id === collection.id
-                      }
-                    />
-                  );
-                })}
+                    </div>
+                  </section>
+                )}
               </div>
             )}
           </motion.div>

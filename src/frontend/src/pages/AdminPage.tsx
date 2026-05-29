@@ -73,6 +73,7 @@ import {
   PauseCircle,
   Plus,
   RefreshCw,
+  Search,
   Server,
   Shield,
   ShieldCheck,
@@ -1226,7 +1227,9 @@ function CollectionRow({
   );
   const pid = collection.canisterId.toString();
   const imageUrl = resolveImageUrl(collection.imageUrl);
-  const isExternalCollection = collection.kind === "External";
+  const resolvedTrustStatus: CollectionTrustStatus =
+    importMeta?.trustStatus ??
+    (collection.kind === "Minted" ? "Verified" : "CommunityImported");
 
   const browseMutation = useMutation({
     mutationFn: async () => {
@@ -1293,7 +1296,7 @@ function CollectionRow({
 
   return (
     <div
-      className="space-y-3 rounded-xl border border-border bg-card px-4 py-3 hover:bg-muted/30 transition-colors"
+      className="space-y-2 rounded-lg border border-border bg-card px-3 py-2.5 hover:bg-muted/30 transition-colors"
       data-ocid={`admin.collection.item.${index}`}
     >
       <div className="flex items-center gap-4">
@@ -1329,14 +1332,12 @@ function CollectionRow({
             >
               {standardLabel(collection.standard)}
             </Badge>
-            {isExternalCollection && (
-              <Badge
-                variant={collectionTrustVariant(importMeta?.trustStatus)}
-                className="text-xs shrink-0"
-              >
-                {collectionTrustLabel(importMeta?.trustStatus)}
-              </Badge>
-            )}
+            <Badge
+              variant={collectionTrustVariant(resolvedTrustStatus)}
+              className="text-xs shrink-0"
+            >
+              {collectionTrustLabel(resolvedTrustStatus)}
+            </Badge>
           </div>
           <p className="text-xs text-muted-foreground font-mono truncate flex items-center gap-1">
             {truncatePrincipal(pid)}
@@ -1392,7 +1393,7 @@ function CollectionRow({
         </AlertDialog>
       </div>
 
-      <div className="grid grid-cols-1 gap-2 border-t border-border pt-3 sm:grid-cols-[1fr_1fr_auto]">
+      <div className="grid grid-cols-1 gap-2 border-t border-border pt-2 sm:grid-cols-[1fr_1fr_auto]">
         <Input
           inputMode="numeric"
           placeholder="Collection size"
@@ -1426,12 +1427,19 @@ function CollectionRow({
         </Button>
       </div>
 
-      {isExternalCollection && (
-        <div className="flex flex-wrap gap-2 border-t border-border pt-3">
+      <div className="space-y-2 border-t border-border pt-2">
+        <p className="text-[11px] leading-relaxed text-muted-foreground">
+          Verify marks the collection as Mintlab reviewed. Needs Range flags
+          missing token browse data. Disable Sync stops wallet auto-sync. Hide
+          removes it from public browsing. Block removes public access and
+          prevents sync or marketplace use.
+        </p>
+        <div className="flex flex-wrap gap-2">
           <Button
             size="sm"
             variant="secondary"
             className="gap-2"
+            title="Mark this collection as reviewed and Mintlab verified."
             onClick={() => trustMutation.mutate("Verified")}
             disabled={trustMutation.isPending}
             data-ocid={`admin.collection.verify.${index}`}
@@ -1443,6 +1451,7 @@ function CollectionRow({
             size="sm"
             variant="outline"
             className="gap-2"
+            title="Flag this collection as needing token range browse settings."
             onClick={() => trustMutation.mutate("NeedsBrowseInfo")}
             disabled={trustMutation.isPending}
             data-ocid={`admin.collection.needs_range.${index}`}
@@ -1454,6 +1463,7 @@ function CollectionRow({
             size="sm"
             variant="outline"
             className="gap-2"
+            title="Disable automatic wallet sync for this collection without hiding it."
             onClick={() => trustMutation.mutate("SyncDisabled")}
             disabled={trustMutation.isPending}
             data-ocid={`admin.collection.sync_disabled.${index}`}
@@ -1465,6 +1475,7 @@ function CollectionRow({
             size="sm"
             variant="outline"
             className="gap-2"
+            title="Hide this collection from public browsing while admins review it."
             onClick={() => trustMutation.mutate("Hidden")}
             disabled={trustMutation.isPending}
             data-ocid={`admin.collection.hide.${index}`}
@@ -1476,6 +1487,7 @@ function CollectionRow({
             size="sm"
             variant="destructive"
             className="gap-2"
+            title="Block this collection from public access, wallet sync, and marketplace activity."
             onClick={() => trustMutation.mutate("Blocked")}
             disabled={trustMutation.isPending}
             data-ocid={`admin.collection.block.${index}`}
@@ -1484,7 +1496,7 @@ function CollectionRow({
             Block
           </Button>
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -3559,6 +3571,7 @@ export default function AdminPage() {
   const { isAdmin, isLoading: adminLoading } = useAdmin();
   const { actor, isFetching } = useBackend();
   const queryClient = useQueryClient();
+  const [collectionSearch, setCollectionSearch] = useState("");
 
   const { data: collections, isLoading: collectionsLoading } = useQuery({
     queryKey: ["collections"],
@@ -3593,6 +3606,30 @@ export default function AdminPage() {
     return map;
   }, [collectionImportMetas]);
 
+  const filteredCollections = useMemo(() => {
+    const allCollections = collections ?? [];
+    const q = collectionSearch.trim().toLowerCase();
+    if (!q) return allCollections;
+    return allCollections.filter((collection) => {
+      const meta = collectionImportMetaById.get(collection.id.toString());
+      const status =
+        meta?.trustStatus ??
+        (collection.kind === "Minted" ? "Verified" : "CommunityImported");
+      return [
+        collection.name,
+        collection.symbol,
+        collection.canisterId.toString(),
+        collection.id.toString(),
+        collection.kind,
+        standardLabel(collection.standard),
+        collectionTrustLabel(status),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [collectionImportMetaById, collectionSearch, collections]);
+
   const removeMutation = useMutation({
     mutationFn: async (id: bigint) => {
       if (!actor) throw new Error("Backend not ready");
@@ -3601,6 +3638,9 @@ export default function AdminPage() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["collections"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["collectionImportMetas"],
+      });
       toast.success("Collection removed.");
     },
     onError: (err: unknown) => {
@@ -3618,6 +3658,7 @@ export default function AdminPage() {
 
   const isLoading = adminLoading || collectionsLoading;
   const count = collections?.length ?? 0;
+  const filteredCount = filteredCollections.length;
 
   return (
     <div
@@ -3668,9 +3709,28 @@ export default function AdminPage() {
 
       {/* Collections list */}
       <div className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-          Registered Collections
-        </h2>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+              Registered Collections
+            </h2>
+            {!isLoading && collectionSearch.trim() && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Showing {filteredCount} of {count}
+              </p>
+            )}
+          </div>
+          <div className="relative sm:w-80">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={collectionSearch}
+              onChange={(event) => setCollectionSearch(event.target.value)}
+              placeholder="Search name, canister, status"
+              className="pl-9"
+              data-ocid="admin.collections.search"
+            />
+          </div>
+        </div>
 
         {isLoading ? (
           <div
@@ -3694,9 +3754,19 @@ export default function AdminPage() {
               Use the form above to register the first NFT collection.
             </p>
           </div>
+        ) : filteredCount === 0 ? (
+          <div
+            className="flex flex-col items-center justify-center py-12 rounded-2xl border border-dashed border-border bg-muted/20"
+            data-ocid="admin.collections.no_search_results"
+          >
+            <Search size={32} className="text-muted-foreground/40 mb-3" />
+            <p className="text-sm font-semibold text-muted-foreground">
+              No collections match that search
+            </p>
+          </div>
         ) : (
           <div className="space-y-2" data-ocid="admin.collections.list">
-            {collections!.map((col, i) => (
+            {filteredCollections.map((col, i) => (
               <CollectionRow
                 key={col.id.toString()}
                 collection={col}

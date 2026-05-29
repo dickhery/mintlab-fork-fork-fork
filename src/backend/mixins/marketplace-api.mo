@@ -8,15 +8,20 @@ import MarketplaceTypes "../types/marketplace";
 import WalletTypes "../types/wallet";
 import CollectionTypes "../types/collections";
 import CommonTypes "../types/common";
+import MintTypes "../types/mint";
 import Array "mo:core/Array";
 import Blob "mo:core/Blob";
+import Cycles "mo:core/Cycles";
 import Error "mo:core/Error";
 import Int "mo:core/Int";
+import Map "mo:core/Map";
 import Runtime "mo:core/Runtime";
 import Nat "mo:core/Nat";
 import Principal "mo:core/Principal";
+import Text "mo:core/Text";
 import Time "mo:core/Time";
 import Nat64 "mo:core/Nat64";
+import Prim "mo:⛔";
 
 mixin (
   marketplaceState : MarketplaceLib.MarketplaceState,
@@ -31,6 +36,7 @@ mixin (
   marketplaceFeeState : MarketplaceLib.MarketplaceFeeState,
   walletState : WalletLib.WalletState,
   mintState : MintLib.MintState,
+  moderationState : MintLib.ModerationState,
   collectionsState : CollectionsLib.CollectionsState,
   authState : AuthLib.AdminState,
   canisterId : Principal,
@@ -78,12 +84,49 @@ mixin (
     subaccount : ?Blob;
   };
 
+  type ExternalModerationHttpHeader = {
+    name : Text;
+    value : Text;
+  };
+
+  type ExternalModerationHttpRequestResult = {
+    status : Nat;
+    body : Blob;
+    headers : [ExternalModerationHttpHeader];
+  };
+
+  type ExternalModerationHttpRequestArgs = {
+    url : Text;
+    method : { #get; #put; #head; #post; #delete };
+    max_response_bytes : ?Nat64;
+    body : ?Blob;
+    transform : ?{
+      function : shared query {
+        context : Blob;
+        response : ExternalModerationHttpRequestResult;
+      } -> async ExternalModerationHttpRequestResult;
+      context : Blob;
+    };
+    headers : [ExternalModerationHttpHeader];
+    is_replicated : ?Bool;
+  };
+
+  type ExternalModerationManagementActor = actor {
+    http_request : shared ExternalModerationHttpRequestArgs -> async ExternalModerationHttpRequestResult;
+  };
+
   type MarketplaceChildCollectionActor = actor {
     mintlab_transfer_from : (Principal, Principal, Nat) -> async MarketplaceChildTransferResult;
     mintlab_owner_of : ([Nat]) -> async [?MarketplaceICRC7Account];
   };
 
   let PENDING_BID_TIMEOUT_NS : Int = 5 * 60 * 1_000_000_000;
+  let EXTERNAL_LISTING_MODERATION_RESPONSE_BYTES : Nat64 = 24_000;
+  let EXTERNAL_LISTING_MODERATION_MAX_REQUEST_BYTES : Nat = 48_000;
+  let EXTERNAL_LISTING_MODERATION_CYCLE_RESERVE : Nat = 1_000_000_000_000;
+  let EXTERNAL_LISTING_MODERATION_SAMPLE_LIMIT : Nat = 3;
+  transient var externalListingModerationNonce : Nat = 0;
+  transient var externalListingModerationSampleCounts = Map.empty<CollectionTypes.CollectionId, Nat>();
 
   func requireMarketplaceAdmin(caller : Principal) {
     if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
@@ -121,6 +164,441 @@ mixin (
       case null Runtime.trap("Mintlab sales fee account must be configured before marketplace sales are enabled");
       case (?account) ?account;
     };
+  };
+
+  public query func transformExternalListingModerationResponse(
+    args : {
+      context : Blob;
+      response : ExternalModerationHttpRequestResult;
+    }
+  ) : async ExternalModerationHttpRequestResult {
+    let normalized = switch (Text.decodeUtf8(args.response.body)) {
+      case (?body) externalModerationSummaryFromResponse(args.response.status, body);
+      case null "ERROR_NON_UTF8";
+    };
+    {
+      status = args.response.status;
+      body = Text.encodeUtf8(normalized);
+      headers = [];
+    };
+  };
+
+  func maybeModerateExternalListingSample(nft : WalletTypes.WalletNFT) : async* () {
+    let collection = switch (CollectionsLib.getCollection(collectionsState, nft.collectionId)) {
+      case null Runtime.trap("Collection not found");
+      case (?value) value;
+    };
+    if (collection.kind != #External) {
+      return;
+    };
+    let meta = switch (CollectionsLib.getImportMeta(collectionsState, collection.id)) {
+      case null return;
+      case (?value) value;
+    };
+    if (meta.trustStatus == #Verified) {
+      return;
+    };
+    if (meta.trustStatus == #Hidden or meta.trustStatus == #Blocked) {
+      Runtime.trap("This community collection is hidden or blocked and cannot be listed.");
+    };
+    switch (meta.reviewedAt) {
+      case (?_) return;
+      case null {};
+    };
+    if (externalListingModerationSampleCount(collection.id) >= EXTERNAL_LISTING_MODERATION_SAMPLE_LIMIT) {
+      ignore CollectionsLib.markCollectionReviewed(collectionsState, collection.id);
+      return;
+    };
+    let sampleNumber = noteExternalListingModerationSample(collection.id);
+
+    switch (await* moderateExternalListingNFT(collection, nft)) {
+      case (#allow) {
+        if (sampleNumber >= EXTERNAL_LISTING_MODERATION_SAMPLE_LIMIT) {
+          ignore CollectionsLib.markCollectionReviewed(collectionsState, collection.id);
+        };
+      };
+      case (#block(reason)) {
+        ignore CollectionsLib.reportCollection(
+          collectionsState,
+          collection.id,
+          "Automated moderation flagged external marketplace sample " #
+          Nat.toText(sampleNumber) #
+          " of " #
+          Nat.toText(EXTERNAL_LISTING_MODERATION_SAMPLE_LIMIT) #
+          " for token #" #
+          nft.tokenId #
+          ": " #
+          reason,
+        );
+        ignore CollectionsLib.setCollectionTrustStatus(collectionsState, collection.id, #Hidden);
+      };
+      case (#unavailable(_message)) {
+        ignore CollectionsLib.markCollectionReviewed(collectionsState, collection.id);
+      };
+    };
+  };
+
+  func externalListingModerationSampleCount(collectionId : CollectionTypes.CollectionId) : Nat {
+    switch (Map.get(externalListingModerationSampleCounts, Nat.compare, collectionId)) {
+      case (?count) count;
+      case null 0;
+    };
+  };
+
+  func noteExternalListingModerationSample(collectionId : CollectionTypes.CollectionId) : Nat {
+    let next = externalListingModerationSampleCount(collectionId) + 1;
+    Map.add(externalListingModerationSampleCounts, Nat.compare, collectionId, next);
+    next;
+  };
+
+  func moderateExternalListingNFT(
+    collection : CollectionTypes.Collection,
+    nft : WalletTypes.WalletNFT,
+  ) : async* { #allow; #block : Text; #unavailable : Text } {
+    let config = MintLib.getModerationConfig(moderationState);
+    if (not config.enabled or not externalListingHasActiveModerationRules(config.categories)) {
+      return #allow;
+    };
+    let apiKey = switch (config.apiKey) {
+      case (?value) {
+        let sanitized = externalListingSanitizeModerationApiKey(value);
+        if (sanitized == "") {
+          return #unavailable("OpenAI moderation key is not configured");
+        };
+        sanitized;
+      };
+      case null return #unavailable("OpenAI moderation key is not configured");
+    };
+    let title = switch (nft.metadata.name) {
+      case (?value) value;
+      case null collection.name # " #" # nft.tokenId;
+    };
+    let description = switch (nft.metadata.description) {
+      case (?value) value;
+      case null collection.description;
+    };
+    let imageUrl = switch (nft.metadata.imageUrl) {
+      case (?value) value;
+      case null collection.imageUrl;
+    };
+    let response = try {
+      await callExternalListingModeration(
+        apiKey,
+        title,
+        description,
+        "Collection: " # collection.name # "\nToken ID: " # nft.tokenId # metadataAttributesText(nft.metadata.attributes),
+        imageUrl,
+        externalModerationRequestId(),
+      );
+    } catch (error) {
+      return #unavailable("External listing moderation outcall failed: " # Error.message(error));
+    };
+    if (response.status != 200) {
+      return #unavailable("External listing moderation returned HTTP status " # Nat.toText(response.status));
+    };
+    switch (Text.decodeUtf8(response.body)) {
+      case (?summary) {
+        if (Text.startsWith(summary, #text "ERROR") or summary == "UNKNOWN") {
+          return #unavailable("External listing moderation response could not be verified");
+        };
+        switch (externalModerationDecision(summary, config.categories)) {
+          case ("ALLOW") #allow;
+          case ("BLOCK") #block("Upload declined by moderation. " # config.userMessage);
+          case (_) #unavailable("External listing moderation response could not be verified");
+        };
+      };
+      case null #unavailable("External listing moderation response was not UTF-8");
+    };
+  };
+
+  func callExternalListingModeration(
+    apiKey : Text,
+    title : Text,
+    description : Text,
+    extraText : Text,
+    imageUrl : Text,
+    requestId : Text,
+  ) : async ExternalModerationHttpRequestResult {
+    let imageInput = if (externalListingSupportedModerationImage(imageUrl)) {
+      ",{\"type\":\"image_url\",\"image_url\":{\"url\":" # externalListingJsonString(imageUrl) # "}}";
+    } else {
+      "";
+    };
+    let body = Text.encodeUtf8(
+      "{" #
+      "\"model\":\"omni-moderation-latest\"," #
+      "\"input\":[" #
+      "{\"type\":\"text\",\"text\":" # externalListingJsonString(externalModerationTextInput(title, description, extraText)) # "}" #
+      imageInput #
+      "]" #
+      "}"
+    );
+    if (body.size() > EXTERNAL_LISTING_MODERATION_MAX_REQUEST_BYTES) {
+      Runtime.trap("The external listing moderation request was too large.");
+    };
+    let request : ExternalModerationHttpRequestArgs = {
+      url = "https://api.openai.com/v1/moderations";
+      method = #post;
+      max_response_bytes = ?EXTERNAL_LISTING_MODERATION_RESPONSE_BYTES;
+      headers = [
+        { name = "Host"; value = "api.openai.com" },
+        { name = "Authorization"; value = "Bearer " # apiKey },
+        { name = "User-Agent"; value = "mintlab-external-listing-moderation" },
+        { name = "Content-Type"; value = "application/json" },
+        { name = "Idempotency-Key"; value = requestId },
+      ];
+      body = ?body;
+      transform = ?{
+        function = transformExternalListingModerationResponse;
+        context = Blob.fromArray([]);
+      };
+      is_replicated = null;
+    };
+    let requestSize = externalListingHttpRequestSize(request);
+    let cost = externalListingHttpRequestCost(requestSize, request.max_response_bytes);
+    if (Cycles.balance() <= cost + EXTERNAL_LISTING_MODERATION_CYCLE_RESERVE) {
+      Runtime.trap("The app canister does not have enough cycles to sample-moderate this external listing.");
+    };
+    let ic : ExternalModerationManagementActor = actor "aaaaa-aa";
+    await (with cycles = cost) ic.http_request(request);
+  };
+
+  func ensureCollectionCanBeListed(nft : WalletTypes.WalletNFT) {
+    let collection = switch (CollectionsLib.getCollection(collectionsState, nft.collectionId)) {
+      case null Runtime.trap("Collection not found");
+      case (?value) value;
+    };
+    if (not CollectionsLib.isMarketplaceAllowed(collectionsState, collection)) {
+      Runtime.trap("This collection is hidden or blocked and cannot be listed on the marketplace.");
+    };
+  };
+
+  func ensureListingCollectionCanTrade(listingId : MarketplaceTypes.ListingId) {
+    let nft = switch (MarketplaceLib.getEscrowedNFT(marketplaceState, listingId)) {
+      case null Runtime.trap("Escrowed NFT not found for listing");
+      case (?value) value;
+    };
+    let collection = switch (CollectionsLib.getCollection(collectionsState, nft.collectionId)) {
+      case null Runtime.trap("Collection not found");
+      case (?value) value;
+    };
+    if (not CollectionsLib.isMarketplaceAllowed(collectionsState, collection)) {
+      Runtime.trap("This listing is hidden while the collection is reviewed.");
+    };
+  };
+
+  func externalModerationRequestId() : Text {
+    externalListingModerationNonce += 1;
+    "mintlab-external-listing-" # Nat.toText(Int.abs(Time.now())) # "-" # Nat.toText(externalListingModerationNonce);
+  };
+
+  func externalModerationTextInput(title : Text, description : Text, extraText : Text) : Text {
+    "Kind: external marketplace listing sample" #
+    "\nTitle: " # title #
+    "\nDescription: " # description #
+    "\nMetadata: " # extraText;
+  };
+
+  func metadataAttributesText(attributes : [(Text, Text)]) : Text {
+    var text = "";
+    for ((key, value) in attributes.values()) {
+      text #= "\nAttribute " # key # ": " # value;
+    };
+    text;
+  };
+
+  func externalModerationSummaryFromResponse(status : Nat, body : Text) : Text {
+    if (status != 200) {
+      return externalModerationErrorDiagnostic(body);
+    };
+    let compact = externalListingCompactModerationResponseBody(body);
+    if (Text.contains(compact, #text "\"error\":")) {
+      return externalModerationErrorDiagnostic(body);
+    };
+    switch (externalListingJsonBool(compact, "flagged")) {
+      case (?flagged) {
+        "OPENAI_MODERATION" #
+        ";flagged=" # externalListingBoolText(flagged) #
+        ";sexual=" # externalListingBoolText(externalListingJsonBoolDefault(compact, "sexual")) #
+        ";sexual_minors=" # externalListingBoolText(externalListingJsonBoolDefault(compact, "sexual/minors")) #
+        ";harassment=" # externalListingBoolText(externalListingJsonBoolDefault(compact, "harassment")) #
+        ";harassment_threatening=" # externalListingBoolText(externalListingJsonBoolDefault(compact, "harassment/threatening")) #
+        ";hate=" # externalListingBoolText(externalListingJsonBoolDefault(compact, "hate")) #
+        ";hate_threatening=" # externalListingBoolText(externalListingJsonBoolDefault(compact, "hate/threatening")) #
+        ";illicit=" # externalListingBoolText(externalListingJsonBoolDefault(compact, "illicit")) #
+        ";illicit_violent=" # externalListingBoolText(externalListingJsonBoolDefault(compact, "illicit/violent")) #
+        ";self_harm=" # externalListingBoolText(externalListingJsonBoolDefault(compact, "self-harm")) #
+        ";self_harm_intent=" # externalListingBoolText(externalListingJsonBoolDefault(compact, "self-harm/intent")) #
+        ";self_harm_instructions=" # externalListingBoolText(externalListingJsonBoolDefault(compact, "self-harm/instructions")) #
+        ";violence=" # externalListingBoolText(externalListingJsonBoolDefault(compact, "violence")) #
+        ";violence_graphic=" # externalListingBoolText(externalListingJsonBoolDefault(compact, "violence/graphic"));
+      };
+      case null "UNKNOWN";
+    };
+  };
+
+  func externalModerationDecision(summary : Text, categories : MintTypes.ModerationCategorySettings) : Text {
+    if (not Text.startsWith(summary, #text "OPENAI_MODERATION;")) {
+      return "UNKNOWN";
+    };
+    let sexual = externalListingSummaryFlag(summary, "sexual") or externalListingSummaryFlag(summary, "sexual_minors");
+    let violence = externalListingSummaryFlag(summary, "violence") or externalListingSummaryFlag(summary, "violence_graphic");
+    let selfHarm = externalListingSummaryFlag(summary, "self_harm") or externalListingSummaryFlag(summary, "self_harm_intent") or externalListingSummaryFlag(summary, "self_harm_instructions");
+    let harassment = externalListingSummaryFlag(summary, "harassment") or externalListingSummaryFlag(summary, "harassment_threatening");
+    let hate = externalListingSummaryFlag(summary, "hate") or externalListingSummaryFlag(summary, "hate_threatening");
+    let illicit = externalListingSummaryFlag(summary, "illicit") or externalListingSummaryFlag(summary, "illicit_violent");
+    let blockAdult = categories.nudityOrSexual and sexual;
+    let blockViolence = categories.graphicViolence and violence;
+    let blockSelfHarm = categories.selfHarm and selfHarm;
+    let blockHateOrHarassment = categories.hateOrHarassment and (hate or harassment);
+    let blockExplicitLanguage = categories.explicitLanguage and harassment;
+    let blockHateSymbols = categories.hateSymbols and hate;
+    let blockIllegalOrDangerous = categories.illegalOrDangerous and illicit;
+    let blockOtherNsfw = categories.otherNsfw and (sexual or externalListingSummaryFlag(summary, "violence_graphic") or selfHarm);
+    if (
+      blockAdult or
+      blockViolence or
+      blockSelfHarm or
+      blockHateOrHarassment or
+      blockExplicitLanguage or
+      blockHateSymbols or
+      blockIllegalOrDangerous or
+      blockOtherNsfw
+    ) {
+      "BLOCK";
+    } else {
+      "ALLOW";
+    };
+  };
+
+  func externalModerationErrorDiagnostic(body : Text) : Text {
+    let compact = Text.toLower(externalListingCompactModerationResponseBody(body));
+    if (Text.contains(compact, #text "image") and (Text.contains(compact, #text "url") or Text.contains(compact, #text "fetch"))) {
+      "ERROR_IMAGE_URL";
+    } else if (Text.contains(compact, #text "api key") or Text.contains(compact, #text "unauthorized") or Text.contains(compact, #text "forbidden")) {
+      "ERROR_AUTH";
+    } else if (Text.contains(compact, #text "rate") or Text.contains(compact, #text "quota")) {
+      "ERROR_RATE_LIMIT";
+    } else {
+      "ERROR";
+    };
+  };
+
+  func externalListingJsonBool(body : Text, field : Text) : ?Bool {
+    if (Text.contains(body, #text ("\"" # field # "\":true"))) {
+      ?true;
+    } else if (Text.contains(body, #text ("\"" # field # "\":false"))) {
+      ?false;
+    } else {
+      null;
+    };
+  };
+
+  func externalListingJsonBoolDefault(body : Text, field : Text) : Bool {
+    switch (externalListingJsonBool(body, field)) {
+      case (?value) value;
+      case null false;
+    };
+  };
+
+  func externalListingBoolText(value : Bool) : Text {
+    if (value) "true" else "false";
+  };
+
+  func externalListingSummaryFlag(summary : Text, field : Text) : Bool {
+    Text.contains(summary, #text (field # "=true"));
+  };
+
+  func externalListingCompactModerationResponseBody(body : Text) : Text {
+    let noSpaces = Text.replace(body, #text " ", "");
+    let noNewlines = Text.replace(noSpaces, #text "\n", "");
+    let noCarriageReturns = Text.replace(noNewlines, #text "\r", "");
+    Text.replace(noCarriageReturns, #text "\t", "");
+  };
+
+  func externalListingJsonString(value : Text) : Text {
+    let escapedBackslash = Text.replace(value, #text "\\", "\\\\");
+    let escapedQuote = Text.replace(escapedBackslash, #text "\"", "\\\"");
+    let escapedNewline = Text.replace(escapedQuote, #text "\n", "\\n");
+    let escapedCarriageReturn = Text.replace(escapedNewline, #text "\r", "\\r");
+    let escapedTab = Text.replace(escapedCarriageReturn, #text "\t", "\\t");
+    "\"" # escapedTab # "\"";
+  };
+
+  func externalListingSanitizeModerationApiKey(value : Text) : Text {
+    var result = "";
+    for (char in value.chars()) {
+      if (not externalListingIsAsciiWhitespace(char)) {
+        result #= Text.fromChar(char);
+      };
+    };
+    externalListingStripBearerPrefix(result);
+  };
+
+  func externalListingStripBearerPrefix(value : Text) : Text {
+    if (Text.startsWith(value, #text "Bearer")) {
+      switch (Text.stripStart(value, #text "Bearer")) {
+        case (?stripped) stripped;
+        case null value;
+      };
+    } else if (Text.startsWith(value, #text "bearer")) {
+      switch (Text.stripStart(value, #text "bearer")) {
+        case (?stripped) stripped;
+        case null value;
+      };
+    } else {
+      value;
+    };
+  };
+
+  func externalListingIsAsciiWhitespace(char : Char) : Bool {
+    char == ' ' or char == '\n' or char == '\r' or char == '\t';
+  };
+
+  func externalListingSupportedModerationImage(imageUrl : Text) : Bool {
+    Text.startsWith(imageUrl, #text "data:image/png;base64,") or
+    Text.startsWith(imageUrl, #text "data:image/jpeg;base64,") or
+    Text.startsWith(imageUrl, #text "data:image/jpg;base64,") or
+    Text.startsWith(imageUrl, #text "https://");
+  };
+
+  func externalListingHasActiveModerationRules(categories : MintTypes.ModerationCategorySettings) : Bool {
+    categories.nudityOrSexual or
+    categories.graphicViolence or
+    categories.explicitLanguage or
+    categories.hateOrHarassment or
+    categories.hateSymbols or
+    categories.illegalOrDangerous or
+    categories.selfHarm or
+    categories.otherNsfw;
+  };
+
+  func externalListingHttpRequestSize(request : ExternalModerationHttpRequestArgs) : Nat {
+    var requestSize = request.url.size();
+    for (header in request.headers.values()) {
+      requestSize += header.name.size();
+      requestSize += header.value.size();
+    };
+    switch (request.body) {
+      case (?body) requestSize += body.size();
+      case null {};
+    };
+    switch (request.transform) {
+      case (?transform) {
+        requestSize += transform.context.size();
+        requestSize += 256;
+      };
+      case null {};
+    };
+    requestSize + 2_000;
+  };
+
+  func externalListingHttpRequestCost(requestSize : Nat, maxResponseBytesOption : ?Nat64) : Nat {
+    let maxResponseBytes = switch (maxResponseBytesOption) {
+      case (?value) Nat64.toNat(value);
+      case null 2_000_000;
+    };
+    Prim.costHttpRequest(Nat64.fromNat(requestSize), Nat64.fromNat(maxResponseBytes));
   };
 
   func ledgerTimestampNow() : Nat64 {
@@ -709,6 +1187,61 @@ mixin (
     page;
   };
 
+  func viewerCanSeeNFTCollection(nft : WalletTypes.WalletNFT, viewer : Principal) : Bool {
+    switch (CollectionsLib.getCollection(collectionsState, nft.collectionId)) {
+      case null false;
+      case (?collection) {
+        CollectionsLib.canViewerSeeCollection(
+          collectionsState,
+          collection,
+          viewer,
+          AuthLib.isAdmin(authState, viewer),
+        );
+      };
+    };
+  };
+
+  func viewerCanSeeListing(listing : MarketplaceTypes.ActiveListing, viewer : Principal) : Bool {
+    let listingId = switch (listing) {
+      case (#Fixed(fixed)) fixed.id;
+      case (#Auction(auction)) auction.id;
+    };
+    switch (MarketplaceLib.getEscrowedNFT(marketplaceState, listingId)) {
+      case null false;
+      case (?nft) viewerCanSeeNFTCollection(nft, viewer);
+    };
+  };
+
+  func viewerCanSeeListingDetail(detail : MarketplaceTypes.ActiveListingDetail, viewer : Principal) : Bool {
+    viewerCanSeeNFTCollection(detail.nft, viewer);
+  };
+
+  func filterActiveListingsForViewer(
+    listings : [MarketplaceTypes.ActiveListing],
+    viewer : Principal,
+  ) : [MarketplaceTypes.ActiveListing] {
+    var visible : [MarketplaceTypes.ActiveListing] = [];
+    for (listing in listings.values()) {
+      if (viewerCanSeeListing(listing, viewer)) {
+        visible := Array.concat<MarketplaceTypes.ActiveListing>(visible, [listing]);
+      };
+    };
+    visible;
+  };
+
+  func filterActiveListingDetailsForViewer(
+    details : [MarketplaceTypes.ActiveListingDetail],
+    viewer : Principal,
+  ) : [MarketplaceTypes.ActiveListingDetail] {
+    var visible : [MarketplaceTypes.ActiveListingDetail] = [];
+    for (detail in details.values()) {
+      if (viewerCanSeeListingDetail(detail, viewer)) {
+        visible := Array.concat<MarketplaceTypes.ActiveListingDetail>(visible, [detail]);
+      };
+    };
+    visible;
+  };
+
   func settlementStageText(stage : MarketplaceTypes.SettlementStage) : Text {
     switch (stage) {
       case (#PaymentPending) "payment pending";
@@ -850,6 +1383,8 @@ mixin (
     };
     try {
       ensureNoActiveListingForNFT(nft);
+      ensureCollectionCanBeListed(nft);
+      await* maybeModerateExternalListingSample(nft);
       await* prepareNFTForListing(nft, caller);
       let currentNFT = recheckWalletNFTForListing(nftId, nft, caller);
       ensureNoActiveListingForNFT(currentNFT);
@@ -883,6 +1418,8 @@ mixin (
     };
     try {
       ensureNoActiveListingForNFT(nft);
+      ensureCollectionCanBeListed(nft);
+      await* maybeModerateExternalListingSample(nft);
       await* prepareNFTForListing(nft, caller);
       let currentNFT = recheckWalletNFTForListing(nftId, nft, caller);
       ensureNoActiveListingForNFT(currentNFT);
@@ -894,50 +1431,76 @@ mixin (
   };
 
   /// Return all currently active listings (fixed + auction)
-  public query func getActiveListings() : async [MarketplaceTypes.ActiveListing] {
-    MarketplaceLib.getAvailableActiveListings(
-      marketplaceState,
-      marketplaceSettlementState,
-      marketplaceNoBidAuctionReturnState,
-      marketplaceListingReturnState,
+  public shared query ({ caller }) func getActiveListings() : async [MarketplaceTypes.ActiveListing] {
+    filterActiveListingsForViewer(
+      MarketplaceLib.getAvailableActiveListings(
+        marketplaceState,
+        marketplaceSettlementState,
+        marketplaceNoBidAuctionReturnState,
+        marketplaceListingReturnState,
+      ),
+      caller,
     );
   };
 
-  public query func getActiveListingsPage(
+  public shared query ({ caller }) func getActiveListingsPage(
     cursor : ?Nat,
     limit : ?Nat,
   ) : async MarketplaceTypes.ActiveListingPage {
-    MarketplaceLib.getAvailableActiveListingsPage(
-      marketplaceState,
-      marketplaceSettlementState,
-      marketplaceNoBidAuctionReturnState,
-      marketplaceListingReturnState,
-      cursorOrZero(cursor),
-      normalizeMarketplacePageSize(limit),
+    let visible = filterActiveListingsForViewer(
+      MarketplaceLib.getAvailableActiveListings(
+        marketplaceState,
+        marketplaceSettlementState,
+        marketplaceNoBidAuctionReturnState,
+        marketplaceListingReturnState,
+      ),
+      caller,
+    );
+    let start = cursorOrZero(cursor);
+    let pageSize = normalizeMarketplacePageSize(limit);
+    let page = sliceActiveListings(visible, start, pageSize);
+    let next = start + page.size();
+    {
+      listings = page;
+      nextCursor = if (next < visible.size()) ?next else null;
+      totalCount = visible.size();
+    };
+  };
+
+  public shared query ({ caller }) func getActiveListingDetails() : async [MarketplaceTypes.ActiveListingDetail] {
+    filterActiveListingDetailsForViewer(
+      MarketplaceLib.getAvailableActiveListingDetails(
+        marketplaceState,
+        marketplaceSettlementState,
+        marketplaceNoBidAuctionReturnState,
+        marketplaceListingReturnState,
+      ),
+      caller,
     );
   };
 
-  public query func getActiveListingDetails() : async [MarketplaceTypes.ActiveListingDetail] {
-    MarketplaceLib.getAvailableActiveListingDetails(
-      marketplaceState,
-      marketplaceSettlementState,
-      marketplaceNoBidAuctionReturnState,
-      marketplaceListingReturnState,
-    );
-  };
-
-  public query func getActiveListingDetailsPage(
+  public shared query ({ caller }) func getActiveListingDetailsPage(
     cursor : ?Nat,
     limit : ?Nat,
   ) : async MarketplaceTypes.ActiveListingDetailPage {
-    MarketplaceLib.getAvailableActiveListingDetailsPage(
-      marketplaceState,
-      marketplaceSettlementState,
-      marketplaceNoBidAuctionReturnState,
-      marketplaceListingReturnState,
-      cursorOrZero(cursor),
-      normalizeMarketplacePageSize(limit),
+    let visible = filterActiveListingDetailsForViewer(
+      MarketplaceLib.getAvailableActiveListingDetails(
+        marketplaceState,
+        marketplaceSettlementState,
+        marketplaceNoBidAuctionReturnState,
+        marketplaceListingReturnState,
+      ),
+      caller,
     );
+    let start = cursorOrZero(cursor);
+    let pageSize = normalizeMarketplacePageSize(limit);
+    let page = sliceActiveListingDetails(visible, start, pageSize);
+    let next = start + page.size();
+    {
+      details = page;
+      nextCursor = if (next < visible.size()) ?next else null;
+      totalCount = visible.size();
+    };
   };
 
   public shared query ({ caller }) func getMyMarketplaceSettlementStatuses() : async [MarketplaceTypes.SettlementStatus] {
@@ -1460,6 +2023,7 @@ mixin (
     try {
       switch (MarketplaceLib.getFixedPurchaseSettlement(marketplaceSettlementState, listingId)) {
         case null {
+          ensureListingCollectionCanTrade(listingId);
           acquireUserPaymentLockOrTrap(caller);
           paymentLockOwner := ?caller;
           ignore await* startFixedPurchaseSettlement(listingId, caller);
@@ -1490,6 +2054,7 @@ mixin (
       case null Runtime.trap("Listing not found");
       case (?l) l;
     };
+    ensureListingCollectionCanTrade(listingId);
     if (listing.status != #Active) Runtime.trap("Listing is not active");
     if (Principal.equal(listing.seller, buyer)) Runtime.trap("Seller cannot buy their own listing");
     let escrowedNFT = switch (MarketplaceLib.getEscrowedNFT(marketplaceState, listingId)) {
@@ -1949,6 +2514,7 @@ mixin (
         };
       };
       if (shouldStartBid) {
+        ensureListingCollectionCanTrade(listingId);
         acquireUserPaymentLockOrTrap(caller);
         paymentLockOwner := ?caller;
         ignore await* startPendingBidDeposit(listingId, caller, amount);
@@ -2145,6 +2711,7 @@ mixin (
       case null Runtime.trap("Auction listing not found");
       case (?value) value;
     };
+    ensureListingCollectionCanTrade(listingId);
     if (listing.status != #Active) Runtime.trap("Auction is not active");
     if (bidObservedAt >= listing.endTime) Runtime.trap("Auction has ended");
     if (Principal.equal(listing.seller, bidder)) Runtime.trap("Seller cannot bid on their own auction");

@@ -31,6 +31,12 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
+import {
+  COMMUNITY_COLLECTION_NOTICE,
+  collectionMetaMap,
+  collectionTrustStatus,
+  isMintlabVerifiedCollection,
+} from "@/lib/collection-trust";
 import { transferRegisteredNFT } from "@/lib/external-nft-transfer";
 import { formatICPAmount, parseICPToE8s } from "@/lib/icp";
 import {
@@ -47,6 +53,8 @@ import type {
   AuctionBidStatus,
   AuctionListing,
   Collection,
+  CollectionImportMeta,
+  CollectionTrustStatus,
   FixedListing,
   ListingId,
   SettlementStatus,
@@ -57,6 +65,7 @@ import { useNavigate } from "@tanstack/react-router";
 import {
   Clock,
   Coins,
+  Flag,
   Gavel,
   ImageOff,
   Lock,
@@ -177,11 +186,13 @@ interface FixedCardProps {
   nft: WalletNFT | undefined;
   collection?: Collection;
   dividendE8s?: bigint;
+  trustStatus?: CollectionTrustStatus | null;
   index: number;
   currentPrincipal: string | null;
   onBuy: (id: ListingId) => void;
   onCancel: (id: ListingId) => void;
   onDetails: () => void;
+  onReport?: () => void;
   isBuying: boolean;
   isCancelling: boolean;
 }
@@ -191,11 +202,13 @@ function FixedListingCard({
   nft,
   collection,
   dividendE8s = 0n,
+  trustStatus,
   index,
   currentPrincipal,
   onBuy,
   onCancel,
   onDetails,
+  onReport,
   isBuying,
   isCancelling,
 }: FixedCardProps) {
@@ -226,6 +239,20 @@ function FixedListingCard({
         <Badge className="absolute top-2 left-2 bg-primary/90 text-primary-foreground text-xs font-mono uppercase">
           Fixed
         </Badge>
+        {onReport && (
+          <button
+            type="button"
+            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 bg-card/85 text-muted-foreground opacity-0 shadow-sm backdrop-blur-sm transition-opacity hover:text-foreground group-hover:opacity-100 focus:opacity-100"
+            title="Report this NFT"
+            aria-label="Report this NFT"
+            onClick={(event) => {
+              event.stopPropagation();
+              onReport();
+            }}
+          >
+            <Flag className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       <div className="p-3 flex flex-col gap-2 flex-1">
@@ -241,7 +268,13 @@ function FixedListingCard({
           </p>
         </div>
 
-        {collection && <CollectionBadge collection={collection} size="sm" />}
+        {collection && (
+          <CollectionBadge
+            collection={collection}
+            trustStatus={trustStatus}
+            size="sm"
+          />
+        )}
         {nft && custodyLabel && (
           <Badge
             variant="secondary"
@@ -307,6 +340,7 @@ interface ListingDetailModalProps {
     listing: ActiveListing;
     nft: WalletNFT;
     collection?: Collection;
+    trustStatus?: CollectionTrustStatus | null;
     dividendE8s: bigint;
   } | null;
   currentPrincipal: string | null;
@@ -315,6 +349,7 @@ interface ListingDetailModalProps {
   onBuy: (id: ListingId) => void;
   onCancel: (id: ListingId) => void;
   onBid: (listing: AuctionListing) => void;
+  onReport: (collection: Collection | undefined, nft: WalletNFT) => void;
 }
 
 function ListingDetailModal({
@@ -325,10 +360,11 @@ function ListingDetailModal({
   onBuy,
   onCancel,
   onBid,
+  onReport,
 }: ListingDetailModalProps) {
   if (!detail) return null;
 
-  const { listing, nft, collection, dividendE8s } = detail;
+  const { listing, nft, collection, trustStatus, dividendE8s } = detail;
   const name = nft.metadata.name ?? `NFT #${nft.tokenId}`;
   const canisterId = collection?.canisterId.toString();
   const fixed = listing.__kind__ === "Fixed" ? listing.Fixed : null;
@@ -386,7 +422,11 @@ function ListingDetailModal({
                   {fixed ? "Fixed Price" : "Auction"}
                 </Badge>
                 {collection && (
-                  <CollectionBadge collection={collection} size="sm" />
+                  <CollectionBadge
+                    collection={collection}
+                    trustStatus={trustStatus}
+                    size="sm"
+                  />
                 )}
                 <Badge
                   variant="secondary"
@@ -395,6 +435,17 @@ function ListingDetailModal({
                   {custodyLabel}
                 </Badge>
                 <DividendBalanceBadge e8s={dividendE8s} size="md" />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1.5 text-xs"
+                  onClick={() => onReport(collection, nft)}
+                  data-ocid="marketplace.nft_detail.report_button"
+                >
+                  <Flag className="h-3.5 w-3.5" />
+                  Report
+                </Button>
               </div>
               <DialogTitle className="font-display text-xl text-foreground">
                 {name}
@@ -573,6 +624,7 @@ interface AuctionCardProps {
   nft: WalletNFT | undefined;
   collection?: Collection;
   dividendE8s?: bigint;
+  trustStatus?: CollectionTrustStatus | null;
   index: number;
   currentPrincipal: string | null;
   bidStatus?: AuctionBidStatus;
@@ -580,6 +632,7 @@ interface AuctionCardProps {
   onSettle: (id: ListingId) => void;
   onCancel: (id: ListingId) => void;
   onDetails: () => void;
+  onReport?: () => void;
   isSettling: boolean;
   isCancelling: boolean;
 }
@@ -589,6 +642,7 @@ function AuctionListingCard({
   nft,
   collection,
   dividendE8s = 0n,
+  trustStatus,
   index,
   currentPrincipal,
   bidStatus,
@@ -596,6 +650,7 @@ function AuctionListingCard({
   onSettle,
   onCancel,
   onDetails,
+  onReport,
   isSettling,
   isCancelling,
 }: AuctionCardProps) {
@@ -637,6 +692,20 @@ function AuctionListingCard({
         >
           {ended ? "Ended" : "Live"}
         </Badge>
+        {onReport && (
+          <button
+            type="button"
+            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 bg-card/85 text-muted-foreground opacity-0 shadow-sm backdrop-blur-sm transition-opacity hover:text-foreground group-hover:opacity-100 focus:opacity-100"
+            title="Report this NFT"
+            aria-label="Report this NFT"
+            onClick={(event) => {
+              event.stopPropagation();
+              onReport();
+            }}
+          >
+            <Flag className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       <div className="p-3 flex flex-col gap-2 flex-1">
@@ -652,7 +721,13 @@ function AuctionListingCard({
           </p>
         </div>
 
-        {collection && <CollectionBadge collection={collection} size="sm" />}
+        {collection && (
+          <CollectionBadge
+            collection={collection}
+            trustStatus={trustStatus}
+            size="sm"
+          />
+        )}
         {nft && custodyLabel && (
           <Badge
             variant="secondary"
@@ -1416,6 +1491,18 @@ export default function MarketplacePage() {
     enabled: !!actor && !actorLoading,
   });
 
+  const { data: collectionImportMetas = [] } = useQuery<CollectionImportMeta[]>(
+    {
+      queryKey: ["collectionImportMetas", "marketplace"],
+      queryFn: async () => {
+        if (!actor) return [];
+        const page = await actor.listCollectionImportMetasPage(null, 100n);
+        return page.metas;
+      },
+      enabled: !!actor && !actorLoading,
+    },
+  );
+
   const { data: marketplaceFeeConfig } = useQuery({
     queryKey: ["marketplaceFeeConfig"],
     queryFn: async () => {
@@ -1457,6 +1544,7 @@ export default function MarketplacePage() {
   const collectionMap = new Map<bigint, Collection>(
     collections.map((collection) => [collection.id, collection]),
   );
+  const importMetaMap = collectionMetaMap(collectionImportMetas);
 
   const { data: listingDividendBalances = [] } = useQuery<
     Array<[string, bigint]>
@@ -1506,13 +1594,22 @@ export default function MarketplacePage() {
 
   const fixedListings = listingDetails.flatMap((detail) =>
     detail.listing.__kind__ === "Fixed"
-      ? [
-          {
-            listing: detail.listing.Fixed,
-            nft: detail.nft,
-            collection: collectionMap.get(detail.nft.collectionId),
-          },
-        ]
+      ? (() => {
+          const collection = collectionMap.get(detail.nft.collectionId);
+          return [
+            {
+              listing: detail.listing.Fixed,
+              nft: detail.nft,
+              collection,
+              trustStatus: collection
+                ? collectionTrustStatus(
+                    collection,
+                    importMetaMap.get(collection.id.toString()),
+                  )
+                : null,
+            },
+          ];
+        })()
       : [],
   );
 
@@ -1523,14 +1620,43 @@ export default function MarketplacePage() {
 
   const auctionListings = listingDetails.flatMap((detail) =>
     detail.listing.__kind__ === "Auction"
-      ? [
-          {
-            listing: detail.listing.Auction,
-            nft: detail.nft,
-            collection: collectionMap.get(detail.nft.collectionId),
-          },
-        ]
+      ? (() => {
+          const collection = collectionMap.get(detail.nft.collectionId);
+          return [
+            {
+              listing: detail.listing.Auction,
+              nft: detail.nft,
+              collection,
+              trustStatus: collection
+                ? collectionTrustStatus(
+                    collection,
+                    importMetaMap.get(collection.id.toString()),
+                  )
+                : null,
+            },
+          ];
+        })()
       : [],
+  );
+
+  const isVerifiedListing = ({
+    collection,
+  }: {
+    collection?: Collection;
+  }) =>
+    collection != null &&
+    isMintlabVerifiedCollection(
+      collection,
+      importMetaMap.get(collection.id.toString()),
+    );
+
+  const verifiedFixedListings = fixedListings.filter(isVerifiedListing);
+  const communityFixedListings = fixedListings.filter(
+    (item) => !isVerifiedListing(item),
+  );
+  const verifiedAuctionListings = auctionListings.filter(isVerifiedListing);
+  const communityAuctionListings = auctionListings.filter(
+    (item) => !isVerifiedListing(item),
   );
 
   const cancelAuctionDetail =
@@ -1602,11 +1728,51 @@ export default function MarketplacePage() {
     void qc.invalidateQueries({ queryKey: ["userNFTs"] });
     void qc.invalidateQueries({ queryKey: ["userStats"] });
     void qc.invalidateQueries({ queryKey: ["icp-balance"] });
+    void qc.invalidateQueries({ queryKey: ["collectionImportMetas"] });
     void qc.invalidateQueries({ queryKey: ["myAuctionBidStatuses"] });
     void qc.invalidateQueries({
       queryKey: ["myMarketplaceSettlementStatuses"],
     });
   };
+
+  const { mutate: reportListing } = useMutation({
+    mutationFn: async ({
+      collection,
+      nft,
+    }: {
+      collection: Collection;
+      nft: WalletNFT;
+    }) => {
+      if (!actor) throw new Error("Not connected");
+      const result = await actor.reportCollection(
+        collection.id,
+        `Marketplace report for token #${nft.tokenId} in ${collection.name}`,
+      );
+      if (result.__kind__ === "err") throw new Error(result.err);
+      return result.ok;
+    },
+    onSuccess: () => {
+      toast.success("Report sent to Mintlab admins.");
+      void qc.invalidateQueries({ queryKey: ["collectionImportMetas"] });
+      void qc.invalidateQueries({ queryKey: ["collections"] });
+    },
+    onError: (e: Error) => toast.error(`Report failed: ${e.message}`),
+  });
+
+  function handleReportListing(
+    collection: Collection | undefined,
+    nft: WalletNFT,
+  ) {
+    if (!collection) {
+      toast.error("Collection information is missing for this NFT.");
+      return;
+    }
+    if (!isAuthenticated) {
+      toast("Sign in to report this NFT.");
+      return;
+    }
+    reportListing({ collection, nft });
+  }
 
   async function ensureNFTReadyForListing(nft: WalletNFT): Promise<bigint> {
     if (!actor) throw new Error("Not connected");
@@ -1996,37 +2162,104 @@ export default function MarketplacePage() {
                 data-ocid="marketplace.fixed.empty_state"
               />
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {fixedListings.map(({ listing, nft, collection }, i) => (
-                  <FixedListingCard
-                    key={listing.id.toString()}
-                    listing={listing}
-                    nft={nft}
-                    collection={collection}
-                    dividendE8s={
-                      listingDividendMap.get(
-                        nftKey(nft.collectionId, nft.tokenId),
-                      ) ?? 0n
-                    }
-                    index={i}
-                    currentPrincipal={principalStr}
-                    onBuy={(id) => setBuyTarget(id)}
-                    onCancel={(id) => setCancelTarget(id)}
-                    onDetails={() =>
-                      setDetailTarget({
-                        listing: { __kind__: "Fixed", Fixed: listing },
-                        nft,
-                        collection,
-                        dividendE8s:
-                          listingDividendMap.get(
-                            nftKey(nft.collectionId, nft.tokenId),
-                          ) ?? 0n,
-                      })
-                    }
-                    isBuying={isBuying && buyTarget === listing.id}
-                    isCancelling={isCancelling && cancelTarget === listing.id}
-                  />
-                ))}
+              <div className="space-y-8">
+                {verifiedFixedListings.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    {verifiedFixedListings.map(
+                      ({ listing, nft, collection, trustStatus }, i) => (
+                        <FixedListingCard
+                          key={listing.id.toString()}
+                          listing={listing}
+                          nft={nft}
+                          collection={collection}
+                          trustStatus={trustStatus}
+                          dividendE8s={
+                            listingDividendMap.get(
+                              nftKey(nft.collectionId, nft.tokenId),
+                            ) ?? 0n
+                          }
+                          index={i}
+                          currentPrincipal={principalStr}
+                          onBuy={(id) => setBuyTarget(id)}
+                          onCancel={(id) => setCancelTarget(id)}
+                          onReport={() => handleReportListing(collection, nft)}
+                          onDetails={() =>
+                            setDetailTarget({
+                              listing: { __kind__: "Fixed", Fixed: listing },
+                              nft,
+                              collection,
+                              trustStatus,
+                              dividendE8s:
+                                listingDividendMap.get(
+                                  nftKey(nft.collectionId, nft.tokenId),
+                                ) ?? 0n,
+                            })
+                          }
+                          isBuying={isBuying && buyTarget === listing.id}
+                          isCancelling={
+                            isCancelling && cancelTarget === listing.id
+                          }
+                        />
+                      ),
+                    )}
+                  </div>
+                )}
+
+                {communityFixedListings.length > 0 && (
+                  <section className="space-y-4">
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+                      <p className="text-sm font-semibold text-foreground">
+                        Unverified community listings
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        {COMMUNITY_COLLECTION_NOTICE} Check canister IDs
+                        carefully and report suspected counterfeits or unsafe
+                        content.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                      {communityFixedListings.map(
+                        ({ listing, nft, collection, trustStatus }, i) => (
+                          <FixedListingCard
+                            key={listing.id.toString()}
+                            listing={listing}
+                            nft={nft}
+                            collection={collection}
+                            trustStatus={trustStatus}
+                            dividendE8s={
+                              listingDividendMap.get(
+                                nftKey(nft.collectionId, nft.tokenId),
+                              ) ?? 0n
+                            }
+                            index={verifiedFixedListings.length + i}
+                            currentPrincipal={principalStr}
+                            onBuy={(id) => setBuyTarget(id)}
+                            onCancel={(id) => setCancelTarget(id)}
+                            onReport={() =>
+                              handleReportListing(collection, nft)
+                            }
+                            onDetails={() =>
+                              setDetailTarget({
+                                listing: { __kind__: "Fixed", Fixed: listing },
+                                nft,
+                                collection,
+                                trustStatus,
+                                dividendE8s:
+                                  listingDividendMap.get(
+                                    nftKey(nft.collectionId, nft.tokenId),
+                                  ) ?? 0n,
+                              })
+                            }
+                            isBuying={isBuying && buyTarget === listing.id}
+                            isCancelling={
+                              isCancelling && cancelTarget === listing.id
+                            }
+                          />
+                        ),
+                      )}
+                    </div>
+                  </section>
+                )}
               </div>
             )}
           </TabsContent>
@@ -2057,39 +2290,118 @@ export default function MarketplacePage() {
                 data-ocid="marketplace.auction.empty_state"
               />
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {auctionListings.map(({ listing, nft, collection }, i) => (
-                  <AuctionListingCard
-                    key={listing.id.toString()}
-                    listing={listing}
-                    nft={nft}
-                    collection={collection}
-                    dividendE8s={
-                      listingDividendMap.get(
-                        nftKey(nft.collectionId, nft.tokenId),
-                      ) ?? 0n
-                    }
-                    index={i}
-                    currentPrincipal={principalStr}
-                    bidStatus={myAuctionBidStatusMap.get(listing.id.toString())}
-                    onBid={(l) => setBidTarget(l)}
-                    onSettle={(id) => settleAuction(id)}
-                    onCancel={(id) => setCancelTarget(id)}
-                    onDetails={() =>
-                      setDetailTarget({
-                        listing: { __kind__: "Auction", Auction: listing },
-                        nft,
-                        collection,
-                        dividendE8s:
-                          listingDividendMap.get(
-                            nftKey(nft.collectionId, nft.tokenId),
-                          ) ?? 0n,
-                      })
-                    }
-                    isSettling={isSettling}
-                    isCancelling={isCancelling && cancelTarget === listing.id}
-                  />
-                ))}
+              <div className="space-y-8">
+                {verifiedAuctionListings.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    {verifiedAuctionListings.map(
+                      ({ listing, nft, collection, trustStatus }, i) => (
+                        <AuctionListingCard
+                          key={listing.id.toString()}
+                          listing={listing}
+                          nft={nft}
+                          collection={collection}
+                          trustStatus={trustStatus}
+                          dividendE8s={
+                            listingDividendMap.get(
+                              nftKey(nft.collectionId, nft.tokenId),
+                            ) ?? 0n
+                          }
+                          index={i}
+                          currentPrincipal={principalStr}
+                          bidStatus={myAuctionBidStatusMap.get(
+                            listing.id.toString(),
+                          )}
+                          onBid={(l) => setBidTarget(l)}
+                          onSettle={(id) => settleAuction(id)}
+                          onCancel={(id) => setCancelTarget(id)}
+                          onReport={() => handleReportListing(collection, nft)}
+                          onDetails={() =>
+                            setDetailTarget({
+                              listing: {
+                                __kind__: "Auction",
+                                Auction: listing,
+                              },
+                              nft,
+                              collection,
+                              trustStatus,
+                              dividendE8s:
+                                listingDividendMap.get(
+                                  nftKey(nft.collectionId, nft.tokenId),
+                                ) ?? 0n,
+                            })
+                          }
+                          isSettling={isSettling}
+                          isCancelling={
+                            isCancelling && cancelTarget === listing.id
+                          }
+                        />
+                      ),
+                    )}
+                  </div>
+                )}
+
+                {communityAuctionListings.length > 0 && (
+                  <section className="space-y-4">
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+                      <p className="text-sm font-semibold text-foreground">
+                        Unverified community auctions
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        {COMMUNITY_COLLECTION_NOTICE} Check canister IDs
+                        carefully and report suspected counterfeits or unsafe
+                        content.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                      {communityAuctionListings.map(
+                        ({ listing, nft, collection, trustStatus }, i) => (
+                          <AuctionListingCard
+                            key={listing.id.toString()}
+                            listing={listing}
+                            nft={nft}
+                            collection={collection}
+                            trustStatus={trustStatus}
+                            dividendE8s={
+                              listingDividendMap.get(
+                                nftKey(nft.collectionId, nft.tokenId),
+                              ) ?? 0n
+                            }
+                            index={verifiedAuctionListings.length + i}
+                            currentPrincipal={principalStr}
+                            bidStatus={myAuctionBidStatusMap.get(
+                              listing.id.toString(),
+                            )}
+                            onBid={(l) => setBidTarget(l)}
+                            onSettle={(id) => settleAuction(id)}
+                            onCancel={(id) => setCancelTarget(id)}
+                            onReport={() =>
+                              handleReportListing(collection, nft)
+                            }
+                            onDetails={() =>
+                              setDetailTarget({
+                                listing: {
+                                  __kind__: "Auction",
+                                  Auction: listing,
+                                },
+                                nft,
+                                collection,
+                                trustStatus,
+                                dividendE8s:
+                                  listingDividendMap.get(
+                                    nftKey(nft.collectionId, nft.tokenId),
+                                  ) ?? 0n,
+                              })
+                            }
+                            isSettling={isSettling}
+                            isCancelling={
+                              isCancelling && cancelTarget === listing.id
+                            }
+                          />
+                        ),
+                      )}
+                    </div>
+                  </section>
+                )}
               </div>
             )}
           </TabsContent>
@@ -2104,6 +2416,7 @@ export default function MarketplacePage() {
         onBuy={(id) => setBuyTarget(id)}
         onCancel={(id) => setCancelTarget(id)}
         onBid={(listing) => setBidTarget(listing)}
+        onReport={handleReportListing}
       />
 
       {/* Buy Confirmation Dialog */}

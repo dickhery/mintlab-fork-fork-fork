@@ -479,6 +479,17 @@ type FixedListing =
    seller: UserId;
    status: ListingStatus;
  };
+type ExternalModerationHttpRequestResult =
+ record {
+   body: blob;
+   headers: vec ExternalModerationHttpHeader;
+   status: nat;
+ };
+type ExternalModerationHttpHeader =
+ record {
+   name: text;
+   value: text;
+ };
 type EXTUser =
  variant {
    address: EXTAccountIdentifier;
@@ -1455,6 +1466,11 @@ service : {
   transferICPOut: (to: AccountIdentifier, amount: nat64) -> (TransferResult);
   transferICPOutWithClientNonce: (to: AccountIdentifier, amount: nat64,
    clientNonce: nat64) -> (TransferResult);
+  transformExternalListingModerationResponse: (args:
+   record {
+     context: blob;
+     response: ExternalModerationHttpRequestResult;
+   }) -> (ExternalModerationHttpRequestResult) query;
   transformModerationResponse: (args:
    record {
      context: blob;

@@ -1,8 +1,8 @@
 import { Badge } from "@/components/ui/badge";
 import { nftCustodyClass, nftCustodyLabel } from "@/lib/nft-custody";
 import { cn } from "@/lib/utils";
-import type { Collection, WalletNFT } from "@/types";
-import { ImageOff } from "lucide-react";
+import type { Collection, CollectionTrustStatus, WalletNFT } from "@/types";
+import { Flag, ImageOff } from "lucide-react";
 import { motion } from "motion/react";
 import { CollectionBadge } from "./CollectionBadge";
 import { DividendBalanceBadge } from "./DividendBalanceBadge";
@@ -14,8 +14,11 @@ interface NFTCardProps {
   collection?: Collection;
   listingPrice?: bigint;
   dividendE8s?: bigint;
+  trustStatus?: CollectionTrustStatus | null;
   isAuction?: boolean;
   isListed?: boolean;
+  onReport?: () => void;
+  reportLabel?: string;
   onClick?: () => void;
   index?: number;
   "data-ocid"?: string;
@@ -26,8 +29,11 @@ export function NFTCard({
   collection,
   listingPrice,
   dividendE8s,
+  trustStatus,
   isAuction,
   isListed = false,
+  onReport,
+  reportLabel = "Report NFT",
   onClick,
   index = 0,
   "data-ocid": dataOcid,
@@ -70,6 +76,20 @@ export function NFTCard({
             AUCTION
           </Badge>
         )}
+        {onReport && (
+          <button
+            type="button"
+            className="absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 bg-card/85 text-muted-foreground opacity-0 shadow-sm backdrop-blur-sm transition-opacity hover:text-foreground group-hover:opacity-100 focus:opacity-100"
+            title={reportLabel}
+            aria-label={reportLabel}
+            onClick={(event) => {
+              event.stopPropagation();
+              onReport();
+            }}
+          >
+            <Flag className="h-4 w-4" />
+          </button>
+        )}
       </div>
 
       {/* Info */}
@@ -85,7 +105,13 @@ export function NFTCard({
           )}
         </div>
 
-        {collection && <CollectionBadge collection={collection} size="sm" />}
+        {collection && (
+          <CollectionBadge
+            collection={collection}
+            trustStatus={trustStatus}
+            size="sm"
+          />
+        )}
 
         <div className="flex flex-wrap gap-1.5">
           {isListed && (

@@ -31,6 +31,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAdmin } from "@/hooks/use-admin";
 import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
+import {
+  COMMUNITY_COLLECTION_NOTICE,
+  collectionMetaMap,
+  collectionTrustStatus,
+  isMintlabVerifiedCollection,
+} from "@/lib/collection-trust";
 import { isLowCyclesError } from "@/lib/cycles";
 import { transferRegisteredNFT } from "@/lib/external-nft-transfer";
 import { compressModerationImage } from "@/lib/imageUtils";
@@ -44,8 +50,10 @@ import {
 import type {
   ActiveListingDetail,
   Collection,
+  CollectionImportMeta,
   CollectionIndexPageResult,
   CollectionIndexStatus,
+  CollectionTrustStatus,
   MintConfig,
   NFTDividend,
   NFTMetadata,
@@ -70,6 +78,7 @@ import {
   Coins,
   Copy,
   ExternalLink,
+  Flag,
   ImagePlus,
   Info,
   Layers,
@@ -591,8 +600,10 @@ interface NFTDetailsModalProps {
   onClose: () => void;
   nft: WalletNFT;
   collection?: Collection;
+  trustStatus?: CollectionTrustStatus | null;
   isListed?: boolean;
   dividendE8s?: bigint;
+  onReport?: () => void;
   onSend?: () => void;
 }
 
@@ -601,8 +612,10 @@ function NFTDetailsModal({
   onClose,
   nft,
   collection,
+  trustStatus,
   isListed = false,
   dividendE8s = 0n,
+  onReport,
   onSend,
 }: NFTDetailsModalProps) {
   const nftName = nft.metadata.name ?? `NFT #${nft.tokenId}`;
@@ -659,9 +672,26 @@ function NFTDetailsModal({
                   {custodyLabel}
                 </Badge>
                 {collection && (
-                  <CollectionBadge collection={collection} size="sm" />
+                  <CollectionBadge
+                    collection={collection}
+                    trustStatus={trustStatus}
+                    size="sm"
+                  />
                 )}
                 <DividendBalanceBadge e8s={dividendE8s} size="md" />
+                {onReport && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={onReport}
+                    data-ocid="wallet.nft_details.report_button"
+                  >
+                    <Flag className="h-3.5 w-3.5" />
+                    Report
+                  </Button>
+                )}
               </div>
               <DialogTitle className="font-display text-xl text-foreground break-words">
                 {nftName}
@@ -2117,19 +2147,23 @@ function UnauthHero({ login }: { login: () => void }) {
 interface CollectionSectionProps {
   collection: Collection;
   nfts: WalletNFT[];
+  trustStatus?: CollectionTrustStatus | null;
   listedNFTKeys: Set<string>;
   sectionIndex: number;
   isCreatorCollection: boolean;
   dividendBalances: Map<string, bigint>;
+  onReportNFT: (collection: Collection, nft: WalletNFT) => void;
 }
 
 function CollectionSection({
   collection,
   nfts,
+  trustStatus,
   listedNFTKeys,
   sectionIndex,
   isCreatorCollection,
   dividendBalances,
+  onReportNFT,
 }: CollectionSectionProps) {
   const [registerOpen, setRegisterOpen] = useState(false);
   const [detailNft, setDetailNft] = useState<WalletNFT | null>(null);
@@ -2180,6 +2214,7 @@ function CollectionSection({
             </div>
             <CollectionBadge
               collection={collection}
+              trustStatus={trustStatus}
               size="sm"
               className="mt-0.5"
             />
@@ -2232,12 +2267,15 @@ function CollectionSection({
             <NFTCard
               nft={nft}
               collection={collection}
+              trustStatus={trustStatus}
               isListed={isNFTListed(nft)}
               dividendE8s={
                 dividendBalances.get(nftKey(nft.collectionId, nft.tokenId)) ??
                 0n
               }
               index={i}
+              onReport={() => onReportNFT(collection, nft)}
+              reportLabel={`Report ${nft.metadata.name ?? `NFT #${nft.tokenId}`}`}
               onClick={() => setDetailNft(nft)}
               data-ocid={`wallet.nft.item.${sectionIndex * 100 + i + 1}`}
             />
@@ -2282,12 +2320,14 @@ function CollectionSection({
           onClose={() => setDetailNft(null)}
           nft={detailNft}
           collection={collection}
+          trustStatus={trustStatus}
           isListed={isNFTListed(detailNft)}
           dividendE8s={
             dividendBalances.get(
               nftKey(detailNft.collectionId, detailNft.tokenId),
             ) ?? 0n
           }
+          onReport={() => onReportNFT(collection, detailNft)}
           onSend={
             isNFTListed(detailNft)
               ? undefined
@@ -2384,6 +2424,18 @@ export default function WalletPage() {
   const collections =
     collectionPages?.pages.flatMap((page) => page.collections) ?? [];
 
+  const { data: collectionImportMetas = [] } = useQuery<CollectionImportMeta[]>(
+    {
+      queryKey: ["collectionImportMetas", "wallet"],
+      queryFn: async () => {
+        if (!actor) return [];
+        const page = await actor.listCollectionImportMetasPage(null, 100n);
+        return page.metas;
+      },
+      enabled: !!actor && !isFetching && isAuthenticated,
+    },
+  );
+
   const { data: accountIdBytes } = useQuery<Uint8Array>({
     queryKey: ["userAccountId", principalText],
     queryFn: async () => {
@@ -2476,6 +2528,7 @@ export default function WalletPage() {
   for (const c of collections ?? []) {
     collectionMap.set(c.id, c);
   }
+  const importMetaMap = collectionMetaMap(collectionImportMetas);
   const indexingCollection =
     indexingCollectionId == null
       ? null
@@ -2499,15 +2552,69 @@ export default function WalletPage() {
 
   const collectionEntries: Array<{
     collection: Collection;
+    trustStatus: CollectionTrustStatus;
     nfts: WalletNFT[];
   }> = [];
   nftsByCollection.forEach((nfts, collId) => {
     const coll = collectionMap.get(collId);
-    if (coll) collectionEntries.push({ collection: coll, nfts });
+    if (coll) {
+      collectionEntries.push({
+        collection: coll,
+        trustStatus: collectionTrustStatus(
+          coll,
+          importMetaMap.get(coll.id.toString()),
+        ),
+        nfts,
+      });
+    }
   });
+
+  const verifiedCollectionEntries = collectionEntries.filter(({ collection }) =>
+    isMintlabVerifiedCollection(
+      collection,
+      importMetaMap.get(collection.id.toString()),
+    ),
+  );
+  const communityCollectionEntries = collectionEntries.filter(
+    ({ collection }) =>
+      !isMintlabVerifiedCollection(
+        collection,
+        importMetaMap.get(collection.id.toString()),
+      ),
+  );
 
   const hasNFTs = (userNFTs?.length ?? 0) > 0;
   const dataLoading = nftsLoading || statsLoading || isFetching;
+
+  const { mutate: reportWalletNFT } = useMutation({
+    mutationFn: async ({
+      collection,
+      nft,
+    }: {
+      collection: Collection;
+      nft: WalletNFT;
+    }) => {
+      if (!actor) throw new Error("Backend not connected");
+      const result = await actor.reportCollection(
+        collection.id,
+        `Wallet report for token #${nft.tokenId} in ${collection.name}`,
+      );
+      if (result.__kind__ === "err") throw new Error(result.err);
+      return result.ok;
+    },
+    onSuccess: () => {
+      toast.success("Report sent to Mintlab admins.");
+      void queryClient.invalidateQueries({
+        queryKey: ["collectionImportMetas"],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["collections"] });
+    },
+    onError: (err: Error) => toast.error(`Report failed: ${err.message}`),
+  });
+
+  function handleReportWalletNFT(collection: Collection, nft: WalletNFT) {
+    reportWalletNFT({ collection, nft });
+  }
 
   // ── sync state ────────────────────────────────────────────────────────────
 
@@ -3036,17 +3143,52 @@ export default function WalletPage() {
         </>
       ) : (
         <div className="space-y-10" data-ocid="wallet.nft_list">
-          {collectionEntries.map(({ collection, nfts }, idx) => (
-            <CollectionSection
-              key={collection.id.toString()}
-              collection={collection}
-              nfts={nfts}
-              listedNFTKeys={listedNFTKeys}
-              sectionIndex={idx}
-              isCreatorCollection={myCreatedCollectionIds.has(collection.id)}
-              dividendBalances={dividendBalances}
-            />
-          ))}
+          {verifiedCollectionEntries.map(
+            ({ collection, trustStatus, nfts }, idx) => (
+              <CollectionSection
+                key={collection.id.toString()}
+                collection={collection}
+                trustStatus={trustStatus}
+                nfts={nfts}
+                listedNFTKeys={listedNFTKeys}
+                sectionIndex={idx}
+                isCreatorCollection={myCreatedCollectionIds.has(collection.id)}
+                dividendBalances={dividendBalances}
+                onReportNFT={handleReportWalletNFT}
+              />
+            ),
+          )}
+          {communityCollectionEntries.length > 0 && (
+            <section className="space-y-6">
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+                <p className="text-sm font-semibold text-foreground">
+                  Unverified NFTs
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {COMMUNITY_COLLECTION_NOTICE} Treat names, images, and floor
+                  prices carefully, and report suspected counterfeits or unsafe
+                  content.
+                </p>
+              </div>
+              {communityCollectionEntries.map(
+                ({ collection, trustStatus, nfts }, idx) => (
+                  <CollectionSection
+                    key={collection.id.toString()}
+                    collection={collection}
+                    trustStatus={trustStatus}
+                    nfts={nfts}
+                    listedNFTKeys={listedNFTKeys}
+                    sectionIndex={verifiedCollectionEntries.length + idx}
+                    isCreatorCollection={myCreatedCollectionIds.has(
+                      collection.id,
+                    )}
+                    dividendBalances={dividendBalances}
+                    onReportNFT={handleReportWalletNFT}
+                  />
+                ),
+              )}
+            </section>
+          )}
           {hasMoreNFTs && (
             <div className="flex justify-center pt-2">
               <Button

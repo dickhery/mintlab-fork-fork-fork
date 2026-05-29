@@ -110,10 +110,10 @@ mixin (
 
   /// Return all registered collections
   public shared query ({ caller }) func listCollections() : async [CollectionTypes.Collection] {
-    let includeHidden = AuthLib.isAdmin(authState, caller);
+    let isAdmin = AuthLib.isAdmin(authState, caller);
     var collections : [CollectionTypes.Collection] = [];
     for (collection in CollectionsLib.getCollections(collectionsState).values()) {
-      if (includeHidden or CollectionsLib.isPubliclyVisible(collectionsState, collection)) {
+      if (CollectionsLib.canViewerSeeCollection(collectionsState, collection, caller, isAdmin)) {
         collections := Array.concat<CollectionTypes.Collection>(collections, [collection]);
       };
     };
@@ -124,15 +124,34 @@ mixin (
     cursor : ?Nat,
     limit : ?Nat,
   ) : async CollectionTypes.CollectionPage {
-    CollectionsLib.getCollectionsPage(
-      collectionsState,
-      cursor,
-      switch (limit) {
-        case (?value) value;
-        case null 0;
-      },
-      AuthLib.isAdmin(authState, caller),
-    );
+    let isAdmin = AuthLib.isAdmin(authState, caller);
+    let start = switch (cursor) {
+      case (?value) value;
+      case null 0;
+    };
+    let pageSize = normalizePublicCollectionPageLimit(limit);
+    var page : [CollectionTypes.Collection] = [];
+    var index : Nat = 0;
+    var added : Nat = 0;
+    for (collection in CollectionsLib.getCollections(collectionsState).values()) {
+      if (CollectionsLib.canViewerSeeCollection(collectionsState, collection, caller, isAdmin)) {
+        if (index < start) {
+          index += 1;
+        } else if (added < pageSize) {
+          page := Array.concat<CollectionTypes.Collection>(page, [collection]);
+          added += 1;
+          index += 1;
+        } else {
+          index += 1;
+        };
+      };
+    };
+    let next = start + added;
+    {
+      collections = page;
+      nextCursor = if (next < index) ?next else null;
+      totalCount = index;
+    };
   };
 
   public query func getCollectionImportMeta(
@@ -217,8 +236,17 @@ mixin (
   };
 
   /// Return a single collection by id
-  public query func getCollection(id : CollectionTypes.CollectionId) : async ?CollectionTypes.Collection {
-    CollectionsLib.getCollection(collectionsState, id);
+  public shared query ({ caller }) func getCollection(id : CollectionTypes.CollectionId) : async ?CollectionTypes.Collection {
+    switch (CollectionsLib.getCollection(collectionsState, id)) {
+      case null null;
+      case (?collection) {
+        if (CollectionsLib.canViewerSeeCollection(collectionsState, collection, caller, AuthLib.isAdmin(authState, caller))) {
+          ?collection;
+        } else {
+          null;
+        };
+      };
+    };
   };
 
   /// Admin only: update the token range Mintlab can use when a collection does not enumerate tokens reliably.
@@ -374,6 +402,21 @@ mixin (
     };
     if (imageUrl.size() > 1_900_000) {
       Runtime.trap("Collection image is too large for on-chain storage");
+    };
+  };
+
+  func normalizePublicCollectionPageLimit(limit : ?Nat) : Nat {
+    switch (limit) {
+      case null 25;
+      case (?value) {
+        if (value == 0) {
+          25;
+        } else if (value > 100) {
+          100;
+        } else {
+          value;
+        };
+      };
     };
   };
 

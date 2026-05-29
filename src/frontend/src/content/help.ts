@@ -130,6 +130,7 @@ export const helpSections: HelpSection[] = [
     risks: [
       "Minting into the main app collection can require an admin-set ICP price and uses your in-app ICP balance.",
       "External collection sync can be slow when the original collection canister does not expose a complete ownership index.",
+      "NFTs from unverified imported collections are separated from Mintlab verified NFTs and may be counterfeit, unsafe, or inaccurate.",
       "Images may be compressed and, when moderation is enabled, checked before ICP is transferred.",
     ],
     links: [{ label: "Open Wallet", href: "/wallet" }],
@@ -163,7 +164,8 @@ export const helpSections: HelpSection[] = [
     risks: [
       "A collection canister needs cycles to keep running. Use Top Up when Mintlab reports low cycles.",
       "Mintlab needs controller access for app-managed updates, top-ups, and recovery flows. Removing Mintlab as a controller can make those app tools stop working for that collection.",
-      "External imports are shared with every Mintlab user, so use clear names, symbols, and images.",
+      "External imports are shared with every Mintlab user unless hidden or blocked by admins. Mintlab may sample imported collection listings for moderation instead of checking every NFT.",
+      "Unverified community imports can impersonate valuable collections. Check canister IDs and report suspected counterfeits, unsafe content, or misleading metadata.",
     ],
     links: [{ label: "Open Collections", href: "/collections" }],
   },
@@ -196,6 +198,7 @@ export const helpSections: HelpSection[] = [
     risks: [
       "Registered external wallet NFTs are deposited into the app vault before listing so Mintlab can settle the sale.",
       "Ledger transfers into escrow and back can cost network fees even when a bid is later refunded.",
+      "Unverified marketplace listings are separated from Mintlab verified listings. Verify the collection canister before buying or bidding.",
       "Sellers should review price, duration, and listing type carefully before confirming.",
     ],
     links: [{ label: "Open Marketplace", href: "/marketplace" }],

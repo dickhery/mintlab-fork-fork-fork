@@ -330,6 +330,28 @@ module {
     ?updated;
   };
 
+  public func markCollectionReviewed(
+    state : CollectionsState,
+    collectionId : Types.CollectionId,
+  ) : ?Types.CollectionImportMeta {
+    let metas = importMetas(state);
+    let current = switch (Map.get(metas, Nat.compare, collectionId)) {
+      case (?meta) meta;
+      case null {
+        switch (Map.get(state.collections, Nat.compare, collectionId)) {
+          case null return null;
+          case (?_) ensureImportMeta(state, collectionId, Principal.fromText("2vxsx-fae"), #CommunityImported);
+        };
+      };
+    };
+    let updated : Types.CollectionImportMeta = {
+      current with
+      reviewedAt = ?Time.now();
+    };
+    Map.add(metas, Nat.compare, collectionId, updated);
+    ?updated;
+  };
+
   public func collectionAllowsSync(
     state : CollectionsState,
     collection : Types.Collection,
@@ -341,6 +363,49 @@ module {
   };
 
   public func isPubliclyVisible(
+    state : CollectionsState,
+    collection : Types.Collection,
+  ) : Bool {
+    switch (Map.get(importMetas(state), Nat.compare, collection.id)) {
+      case (?meta) meta.trustStatus != #Hidden and meta.trustStatus != #Blocked;
+      case null true;
+    };
+  };
+
+  public func canViewerSeeCollection(
+    state : CollectionsState,
+    collection : Types.Collection,
+    viewer : Principal,
+    viewerIsAdmin : Bool,
+  ) : Bool {
+    switch (Map.get(importMetas(state), Nat.compare, collection.id)) {
+      case (?meta) {
+        if (meta.trustStatus == #Hidden or meta.trustStatus == #Blocked) {
+          viewerIsAdmin or Principal.equal(meta.importedBy, viewer);
+        } else {
+          true;
+        };
+      };
+      case null true;
+    };
+  };
+
+  public func isMintlabVerified(
+    state : CollectionsState,
+    collection : Types.Collection,
+  ) : Bool {
+    switch (collection.kind) {
+      case (#Minted) true;
+      case (#External) {
+        switch (Map.get(importMetas(state), Nat.compare, collection.id)) {
+          case (?meta) meta.trustStatus == #Verified;
+          case null false;
+        };
+      };
+    };
+  };
+
+  public func isMarketplaceAllowed(
     state : CollectionsState,
     collection : Types.Collection,
   ) : Bool {

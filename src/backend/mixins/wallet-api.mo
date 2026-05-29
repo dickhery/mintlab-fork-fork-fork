@@ -408,16 +408,16 @@ mixin (
     };
   };
 
-  public query func getUserNFTs(user : Principal) : async [WalletTypes.WalletNFT] {
-    walletVisibleNFTs(user);
+  public shared query ({ caller }) func getUserNFTs(user : Principal) : async [WalletTypes.WalletNFT] {
+    walletVisibleNFTsForViewer(user, caller);
   };
 
-  public query func getUserNFTsPage(
+  public shared query ({ caller }) func getUserNFTsPage(
     user : Principal,
     cursor : ?Nat,
     limit : ?Nat,
   ) : async WalletTypes.WalletNFTPage {
-    let nfts = walletVisibleNFTs(user);
+    let nfts = walletVisibleNFTsForViewer(user, caller);
     let start = switch (cursor) {
       case (?value) value;
       case null 0;
@@ -432,8 +432,8 @@ mixin (
     };
   };
 
-  public query func getNFTStats(user : Principal) : async WalletTypes.NFTStats {
-    WalletLib.buildNFTStats(walletVisibleNFTs(user));
+  public shared query ({ caller }) func getNFTStats(user : Principal) : async WalletTypes.NFTStats {
+    WalletLib.buildNFTStats(walletVisibleNFTsForViewer(user, caller));
   };
 
   public shared query ({ caller }) func getUserAccountId() : async CommonTypes.AccountIdentifier {
@@ -1371,6 +1371,25 @@ mixin (
       ),
       walletLocalMintedNFTs(user),
     );
+  };
+
+  func walletVisibleNFTsForViewer(
+    user : Principal,
+    viewer : Principal,
+  ) : [WalletTypes.WalletNFT] {
+    let isAdmin = AuthLib.isAdmin(authState, viewer);
+    var visible : [WalletTypes.WalletNFT] = [];
+    for (nft in walletVisibleNFTs(user).values()) {
+      switch (CollectionLib.getCollection(collectionsState, nft.collectionId)) {
+        case null {};
+        case (?collection) {
+          if (CollectionLib.canViewerSeeCollection(collectionsState, collection, viewer, isAdmin)) {
+            visible := Array.concat<WalletTypes.WalletNFT>(visible, [nft]);
+          };
+        };
+      };
+    };
+    visible;
   };
 
   func walletLocalMintedNFTs(user : Principal) : [WalletTypes.WalletNFT] {

@@ -86,6 +86,7 @@ persistent actor Backend {
     marketplaceFeeState,
     walletState,
     mintState,
+    moderationState,
     collectionsState,
     authState,
     Principal.fromActor(Backend),

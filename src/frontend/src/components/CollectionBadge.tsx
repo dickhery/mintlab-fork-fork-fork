@@ -1,6 +1,12 @@
+import {
+  collectionTrustBadgeClass,
+  collectionTrustDescription,
+  collectionTrustLabel,
+  collectionTrustStatus,
+} from "@/lib/collection-trust";
 import { resolveImageUrl } from "@/lib/media";
 import { cn } from "@/lib/utils";
-import type { Collection, NFTStandard } from "@/types";
+import type { Collection, CollectionTrustStatus, NFTStandard } from "@/types";
 
 function getStandardLabel(standard: NFTStandard): string {
   if (standard.__kind__ === "EXT") return "EXT";
@@ -9,28 +15,23 @@ function getStandardLabel(standard: NFTStandard): string {
   return standard.Other ?? "Unknown";
 }
 
-function getTrustLabel(collection: Collection): string {
-  if (collection.kind === "Minted") return "Mintlab-created";
-  const needsRange =
-    (collection.standard.__kind__ === "EXT" ||
-      collection.standard.__kind__ === "DIP721") &&
-    collection.browseInfo?.totalSupply == null;
-  return needsRange ? "Needs token range" : "External collection";
-}
-
 interface CollectionBadgeProps {
   collection: Collection;
+  trustStatus?: CollectionTrustStatus | null;
   size?: "sm" | "md";
   className?: string;
 }
 
 export function CollectionBadge({
   collection,
+  trustStatus,
   size = "md",
   className,
 }: CollectionBadgeProps) {
   const standardLabel = getStandardLabel(collection.standard);
-  const trustLabel = getTrustLabel(collection);
+  const resolvedTrustStatus =
+    trustStatus ?? collectionTrustStatus(collection, null);
+  const trustLabel = collectionTrustLabel(resolvedTrustStatus);
   const imageUrl = resolveImageUrl(collection.imageUrl);
 
   return (
@@ -64,11 +65,10 @@ export function CollectionBadge({
       <span
         className={cn(
           "shrink-0 px-1.5 py-0.5 rounded border",
-          collection.kind === "Minted"
-            ? "bg-accent/10 text-accent border-accent/20"
-            : "bg-muted/40 text-muted-foreground border-border/40",
+          collectionTrustBadgeClass(resolvedTrustStatus),
           size === "sm" ? "text-[10px]" : "text-xs",
         )}
+        title={collectionTrustDescription(resolvedTrustStatus)}
       >
         {trustLabel}
       </span>
