@@ -14,6 +14,7 @@ import CollectionTypes "../types/collections";
 import CommonTypes "../types/common";
 import WalletTypes "../types/wallet";
 import Nat "mo:core/Nat";
+import Text "mo:core/Text";
 import Time "mo:core/Time";
 import Principal "mo:core/Principal";
 
@@ -60,6 +61,16 @@ mixin (
     complete : Bool;
   };
 
+  type WalletSelectedScanResult = {
+    nfts : [WalletTypes.WalletNFT];
+    errors : [Text];
+    skip : ?WalletTypes.WalletSyncSkip;
+    scannedThisRun : Nat;
+    indexedThisRun : Nat;
+    complete : Bool;
+    status : ?WalletTypes.CollectionIndexStatus;
+  };
+
   // Kept as stable fields for upgrade compatibility; sync uses the transient safe limits below.
   let AUTO_INDEX_PAGE_LIMIT : Nat = 40;
   let AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat = 2;
@@ -69,6 +80,7 @@ mixin (
   transient let SYNC_COLLECTION_PAGE_MAX : Nat = 3;
   transient let TARGET_SYNC_INDEX_PAGE_DEFAULT : Nat = 3;
   transient let TARGET_SYNC_INDEX_PAGE_MAX : Nat = 3;
+  transient let TARGET_SYNC_TOKEN_HINT_MAX : Nat = 3;
   transient let CHILD_NFT_SYNC_PAGE_SIZE : Nat = 25;
   transient let CHILD_TOKEN_SYNC_PAGE_SIZE : Nat = 25;
   transient let PUBLIC_PAGE_DEFAULT : Nat = 50;
@@ -577,6 +589,209 @@ mixin (
     };
   };
 
+  public shared ({ caller }) func syncUserNFTsForCollectionV2(
+    collectionId : WalletTypes.CollectionId,
+    tokenHints : [Text],
+    maxPages : Nat,
+  ) : async {
+    #ok : WalletTypes.WalletCollectionSyncProgress;
+    #err : Text;
+  } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("You must be logged in to sync your wallet");
+    };
+    if (not acquireWalletSyncLock(caller)) {
+      return #err("Wallet sync is already running. Wait for the current sync to finish.");
+    };
+    try {
+      switch (enforceWalletSyncCooldown(caller)) {
+        case (?message) return #err(message);
+        case null {};
+      };
+      let collection = switch (CollectionLib.getCollection(collectionsState, collectionId)) {
+        case null return #err("Collection not found");
+        case (?value) value;
+      };
+      if (collection.kind != #External) {
+        return #err("Selected sync is only needed for imported external collections");
+      };
+      if (not CollectionLib.isPubliclyVisible(collectionsState, collection)) {
+        return #err("This community import is hidden or blocked while it is reviewed.");
+      };
+      if (not CollectionLib.collectionAllowsSync(collectionsState, collection)) {
+        return #err("Automatic wallet sync is disabled for this collection.");
+      };
+
+      let userAccountId = IcpLib.accountIdentifier(caller, IcpLib.zeroSubaccount());
+      let userAccountIdHex = WalletLib.blobToHexPublic(userAccountId);
+      var newCount : Nat = 0;
+      var errors : [Text] = [];
+      var skipped : [WalletTypes.WalletSyncSkip] = [];
+      var hintCount : Nat = 0;
+      var verifiedHintCount : Nat = 0;
+
+      label tokenHintLoop for (rawHint in tokenHints.values()) {
+        if (hintCount >= TARGET_SYNC_TOKEN_HINT_MAX) {
+          errors := Array.concat<Text>(
+            errors,
+            ["Only the first " # Nat.toText(TARGET_SYNC_TOKEN_HINT_MAX) # " token ID hints were checked."],
+          );
+          break tokenHintLoop;
+        };
+        let hint = Text.trim(rawHint, #char ' ');
+        if (Text.size(hint) > 0) {
+          hintCount += 1;
+          switch (await* syncKnownExternalTokenHint(caller, collection, hint, userAccountId)) {
+            case (#ok(wasNew)) {
+              verifiedHintCount += 1;
+              if (wasNew) {
+                newCount += 1;
+              };
+            };
+            case (#err(message)) {
+              errors := Array.concat<Text>(errors, [message]);
+            };
+          };
+        };
+      };
+
+      let initialStatus = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collectionId);
+      var scan : WalletSelectedScanResult = {
+        nfts = [];
+        errors = [];
+        skip = null;
+        scannedThisRun = 0;
+        indexedThisRun = 0;
+        complete = switch (initialStatus) {
+          case (?value) value.complete;
+          case null false;
+        };
+        status = initialStatus;
+      };
+      var shouldRunSelectedScan = verifiedHintCount == 0;
+
+      if (verifiedHintCount == 0) {
+        let indexedNFTs = WalletLib.indexedNFTsForOwner(
+          ownershipIndexState,
+          collection.id,
+          caller,
+          userAccountIdHex,
+        );
+        switch (await* WalletLib.previewUserOwnedNFTsFromOwnerIndex(collection, caller, userAccountId)) {
+          case (#ok(nfts)) {
+            let registered = registerPreviewNFTs(caller, collection, nfts, #Registered);
+            newCount += registered.newCount;
+            if (nfts.size() > 0) {
+              shouldRunSelectedScan := false;
+            };
+          };
+          case (#err(message)) {
+            if (indexedNFTs.size() > 0) {
+              let registered = registerPreviewNFTs(caller, collection, indexedNFTs, #Registered);
+              newCount += registered.newCount;
+            } else if (not WalletLib.isOwnerIndexMissingMessage(message)) {
+              errors := Array.concat<Text>(errors, [message]);
+            };
+          };
+        };
+
+        if (shouldRunSelectedScan) {
+          scan := await* autoScanSelectedCollectionForOwner(
+            collection,
+            caller,
+            userAccountIdHex,
+            normalizeTargetIndexPageBudget(maxPages),
+          );
+        };
+      };
+
+      let scanRegistered = registerPreviewNFTs(caller, collection, scan.nfts, #Registered);
+      newCount += scanRegistered.newCount;
+      errors := Array.concat<Text>(errors, scan.errors);
+      switch (scan.skip) {
+        case (?skip) skipped := Array.concat<WalletTypes.WalletSyncSkip>(skipped, [skip]);
+        case null {};
+      };
+
+      let status = switch (scan.status) {
+        case (?value) ?value;
+        case null WalletLib.getOwnershipIndexStatus(ownershipIndexState, collectionId);
+      };
+      #ok({
+        collectionId;
+        newCount;
+        errors;
+        skipped;
+        scannedThisRun = scan.scannedThisRun;
+        indexedThisRun = scan.indexedThisRun;
+        nextCursor = switch (status) {
+          case (?value) value.cursor;
+          case null null;
+        };
+        complete = scan.complete;
+        status;
+      });
+    } finally {
+      releaseWalletSyncLock(caller);
+    };
+  };
+
+  func syncKnownExternalTokenHint(
+    caller : Principal,
+    collection : CollectionTypes.Collection,
+    tokenId : Text,
+    userAccountId : Blob,
+  ) : async* { #ok : Bool; #err : Text } {
+    let canonicalTokenId = WalletLib.canonicalTokenId(collection, tokenId);
+    if (not MarketplaceLib.acquireListingTokenLock(marketplaceListingLockState, collection.id, canonicalTokenId)) {
+      return #err("This NFT is currently being listed. Try again shortly.");
+    };
+    try {
+      switch (MarketplaceLib.findActiveEscrowedNFT(marketplaceState, collection.id, canonicalTokenId)) {
+        case (?_) {
+          return #err("This NFT is locked in an active marketplace listing. Cancel or settle the listing first.");
+        };
+        case null {};
+      };
+      let metadataFallback = switch (WalletLib.findByCollectionToken(walletState, collection.id, canonicalTokenId)) {
+        case (?knownNFT) ?knownNFT.metadata;
+        case null null;
+      };
+      switch (
+        await* WalletLib.verifyKnownOwnedNFTWithFallback(
+          collection,
+          caller,
+          userAccountId,
+          canonicalTokenId,
+          metadataFallback,
+        )
+      ) {
+        case (#err(message)) #err(message);
+        case (#ok(metadata)) {
+          switch (MarketplaceLib.findActiveEscrowedNFT(marketplaceState, collection.id, canonicalTokenId)) {
+            case (?_) {
+              return #err("This NFT is locked in an active marketplace listing. Cancel or settle the listing first.");
+            };
+            case null {};
+          };
+          let existing = WalletLib.findByCollectionToken(walletState, collection.id, canonicalTokenId);
+          let wasNew = countsAsNewWalletNFT(existing, caller);
+          ignore WalletLib.registerNFT(
+            walletState,
+            caller,
+            collection.id,
+            canonicalTokenId,
+            metadata,
+            #Registered,
+          );
+          #ok(wasNew);
+        };
+      };
+    } finally {
+      MarketplaceLib.releaseListingTokenLock(marketplaceListingLockState, collection.id, canonicalTokenId);
+    };
+  };
+
   func syncUserNFTsPageUnlocked(
     caller : Principal,
     cursor : ?Nat,
@@ -855,7 +1070,7 @@ mixin (
           caller,
           userAccountIdHex,
         );
-        let preview = await* WalletLib.previewUserOwnedNFTs(
+        let preview = await* WalletLib.previewUserOwnedNFTsFromOwnerIndex(
           collection,
           caller,
           userAccountId,
@@ -1056,6 +1271,166 @@ mixin (
             errors = [];
             skip = null;
             complete = false;
+          };
+        };
+      };
+    };
+  };
+
+  func autoScanSelectedCollectionForOwner(
+    collection : CollectionTypes.Collection,
+    caller : Principal,
+    userAccountIdHex : Text,
+    maxIndexPages : Nat,
+  ) : async* WalletSelectedScanResult {
+    if (collectionNeedsSafeIndexSetup(collection)) {
+      return {
+        nfts = [];
+        errors = [];
+        skip = ?{
+          collectionId = collection.id;
+          collectionName = collection.name;
+          reason = "INDEX_REQUIRED";
+          message = "This collection needs token range setup before selected wallet sync can scan it safely. " #
+          "If you know the token ID, enter it and run Sync selected to verify that token directly.";
+        };
+        scannedThisRun = 0;
+        indexedThisRun = 0;
+        complete = false;
+        status = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id);
+      };
+    };
+
+    var pages : Nat = 0;
+    var scanned : Nat = 0;
+    var indexed : Nat = 0;
+    var complete = false;
+    var lastError : ?Text = null;
+    var found : [WalletTypes.WalletNFT] = [];
+    let pageBudget = normalizeAutoIndexPageBudget(maxIndexPages);
+
+    label selectedScan loop {
+      if (pages >= pageBudget) {
+        break selectedScan;
+      };
+      let status = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id);
+      switch (status) {
+        case (?value) {
+          if (value.complete) {
+            complete := true;
+            break selectedScan;
+          };
+        };
+        case null {};
+      };
+      let cursor = switch (status) {
+        case (?value) value.cursor;
+        case null null;
+      };
+      switch (
+        await* WalletLib.indexCollectionOwnershipPageForOwner(
+          ownershipIndexState,
+          collection,
+          caller,
+          userAccountIdHex,
+          cursor,
+          SAFE_AUTO_INDEX_PAGE_LIMIT,
+        )
+      ) {
+        case (#err(message)) {
+          lastError := ?message;
+          break selectedScan;
+        };
+        case (#ok(page)) {
+          pages += 1;
+          scanned += page.scanned;
+          indexed += page.indexed;
+          found := Array.concat<WalletTypes.WalletNFT>(found, page.nfts);
+          complete := page.complete;
+          if (page.complete or page.nextCursor == null) {
+            break selectedScan;
+          };
+        };
+      };
+    };
+
+    let status = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id);
+    let completeNow = complete or (switch (status) {
+      case (?value) value.complete;
+      case null false;
+    });
+
+    if (found.size() > 0 or completeNow) {
+      return {
+        nfts = found;
+        errors = [];
+        skip = if (not completeNow and pages > 0) {
+          ?{
+            collectionId = collection.id;
+            collectionName = collection.name;
+            reason = "INDEXING_IN_PROGRESS";
+            message = "Mintlab scanned " #
+            Nat.toText(scanned) #
+            " more token positions in this collection. Matching NFTs appear as soon as they are found; click Sync selected again to continue.";
+          };
+        } else {
+          null;
+        };
+        scannedThisRun = scanned;
+        indexedThisRun = indexed;
+        complete = completeNow;
+        status;
+      };
+    };
+
+    switch (lastError) {
+      case (?message) {
+        {
+          nfts = [];
+          errors = [];
+          skip = ?{
+            collectionId = collection.id;
+            collectionName = collection.name;
+            reason = "INDEX_REQUIRED";
+            message = "Mintlab tried selected ownership scanning, but this collection needs extra setup before new NFTs can be discovered automatically. " #
+            "Known token IDs can still be verified directly. Details: " #
+            message;
+          };
+          scannedThisRun = scanned;
+          indexedThisRun = indexed;
+          complete = false;
+          status;
+        };
+      };
+      case null {
+        if (pages > 0) {
+          {
+            nfts = [];
+            errors = [];
+            skip = ?{
+              collectionId = collection.id;
+              collectionName = collection.name;
+              reason = "INDEXING_IN_PROGRESS";
+              message = "Mintlab scanned " #
+              Nat.toText(scanned) #
+              " more token positions and saved " #
+              Nat.toText(indexed) #
+              " owner records for this collection. No matching NFT was found yet; click Sync selected again to continue, or enter a known token ID.";
+            };
+            scannedThisRun = scanned;
+            indexedThisRun = indexed;
+            complete = false;
+            status;
+          };
+        } else {
+          {
+            nfts = [];
+            errors = [];
+            skip = null;
+            scannedThisRun = 0;
+            indexedThisRun = 0;
+            complete = completeNow;
+            status;
           };
         };
       };

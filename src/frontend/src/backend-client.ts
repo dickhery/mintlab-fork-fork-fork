@@ -149,6 +149,15 @@ export interface WalletSyncPageResult extends WalletSyncV2Result {
   checkedCollections: bigint;
 }
 
+export interface WalletCollectionSyncProgress extends WalletSyncV2Result {
+  collectionId: CollectionId;
+  scannedThisRun: bigint;
+  indexedThisRun: bigint;
+  nextCursor: string | null;
+  complete: boolean;
+  status: CollectionIndexStatus | null;
+}
+
 export interface CollectionIndexStatus {
   collectionId: CollectionId;
   cursor: string | null;
@@ -757,6 +766,11 @@ export interface backendInterface {
   ): Promise<
     { __kind__: "ok"; ok: boolean } | { __kind__: "err"; err: string }
   >;
+  adminResetCollectionOwnershipIndex(
+    collectionId: CollectionId,
+  ): Promise<
+    { __kind__: "ok"; ok: boolean } | { __kind__: "err"; err: string }
+  >;
   adminDisableCollectionSync(
     collectionId: CollectionId,
   ): Promise<
@@ -1149,6 +1163,14 @@ export interface backendInterface {
     | { __kind__: "ok"; ok: WalletSyncPageResult }
     | { __kind__: "err"; err: string }
   >;
+  syncUserNFTsForCollectionV2(
+    collectionId: CollectionId,
+    tokenHints: string[],
+    maxPages: bigint,
+  ): Promise<
+    | { __kind__: "ok"; ok: WalletCollectionSyncProgress }
+    | { __kind__: "err"; err: string }
+  >;
   syncCollectionDividends(
     collectionId: CollectionId,
   ): Promise<
@@ -1296,6 +1318,14 @@ type RawWalletSyncPageResult = RawWalletSyncV2Result & {
   nextCursor: [] | [bigint];
   complete: boolean;
   checkedCollections: bigint;
+};
+type RawWalletCollectionSyncProgress = RawWalletSyncV2Result & {
+  collectionId: CollectionId;
+  scannedThisRun: bigint;
+  indexedThisRun: bigint;
+  nextCursor: [] | [string];
+  complete: boolean;
+  status: [] | [RawCollectionIndexStatus];
 };
 type RawCollectionIndexStatus = {
   collectionId: CollectionId;
@@ -1903,6 +1933,21 @@ function fromRawWalletSyncPageResult(
     nextCursor: fromRawOption(value.nextCursor),
     complete: value.complete,
     checkedCollections: value.checkedCollections,
+  };
+}
+
+function fromRawWalletCollectionSyncProgress(
+  value: RawWalletCollectionSyncProgress,
+): WalletCollectionSyncProgress {
+  const status = fromRawOption(value.status);
+  return {
+    ...fromRawWalletSyncV2Result(value),
+    collectionId: value.collectionId,
+    scannedThisRun: value.scannedThisRun,
+    indexedThisRun: value.indexedThisRun,
+    nextCursor: fromRawOption(value.nextCursor),
+    complete: value.complete,
+    status: status == null ? null : fromRawCollectionIndexStatus(status),
   };
 }
 
@@ -2810,6 +2855,20 @@ function fromSyncPageResult(
   return { __kind__: "err", err: value.err };
 }
 
+function fromCollectionSyncProgressResult(
+  value: { ok: RawWalletCollectionSyncProgress } | { err: string },
+):
+  | { __kind__: "ok"; ok: WalletCollectionSyncProgress }
+  | { __kind__: "err"; err: string } {
+  if ("ok" in value) {
+    return {
+      __kind__: "ok",
+      ok: fromRawWalletCollectionSyncProgress(value.ok),
+    };
+  }
+  return { __kind__: "err", err: value.err };
+}
+
 function fromCollectionIndexPageResult(
   value: { ok: RawCollectionIndexPageResult } | { err: string },
 ):
@@ -3062,6 +3121,18 @@ export class Backend implements backendInterface {
     return fromBooleanResult(
       await this.run(() =>
         this.actor.adminReleaseDividendDisbursementLock(collectionId),
+      ),
+    );
+  }
+
+  async adminResetCollectionOwnershipIndex(
+    collectionId: CollectionId,
+  ): Promise<
+    { __kind__: "ok"; ok: boolean } | { __kind__: "err"; err: string }
+  > {
+    return fromBooleanResult(
+      await this.run(() =>
+        this.actor.adminResetCollectionOwnershipIndex(collectionId),
       ),
     );
   }
@@ -4244,6 +4315,25 @@ export class Backend implements backendInterface {
     return fromSyncPageResult(
       await this.run(() =>
         this.actor.syncUserNFTsForCollection(collectionId, maxIndexPages),
+      ),
+    );
+  }
+
+  async syncUserNFTsForCollectionV2(
+    collectionId: CollectionId,
+    tokenHints: string[],
+    maxPages: bigint,
+  ): Promise<
+    | { __kind__: "ok"; ok: WalletCollectionSyncProgress }
+    | { __kind__: "err"; err: string }
+  > {
+    return fromCollectionSyncProgressResult(
+      await this.run(() =>
+        this.actor.syncUserNFTsForCollectionV2(
+          collectionId,
+          tokenHints,
+          maxPages,
+        ),
       ),
     );
   }

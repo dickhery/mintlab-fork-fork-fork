@@ -60,6 +60,7 @@ import type {
   NFTStats,
   PendingMintPaymentView,
   PublicModerationConfig,
+  WalletCollectionSyncProgress,
   WalletNFT,
   WalletSyncSkip,
   WalletSyncV2Result,
@@ -261,6 +262,22 @@ function summarizeSyncAttention(
 
 function isAutoIndexingSkip(skip: WalletSyncSkip): boolean {
   return skip.reason === "INDEXING_IN_PROGRESS";
+}
+
+function selectedSyncProgressMessage(
+  progress: WalletCollectionSyncProgress,
+  collection?: Collection | null,
+): string {
+  const scannedTotal = progress.status?.scanned ?? progress.scannedThisRun;
+  const totalSupply = collection?.browseInfo?.totalSupply ?? null;
+  const scope =
+    totalSupply != null
+      ? `${scannedTotal.toString()} of ${totalSupply.toString()} tokens`
+      : `${scannedTotal.toString()} token positions`;
+  if (progress.complete) {
+    return `Selected sync checked ${scope} and finished this collection.`;
+  }
+  return `Selected sync checked ${scope}. Continue Sync selected to keep checking this collection, or enter a known token ID to verify it directly.`;
 }
 
 function isSyncAlreadyRunningMessage(message: string): boolean {
@@ -1843,6 +1860,7 @@ type SyncStatus =
       message: string;
       errors: string[];
       skipped: WalletSyncSkip[];
+      progress?: WalletCollectionSyncProgress | null;
     }
   | { kind: "error"; message: string };
 
@@ -1851,10 +1869,16 @@ type SyncMode = "silent" | "manual";
 type SyncOptions = {
   silent?: boolean;
   collectionId?: bigint | null;
+  tokenHints?: string[];
 };
 
 type SyncResult =
-  | { __kind__: "ok"; ok: WalletSyncV2Result }
+  | {
+      __kind__: "ok";
+      ok: WalletSyncV2Result & {
+        progress?: WalletCollectionSyncProgress | null;
+      };
+    }
   | { __kind__: "err"; err: string };
 
 interface ReceivingInstructionsProps {
@@ -1862,7 +1886,7 @@ interface ReceivingInstructionsProps {
   accountIdHex: string | null;
   collections: Collection[];
   onSync: () => void;
-  onSyncCollection?: (collectionId: bigint) => void;
+  onSyncCollection?: (collectionId: bigint, tokenHints?: string[]) => void;
   onImportSpecificNFT: () => void;
   onIndexCollection?: (collectionId: bigint) => void;
   syncStatus: SyncStatus;
@@ -1879,8 +1903,10 @@ function ReceivingInstructions({
   syncStatus,
 }: ReceivingInstructionsProps) {
   const [syncTargetCollectionId, setSyncTargetCollectionId] = useState("all");
+  const [syncTokenHint, setSyncTokenHint] = useState("");
   const isSyncing = syncStatus.kind === "syncing";
   const skipped = syncStatus.kind === "partial" ? syncStatus.skipped : [];
+  const progress = syncStatus.kind === "partial" ? syncStatus.progress : null;
   const indexingSkips = skipped.filter(isAutoIndexingSkip);
   const setupSkips = skipped.filter((skip) => !isAutoIndexingSkip(skip));
   const onlyAutoIndexing = skipped.length > 0 && setupSkips.length === 0;
@@ -1906,7 +1932,8 @@ function ReceivingInstructions({
 
   function handleSyncClick() {
     if (selectedSyncCollection && onSyncCollection) {
-      onSyncCollection(selectedSyncCollection.id);
+      const hint = syncTokenHint.trim();
+      onSyncCollection(selectedSyncCollection.id, hint ? [hint] : []);
       return;
     }
     onSync();
@@ -2021,6 +2048,16 @@ function ReceivingInstructions({
               </SelectContent>
             </Select>
           )}
+          {selectedSyncCollection && (
+            <Input
+              value={syncTokenHint}
+              onChange={(event) => setSyncTokenHint(event.target.value)}
+              placeholder="Optional token ID"
+              className="h-7 w-[min(100%,9rem)] border-border bg-background/60 px-2 text-xs"
+              data-ocid="wallet.sync_token_hint_input"
+              aria-label="Optional token ID for selected sync"
+            />
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -2067,65 +2104,73 @@ function ReceivingInstructions({
           )}
         </div>
 
-        {syncStatus.kind === "partial" && syncStatus.skipped.length > 0 && (
-          <div className="rounded-lg border border-amber-200/70 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
-            <div className="flex flex-col gap-2">
-              <div className="flex items-start gap-2">
-                <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-foreground">
-                    {onlyAutoIndexing
-                      ? "Automatic discovery is indexing"
-                      : "Some collections need discovery setup"}
-                  </p>
-                  <p className="text-xs leading-relaxed text-muted-foreground">
-                    {onlyAutoIndexing
-                      ? "Sync is indexing imported collections in safe pages. New NFTs appear as soon as they are found; known token IDs can still be imported directly."
-                      : "Sync tried automatic ownership indexing, but these imported collections need extra setup before new NFTs can be found automatically. Known token IDs can still be imported directly."}
-                  </p>
-                </div>
-              </div>
-              {syncStatus.skipped.slice(0, 4).map((skip) => (
-                <div
-                  key={skip.collectionId.toString()}
-                  className="flex flex-col gap-2 border-t border-amber-200/60 pt-2 sm:flex-row sm:items-center sm:justify-between dark:border-amber-900/40"
-                >
+        {syncStatus.kind === "partial" &&
+          (syncStatus.skipped.length > 0 || progress) && (
+            <div className="rounded-lg border border-amber-200/70 bg-amber-50/70 p-3 dark:border-amber-900/50 dark:bg-amber-950/20">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-start gap-2">
+                  <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {skip.collectionName}
+                    <p className="text-sm font-medium text-foreground">
+                      {progress
+                        ? "Selected collection sync progress"
+                        : onlyAutoIndexing
+                          ? "Automatic discovery is indexing"
+                          : "Some collections need discovery setup"}
                     </p>
-                    <p className="text-xs text-muted-foreground">
-                      {skip.message ||
-                        "Automatic discovery is still catching up for this collection."}
+                    <p className="text-xs leading-relaxed text-muted-foreground">
+                      {progress
+                        ? selectedSyncProgressMessage(
+                            progress,
+                            selectedSyncCollection,
+                          )
+                        : onlyAutoIndexing
+                          ? "Sync is indexing imported collections in safe pages. New NFTs appear as soon as they are found; known token IDs can still be imported directly."
+                          : "Sync tried automatic ownership indexing, but these imported collections need extra setup before new NFTs can be found automatically. Known token IDs can still be imported directly."}
                     </p>
                   </div>
-                  {!isAutoIndexingSkip(skip) && onIndexCollection ? (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 shrink-0"
-                      onClick={() => onIndexCollection(skip.collectionId)}
-                    >
-                      Open Indexing
-                    </Button>
-                  ) : (
-                    <Badge variant="secondary" className="shrink-0">
-                      {isAutoIndexingSkip(skip) ? "Indexing" : "Needs setup"}
-                    </Badge>
-                  )}
                 </div>
-              ))}
-              {syncStatus.skipped.length > 4 && (
-                <p className="text-xs text-muted-foreground">
-                  {syncStatus.skipped.length - 4} more collections{" "}
-                  {onlyAutoIndexing
-                    ? "are indexing automatically."
-                    : "need discovery setup."}
-                </p>
-              )}
+                {syncStatus.skipped.slice(0, 4).map((skip) => (
+                  <div
+                    key={skip.collectionId.toString()}
+                    className="flex flex-col gap-2 border-t border-amber-200/60 pt-2 sm:flex-row sm:items-center sm:justify-between dark:border-amber-900/40"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">
+                        {skip.collectionName}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {skip.message ||
+                          "Automatic discovery is still catching up for this collection."}
+                      </p>
+                    </div>
+                    {!isAutoIndexingSkip(skip) && onIndexCollection ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 shrink-0"
+                        onClick={() => onIndexCollection(skip.collectionId)}
+                      >
+                        Open Indexing
+                      </Button>
+                    ) : (
+                      <Badge variant="secondary" className="shrink-0">
+                        {isAutoIndexingSkip(skip) ? "Indexing" : "Needs setup"}
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+                {syncStatus.skipped.length > 4 && (
+                  <p className="text-xs text-muted-foreground">
+                    {syncStatus.skipped.length - 4} more collections{" "}
+                    {onlyAutoIndexing
+                      ? "are indexing automatically."
+                      : "need discovery setup."}
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
         {isSyncing && (
           <motion.div
@@ -2720,6 +2765,86 @@ export default function WalletPage() {
             ) ?? null;
           const collectionName =
             targetCollection?.name ?? "Selected collection";
+          const tokenHints = options.tokenHints ?? [];
+          if (typeof actor.syncUserNFTsForCollectionV2 === "function") {
+            const progressPromise = actor.syncUserNFTsForCollectionV2(
+              targetCollectionId,
+              tokenHints,
+              TARGET_SYNC_INDEX_PAGE_LIMIT,
+            );
+            let progressResult: Awaited<
+              ReturnType<typeof actor.syncUserNFTsForCollectionV2>
+            >;
+            try {
+              progressResult = await withTimeout(
+                progressPromise,
+                SYNC_TIMEOUT_MS,
+                SYNC_PAGE_TIMEOUT_MESSAGE,
+              );
+            } catch (err) {
+              const message = extractError(err);
+              if (message !== SYNC_PAGE_TIMEOUT_MESSAGE) {
+                throw err;
+              }
+
+              void progressPromise
+                .then(() => {
+                  void refetchNFTs();
+                  void queryClient.invalidateQueries({
+                    queryKey: ["userStats"],
+                  });
+                })
+                .catch((lateError: unknown) => {
+                  if (import.meta.env.DEV) {
+                    console.debug(
+                      "[syncUserNFTsForCollectionV2] late sync failed:",
+                      lateError,
+                    );
+                  }
+                });
+
+              return {
+                __kind__: "ok",
+                ok: {
+                  newCount: 0n,
+                  errors: [],
+                  skipped: [
+                    {
+                      collectionId: targetCollectionId,
+                      collectionName,
+                      reason: "INDEXING_IN_PROGRESS",
+                      message: SYNC_PAGE_TIMEOUT_MESSAGE,
+                    },
+                  ],
+                },
+              };
+            }
+
+            if (progressResult.__kind__ === "err") {
+              return progressResult;
+            }
+
+            const skipped = [...progressResult.ok.skipped];
+            if (!progressResult.ok.complete && skipped.length === 0) {
+              skipped.push({
+                collectionId: targetCollectionId,
+                collectionName,
+                reason: "INDEXING_IN_PROGRESS",
+                message:
+                  "Mintlab saved selected sync progress for this collection. Click Sync selected again to continue, or enter a known token ID.",
+              });
+            }
+            return {
+              __kind__: "ok",
+              ok: {
+                newCount: progressResult.ok.newCount,
+                errors: progressResult.ok.errors,
+                skipped,
+                progress: progressResult.ok,
+              },
+            };
+          }
+
           if (typeof actor.syncUserNFTsForCollection !== "function") {
             return {
               __kind__: "err",
@@ -2964,6 +3089,7 @@ export default function WalletPage() {
               message: warningMessage,
               errors: syncErrors,
               skipped: syncSkipped,
+              progress: result.ok.progress ?? null,
             });
             if (newCount > 0) {
               toast.success(
@@ -3132,8 +3258,8 @@ export default function WalletPage() {
   );
 
   const handleSyncCollection = useCallback(
-    (collectionId: bigint) => {
-      void handleSync({ collectionId });
+    (collectionId: bigint, tokenHints: string[] = []) => {
+      void handleSync({ collectionId, tokenHints });
     },
     [handleSync],
   );

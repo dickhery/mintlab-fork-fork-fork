@@ -41,6 +41,7 @@ export type {
   WalletSyncSkip,
   WalletSyncV2Result,
   WalletSyncPageResult,
+  WalletCollectionSyncProgress,
   NFTStats,
   NFTMetadata,
   MintConfig,

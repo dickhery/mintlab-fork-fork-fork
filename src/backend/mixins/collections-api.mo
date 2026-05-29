@@ -207,6 +207,7 @@ mixin (
       case (?value) value;
       case null return #err("Collection not found");
     };
+    WalletLib.clearOwnershipIndexForCollection(ownershipIndexState, collectionId);
     await* warmImportedCollectionIndex(collection);
     #ok(meta);
   };
@@ -280,8 +281,28 @@ mixin (
       )
     ) {
       case null #err("Could not update collection browse settings");
-      case (?updated) #ok(updated);
+      case (?updated) {
+        WalletLib.clearOwnershipIndexForCollection(ownershipIndexState, collectionId);
+        #ok(updated);
+      };
     };
+  };
+
+  public shared ({ caller }) func adminResetCollectionOwnershipIndex(
+    collectionId : CollectionTypes.CollectionId
+  ) : async { #ok : Bool; #err : Text } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("Anonymous caller not allowed");
+    };
+    if (not AuthLib.isAdmin(authState, caller)) {
+      return #err("Unauthorized: admin only");
+    };
+    switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
+      case null return #err("Collection not found");
+      case (?_) {};
+    };
+    WalletLib.clearOwnershipIndexForCollection(ownershipIndexState, collectionId);
+    #ok(true);
   };
 
   /// Admin only: remove a collection by id

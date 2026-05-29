@@ -847,6 +847,10 @@ export const mockBackend: backendInterface = {
     __kind__: "ok" as const,
     ok: true,
   }),
+  adminResetCollectionOwnershipIndex: async () => ({
+    __kind__: "ok" as const,
+    ok: true,
+  }),
   quoteCollectionCreationCost: async (
     collectionCanisterCycles,
     collectionCreationPriceE8s,
@@ -1337,6 +1341,28 @@ export const mockBackend: backendInterface = {
       nextCursor: null,
       complete: true,
       checkedCollections: 1n,
+    },
+  }),
+  syncUserNFTsForCollectionV2: async (collectionId) => ({
+    __kind__: "ok" as const,
+    ok: {
+      collectionId,
+      newCount: 0n,
+      errors: [] as string[],
+      skipped: [],
+      scannedThisRun: 50n,
+      indexedThisRun: 50n,
+      nextCursor: "50",
+      complete: false,
+      status: {
+        collectionId,
+        cursor: "50",
+        scanned: 50n,
+        indexed: 50n,
+        complete: false,
+        lastError: null,
+        updatedAt: BigInt(Date.now()) * BigInt(1_000_000),
+      },
     },
   }),
 };

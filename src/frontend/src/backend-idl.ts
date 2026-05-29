@@ -826,6 +826,17 @@ export const idlFactory = ({ IDL }) => {
     'complete' : IDL.Bool,
     'nextCursor' : IDL.Opt(IDL.Nat),
   });
+  const WalletCollectionSyncProgress = IDL.Record({
+    'skipped' : IDL.Vec(WalletSyncSkip),
+    'status' : IDL.Opt(CollectionIndexStatus),
+    'errors' : IDL.Vec(IDL.Text),
+    'indexedThisRun' : IDL.Nat,
+    'collectionId' : CollectionId,
+    'newCount' : IDL.Nat,
+    'complete' : IDL.Bool,
+    'nextCursor' : IDL.Opt(IDL.Text),
+    'scannedThisRun' : IDL.Nat,
+  });
   const WalletSyncV2Result = IDL.Record({
     'skipped' : IDL.Vec(WalletSyncSkip),
     'errors' : IDL.Vec(IDL.Text),
@@ -974,6 +985,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'adminReleaseDividendDisbursementLock' : IDL.Func(
+        [CollectionId],
+        [IDL.Variant({ 'ok' : IDL.Bool, 'err' : IDL.Text })],
+        [],
+      ),
+    'adminResetCollectionOwnershipIndex' : IDL.Func(
         [CollectionId],
         [IDL.Variant({ 'ok' : IDL.Bool, 'err' : IDL.Text })],
         [],
@@ -1587,6 +1603,16 @@ export const idlFactory = ({ IDL }) => {
     'syncUserNFTsForCollection' : IDL.Func(
         [CollectionId, IDL.Nat],
         [IDL.Variant({ 'ok' : WalletSyncPageResult, 'err' : IDL.Text })],
+        [],
+      ),
+    'syncUserNFTsForCollectionV2' : IDL.Func(
+        [CollectionId, IDL.Vec(IDL.Text), IDL.Nat],
+        [
+          IDL.Variant({
+            'ok' : WalletCollectionSyncProgress,
+            'err' : IDL.Text,
+          }),
+        ],
         [],
       ),
     'syncUserNFTsV2' : IDL.Func(

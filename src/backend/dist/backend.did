@@ -42,6 +42,18 @@ type WalletLocation =
    Registered;
    Vaulted;
  };
+type WalletCollectionSyncProgress =
+ record {
+   collectionId: CollectionId;
+   complete: bool;
+   errors: vec text;
+   indexedThisRun: nat;
+   newCount: nat;
+   nextCursor: opt text;
+   scannedThisRun: nat;
+   skipped: vec WalletSyncSkip;
+   status: opt CollectionIndexStatus;
+ };
 type UserId = principal;
 type TransferResult = 
  variant {
@@ -1094,6 +1106,11 @@ service : {
       err: text;
       ok: bool;
     });
+  adminResetCollectionOwnershipIndex: (collectionId: CollectionId) ->
+   (variant {
+      err: text;
+      ok: bool;
+    });
   adminResetUnresolvedMintlabFeeAttempt: (listingId: ListingId) ->
    (MintlabFeeRecoveryQuote);
   adminResolvePendingBid: (listingId: ListingId) -> (MarketplaceActionResult);
@@ -1440,6 +1457,12 @@ service : {
               err: text;
               ok: WalletSyncPageResult;
             });
+  syncUserNFTsForCollectionV2: (collectionId: CollectionId, tokenHints:
+   vec text, maxPages: nat) ->
+   (variant {
+      err: text;
+      ok: WalletCollectionSyncProgress;
+    });
   syncUserNFTsPage: (cursor: opt nat, maxCollections: nat) ->
    (variant {
       err: text;

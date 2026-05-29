@@ -93,6 +93,18 @@ module {
     checkedCollections : Nat;
   };
 
+  public type WalletCollectionSyncProgress = {
+    collectionId : CollectionId;
+    newCount : Nat;
+    errors : [Text];
+    skipped : [WalletSyncSkip];
+    scannedThisRun : Nat;
+    indexedThisRun : Nat;
+    nextCursor : ?Text;
+    complete : Bool;
+    status : ?CollectionIndexStatus;
+  };
+
   public type WalletNFTPage = {
     nfts : [WalletNFT];
     nextCursor : ?Nat;

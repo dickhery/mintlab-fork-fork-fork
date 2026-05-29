@@ -1287,6 +1287,27 @@ function CollectionRow({
     },
   });
 
+  const resetIndexMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not ready");
+      const result = await actor.adminResetCollectionOwnershipIndex(
+        collection.id,
+      );
+      if (result.__kind__ === "err") throw new Error(result.err);
+      return result.ok;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: ["collectionIndexStatus", collection.id.toString()],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["collections"] });
+      toast.success("Ownership index reset for this collection.");
+    },
+    onError: (err: unknown) => {
+      toast.error(`Failed to reset ownership index: ${extractError(err)}`);
+    },
+  });
+
   useEffect(() => {
     setTotalSupply(collection.browseInfo?.totalSupply?.toString() ?? "");
     setTokenIndexOffset(
@@ -1470,6 +1491,18 @@ function CollectionRow({
           >
             <PauseCircle size={14} />
             Disable Sync
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2"
+            title="Clear saved ownership scan progress so the next sync starts from the current token range."
+            onClick={() => resetIndexMutation.mutate()}
+            disabled={resetIndexMutation.isPending}
+            data-ocid={`admin.collection.reset_index.${index}`}
+          >
+            <RefreshCw size={14} />
+            Reset Index
           </Button>
           <Button
             size="sm"
