@@ -1309,7 +1309,10 @@ export const mockBackend: backendInterface = {
     };
   },
   isNFTInUserWallet: async () => false,
-  syncUserNFTs: async () => ({ __kind__: "ok" as const, ok: { newCount: 0n, errors: [] as string[] } }),
+  syncUserNFTs: async () => ({
+    __kind__: "ok" as const,
+    ok: { newCount: 0n, errors: [] as string[] },
+  }),
   syncUserNFTsV2: async () => ({
     __kind__: "ok" as const,
     ok: { newCount: 0n, errors: [] as string[], skipped: [] },
@@ -1323,6 +1326,17 @@ export const mockBackend: backendInterface = {
       nextCursor: null,
       complete: true,
       checkedCollections: 0n,
+    },
+  }),
+  syncUserNFTsForCollection: async () => ({
+    __kind__: "ok" as const,
+    ok: {
+      newCount: 0n,
+      errors: [] as string[],
+      skipped: [],
+      nextCursor: null,
+      complete: true,
+      checkedCollections: 1n,
     },
   }),
 };

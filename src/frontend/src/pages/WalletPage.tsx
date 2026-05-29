@@ -91,7 +91,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -143,6 +143,7 @@ const SYNC_STILL_RUNNING_MESSAGE =
 const SYNC_PAGE_TIMEOUT_MESSAGE =
   "This sync page is taking longer than expected. Mintlab saved progress and will continue on the next Sync.";
 const SYNC_PAGE_COLLECTION_LIMIT = 2n;
+const TARGET_SYNC_INDEX_PAGE_LIMIT = 3n;
 const MAX_SYNC_PAGES_PER_CLICK = 5;
 const SYNC_SLOW_NOTICE_MS = 15_000;
 const SYNC_REFRESH_INTERVAL_MS = 6_000;
@@ -1847,6 +1848,11 @@ type SyncStatus =
 
 type SyncMode = "silent" | "manual";
 
+type SyncOptions = {
+  silent?: boolean;
+  collectionId?: bigint | null;
+};
+
 type SyncResult =
   | { __kind__: "ok"; ok: WalletSyncV2Result }
   | { __kind__: "err"; err: string };
@@ -1854,7 +1860,9 @@ type SyncResult =
 interface ReceivingInstructionsProps {
   principalText: string | null;
   accountIdHex: string | null;
+  collections: Collection[];
   onSync: () => void;
+  onSyncCollection?: (collectionId: bigint) => void;
   onImportSpecificNFT: () => void;
   onIndexCollection?: (collectionId: bigint) => void;
   syncStatus: SyncStatus;
@@ -1863,16 +1871,46 @@ interface ReceivingInstructionsProps {
 function ReceivingInstructions({
   principalText,
   accountIdHex,
+  collections,
   onSync,
+  onSyncCollection,
   onImportSpecificNFT,
   onIndexCollection,
   syncStatus,
 }: ReceivingInstructionsProps) {
+  const [syncTargetCollectionId, setSyncTargetCollectionId] = useState("all");
   const isSyncing = syncStatus.kind === "syncing";
   const skipped = syncStatus.kind === "partial" ? syncStatus.skipped : [];
   const indexingSkips = skipped.filter(isAutoIndexingSkip);
   const setupSkips = skipped.filter((skip) => !isAutoIndexingSkip(skip));
   const onlyAutoIndexing = skipped.length > 0 && setupSkips.length === 0;
+  const syncableCollections = useMemo(
+    () => collections.filter((collection) => collection.kind === "External"),
+    [collections],
+  );
+  const selectedSyncCollection =
+    syncableCollections.find(
+      (collection) => collection.id.toString() === syncTargetCollectionId,
+    ) ?? null;
+
+  useEffect(() => {
+    if (
+      syncTargetCollectionId !== "all" &&
+      !syncableCollections.some(
+        (collection) => collection.id.toString() === syncTargetCollectionId,
+      )
+    ) {
+      setSyncTargetCollectionId("all");
+    }
+  }, [syncTargetCollectionId, syncableCollections]);
+
+  function handleSyncClick() {
+    if (selectedSyncCollection && onSyncCollection) {
+      onSyncCollection(selectedSyncCollection.id);
+      return;
+    }
+    onSync();
+  }
 
   return (
     <motion.div
@@ -1957,11 +1995,37 @@ function ReceivingInstructions({
             <Plus className="w-3 h-3" />
             Import NFT
           </Button>
+          {syncableCollections.length > 0 && (
+            <Select
+              value={syncTargetCollectionId}
+              onValueChange={setSyncTargetCollectionId}
+            >
+              <SelectTrigger
+                aria-label="Choose sync collection"
+                className="h-7 w-[min(100%,13rem)] border-border bg-background/60 px-2 text-xs"
+                data-ocid="wallet.sync_collection_select"
+              >
+                <Layers className="mr-1.5 h-3 w-3 shrink-0 text-muted-foreground" />
+                <SelectValue placeholder="All collections" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All collections</SelectItem>
+                {syncableCollections.map((collection) => (
+                  <SelectItem
+                    key={collection.id.toString()}
+                    value={collection.id.toString()}
+                  >
+                    {collection.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Button
             size="sm"
             variant="ghost"
             className="h-7 px-2 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            onClick={onSync}
+            onClick={handleSyncClick}
             disabled={isSyncing}
             data-ocid="wallet.refresh_button"
             aria-label="Sync NFTs from chain"
@@ -1969,7 +2033,11 @@ function ReceivingInstructions({
             <RefreshCw
               className={`w-3 h-3 ${isSyncing ? "animate-spin" : ""}`}
             />
-            {isSyncing ? "Syncing…" : "Sync"}
+            {isSyncing
+              ? "Syncing…"
+              : selectedSyncCollection
+                ? "Sync selected"
+                : "Sync"}
           </Button>
         </div>
       </div>
@@ -2637,13 +2705,99 @@ export default function WalletPage() {
   }, [syncStatus]);
 
   const handleSync = useCallback(
-    async (options: { silent?: boolean } = {}) => {
+    async (options: SyncOptions = {}) => {
       if (!actor) return;
       const silent = options.silent === true;
+      const targetCollectionId = options.collectionId ?? null;
       const requestedMode: SyncMode = silent ? "silent" : "manual";
       if (!silent) setSyncStatus({ kind: "syncing" });
 
       const runWalletSync = async (): Promise<SyncResult> => {
+        if (targetCollectionId !== null) {
+          const targetCollection =
+            collections?.find(
+              (collection) => collection.id === targetCollectionId,
+            ) ?? null;
+          const collectionName =
+            targetCollection?.name ?? "Selected collection";
+          if (typeof actor.syncUserNFTsForCollection !== "function") {
+            return {
+              __kind__: "err",
+              err: "Targeted collection sync is not available in this build.",
+            };
+          }
+          const pagePromise = actor.syncUserNFTsForCollection(
+            targetCollectionId,
+            TARGET_SYNC_INDEX_PAGE_LIMIT,
+          );
+          let page: Awaited<ReturnType<typeof actor.syncUserNFTsForCollection>>;
+          try {
+            page = await withTimeout(
+              pagePromise,
+              SYNC_TIMEOUT_MS,
+              SYNC_PAGE_TIMEOUT_MESSAGE,
+            );
+          } catch (err) {
+            const message = extractError(err);
+            if (message !== SYNC_PAGE_TIMEOUT_MESSAGE) {
+              throw err;
+            }
+
+            void pagePromise
+              .then(() => {
+                void refetchNFTs();
+                void queryClient.invalidateQueries({ queryKey: ["userStats"] });
+              })
+              .catch((lateError: unknown) => {
+                if (import.meta.env.DEV) {
+                  console.debug(
+                    "[syncUserNFTsForCollection] late sync failed:",
+                    lateError,
+                  );
+                }
+              });
+
+            return {
+              __kind__: "ok",
+              ok: {
+                newCount: 0n,
+                errors: [],
+                skipped: [
+                  {
+                    collectionId: targetCollectionId,
+                    collectionName,
+                    reason: "INDEXING_IN_PROGRESS",
+                    message: SYNC_PAGE_TIMEOUT_MESSAGE,
+                  },
+                ],
+              },
+            };
+          }
+
+          if (page.__kind__ === "err") {
+            return page;
+          }
+
+          const skipped = [...page.ok.skipped];
+          if (!page.ok.complete && skipped.length === 0) {
+            skipped.push({
+              collectionId: targetCollectionId,
+              collectionName,
+              reason: "INDEXING_IN_PROGRESS",
+              message:
+                "Mintlab saved targeted sync progress for this collection. Click Sync selected again to continue.",
+            });
+          }
+          return {
+            __kind__: "ok",
+            ok: {
+              newCount: page.ok.newCount,
+              errors: page.ok.errors,
+              skipped,
+            },
+          };
+        }
+
         if (typeof actor.syncUserNFTsPage !== "function") {
           syncResumeCursorRef.current = null;
           return actor.syncUserNFTsV2();
@@ -2974,7 +3128,14 @@ export default function WalletPage() {
         }
       }
     },
-    [actor, queryClient, refetchNFTs],
+    [actor, collections, queryClient, refetchNFTs],
+  );
+
+  const handleSyncCollection = useCallback(
+    (collectionId: bigint) => {
+      void handleSync({ collectionId });
+    },
+    [handleSync],
   );
 
   useEffect(() => {
@@ -3062,7 +3223,11 @@ export default function WalletPage() {
       <ReceivingInstructions
         principalText={principalText}
         accountIdHex={accountIdHex}
-        onSync={handleSync}
+        collections={collections ?? []}
+        onSync={() => {
+          void handleSync();
+        }}
+        onSyncCollection={handleSyncCollection}
         onImportSpecificNFT={() => setImportSpecificOpen(true)}
         onIndexCollection={
           isAdmin

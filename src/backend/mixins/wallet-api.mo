@@ -67,6 +67,8 @@ mixin (
   transient let SAFE_AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat = 1;
   transient let SYNC_COLLECTION_PAGE_DEFAULT : Nat = 1;
   transient let SYNC_COLLECTION_PAGE_MAX : Nat = 3;
+  transient let TARGET_SYNC_INDEX_PAGE_DEFAULT : Nat = 3;
+  transient let TARGET_SYNC_INDEX_PAGE_MAX : Nat = 3;
   transient let CHILD_NFT_SYNC_PAGE_SIZE : Nat = 25;
   transient let CHILD_TOKEN_SYNC_PAGE_SIZE : Nat = 25;
   transient let PUBLIC_PAGE_DEFAULT : Nat = 50;
@@ -531,6 +533,50 @@ mixin (
     };
   };
 
+  public shared ({ caller }) func syncUserNFTsForCollection(
+    collectionId : WalletTypes.CollectionId,
+    maxIndexPages : Nat,
+  ) : async {
+    #ok : WalletTypes.WalletSyncPageResult;
+    #err : Text;
+  } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("You must be logged in to sync your wallet");
+    };
+    if (not acquireWalletSyncLock(caller)) {
+      return #err("Wallet sync is already running. Wait for the current sync to finish.");
+    };
+    try {
+      switch (enforceWalletSyncCooldown(caller)) {
+        case (?message) return #err(message);
+        case null {};
+      };
+      let collection = switch (CollectionLib.getCollection(collectionsState, collectionId)) {
+        case null return #err("Collection not found");
+        case (?value) value;
+      };
+      let userAccountId = IcpLib.accountIdentifier(caller, IcpLib.zeroSubaccount());
+      let userAccountIdHex = WalletLib.blobToHexPublic(userAccountId);
+      let result = await* syncOneWalletCollectionWithIndexBudget(
+        caller,
+        collection,
+        userAccountId,
+        userAccountIdHex,
+        normalizeTargetIndexPageBudget(maxIndexPages),
+      );
+      #ok({
+        newCount = result.newCount;
+        errors = result.errors;
+        skipped = result.skipped;
+        nextCursor = null;
+        complete = result.errors.size() == 0 and result.skipped.size() == 0;
+        checkedCollections = 1;
+      });
+    } finally {
+      releaseWalletSyncLock(caller);
+    };
+  };
+
   func syncUserNFTsPageUnlocked(
     caller : Principal,
     cursor : ?Nat,
@@ -655,6 +701,26 @@ mixin (
     };
   };
 
+  func normalizeTargetIndexPageBudget(maxIndexPages : Nat) : Nat {
+    if (maxIndexPages == 0) {
+      TARGET_SYNC_INDEX_PAGE_DEFAULT;
+    } else if (maxIndexPages > TARGET_SYNC_INDEX_PAGE_MAX) {
+      TARGET_SYNC_INDEX_PAGE_MAX;
+    } else {
+      maxIndexPages;
+    };
+  };
+
+  func normalizeAutoIndexPageBudget(maxIndexPages : Nat) : Nat {
+    if (maxIndexPages == 0) {
+      SAFE_AUTO_INDEX_MAX_PAGES_PER_SYNC;
+    } else if (maxIndexPages > TARGET_SYNC_INDEX_PAGE_MAX) {
+      TARGET_SYNC_INDEX_PAGE_MAX;
+    } else {
+      maxIndexPages;
+    };
+  };
+
   func normalizePublicPageSize(limit : ?Nat) : Nat {
     switch (limit) {
       case null PUBLIC_PAGE_DEFAULT;
@@ -719,6 +785,22 @@ mixin (
     collection : CollectionTypes.Collection,
     userAccountId : Blob,
     userAccountIdHex : Text,
+  ) : async* WalletCollectionSyncResult {
+    await* syncOneWalletCollectionWithIndexBudget(
+      caller,
+      collection,
+      userAccountId,
+      userAccountIdHex,
+      SAFE_AUTO_INDEX_MAX_PAGES_PER_SYNC,
+    );
+  };
+
+  func syncOneWalletCollectionWithIndexBudget(
+    caller : Principal,
+    collection : CollectionTypes.Collection,
+    userAccountId : Blob,
+    userAccountIdHex : Text,
+    maxIndexPages : Nat,
   ) : async* WalletCollectionSyncResult {
     var newCount : Nat = 0;
     var errors : [Text] = [];
@@ -785,6 +867,7 @@ mixin (
                 collection,
                 caller,
                 userAccountIdHex,
+                maxIndexPages,
               );
               let nftsToRegister = if (autoIndexed.nfts.size() > 0) {
                 autoIndexed.nfts;
@@ -838,6 +921,7 @@ mixin (
     collection : CollectionTypes.Collection,
     caller : Principal,
     userAccountIdHex : Text,
+    maxIndexPages : Nat,
   ) : async* WalletAutoIndexResult {
     if (collectionNeedsSafeIndexSetup(collection)) {
       return {
@@ -859,6 +943,7 @@ mixin (
     var indexed : Nat = 0;
     var complete = false;
     var lastError : ?Text = null;
+    let pageBudget = normalizeAutoIndexPageBudget(maxIndexPages);
     var found = WalletLib.indexedNFTsForOwner(
       ownershipIndexState,
       collection.id,
@@ -867,7 +952,7 @@ mixin (
     );
 
     label autoIndex loop {
-      if (pages >= SAFE_AUTO_INDEX_MAX_PAGES_PER_SYNC) {
+      if (pages >= pageBudget) {
         break autoIndex;
       };
       let status = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id);

@@ -1584,6 +1584,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : WalletSyncPageResult, 'err' : IDL.Text })],
         [],
       ),
+    'syncUserNFTsForCollection' : IDL.Func(
+        [CollectionId, IDL.Nat],
+        [IDL.Variant({ 'ok' : WalletSyncPageResult, 'err' : IDL.Text })],
+        [],
+      ),
     'syncUserNFTsV2' : IDL.Func(
         [],
         [IDL.Variant({ 'ok' : WalletSyncV2Result, 'err' : IDL.Text })],

@@ -1440,6 +1440,11 @@ service : {
       err: text;
       ok: WalletSyncPageResult;
     });
+  syncUserNFTsForCollection: (collectionId: CollectionId, maxIndexPages: nat) ->
+   (variant {
+      err: text;
+      ok: WalletSyncPageResult;
+    });
   syncUserNFTsV2: () -> (variant {
                            err: text;
                            ok: WalletSyncV2Result;

@@ -1435,6 +1435,11 @@ service : {
             newCount: nat;
           };
     });
+  syncUserNFTsForCollection: (collectionId: CollectionId, maxIndexPages:
+   nat) -> (variant {
+              err: text;
+              ok: WalletSyncPageResult;
+            });
   syncUserNFTsPage: (cursor: opt nat, maxCollections: nat) ->
    (variant {
       err: text;

@@ -1142,6 +1142,13 @@ export interface backendInterface {
     | { __kind__: "ok"; ok: WalletSyncPageResult }
     | { __kind__: "err"; err: string }
   >;
+  syncUserNFTsForCollection(
+    collectionId: CollectionId,
+    maxIndexPages: bigint,
+  ): Promise<
+    | { __kind__: "ok"; ok: WalletSyncPageResult }
+    | { __kind__: "err"; err: string }
+  >;
   syncCollectionDividends(
     collectionId: CollectionId,
   ): Promise<
@@ -4223,6 +4230,20 @@ export class Backend implements backendInterface {
     return fromSyncPageResult(
       await this.run(() =>
         this.actor.syncUserNFTsPage(toRawOption(cursor), maxCollections),
+      ),
+    );
+  }
+
+  async syncUserNFTsForCollection(
+    collectionId: CollectionId,
+    maxIndexPages: bigint,
+  ): Promise<
+    | { __kind__: "ok"; ok: WalletSyncPageResult }
+    | { __kind__: "err"; err: string }
+  > {
+    return fromSyncPageResult(
+      await this.run(() =>
+        this.actor.syncUserNFTsForCollection(collectionId, maxIndexPages),
       ),
     );
   }
