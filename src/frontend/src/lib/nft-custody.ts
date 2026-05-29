@@ -7,7 +7,7 @@ export const VAULTED_PURCHASE_NOTICE =
 export function nftCustodyLabel(location: WalletLocation): string {
   if (location === "Registered") return "Registered external wallet NFT";
   if (location === "Vaulted") return "Vaulted in Mintlab";
-  return "Mintlab-created NFT";
+  return "Minted NFT";
 }
 
 export function nftCustodyClass(location: WalletLocation): string {
@@ -32,8 +32,8 @@ export function nftCustodyDescription(
     return "The original external NFT is held by the Mintlab canister vault. The in-app owner can withdraw it to an external wallet principal.";
   }
 
-  const collectionName = collection?.name ?? "its Mintlab collection";
-  return `This NFT was created by Mintlab and transfers through ${collectionName}.`;
+  const collectionName = collection?.name ?? "its collection";
+  return `This NFT was minted into ${collectionName} and transfers through that collection canister.`;
 }
 
 export function isVaultedInMintlab(

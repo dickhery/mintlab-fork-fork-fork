@@ -1,4 +1,5 @@
 import { CollectionBadge } from "@/components/CollectionBadge";
+import { DividendBalanceBadge } from "@/components/DividendBalanceBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { HelpCallout, HelpTooltip } from "@/components/HelpCallout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -249,11 +250,7 @@ function FixedListingCard({
             {custodyLabel}
           </Badge>
         )}
-        {dividendE8s > 0n && (
-          <Badge className="w-fit bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[10px]">
-            {formatICPAmount(dividendE8s)} ICP dividends
-          </Badge>
-        )}
+        <DividendBalanceBadge e8s={dividendE8s} compact label="Dividends" />
 
         <div className="mt-auto pt-2 border-t border-border/60 flex items-end justify-between gap-2">
           <PriceDisplay e8s={listing.price} size="sm" label="Price" />
@@ -397,12 +394,7 @@ function ListingDetailModal({
                 >
                   {custodyLabel}
                 </Badge>
-                {dividendE8s > 0n && (
-                  <Badge className="bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
-                    <Coins className="w-3 h-3 mr-1" />
-                    {formatICPAmount(dividendE8s)} ICP
-                  </Badge>
-                )}
+                <DividendBalanceBadge e8s={dividendE8s} size="md" />
               </div>
               <DialogTitle className="font-display text-xl text-foreground">
                 {name}
@@ -669,11 +661,7 @@ function AuctionListingCard({
             {custodyLabel}
           </Badge>
         )}
-        {dividendE8s > 0n && (
-          <Badge className="w-fit bg-emerald-500/10 text-emerald-700 border border-emerald-500/20 text-[10px]">
-            {formatICPAmount(dividendE8s)} ICP dividends
-          </Badge>
-        )}
+        <DividendBalanceBadge e8s={dividendE8s} compact label="Dividends" />
 
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-mono">
           <Clock className="w-3 h-3 shrink-0" />

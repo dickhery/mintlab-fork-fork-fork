@@ -3,6 +3,7 @@ import {
   CollectionCreationDiagnosticsPanel,
   recommendedCollectionCreationTopUpCycles,
 } from "@/components/CollectionCreationDiagnosticsPanel";
+import { DividendBalanceBadge } from "@/components/DividendBalanceBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { HelpCallout, HelpTooltip } from "@/components/HelpCallout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
@@ -1550,11 +1551,7 @@ function NFTDetailModal({
                       Listed on Market
                     </Badge>
                   )}
-                  {dividendE8s > 0n && (
-                    <Badge className="text-xs bg-emerald-500/10 text-emerald-700 border border-emerald-500/20">
-                      {formatICP(dividendE8s)} ICP dividends
-                    </Badge>
-                  )}
+                  <DividendBalanceBadge e8s={dividendE8s} size="md" />
                 </div>
               </DialogHeader>
 
@@ -2689,11 +2686,12 @@ function BrowseNFTCard({
             Listed
           </Badge>
         )}
-        {dividendE8s > 0n && (
-          <Badge className="absolute bottom-2 left-2 bg-emerald-500/90 text-white border-0 text-[10px] font-mono">
-            {formatICP(dividendE8s)} ICP
-          </Badge>
-        )}
+        <DividendBalanceBadge
+          e8s={dividendE8s}
+          compact
+          label="Dividends"
+          className="absolute bottom-2 left-2 right-2 w-auto max-w-[calc(100%-1rem)] border-0 bg-emerald-600/95 text-white shadow-md"
+        />
       </div>
 
       {/* Info */}

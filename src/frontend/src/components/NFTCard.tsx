@@ -5,6 +5,7 @@ import type { Collection, WalletNFT } from "@/types";
 import { ImageOff } from "lucide-react";
 import { motion } from "motion/react";
 import { CollectionBadge } from "./CollectionBadge";
+import { DividendBalanceBadge } from "./DividendBalanceBadge";
 import { MediaImage } from "./MediaImage";
 import { PriceDisplay } from "./PriceDisplay";
 
@@ -102,10 +103,8 @@ export function NFTCard({
           >
             {custodyLabel}
           </Badge>
-          {dividendE8s !== undefined && dividendE8s > 0n && (
-            <Badge className="text-[10px] border bg-emerald-500/10 text-emerald-700 border-emerald-500/20">
-              {formatCompactICP(dividendE8s)} ICP
-            </Badge>
+          {dividendE8s !== undefined && (
+            <DividendBalanceBadge e8s={dividendE8s} compact />
           )}
         </div>
 
@@ -121,13 +120,4 @@ export function NFTCard({
       </div>
     </motion.div>
   );
-}
-
-const E8S = 100_000_000n;
-
-function formatCompactICP(e8s: bigint): string {
-  const whole = e8s / E8S;
-  const frac = (e8s % E8S).toString().padStart(8, "0").slice(0, 4);
-  const trimmed = frac.replace(/0+$/, "");
-  return trimmed ? `${whole}.${trimmed}` : whole.toString();
 }

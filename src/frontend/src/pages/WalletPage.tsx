@@ -1,5 +1,6 @@
 import { AppCanisterTopUpDialog } from "@/components/AppCanisterTopUpDialog";
 import { CollectionBadge } from "@/components/CollectionBadge";
+import { DividendBalanceBadge } from "@/components/DividendBalanceBadge";
 import { EmptyState } from "@/components/EmptyState";
 import { HelpCallout, HelpTooltip } from "@/components/HelpCallout";
 import { MediaImage } from "@/components/MediaImage";
@@ -660,12 +661,7 @@ function NFTDetailsModal({
                 {collection && (
                   <CollectionBadge collection={collection} size="sm" />
                 )}
-                {dividendE8s > 0n && (
-                  <Badge className="border text-xs bg-emerald-500/10 text-emerald-700 border-emerald-500/20">
-                    <Coins className="w-3 h-3 mr-1" />
-                    {formatICP(dividendE8s)} ICP
-                  </Badge>
-                )}
+                <DividendBalanceBadge e8s={dividendE8s} size="md" />
               </div>
               <DialogTitle className="font-display text-xl text-foreground break-words">
                 {nftName}
