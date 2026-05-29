@@ -413,6 +413,7 @@ type WithdrawalStatus__328667338 = {#Completed; #Failed; #Pending};
 actor {
   stable AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat;
   stable AUTO_INDEX_PAGE_LIMIT : Nat;
+  stable DEFAULT_COLLECTION_PAGE_SIZE : Nat;
   stable EXTERNAL_LISTING_MODERATION_CYCLE_RESERVE : Nat;
   stable EXTERNAL_LISTING_MODERATION_MAX_REQUEST_BYTES : Nat;
   stable EXTERNAL_LISTING_MODERATION_RESPONSE_BYTES : Nat64;
@@ -420,7 +421,9 @@ actor {
   stable IMPORT_COOLDOWN_NS : Int;
   stable IMPORT_DAY_NS : Int;
   stable IMPORT_INDEX_WARM_PAGE_LIMIT : Nat;
+  stable MAX_COLLECTION_PAGE_SIZE : Nat;
   stable MAX_IMPORTS_PER_USER_PER_DAY : Nat;
+  stable MAX_RICH_METADATA_PAGE_SIZE : Nat;
   stable MAX_UNVERIFIED_COLLECTIONS_VISIBLE : Nat;
   stable PENDING_BID_TIMEOUT_NS : Int;
   stable authState : {var adminPrincipal : ?Principal};
