@@ -116,7 +116,12 @@ export default function App() {
   return (
     <>
       <RouterProvider router={router} />
-      <Toaster position="bottom-right" theme="dark" />
+      <Toaster
+        position="top-right"
+        offset={{ top: "5rem", right: "1rem" }}
+        mobileOffset={{ top: "5rem", right: "1rem", left: "1rem" }}
+        theme="light"
+      />
     </>
   );
 }
