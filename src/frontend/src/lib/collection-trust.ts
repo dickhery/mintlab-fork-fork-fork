@@ -38,7 +38,14 @@ export function isCommunityCollection(
   return !isMintlabVerifiedCollection(collection, meta);
 }
 
-export function collectionTrustLabel(status: CollectionTrustStatus): string {
+function hasBrowseRange(collection?: Collection | null): boolean {
+  return collection?.browseInfo?.totalSupply != null;
+}
+
+export function collectionTrustLabel(
+  status: CollectionTrustStatus,
+  collection?: Collection | null,
+): string {
   switch (status) {
     case "Verified":
       return "Mintlab verified";
@@ -49,7 +56,9 @@ export function collectionTrustLabel(status: CollectionTrustStatus): string {
     case "SyncDisabled":
       return "Sync disabled";
     case "NeedsBrowseInfo":
-      return "Needs token range";
+      return hasBrowseRange(collection)
+        ? "Token range set"
+        : "Needs token range";
     case "Reported":
       return "Reported";
     case "CommunityImported":
@@ -61,6 +70,7 @@ export function collectionTrustLabel(status: CollectionTrustStatus): string {
 
 export function collectionTrustDescription(
   status: CollectionTrustStatus,
+  collection?: Collection | null,
 ): string {
   switch (status) {
     case "Verified":
@@ -72,7 +82,9 @@ export function collectionTrustDescription(
     case "SyncDisabled":
       return "Automatic wallet sync is disabled for this imported collection.";
     case "NeedsBrowseInfo":
-      return "Admins need a token range before Mintlab can browse this collection reliably.";
+      return hasBrowseRange(collection)
+        ? "Mintlab has token range details for this collection. Admins can review it when ready."
+        : "Admins need a token range before Mintlab can browse this collection reliably.";
     case "Reported":
       return "Users have reported this imported collection for admin review.";
     case "CommunityImported":

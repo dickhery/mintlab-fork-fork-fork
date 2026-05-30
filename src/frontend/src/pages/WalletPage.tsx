@@ -268,6 +268,16 @@ function selectedSyncProgressMessage(
   progress: WalletCollectionSyncProgress,
   collection?: Collection | null,
 ): string {
+  const checkedDirectHint =
+    progress.scannedThisRun === 0n &&
+    progress.indexedThisRun === 0n &&
+    progress.nextCursor === null;
+  if (checkedDirectHint && progress.errors.length > 0) {
+    return "Selected sync checked the token ID directly and could not verify it in the expected wallet account.";
+  }
+  if (checkedDirectHint && progress.newCount > 0n) {
+    return "Selected sync verified the token ID directly and registered it.";
+  }
   const scannedTotal = progress.status?.scanned ?? progress.scannedThisRun;
   const totalSupply = collection?.browseInfo?.totalSupply ?? null;
   const isExtRegistryCheck =
@@ -2478,6 +2488,7 @@ export default function WalletPage() {
   const autoSyncedPrincipalRef = useRef<string | null>(null);
   const syncInFlightRef = useRef<Promise<SyncResult> | null>(null);
   const syncModeRef = useRef<SyncMode | null>(null);
+  const syncScopeRef = useRef<string | null>(null);
   const syncResumeCursorRef = useRef<bigint | null>(null);
   const [importSpecificOpen, setImportSpecificOpen] = useState(false);
   const [indexingCollectionId, setIndexingCollectionId] = useState<
@@ -2761,6 +2772,15 @@ export default function WalletPage() {
       const silent = options.silent === true;
       const targetCollectionId = options.collectionId ?? null;
       const requestedMode: SyncMode = silent ? "silent" : "manual";
+      const requestedScope =
+        targetCollectionId === null
+          ? "all"
+          : `collection:${targetCollectionId.toString()}:hints:${(
+              options.tokenHints ?? []
+            )
+              .map((hint) => hint.trim())
+              .filter(Boolean)
+              .join("|")}`;
       if (!silent) setSyncStatus({ kind: "syncing" });
 
       const runWalletSync = async (): Promise<SyncResult> => {
@@ -3147,7 +3167,10 @@ export default function WalletPage() {
       };
 
       const existingSync = syncInFlightRef.current;
-      const canReuseExistingSync = existingSync !== null;
+      const canReuseExistingSync =
+        existingSync !== null &&
+        syncModeRef.current === requestedMode &&
+        syncScopeRef.current === requestedScope;
       const startedNewSync = !canReuseExistingSync;
       let rawSyncPromise: Promise<SyncResult>;
       let syncPromise: Promise<SyncResult>;
@@ -3157,6 +3180,7 @@ export default function WalletPage() {
         rawSyncPromise = runWalletSync();
         syncInFlightRef.current = rawSyncPromise;
         syncModeRef.current = requestedMode;
+        syncScopeRef.current = requestedScope;
       }
       syncPromise = rawSyncPromise;
 
@@ -3229,6 +3253,7 @@ export default function WalletPage() {
               if (syncInFlightRef.current === rawSyncPromise) {
                 syncInFlightRef.current = null;
                 syncModeRef.current = null;
+                syncScopeRef.current = null;
               }
               void refetchNFTs();
               void queryClient.invalidateQueries({ queryKey: ["userStats"] });
@@ -3252,6 +3277,7 @@ export default function WalletPage() {
         ) {
           syncInFlightRef.current = null;
           syncModeRef.current = null;
+          syncScopeRef.current = null;
         }
         if (!keepRefreshUntilRawSettles) {
           // Always refresh the local list after sync settles

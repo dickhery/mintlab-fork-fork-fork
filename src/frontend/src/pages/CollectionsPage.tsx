@@ -1159,9 +1159,9 @@ function CollectionCard({
                 className={`border text-[10px] ${collectionTrustBadgeClass(
                   trustStatus,
                 )}`}
-                title={collectionTrustDescription(trustStatus)}
+                title={collectionTrustDescription(trustStatus, collection)}
               >
-                {collectionTrustLabel(trustStatus)}
+                {collectionTrustLabel(trustStatus, collection)}
               </Badge>
             </div>
           </div>

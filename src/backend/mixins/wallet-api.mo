@@ -104,6 +104,72 @@ mixin (
     Map.remove(walletSyncLocks, Principal.compare, caller);
   };
 
+  func appendUniqueTokenCandidate(values : [Text], value : Text) : [Text] {
+    for (existing in values.values()) {
+      if (existing == value) {
+        return values;
+      };
+    };
+    Array.concat<Text>(values, [value]);
+  };
+
+  func externalTokenCandidateIds(
+    collection : CollectionTypes.Collection,
+    tokenId : Text,
+  ) : [Text] {
+    let trimmed = Text.trim(tokenId, #char ' ');
+    var candidates : [Text] = [WalletLib.canonicalTokenId(collection, trimmed)];
+    switch (collection.standard) {
+      case (#EXT) {
+        switch (Nat.fromText(trimmed)) {
+          case (?tokenIndex) {
+            if (tokenIndex > 0) {
+              candidates := appendUniqueTokenCandidate(
+                candidates,
+                WalletLib.canonicalTokenId(collection, Nat.toText(tokenIndex - 1)),
+              );
+            };
+            if (tokenIndex < 4_294_967_295) {
+              candidates := appendUniqueTokenCandidate(
+                candidates,
+                WalletLib.canonicalTokenId(collection, Nat.toText(tokenIndex + 1)),
+              );
+            };
+          };
+          case null {};
+        };
+      };
+      case (_) {};
+    };
+    candidates;
+  };
+
+  func firstNonEmptyText(values : [Text]) : ?Text {
+    for (value in values.values()) {
+      if (Text.size(Text.trim(value, #char ' ')) > 0) {
+        return ?value;
+      };
+    };
+    null;
+  };
+
+  func tokenCandidateFailureMessage(
+    tokenId : Text,
+    candidates : [Text],
+    errors : [Text],
+  ) : Text {
+    let hint = Text.trim(tokenId, #char ' ');
+    let base = if (candidates.size() > 1) {
+      "Could not verify token '" # hint # "' in the expected on-chain owner account. Mintlab also checked adjacent token IDs for 0/1 offset issues.";
+    } else {
+      "Could not verify token '" # hint # "' in the expected on-chain owner account.";
+    };
+    switch (firstNonEmptyText(errors)) {
+      case (?message) base # " " # message;
+      case null base;
+    };
+  };
+
   public shared ({ caller }) func registerNFT(
     collectionId : WalletTypes.CollectionId,
     tokenId : Text,
@@ -359,7 +425,26 @@ mixin (
     if (collection.kind != #External) {
       return #err("Only imported external NFTs can be synced by owner");
     };
-    let canonicalTokenId = WalletLib.canonicalTokenId(collection, tokenId);
+    let candidates = externalTokenCandidateIds(collection, tokenId);
+    var errors : [Text] = [];
+    for (canonicalTokenId in candidates.values()) {
+      switch (await* syncExternalNFTOwnerCandidate(caller, collection, canonicalTokenId, owner)) {
+        case (#ok(nft)) return #ok(nft);
+        case (#err(message)) {
+          errors := Array.concat<Text>(errors, [message]);
+        };
+      };
+    };
+    #err(tokenCandidateFailureMessage(tokenId, candidates, errors));
+  };
+
+  func syncExternalNFTOwnerCandidate(
+    caller : Principal,
+    collection : CollectionTypes.Collection,
+    canonicalTokenId : Text,
+    owner : Principal,
+  ) : async* { #ok : WalletTypes.WalletNFT; #err : Text } {
+    let collectionId = collection.id;
     let metadataFallback = switch (WalletLib.findByCollectionToken(walletState, collectionId, canonicalTokenId)) {
       case (?knownNFT) {
         if (
@@ -669,9 +754,9 @@ mixin (
         };
         status = initialStatus;
       };
-      var shouldRunSelectedScan = verifiedHintCount == 0;
+      var shouldRunSelectedScan = verifiedHintCount == 0 and hintCount == 0;
 
-      if (verifiedHintCount == 0) {
+      if (verifiedHintCount == 0 and hintCount == 0) {
         let indexedNFTs = WalletLib.indexedNFTsForOwner(
           ownershipIndexState,
           collection.id,
@@ -729,7 +814,7 @@ mixin (
           case (?value) value.cursor;
           case null null;
         };
-        complete = scan.complete;
+        complete = hintCount > 0 or scan.complete;
         status;
       });
     } finally {
@@ -743,7 +828,25 @@ mixin (
     tokenId : Text,
     userAccountId : Blob,
   ) : async* { #ok : Bool; #err : Text } {
-    let canonicalTokenId = WalletLib.canonicalTokenId(collection, tokenId);
+    let candidates = externalTokenCandidateIds(collection, tokenId);
+    var errors : [Text] = [];
+    for (canonicalTokenId in candidates.values()) {
+      switch (await* syncKnownExternalCanonicalTokenHint(caller, collection, canonicalTokenId, userAccountId)) {
+        case (#ok(wasNew)) return #ok(wasNew);
+        case (#err(message)) {
+          errors := Array.concat<Text>(errors, [message]);
+        };
+      };
+    };
+    #err(tokenCandidateFailureMessage(tokenId, candidates, errors));
+  };
+
+  func syncKnownExternalCanonicalTokenHint(
+    caller : Principal,
+    collection : CollectionTypes.Collection,
+    canonicalTokenId : Text,
+    userAccountId : Blob,
+  ) : async* { #ok : Bool; #err : Text } {
     if (not MarketplaceLib.acquireListingTokenLock(marketplaceListingLockState, collection.id, canonicalTokenId)) {
       return #err("This NFT is currently being listed. Try again shortly.");
     };

@@ -31,7 +31,7 @@ export function CollectionBadge({
   const standardLabel = getStandardLabel(collection.standard);
   const resolvedTrustStatus =
     trustStatus ?? collectionTrustStatus(collection, null);
-  const trustLabel = collectionTrustLabel(resolvedTrustStatus);
+  const trustLabel = collectionTrustLabel(resolvedTrustStatus, collection);
   const imageUrl = resolveImageUrl(collection.imageUrl);
 
   return (
@@ -68,7 +68,7 @@ export function CollectionBadge({
           collectionTrustBadgeClass(resolvedTrustStatus),
           size === "sm" ? "text-[10px]" : "text-xs",
         )}
-        title={collectionTrustDescription(resolvedTrustStatus)}
+        title={collectionTrustDescription(resolvedTrustStatus, collection)}
       >
         {trustLabel}
       </span>
