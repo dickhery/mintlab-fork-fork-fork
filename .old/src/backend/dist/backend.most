@@ -350,6 +350,20 @@ type PendingMintPayment__763212301 =
     status : PendingMintPaymentStatus__1070325767;
     updatedAt : Nat64
   };
+type RecentTransaction__151122476 =
+  {
+    amountE8s : ?Nat64;
+    blockIndex : ?Nat64;
+    detail : Text;
+    direction : TransactionDirection__733944876;
+    feeE8s : ?Nat64;
+    id : Nat;
+    kind : TransactionKind__723026063;
+    occurredAt : Nat64;
+    reference : ?Text;
+    status : TransactionStatus__628660341;
+    title : Text
+  };
 type SettlementStage__594654131 =
   {
     #MintlabFeePending;
@@ -381,6 +395,21 @@ type TokenDividendSnapshot__844801814 =
     var pendingCarryE8s : Nat64;
     tokenId : Text
   };
+type TransactionDirection__733944876 = {#In; #Neutral; #Out};
+type TransactionKind__723026063 =
+  {
+    #AppCanisterTopUp;
+    #AuctionBid;
+    #AuctionRefund;
+    #CollectionCanisterTopUp;
+    #CollectionCreation;
+    #DividendClaim;
+    #ICPTransferOut;
+    #MarketplacePurchase;
+    #MarketplaceSale;
+    #Mint
+  };
+type TransactionStatus__628660341 = {#Completed; #Failed; #Pending};
 type UserId__158757552 = Principal;
 type UserId__166399690 = UserId__158757552;
 type UserId__74810557 = UserId__158757552;
@@ -571,6 +600,12 @@ actor {
       var nextPaymentId : Nat;
       payments : Map__605269027<Nat, PendingMintPayment__763212301>;
       paymentsByCaller : Map__605269027<Principal, [Nat]>
+    };
+  stable transactionState :
+    {
+      var nextId : Nat;
+      transactionsByUser :
+        Map__605269027<Principal, [RecentTransaction__151122476]>
     };
   stable walletState :
     {
