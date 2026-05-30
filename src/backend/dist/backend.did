@@ -68,6 +68,31 @@ type TransferError =
    TxDuplicate: record {duplicate_of: nat64;};
    TxTooOld: record {allowed_window_nanos: nat64;};
  };
+type TransactionStatus = 
+ variant {
+   Completed;
+   Failed;
+   Pending;
+ };
+type TransactionKind = 
+ variant {
+   AppCanisterTopUp;
+   AuctionBid;
+   AuctionRefund;
+   CollectionCanisterTopUp;
+   CollectionCreation;
+   DividendClaim;
+   ICPTransferOut;
+   MarketplacePurchase;
+   MarketplaceSale;
+   Mint;
+ };
+type TransactionDirection = 
+ variant {
+   In;
+   Neutral;
+   Out;
+ };
 type Tokens = record {e8s: nat64;};
 type TokenMetadataValue = 
  variant {
@@ -176,6 +201,20 @@ type SettlementEscrowRepairKind =
  variant {
    Auction;
    FixedPurchase;
+ };
+type RecentTransaction = 
+ record {
+   amountE8s: opt nat64;
+   blockIndex: opt nat64;
+   detail: text;
+   direction: TransactionDirection;
+   feeE8s: opt nat64;
+   id: nat;
+   kind: TransactionKind;
+   occurredAt: nat64;
+   reference: opt text;
+   status: TransactionStatus;
+   title: text;
  };
 type PublicModerationConfig = 
  record {
@@ -1268,6 +1307,7 @@ service : {
    opt nat) -> (SettlementStatusPage) query;
   getMyPendingAuctionRefunds: () -> (vec AuctionEscrow) query;
   getMyPendingMintPayments: () -> (vec PendingMintPaymentView) query;
+  getMyRecentTransactions: (limit: opt nat) -> (vec RecentTransaction) query;
   getNFTStats: (user: principal) -> (NFTStats) query;
   getRegistry: () -> (vec record {
                             EXTTokenIndex;

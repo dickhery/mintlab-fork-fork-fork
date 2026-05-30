@@ -4,6 +4,7 @@ import IcpLib "../lib/icp";
 import MintLib "../lib/mint";
 import AuthLib "../lib/auth";
 import CollectionsLib "../lib/collections";
+import TransactionsLib "../lib/transactions";
 import MarketplaceTypes "../types/marketplace";
 import WalletTypes "../types/wallet";
 import CollectionTypes "../types/collections";
@@ -39,6 +40,7 @@ mixin (
   moderationState : MintLib.ModerationState,
   collectionsState : CollectionsLib.CollectionsState,
   authState : AuthLib.AdminState,
+  transactionState : TransactionsLib.TransactionState,
   canisterId : Principal,
 ) {
   type MarketplaceChildTransferResult = {
@@ -131,6 +133,112 @@ mixin (
   func requireMarketplaceAdmin(caller : Principal) {
     if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
     if (not AuthLib.isAdmin(authState, caller)) Runtime.trap("Unauthorized: admin only");
+  };
+
+  func nat64Add(a : Nat64, b : Nat64) : Nat64 {
+    Nat64.fromNat(Nat64.toNat(a) + Nat64.toNat(b));
+  };
+
+  func listingDetail(listingId : MarketplaceTypes.ListingId) : Text {
+    "Listing #" # Nat.toText(listingId);
+  };
+
+  func blockReference(prefix : Text, id : Nat, blockIndex : Nat64) : Text {
+    prefix # ":" # Nat.toText(id) # ":" # Nat64.toText(blockIndex);
+  };
+
+  func recordMarketplacePurchase(
+    buyer : Principal,
+    listingId : MarketplaceTypes.ListingId,
+    amountE8s : Nat64,
+    feeE8s : Nat64,
+    blockIndex : Nat64,
+  ) {
+    ignore TransactionsLib.recordOnce(
+      transactionState,
+      buyer,
+      blockReference("marketplace-purchase", listingId, blockIndex),
+      {
+        kind = #MarketplacePurchase;
+        direction = #Out;
+        status = #Completed;
+        amountE8s = ?amountE8s;
+        feeE8s = ?feeE8s;
+        title = "Marketplace purchase";
+        detail = listingDetail(listingId);
+        blockIndex = ?blockIndex;
+        reference = null;
+      },
+    );
+  };
+
+  func recordMarketplaceSale(
+    seller : Principal,
+    listingId : MarketplaceTypes.ListingId,
+    amountE8s : Nat64,
+    feeE8s : Nat64,
+    blockIndex : Nat64,
+  ) {
+    ignore TransactionsLib.recordOnce(
+      transactionState,
+      seller,
+      blockReference("marketplace-sale", listingId, blockIndex),
+      {
+        kind = #MarketplaceSale;
+        direction = #In;
+        status = #Completed;
+        amountE8s = ?amountE8s;
+        feeE8s = ?feeE8s;
+        title = "Marketplace sale";
+        detail = listingDetail(listingId);
+        blockIndex = ?blockIndex;
+        reference = null;
+      },
+    );
+  };
+
+  func recordAuctionBidTransaction(
+    pending : MarketplaceTypes.PendingBidDeposit,
+    depositedBlock : Nat64,
+  ) {
+    ignore TransactionsLib.recordOnce(
+      transactionState,
+      pending.bidder,
+      blockReference("auction-bid", pending.listingId, depositedBlock),
+      {
+        kind = #AuctionBid;
+        direction = #Out;
+        status = #Completed;
+        amountE8s = ?pending.amount;
+        feeE8s = ?nat64Add(pending.feeReserve, pending.ledgerFeeE8s);
+        title = "Auction bid placed";
+        detail = listingDetail(pending.listingId);
+        blockIndex = ?depositedBlock;
+        reference = null;
+      },
+    );
+  };
+
+  func recordAuctionRefundTransaction(
+    pending : MarketplaceTypes.PendingAuctionRefund,
+    blockIndex : Nat64,
+  ) {
+    ignore TransactionsLib.recordOnce(
+      transactionState,
+      pending.escrow.bidder,
+      blockReference("auction-refund", pending.escrow.escrowId, blockIndex),
+      {
+        kind = #AuctionRefund;
+        direction = #In;
+        status = #Completed;
+        amountE8s = ?pending.refundAmount;
+        feeE8s = ?pending.refundFeeE8s;
+        title = "Auction refund";
+        detail = listingDetail(pending.escrow.listingId);
+        blockIndex = ?blockIndex;
+        reference = null;
+      },
+    );
   };
 
   func validateMarketplaceFeeRecipient(recipient : ?MarketplaceTypes.AccountIdentifier) {
@@ -2462,6 +2570,31 @@ mixin (
       case (#err(message)) return #err(message);
     };
 
+    switch (settlement.paymentBlock) {
+      case (?paymentBlock) {
+        recordMarketplacePurchase(
+          settlement.buyer,
+          settlement.listingId,
+          settlement.price,
+          settlement.ledgerFeeE8s,
+          paymentBlock,
+        );
+      };
+      case null {};
+    };
+    switch (settlement.sellerPaymentBlock) {
+      case (?sellerBlock) {
+        recordMarketplaceSale(
+          settlement.seller,
+          settlement.listingId,
+          settlement.sellerProceeds,
+          settlement.ledgerFeeE8s,
+          sellerBlock,
+        );
+      };
+      case null {};
+    };
+
     ignore MarketplaceLib.settleFixedListing(marketplaceState, settlement.listingId);
     ignore MarketplaceLib.takeEscrowedNFT(marketplaceState, settlement.listingId);
     ignore MarketplaceLib.clearListingsForToken(marketplaceState, settlement.nft.collectionId, settlement.nft.tokenId);
@@ -2930,6 +3063,7 @@ mixin (
         createdAt = pending.createdAt;
       },
     );
+    recordAuctionBidTransaction(pending, depositedBlock);
     ignore MarketplaceLib.removePendingBidDeposit(marketplaceBidState, listingId);
 
     switch (previousEscrowToRefund) {
@@ -3442,6 +3576,19 @@ mixin (
       case (#err(message)) return #err(message);
     };
 
+    switch (settlement.sellerPaymentBlock) {
+      case (?sellerBlock) {
+        recordMarketplaceSale(
+          settlement.seller,
+          settlement.listingId,
+          settlement.sellerProceeds,
+          settlement.ledgerFeeE8s,
+          sellerBlock,
+        );
+      };
+      case null {};
+    };
+
     ignore MarketplaceLib.removeAuctionEscrow(marketplacePaymentState, settlement.listingId);
     ignore MarketplaceLib.removePendingRefund(marketplacePaymentState, settlement.winningEscrowId);
     ignore MarketplaceLib.removePendingRefundJournal(marketplaceRefundState, settlement.winningEscrowId);
@@ -3787,6 +3934,7 @@ mixin (
           refundBlock = ?blockIndex;
           updatedAt = Time.now();
         });
+        recordAuctionRefundTransaction(pending, blockIndex);
         ignore MarketplaceLib.removePendingRefund(marketplacePaymentState, escrow.escrowId);
         ignore MarketplaceLib.removePendingRefundJournal(marketplaceRefundState, escrow.escrowId);
         #ok(blockIndex);
@@ -3797,6 +3945,7 @@ mixin (
           refundBlock = ?duplicate_of;
           updatedAt = Time.now();
         });
+        recordAuctionRefundTransaction(pending, duplicate_of);
         ignore MarketplaceLib.removePendingRefund(marketplacePaymentState, escrow.escrowId);
         ignore MarketplaceLib.removePendingRefundJournal(marketplaceRefundState, escrow.escrowId);
         #ok(duplicate_of);

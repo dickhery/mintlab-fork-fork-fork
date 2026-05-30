@@ -5,6 +5,7 @@ import WalletLib "lib/wallet";
 import MarketplaceLib "lib/marketplace";
 import DividendsLib "lib/dividends";
 import IcpLib "lib/icp";
+import TransactionsLib "lib/transactions";
 import Principal "mo:core/Principal";
 
 import AuthApi "mixins/auth-api";
@@ -15,6 +16,7 @@ import ICPApi "mixins/icp-api";
 import MarketplaceApi "mixins/marketplace-api";
 import BrowseApi "mixins/browse-api";
 import DividendsApi "mixins/dividends-api";
+import TransactionsApi "mixins/transactions-api";
 
 persistent actor Backend {
   // ── Stable state ──────────────────────────────────────────────────────────
@@ -41,6 +43,7 @@ persistent actor Backend {
   let dividendsState = DividendsLib.newState();
   let dividendAccumulatorState = DividendsLib.newAccumulatorState();
   let dividendFeeState = DividendsLib.newFeeState();
+  let transactionState = TransactionsLib.newState();
 
   // ── Mixin composition ─────────────────────────────────────────────────────
   include AuthApi(authState);
@@ -56,6 +59,7 @@ persistent actor Backend {
     authState,
     marketplaceUserPaymentLockState,
     dividendAccumulatorState,
+    transactionState,
     Principal.fromActor(Backend),
   );
   include WalletApi(
@@ -71,6 +75,7 @@ persistent actor Backend {
   include ICPApi(
     marketplaceUserPaymentLockState,
     icpWithdrawalState,
+    transactionState,
     Principal.fromActor(Backend),
   );
   include MarketplaceApi(
@@ -89,6 +94,7 @@ persistent actor Backend {
     moderationState,
     collectionsState,
     authState,
+    transactionState,
     Principal.fromActor(Backend),
   );
   include DividendsApi(
@@ -102,6 +108,7 @@ persistent actor Backend {
     marketplaceUserPaymentLockState,
     mintState,
     authState,
+    transactionState,
     Principal.fromActor(Backend),
   );
   include BrowseApi(
@@ -111,4 +118,5 @@ persistent actor Backend {
     mintState,
     Principal.fromActor(Backend),
   );
+  include TransactionsApi(transactionState);
 };

@@ -1,4 +1,8 @@
-import type { AccountIdentifier, TransferResult } from "@/backend-client";
+import type {
+  AccountIdentifier,
+  RecentTransaction,
+  TransferResult,
+} from "@/backend-client";
 import { HelpCallout } from "@/components/HelpCallout";
 import { TermsAgreementNotice } from "@/components/TermsAcceptance";
 import { Badge } from "@/components/ui/badge";
@@ -22,9 +26,12 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertCircle,
   ArrowDownLeft,
+  ArrowUpRight,
   CheckCircle2,
   Copy,
+  History,
   LogIn,
+  Minus,
   RefreshCw,
   Send,
   Wallet,
@@ -101,6 +108,97 @@ function formatTransferError(result: TransferResult): string {
     default:
       return "Transfer failed";
   }
+}
+
+function formatTransactionTime(timestampNanos: bigint): string {
+  const date = new Date(Number(timestampNanos / 1_000_000n));
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function transactionAmountLabel(tx: RecentTransaction): string {
+  if (tx.amountE8s === null) return "";
+  const prefix =
+    tx.direction === "In" ? "+" : tx.direction === "Out" ? "-" : "";
+  return `${prefix}${formatICP(tx.amountE8s)} ICP`;
+}
+
+function transactionIcon(tx: RecentTransaction) {
+  if (tx.direction === "In") {
+    return <ArrowDownLeft className="h-4 w-4 text-emerald-500" />;
+  }
+  if (tx.direction === "Out") {
+    return <ArrowUpRight className="h-4 w-4 text-amber-500" />;
+  }
+  return <Minus className="h-4 w-4 text-muted-foreground" />;
+}
+
+function statusTone(status: RecentTransaction["status"]): string {
+  if (status === "Completed") {
+    return "border-emerald-500/30 bg-emerald-500/10 text-emerald-500";
+  }
+  if (status === "Failed") {
+    return "border-destructive/30 bg-destructive/10 text-destructive";
+  }
+  return "border-amber-500/30 bg-amber-500/10 text-amber-500";
+}
+
+function RecentTransactionRow({ tx }: { tx: RecentTransaction }) {
+  const amount = transactionAmountLabel(tx);
+
+  return (
+    <div className="flex items-center gap-3 py-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40">
+        {transactionIcon(tx)}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <p className="truncate text-sm font-medium text-foreground">
+            {tx.title}
+          </p>
+          {tx.status !== "Completed" && (
+            <Badge
+              variant="outline"
+              className={`shrink-0 px-1.5 py-0 text-[10px] ${statusTone(tx.status)}`}
+            >
+              {tx.status}
+            </Badge>
+          )}
+        </div>
+        <p className="truncate text-xs text-muted-foreground">{tx.detail}</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          {formatTransactionTime(tx.occurredAt)}
+          {tx.blockIndex !== null && (
+            <span className="font-mono"> block {tx.blockIndex.toString()}</span>
+          )}
+        </p>
+      </div>
+      {amount && (
+        <div className="shrink-0 text-right">
+          <p
+            className={`font-mono text-sm font-semibold ${
+              tx.direction === "In"
+                ? "text-emerald-500"
+                : tx.direction === "Out"
+                  ? "text-foreground"
+                  : "text-muted-foreground"
+            }`}
+          >
+            {amount}
+          </p>
+          {tx.feeE8s !== null && tx.feeE8s > 0n && (
+            <p className="font-mono text-[11px] text-muted-foreground">
+              fee {formatICP(tx.feeE8s)}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── CopyField ────────────────────────────────────────────────────────────────
@@ -202,6 +300,17 @@ export default function ICPAccountPage() {
       enabled: !!actor && !isFetching && isAuthenticated,
     });
 
+  const { data: recentTransactions = [], isLoading: transactionsLoading } =
+    useQuery<RecentTransaction[]>({
+      queryKey: ["recent-transactions", principalText],
+      queryFn: async () => {
+        if (!actor) return [];
+        return actor.getMyRecentTransactions(10n);
+      },
+      enabled: !!actor && !isFetching && isAuthenticated,
+      refetchInterval: 30_000,
+    });
+
   const accountIdHex = accountIdBytes ? accountIdToHex(accountIdBytes) : null;
   const balanceNum = balanceE8s ?? 0n;
   const hasAmount = amount.trim().length > 0;
@@ -244,6 +353,7 @@ export default function ICPAccountPage() {
         setMemo("");
         setWithdrawalNonce(null);
         queryClient.invalidateQueries({ queryKey: ["icp-balance"] });
+        queryClient.invalidateQueries({ queryKey: ["recent-transactions"] });
       } else {
         toast.error("Transfer failed", {
           description: formatTransferError(result),
@@ -408,6 +518,64 @@ export default function ICPAccountPage() {
               value={principalText}
               ocid="icp-account.principal_id_copy_button"
             />
+          )}
+        </CardContent>
+      </Card>
+
+      {/* ── Recent transactions card ── */}
+      <Card
+        className="border-border/50 bg-card shadow-sm"
+        data-ocid="icp-account.recent_transactions_card"
+      >
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center justify-between text-sm font-medium text-muted-foreground uppercase tracking-wider">
+            <span className="flex items-center gap-2">
+              <History className="h-4 w-4 text-accent" />
+              Recent Transactions
+            </span>
+            {recentTransactions.length > 0 && (
+              <Badge variant="secondary" className="font-mono text-[10px]">
+                {recentTransactions.length}/10
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {transactionsLoading ? (
+            <div
+              className="space-y-3"
+              data-ocid="icp-account.transactions_loading_state"
+            >
+              {[0, 1, 2].map((row) => (
+                <div key={row} className="flex items-center gap-3">
+                  <Skeleton className="h-9 w-9 rounded-md" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Skeleton className="h-4 w-36" />
+                    <Skeleton className="h-3 w-52 max-w-full" />
+                  </div>
+                  <Skeleton className="h-4 w-20" />
+                </div>
+              ))}
+            </div>
+          ) : recentTransactions.length === 0 ? (
+            <div
+              className="flex flex-col items-center gap-2 py-6 text-center text-sm text-muted-foreground"
+              data-ocid="icp-account.transactions_empty_state"
+            >
+              <History className="h-5 w-5" />
+              <span>No recent transactions yet.</span>
+            </div>
+          ) : (
+            <div data-ocid="icp-account.transactions_list">
+              {recentTransactions.map((tx, index) => (
+                <div
+                  key={tx.id.toString()}
+                  className={index > 0 ? "border-t border-border/50" : ""}
+                >
+                  <RecentTransactionRow tx={tx} />
+                </div>
+              ))}
+            </div>
           )}
         </CardContent>
       </Card>

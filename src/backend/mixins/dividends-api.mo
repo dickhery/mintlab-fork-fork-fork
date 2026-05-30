@@ -12,6 +12,7 @@ import IcpLib "../lib/icp";
 import MarketplaceLib "../lib/marketplace";
 import MintLib "../lib/mint";
 import NFTStandards "../lib/nft-standards";
+import TransactionsLib "../lib/transactions";
 import WalletLib "../lib/wallet";
 import CollectionTypes "../types/collections";
 import CommonTypes "../types/common";
@@ -29,6 +30,7 @@ mixin (
   marketplaceUserPaymentLockState : MarketplaceLib.MarketplaceUserPaymentLockState,
   mintState : MintLib.MintState,
   authState : AuthLib.AdminState,
+  transactionState : TransactionsLib.TransactionState,
   canisterId : Principal,
 ) {
   type ChildCollectionOwnerActor = actor {
@@ -65,6 +67,32 @@ mixin (
   transient let DIVIDEND_PAGE_MAX : Nat = 100;
   transient let DIVIDEND_LISTING_PAUSED_MESSAGE : Text =
     "Dividend collection is paused while this NFT is listed on the marketplace. The claimable balance stays attached to the NFT for the buyer or auction winner.";
+
+  func recordDividendClaimTransaction(
+    caller : Principal,
+    collection : CollectionTypes.Collection,
+    paidE8s : Nat64,
+    feeE8s : Nat64,
+    blockIndex : Nat64,
+  ) {
+    ignore TransactionsLib.recordOnce(
+      transactionState,
+      caller,
+      "dividend-claim:" # Nat64.toText(blockIndex),
+      {
+        kind = #DividendClaim;
+        direction = #In;
+        status = #Completed;
+        amountE8s = ?paidE8s;
+        feeE8s = ?feeE8s;
+        title = "Dividend collected";
+        detail = collection.name;
+        blockIndex = ?blockIndex;
+        reference = null;
+      },
+    );
+  };
+
   public shared func getCollectionDividendInfo(
     collectionId : CollectionTypes.CollectionId
   ) : async ?DividendTypes.CollectionDividendInfo {
@@ -666,6 +694,7 @@ mixin (
         switch (result) {
           case (#Ok(blockIndex)) {
             DividendsLib.reduceProcessedBalance(dividendsState, nft.collectionId, claimable);
+            recordDividendClaimTransaction(caller, receiptCollection, payoutE8s, feeE8s, blockIndex);
             #ok({
               nft = receiptNFT;
               collection = receiptCollection;

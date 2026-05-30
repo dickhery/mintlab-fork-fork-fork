@@ -628,6 +628,36 @@ export type TransferResult =
       Err: TransferError;
     };
 
+export type TransactionKind =
+  | "ICPTransferOut"
+  | "Mint"
+  | "CollectionCreation"
+  | "CollectionCanisterTopUp"
+  | "AppCanisterTopUp"
+  | "MarketplacePurchase"
+  | "MarketplaceSale"
+  | "AuctionBid"
+  | "AuctionRefund"
+  | "DividendClaim";
+
+export type TransactionDirection = "In" | "Out" | "Neutral";
+
+export type TransactionStatus = "Pending" | "Completed" | "Failed";
+
+export interface RecentTransaction {
+  id: bigint;
+  kind: TransactionKind;
+  direction: TransactionDirection;
+  status: TransactionStatus;
+  amountE8s: bigint | null;
+  feeE8s: bigint | null;
+  title: string;
+  detail: string;
+  occurredAt: bigint;
+  blockIndex: bigint | null;
+  reference: string | null;
+}
+
 export class ExternalBlob {
   _blob?: Uint8Array<ArrayBuffer> | null;
   directURL: string;
@@ -993,6 +1023,9 @@ export interface backendInterface {
   getNFTStats(user: Principal): Promise<NFTStats>;
   getUserAccountId(): Promise<AccountIdentifier>;
   getUserICPBalance(): Promise<bigint>;
+  getMyRecentTransactions(
+    limit: bigint | null,
+  ): Promise<Array<RecentTransaction>>;
   getUserNFTs(user: Principal): Promise<Array<WalletNFT>>;
   getUserNFTsPage(
     user: Principal,
@@ -1257,6 +1290,35 @@ type RawTransferError =
   | { TxCreatedInFuture: null }
   | { InsufficientFunds: { balance: Tokens } };
 type RawTransferResult = { Ok: bigint } | { Err: RawTransferError };
+type RawTransactionKind =
+  | { ICPTransferOut: null }
+  | { Mint: null }
+  | { CollectionCreation: null }
+  | { CollectionCanisterTopUp: null }
+  | { AppCanisterTopUp: null }
+  | { MarketplacePurchase: null }
+  | { MarketplaceSale: null }
+  | { AuctionBid: null }
+  | { AuctionRefund: null }
+  | { DividendClaim: null };
+type RawTransactionDirection = { In: null } | { Out: null } | { Neutral: null };
+type RawTransactionStatus =
+  | { Pending: null }
+  | { Completed: null }
+  | { Failed: null };
+type RawRecentTransaction = {
+  id: bigint;
+  kind: RawTransactionKind;
+  direction: RawTransactionDirection;
+  status: RawTransactionStatus;
+  amountE8s: [] | [bigint];
+  feeE8s: [] | [bigint];
+  title: string;
+  detail: string;
+  occurredAt: bigint;
+  blockIndex: [] | [bigint];
+  reference: [] | [string];
+};
 type RawCollectionBrowseInfo = {
   totalSupply: [] | [bigint];
   tokenIndexOffset: [] | [bigint];
@@ -2591,6 +2653,53 @@ function fromRawTransferResult(value: RawTransferResult): TransferResult {
   return { __kind__: "Err", Err: fromRawTransferError(value.Err) };
 }
 
+function fromRawTransactionKind(value: RawTransactionKind): TransactionKind {
+  if ("ICPTransferOut" in value) return "ICPTransferOut";
+  if ("Mint" in value) return "Mint";
+  if ("CollectionCreation" in value) return "CollectionCreation";
+  if ("CollectionCanisterTopUp" in value) return "CollectionCanisterTopUp";
+  if ("AppCanisterTopUp" in value) return "AppCanisterTopUp";
+  if ("MarketplacePurchase" in value) return "MarketplacePurchase";
+  if ("MarketplaceSale" in value) return "MarketplaceSale";
+  if ("AuctionBid" in value) return "AuctionBid";
+  if ("AuctionRefund" in value) return "AuctionRefund";
+  return "DividendClaim";
+}
+
+function fromRawTransactionDirection(
+  value: RawTransactionDirection,
+): TransactionDirection {
+  if ("In" in value) return "In";
+  if ("Out" in value) return "Out";
+  return "Neutral";
+}
+
+function fromRawTransactionStatus(
+  value: RawTransactionStatus,
+): TransactionStatus {
+  if ("Pending" in value) return "Pending";
+  if ("Failed" in value) return "Failed";
+  return "Completed";
+}
+
+function fromRawRecentTransaction(
+  value: RawRecentTransaction,
+): RecentTransaction {
+  return {
+    id: value.id,
+    kind: fromRawTransactionKind(value.kind),
+    direction: fromRawTransactionDirection(value.direction),
+    status: fromRawTransactionStatus(value.status),
+    amountE8s: fromRawOption(value.amountE8s),
+    feeE8s: fromRawOption(value.feeE8s),
+    title: value.title,
+    detail: value.detail,
+    occurredAt: value.occurredAt,
+    blockIndex: fromRawOption(value.blockIndex),
+    reference: fromRawOption(value.reference),
+  };
+}
+
 function fromWalletResult(
   value: { ok: RawWalletNFT } | { err: string },
 ): { __kind__: "ok"; ok: WalletNFT } | { __kind__: "err"; err: string } {
@@ -3881,6 +3990,15 @@ export class Backend implements backendInterface {
 
   async getUserICPBalance(): Promise<bigint> {
     return this.run(() => this.actor.getUserICPBalance());
+  }
+
+  async getMyRecentTransactions(
+    limit: bigint | null,
+  ): Promise<Array<RecentTransaction>> {
+    const result = (await this.run(() =>
+      this.actor.getMyRecentTransactions(toRawOption(limit)),
+    )) as Array<RawRecentTransaction>;
+    return result.map(fromRawRecentTransaction);
   }
 
   async getUserNFTs(user: Principal): Promise<Array<WalletNFT>> {

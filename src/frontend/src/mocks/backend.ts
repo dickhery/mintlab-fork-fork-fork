@@ -10,6 +10,7 @@ import type {
   NFTStats,
   AccountIdentifier,
   ModerationCategorySettings,
+  RecentTransaction,
 } from "../backend-client";
 import type { Agent } from "@icp-sdk/core/agent";
 import { ListingStatus } from "../backend-client";
@@ -254,6 +255,47 @@ const sampleActiveListingDetails: ActiveListingDetail[] = sampleActiveListings.m
 );
 
 const mockAccountId: AccountIdentifier = new Uint8Array(32).fill(0xab);
+const sampleRecentTransactions: RecentTransaction[] = [
+  {
+    id: 3n,
+    kind: "MarketplaceSale",
+    direction: "In",
+    status: "Completed",
+    amountE8s: 225_000_000n,
+    feeE8s: 4_500_000n,
+    title: "NFT sold",
+    detail: "Marketplace sale settled",
+    occurredAt: BigInt(Date.now() - 1000 * 60 * 45) * 1_000_000n,
+    blockIndex: 3_220_112n,
+    reference: "mock-sale-3",
+  },
+  {
+    id: 2n,
+    kind: "Mint",
+    direction: "Out",
+    status: "Completed",
+    amountE8s: 100_000_000n,
+    feeE8s: 10_000n,
+    title: "NFT minted",
+    detail: "Mintlab Genesis",
+    occurredAt: BigInt(Date.now() - 1000 * 60 * 60 * 5) * 1_000_000n,
+    blockIndex: 3_219_804n,
+    reference: "mock-mint-2",
+  },
+  {
+    id: 1n,
+    kind: "CollectionCanisterTopUp",
+    direction: "Out",
+    status: "Completed",
+    amountE8s: 50_000_000n,
+    feeE8s: 10_000n,
+    title: "Collection cycles top-up",
+    detail: "Creator Forge",
+    occurredAt: BigInt(Date.now() - 1000 * 60 * 60 * 26) * 1_000_000n,
+    blockIndex: 3_218_455n,
+    reference: "mock-top-up-1",
+  },
+];
 let mockMarketplaceFeeBasisPoints = 200n;
 let mockMarketplaceFeeRecipient: AccountIdentifier | null = mockAccountId;
 
@@ -755,6 +797,10 @@ export const mockBackend: backendInterface = {
   }),
   getUserAccountId: async () => mockAccountId,
   getUserICPBalance: async () => BigInt(4_250_000_000),
+  getMyRecentTransactions: async (limit) => {
+    const count = limit === null ? 10 : Number(limit);
+    return sampleRecentTransactions.slice(0, count);
+  },
   getUserNFTs: async () => sampleNFTs,
   getUserNFTsPage: async (_user, cursor, limit) => {
     const page = paginateMock(sampleNFTs, cursor, limit);

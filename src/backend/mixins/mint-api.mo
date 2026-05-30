@@ -9,6 +9,7 @@ import HttpMedia "../lib/http-media";
 import IcpLib "../lib/icp";
 import MarketplaceLib "../lib/marketplace";
 import MintLib "../lib/mint";
+import TransactionsLib "../lib/transactions";
 import DividendsLib "../lib/dividends";
 import WalletLib "../lib/wallet";
 import AuthLib "../lib/auth";
@@ -39,6 +40,7 @@ mixin (
   authState : AuthLib.AdminState,
   marketplaceUserPaymentLockState : MarketplaceLib.MarketplaceUserPaymentLockState,
   dividendAccumulatorState : DividendsLib.DividendAccumulatorState,
+  transactionState : TransactionsLib.TransactionState,
   canisterId : Principal,
 ) {
   type CanisterSettings = {
@@ -285,6 +287,97 @@ mixin (
 
   func releaseUserPaymentLock(user : Principal) {
     MarketplaceLib.releaseUserPaymentLock(marketplaceUserPaymentLockState, user);
+  };
+
+  func recordMintTransaction(
+    caller : Principal,
+    tokenId : Nat,
+    amountE8s : Nat64,
+    paymentBlock : Nat64,
+  ) {
+    ignore TransactionsLib.recordOnce(
+      transactionState,
+      caller,
+      "mint:" # Nat.toText(tokenId) # ":" # Nat64.toText(paymentBlock),
+      {
+        kind = #Mint;
+        direction = #Out;
+        status = #Completed;
+        amountE8s = ?amountE8s;
+        feeE8s = ?IcpLib.DEFAULT_FEE;
+        title = "NFT minted";
+        detail = "Token #" # Nat.toText(tokenId);
+        blockIndex = ?paymentBlock;
+        reference = null;
+      },
+    );
+  };
+
+  func recordCollectionCreationTransaction(
+    request : MintTypes.CollectionCreationRequest,
+    collection : CollectionTypes.Collection,
+  ) {
+    ignore TransactionsLib.recordOnce(
+      transactionState,
+      request.owner,
+      "collection-creation:" # Nat.toText(request.id),
+      {
+        kind = #CollectionCreation;
+        direction = #Out;
+        status = #Completed;
+        amountE8s = ?request.totalUserDebitE8s;
+        feeE8s = null;
+        title = "Collection created";
+        detail = collection.name # " (" # collection.symbol # ")";
+        blockIndex = request.cyclePaymentBlock;
+        reference = null;
+      },
+    );
+  };
+
+  func recordCollectionTopUpTransaction(
+    caller : Principal,
+    collection : CollectionTypes.Collection,
+    receipt : MintTypes.CollectionCycleTopUpReceipt,
+  ) {
+    ignore TransactionsLib.recordOnce(
+      transactionState,
+      caller,
+      "collection-top-up:" # Nat64.toText(receipt.paymentBlock),
+      {
+        kind = #CollectionCanisterTopUp;
+        direction = #Out;
+        status = #Completed;
+        amountE8s = ?receipt.totalUserDebitE8s;
+        feeE8s = null;
+        title = "Collection cycles topped up";
+        detail = collection.name # " (" # Nat.toText(receipt.cyclesMinted) # " cycles)";
+        blockIndex = ?receipt.paymentBlock;
+        reference = null;
+      },
+    );
+  };
+
+  func recordAppTopUpTransaction(
+    caller : Principal,
+    receipt : MintTypes.AppCycleTopUpReceipt,
+  ) {
+    ignore TransactionsLib.recordOnce(
+      transactionState,
+      caller,
+      "app-top-up:" # Nat64.toText(receipt.paymentBlock),
+      {
+        kind = #AppCanisterTopUp;
+        direction = #Out;
+        status = #Completed;
+        amountE8s = ?receipt.totalUserDebitE8s;
+        feeE8s = null;
+        title = "Canister cycles topped up";
+        detail = receipt.canisterId.toText();
+        blockIndex = ?receipt.paymentBlock;
+        reference = null;
+      },
+    );
   };
 
   func enforcePrincipalCooldown(
@@ -1080,7 +1173,7 @@ mixin (
             case null null;
           };
         };
-        #ok({
+        let receipt = {
           canisterId = targetCanister;
           cyclesRequested = normalizedCycles;
           cyclesMinted;
@@ -1088,7 +1181,9 @@ mixin (
           totalUserDebitE8s = quote.totalUserDebitE8s;
           paymentBlock;
           cycleBalance;
-        });
+        };
+        recordAppTopUpTransaction(caller, receipt);
+        #ok(receipt);
       } catch (error) {
         #err("Canister top-up failed: " # Error.message(error));
       };
@@ -1569,6 +1664,7 @@ mixin (
             case (?_) {
               ignore MintLib.markCollectionCreationInstalled(collectionCreationState, requestId);
               await settleCollectionCreationAdminPayout(requestId);
+              recordCollectionCreationTransaction(request, collection);
               return #ok({
                 collection;
                 paymentBlock = collectionCreationPaymentBlock(request);
@@ -1604,6 +1700,7 @@ mixin (
       };
       ignore MintLib.markCollectionCreationInstalled(collectionCreationState, requestId);
       await settleCollectionCreationAdminPayout(requestId);
+      recordCollectionCreationTransaction(request, collection);
       #ok({
         collection;
         paymentBlock = collectionCreationPaymentBlock(request);
@@ -1881,7 +1978,7 @@ mixin (
           case (?status) ?status.cycles;
           case null null;
         };
-        #ok({
+        let receipt = {
           collectionId;
           canisterId = collection.canisterId;
           cyclesRequested = normalizedCycles;
@@ -1890,7 +1987,9 @@ mixin (
           totalUserDebitE8s = quote.totalUserDebitE8s;
           paymentBlock;
           cycleBalance;
-        });
+        };
+        recordCollectionTopUpTransaction(caller, collection, receipt);
+        #ok(receipt);
       } catch (error) {
         #err("Collection canister top-up failed: " # Error.message(error));
       };
@@ -2006,6 +2105,7 @@ mixin (
           ignore MintLib.markPendingMintPaymentSent(pendingMintPaymentState, payment.id, paymentBlock);
           let finalized = mintMainCollectionNFTFromMetadata(caller, collection, metadata, paymentBlock);
           ignore MintLib.markPendingMintPaymentMinted(pendingMintPaymentState, payment.id, finalized.tokenId);
+          recordMintTransaction(caller, finalized.tokenId, config.mainMintPriceE8s, paymentBlock);
           #ok(finalized.receipt);
         } catch (error) {
           let message =
@@ -2103,6 +2203,7 @@ mixin (
             paymentBlock,
           );
           ignore MintLib.markPendingMintPaymentMinted(pendingMintPaymentState, payment.id, finalized.tokenId);
+          recordMintTransaction(payment.caller, finalized.tokenId, payment.amountE8s, paymentBlock);
           #ok(finalized.receipt);
         } catch (error) {
           let message = "Pending mint retry failed: " # Error.message(error);

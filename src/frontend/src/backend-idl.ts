@@ -886,6 +886,41 @@ export const idlFactory = ({ IDL }) => {
     'Ok' : IDL.Nat64,
     'Err' : TransferError,
   });
+  const TransactionKind = IDL.Variant({
+    'ICPTransferOut' : IDL.Null,
+    'Mint' : IDL.Null,
+    'CollectionCreation' : IDL.Null,
+    'CollectionCanisterTopUp' : IDL.Null,
+    'AppCanisterTopUp' : IDL.Null,
+    'MarketplacePurchase' : IDL.Null,
+    'MarketplaceSale' : IDL.Null,
+    'AuctionBid' : IDL.Null,
+    'AuctionRefund' : IDL.Null,
+    'DividendClaim' : IDL.Null,
+  });
+  const TransactionDirection = IDL.Variant({
+    'In' : IDL.Null,
+    'Out' : IDL.Null,
+    'Neutral' : IDL.Null,
+  });
+  const TransactionStatus = IDL.Variant({
+    'Pending' : IDL.Null,
+    'Completed' : IDL.Null,
+    'Failed' : IDL.Null,
+  });
+  const RecentTransaction = IDL.Record({
+    'id' : IDL.Nat,
+    'kind' : TransactionKind,
+    'direction' : TransactionDirection,
+    'status' : TransactionStatus,
+    'amountE8s' : IDL.Opt(IDL.Nat64),
+    'feeE8s' : IDL.Opt(IDL.Nat64),
+    'title' : IDL.Text,
+    'detail' : IDL.Text,
+    'occurredAt' : IDL.Nat64,
+    'blockIndex' : IDL.Opt(IDL.Nat64),
+    'reference' : IDL.Opt(IDL.Text),
+  });
   const HttpHeader = IDL.Record({ 'value' : IDL.Text, 'name' : IDL.Text });
   const HttpRequestResult = IDL.Record({
     'status' : IDL.Nat,
@@ -1334,6 +1369,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getUserAccountId' : IDL.Func([], [AccountIdentifier], ['query']),
     'getUserICPBalance' : IDL.Func([], [IDL.Nat64], []),
+    'getMyRecentTransactions' : IDL.Func(
+        [IDL.Opt(IDL.Nat)],
+        [IDL.Vec(RecentTransaction)],
+        ['query'],
+      ),
     'getUserNFTs' : IDL.Func([IDL.Principal], [IDL.Vec(WalletNFT)], ['query']),
     'getUserNFTsPage' : IDL.Func(
         [IDL.Principal, IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
