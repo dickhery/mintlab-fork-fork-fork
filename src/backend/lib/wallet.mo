@@ -476,6 +476,133 @@ module {
     };
   };
 
+  public func indexEXTRegistryForOwnerBounded(
+    state : OwnershipIndexState,
+    collection : CollectionTypes.Collection,
+    owner : Principal,
+    accountIdHex : Text,
+    maxRegistryEntries : Nat,
+  ) : async* { #ok : OwnerIndexPageResult; #err : Text } {
+    switch (collection.standard) {
+      case (#EXT) {};
+      case (_) return #err("Selected EXT registry sync only supports EXT collections");
+    };
+
+    let canister : NFTStandards.EXTActor = actor (collection.canisterId.toText());
+    let registry = try {
+      await canister.getRegistry();
+    } catch (error) {
+      let message = "Collection '" # collection.name # "': EXT registry lookup failed: " # Error.message(error);
+      recordIndexFailure(state, collection.id, null, message);
+      return #err(message);
+    };
+
+    if (registry.size() > maxRegistryEntries) {
+      let message = "Collection '" # collection.name # "' has " #
+      Nat.toText(registry.size()) #
+      " EXT registry entries, above the selected sync limit of " #
+      Nat.toText(maxRegistryEntries) #
+      ". Enter a known token ID or add total supply/token range setup before automatic discovery scans it.";
+      recordIndexFailure(state, collection.id, null, message);
+      return #err(message);
+    };
+
+    let principalText = owner.toText();
+    let principalHex = blobToHex(owner.toBlob());
+    let indexedAt = Time.now();
+    var indexed : Nat = 0;
+    var verificationErrorCount : Nat = 0;
+    var firstVerificationError : ?Text = null;
+    var nfts : [Types.WalletNFT] = [];
+
+    for ((tokenIndex, registryOwnerAccountId) in registry.values()) {
+      let tokenIdentifier = extTokenIdentifier(collection.canisterId, tokenIndex);
+      let registryMatchesOwner = extOwnerMatches(registryOwnerAccountId, accountIdHex, principalText, principalHex);
+      if (registryMatchesOwner) {
+        switch (await* fetchEXTOwnerAccountId(canister, tokenIdentifier)) {
+          case (#ok(currentOwnerAccountId)) {
+            let currentMatchesOwner = extOwnerMatches(currentOwnerAccountId, accountIdHex, principalText, principalHex);
+            let metadata = if (currentMatchesOwner) {
+              await* fetchEXTMetadata(canister, collection.canisterId, tokenIdentifier, tokenIndex, collection.name);
+            } else {
+              fallbackEXTMetadata(collection.canisterId, tokenIdentifier, tokenIndex, collection.name);
+            };
+            putOwnershipIndexRecord(
+              state,
+              {
+                collectionId = collection.id;
+                tokenId = tokenIdentifier;
+                owner = #AccountIdText(currentOwnerAccountId);
+                metadata;
+                indexedAt;
+              },
+            );
+            indexed += 1;
+            if (currentMatchesOwner) {
+              nfts := Array.concat<Types.WalletNFT>(
+                nfts,
+                [
+                  buildPreviewNFT(
+                    owner,
+                    collection.id,
+                    tokenIdentifier,
+                    metadata,
+                    #Registered,
+                    tokenIndex.toNat(),
+                  )
+                ],
+              );
+            };
+          };
+          case (#err(message)) {
+            verificationErrorCount += 1;
+            switch (firstVerificationError) {
+              case null firstVerificationError := ?message;
+              case (?_) {};
+            };
+          };
+        };
+      } else {
+        putOwnershipIndexRecord(
+          state,
+          {
+            collectionId = collection.id;
+            tokenId = tokenIdentifier;
+            owner = #AccountIdText(registryOwnerAccountId);
+            metadata = fallbackEXTMetadata(collection.canisterId, tokenIdentifier, tokenIndex, collection.name);
+            indexedAt;
+          },
+        );
+        indexed += 1;
+      };
+    };
+
+    let error = if (verificationErrorCount == 0) {
+      null;
+    } else {
+      let firstIssue = switch (firstVerificationError) {
+        case (?message) " First issue: " # message;
+        case null "";
+      };
+      ?(
+        "Mintlab found " #
+        Nat.toText(verificationErrorCount) #
+        " possible EXT registry match(es), but bearer verification failed before registration." #
+        firstIssue
+      );
+    };
+    let complete = verificationErrorCount == 0;
+    updateIndexStatus(state, collection.id, null, registry.size(), indexed, complete, error);
+    #ok({
+      nfts;
+      scanned = registry.size();
+      indexed;
+      nextCursor = null;
+      complete;
+      error;
+    });
+  };
+
   public func isOwnerIndexMissingMessage(message : Text) : Bool {
     Text.contains(message, #text "did not provide an owner index") or
     Text.contains(message, #text "needs collection indexing") or

@@ -270,12 +270,18 @@ function selectedSyncProgressMessage(
 ): string {
   const scannedTotal = progress.status?.scanned ?? progress.scannedThisRun;
   const totalSupply = collection?.browseInfo?.totalSupply ?? null;
+  const isExtRegistryCheck =
+    collection?.standard.__kind__ === "EXT" && totalSupply == null;
   const scope =
     totalSupply != null
       ? `${scannedTotal.toString()} of ${totalSupply.toString()} tokens`
-      : `${scannedTotal.toString()} token positions`;
+      : isExtRegistryCheck
+        ? `${scannedTotal.toString()} registry entries`
+        : `${scannedTotal.toString()} token positions`;
   if (progress.complete) {
-    return `Selected sync checked ${scope} and finished this collection.`;
+    return isExtRegistryCheck
+      ? `Selected sync checked ${scope} from this EXT collection and finished.`
+      : `Selected sync checked ${scope} and finished this collection.`;
   }
   return `Selected sync checked ${scope}. Continue Sync selected to keep checking this collection, or enter a known token ID to verify it directly.`;
 }

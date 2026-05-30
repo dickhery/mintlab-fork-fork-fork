@@ -81,6 +81,7 @@ mixin (
   transient let TARGET_SYNC_INDEX_PAGE_DEFAULT : Nat = 3;
   transient let TARGET_SYNC_INDEX_PAGE_MAX : Nat = 3;
   transient let TARGET_SYNC_TOKEN_HINT_MAX : Nat = 3;
+  transient let EXT_SELECTED_REGISTRY_SYNC_MAX_ENTRIES : Nat = 2_000;
   transient let CHILD_NFT_SYNC_PAGE_SIZE : Nat = 25;
   transient let CHILD_TOKEN_SYNC_PAGE_SIZE : Nat = 25;
   transient let PUBLIC_PAGE_DEFAULT : Nat = 50;
@@ -1283,6 +1284,85 @@ mixin (
     userAccountIdHex : Text,
     maxIndexPages : Nat,
   ) : async* WalletSelectedScanResult {
+    let existingStatus = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id);
+    switch (existingStatus) {
+      case (?status) {
+        if (status.complete) {
+          return {
+            nfts = [];
+            errors = [];
+            skip = null;
+            scannedThisRun = 0;
+            indexedThisRun = 0;
+            complete = true;
+            status = existingStatus;
+          };
+        };
+      };
+      case null {};
+    };
+
+    switch (collection.standard) {
+      case (#EXT) {
+        if (not collectionHasBrowseRange(collection)) {
+          switch (
+            await* WalletLib.indexEXTRegistryForOwnerBounded(
+              ownershipIndexState,
+              collection,
+              caller,
+              userAccountIdHex,
+              EXT_SELECTED_REGISTRY_SYNC_MAX_ENTRIES,
+            )
+          ) {
+            case (#ok(page)) {
+              let status = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id);
+              let skip = switch (page.error) {
+                case (?message) {
+                  ?{
+                    collectionId = collection.id;
+                    collectionName = collection.name;
+                    reason = "INDEX_REQUIRED";
+                    message = "Mintlab checked this EXT collection registry, but one or more possible owner matches could not be verified before registration. " #
+                    "If you know the token ID, enter it and run Sync selected. Details: " #
+                    message;
+                  };
+                };
+                case null null;
+              };
+              return {
+                nfts = page.nfts;
+                errors = [];
+                skip;
+                scannedThisRun = page.scanned;
+                indexedThisRun = page.indexed;
+                complete = page.complete;
+                status;
+              };
+            };
+            case (#err(message)) {
+              return {
+                nfts = [];
+                errors = [];
+                skip = ?{
+                  collectionId = collection.id;
+                  collectionName = collection.name;
+                  reason = "INDEX_REQUIRED";
+                  message = "Mintlab tried a bounded EXT registry lookup for this selected collection, but it could not complete within safe sync limits. " #
+                  "If you know the token ID, enter it and run Sync selected, or add total supply/token range setup for automatic discovery. Details: " #
+                  message;
+                };
+                scannedThisRun = 0;
+                indexedThisRun = 0;
+                complete = false;
+                status = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id);
+              };
+            };
+          };
+        };
+      };
+      case (_) {};
+    };
+
     if (collectionNeedsSafeIndexSetup(collection)) {
       return {
         nfts = [];
