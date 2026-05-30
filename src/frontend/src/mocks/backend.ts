@@ -258,7 +258,7 @@ const mockAccountId: AccountIdentifier = new Uint8Array(32).fill(0xab);
 const sampleRecentTransactions: RecentTransaction[] = [
   {
     id: 5n,
-    kind: "NFTTransferIn",
+    kind: "Mint",
     direction: "In",
     status: "Completed",
     amountE8s: null,
@@ -271,7 +271,7 @@ const sampleRecentTransactions: RecentTransaction[] = [
   },
   {
     id: 4n,
-    kind: "NFTTransferOut",
+    kind: "Mint",
     direction: "Out",
     status: "Completed",
     amountE8s: null,
@@ -832,8 +832,6 @@ export const mockBackend: backendInterface = {
     return sampleRecentTransactions
       .filter((transaction) =>
         [
-          "NFTTransferIn",
-          "NFTTransferOut",
           "Mint",
           "MarketplacePurchase",
           "MarketplaceSale",

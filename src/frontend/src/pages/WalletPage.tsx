@@ -191,9 +191,9 @@ function nftTransactionLabel(tx: RecentTransaction): string {
       tx.direction === "In" ? "+" : tx.direction === "Out" ? "-" : "";
     return `${prefix}${formatICP(tx.amountE8s)} ICP`;
   }
-  if (tx.kind === "NFTTransferIn") return "Received";
-  if (tx.kind === "NFTTransferOut") return "Sent";
-  return tx.direction;
+  if (tx.direction === "In") return "Received";
+  if (tx.direction === "Out") return "Sent";
+  return "Updated";
 }
 
 function pendingMintStatusLabel(status: PendingMintPaymentView["status"]) {

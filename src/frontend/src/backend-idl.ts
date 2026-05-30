@@ -889,8 +889,6 @@ export const idlFactory = ({ IDL }) => {
   const TransactionKind = IDL.Variant({
     'ICPTransferOut' : IDL.Null,
     'Mint' : IDL.Null,
-    'NFTTransferOut' : IDL.Null,
-    'NFTTransferIn' : IDL.Null,
     'CollectionCreation' : IDL.Null,
     'CollectionCanisterTopUp' : IDL.Null,
     'AppCanisterTopUp' : IDL.Null,

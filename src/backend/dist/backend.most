@@ -407,9 +407,7 @@ type TransactionKind__229646785 =
     #ICPTransferOut;
     #MarketplacePurchase;
     #MarketplaceSale;
-    #Mint;
-    #NFTTransferIn;
-    #NFTTransferOut
+    #Mint
   };
 type TransactionStatus__120810329 = {#Completed; #Failed; #Pending};
 type UserId__598058248 = UserId__653285603;

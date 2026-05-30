@@ -2,8 +2,6 @@ module {
   public type TransactionKind = {
     #ICPTransferOut;
     #Mint;
-    #NFTTransferOut;
-    #NFTTransferIn;
     #CollectionCreation;
     #CollectionCanisterTopUp;
     #AppCanisterTopUp;

@@ -224,7 +224,7 @@ mixin (
         case null null;
       },
       {
-        kind = #NFTTransferOut;
+        kind = #Mint;
         direction = #Out;
         status = #Completed;
         amountE8s = null;
@@ -243,7 +243,7 @@ mixin (
           case null null;
         },
         {
-          kind = #NFTTransferIn;
+          kind = #Mint;
           direction = #In;
           status = #Completed;
           amountE8s = null;

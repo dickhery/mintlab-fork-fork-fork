@@ -86,8 +86,6 @@ type TransactionKind =
    MarketplacePurchase;
    MarketplaceSale;
    Mint;
-   NFTTransferIn;
-   NFTTransferOut;
  };
 type TransactionDirection = 
  variant {

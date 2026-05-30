@@ -3,6 +3,7 @@ import Int "mo:core/Int";
 import Map "mo:core/Map";
 import Nat64 "mo:core/Nat64";
 import Principal "mo:core/Principal";
+import Text "mo:core/Text";
 import Time "mo:core/Time";
 import Types "../types/transactions";
 
@@ -104,21 +105,33 @@ module {
     while (index > 0 and selected.size() < limit) {
       index -= 1;
       let tx = all[index];
-      if (isNFTTransactionKind(tx.kind)) {
+      if (isNFTTransaction(tx)) {
         selected := Array.concat<Types.RecentTransaction>(selected, [tx]);
       };
     };
     selected;
   };
 
-  public func isNFTTransactionKind(kind : Types.TransactionKind) : Bool {
-    switch (kind) {
-      case (#NFTTransferOut) true;
-      case (#NFTTransferIn) true;
+  public func isNFTTransaction(tx : Types.RecentTransaction) : Bool {
+    switch (tx.kind) {
       case (#Mint) true;
       case (#MarketplacePurchase) true;
       case (#MarketplaceSale) true;
-      case (_) false;
+      case (_) isNFTTransferActivity(tx);
+    };
+  };
+
+  func isNFTTransferActivity(tx : Types.RecentTransaction) : Bool {
+    if (tx.title == "NFT sent" or tx.title == "NFT received") {
+      return true;
+    };
+    switch (tx.reference) {
+      case (?reference) {
+        Text.startsWith(reference, #text "nft-transfer:")
+          or Text.startsWith(reference, #text "nft-vault-transfer:")
+          or Text.startsWith(reference, #text "mock-nft-");
+      };
+      case null false;
     };
   };
 
