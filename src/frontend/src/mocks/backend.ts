@@ -257,6 +257,32 @@ const sampleActiveListingDetails: ActiveListingDetail[] = sampleActiveListings.m
 const mockAccountId: AccountIdentifier = new Uint8Array(32).fill(0xab);
 const sampleRecentTransactions: RecentTransaction[] = [
   {
+    id: 5n,
+    kind: "NFTTransferIn",
+    direction: "In",
+    status: "Completed",
+    amountE8s: null,
+    feeE8s: null,
+    title: "NFT received",
+    detail: "Creator Forge - Neon Bloom from rdmx6-jaaaa-aaaaa-aaadq-cai",
+    occurredAt: BigInt(Date.now() - 1000 * 60 * 12) * 1_000_000n,
+    blockIndex: null,
+    reference: "mock-nft-in-5",
+  },
+  {
+    id: 4n,
+    kind: "NFTTransferOut",
+    direction: "Out",
+    status: "Completed",
+    amountE8s: null,
+    feeE8s: null,
+    title: "NFT sent",
+    detail: "Mintlab Genesis - Token 12 to rrkah-fqaaa-aaaaa-aaaaq-cai",
+    occurredAt: BigInt(Date.now() - 1000 * 60 * 28) * 1_000_000n,
+    blockIndex: null,
+    reference: "mock-nft-out-4",
+  },
+  {
     id: 3n,
     kind: "MarketplaceSale",
     direction: "In",
@@ -800,6 +826,20 @@ export const mockBackend: backendInterface = {
   getMyRecentTransactions: async (limit) => {
     const count = limit === null ? 10 : Number(limit);
     return sampleRecentTransactions.slice(0, count);
+  },
+  getMyRecentNFTTransactions: async (limit) => {
+    const count = limit === null ? 10 : Number(limit);
+    return sampleRecentTransactions
+      .filter((transaction) =>
+        [
+          "NFTTransferIn",
+          "NFTTransferOut",
+          "Mint",
+          "MarketplacePurchase",
+          "MarketplaceSale",
+        ].includes(transaction.kind),
+      )
+      .slice(0, count);
   },
   getUserNFTs: async () => sampleNFTs,
   getUserNFTsPage: async (_user, cursor, limit) => {

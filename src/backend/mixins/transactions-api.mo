@@ -14,4 +14,13 @@ mixin (
     };
     TransactionsLib.recentForUser(transactionState, caller, limit);
   };
+
+  public shared query ({ caller }) func getMyRecentNFTTransactions(
+    limit : ?Nat
+  ) : async [TransactionTypes.RecentTransaction] {
+    if (Principal.isAnonymous(caller)) {
+      Runtime.trap("Anonymous caller not allowed");
+    };
+    TransactionsLib.recentNFTForUser(transactionState, caller, limit);
+  };
 };

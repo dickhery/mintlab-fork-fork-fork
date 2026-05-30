@@ -631,6 +631,8 @@ export type TransferResult =
 export type TransactionKind =
   | "ICPTransferOut"
   | "Mint"
+  | "NFTTransferOut"
+  | "NFTTransferIn"
   | "CollectionCreation"
   | "CollectionCanisterTopUp"
   | "AppCanisterTopUp"
@@ -1026,6 +1028,9 @@ export interface backendInterface {
   getMyRecentTransactions(
     limit: bigint | null,
   ): Promise<Array<RecentTransaction>>;
+  getMyRecentNFTTransactions(
+    limit: bigint | null,
+  ): Promise<Array<RecentTransaction>>;
   getUserNFTs(user: Principal): Promise<Array<WalletNFT>>;
   getUserNFTsPage(
     user: Principal,
@@ -1293,6 +1298,8 @@ type RawTransferResult = { Ok: bigint } | { Err: RawTransferError };
 type RawTransactionKind =
   | { ICPTransferOut: null }
   | { Mint: null }
+  | { NFTTransferOut: null }
+  | { NFTTransferIn: null }
   | { CollectionCreation: null }
   | { CollectionCanisterTopUp: null }
   | { AppCanisterTopUp: null }
@@ -2656,6 +2663,8 @@ function fromRawTransferResult(value: RawTransferResult): TransferResult {
 function fromRawTransactionKind(value: RawTransactionKind): TransactionKind {
   if ("ICPTransferOut" in value) return "ICPTransferOut";
   if ("Mint" in value) return "Mint";
+  if ("NFTTransferOut" in value) return "NFTTransferOut";
+  if ("NFTTransferIn" in value) return "NFTTransferIn";
   if ("CollectionCreation" in value) return "CollectionCreation";
   if ("CollectionCanisterTopUp" in value) return "CollectionCanisterTopUp";
   if ("AppCanisterTopUp" in value) return "AppCanisterTopUp";
@@ -3997,6 +4006,15 @@ export class Backend implements backendInterface {
   ): Promise<Array<RecentTransaction>> {
     const result = (await this.run(() =>
       this.actor.getMyRecentTransactions(toRawOption(limit)),
+    )) as Array<RawRecentTransaction>;
+    return result.map(fromRawRecentTransaction);
+  }
+
+  async getMyRecentNFTTransactions(
+    limit: bigint | null,
+  ): Promise<Array<RecentTransaction>> {
+    const result = (await this.run(() =>
+      this.actor.getMyRecentNFTTransactions(toRawOption(limit)),
     )) as Array<RawRecentTransaction>;
     return result.map(fromRawRecentTransaction);
   }

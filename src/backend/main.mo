@@ -70,6 +70,7 @@ persistent actor Backend {
     marketplaceListingLockState,
     mintState,
     authState,
+    transactionState,
     Principal.fromActor(Backend),
   );
   include ICPApi(

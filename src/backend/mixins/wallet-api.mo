@@ -9,6 +9,7 @@ import IcpLib "../lib/icp";
 import MarketplaceLib "../lib/marketplace";
 import MintLib "../lib/mint";
 import NFTStandards "../lib/nft-standards";
+import TransactionsLib "../lib/transactions";
 import WalletLib "../lib/wallet";
 import CollectionTypes "../types/collections";
 import CommonTypes "../types/common";
@@ -26,6 +27,7 @@ mixin (
   marketplaceListingLockState : MarketplaceLib.MarketplaceListingLockState,
   mintState : MintLib.MintState,
   authState : AuthLib.AdminState,
+  transactionState : TransactionsLib.TransactionState,
   canisterId : Principal,
 ) {
   type WalletChildTransferResult = {
@@ -167,6 +169,91 @@ mixin (
     switch (firstNonEmptyText(errors)) {
       case (?message) base # " " # message;
       case null base;
+    };
+  };
+
+  func nftDisplayName(nft : WalletTypes.WalletNFT) : Text {
+    switch (nft.metadata.name) {
+      case (?name) {
+        let trimmed = Text.trim(name, #char ' ');
+        if (Text.size(trimmed) > 0) {
+          trimmed;
+        } else {
+          "Token " # nft.tokenId;
+        };
+      };
+      case null "Token " # nft.tokenId;
+    };
+  };
+
+  func nftTransferDetail(
+    collection : CollectionTypes.Collection,
+    nft : WalletTypes.WalletNFT,
+    directionLabel : Text,
+    counterparty : Principal,
+  ) : Text {
+    collection.name # " - " # nftDisplayName(nft) # " " # directionLabel # " " # counterparty.toText();
+  };
+
+  func recordTransferForUser(
+    user : Principal,
+    reference : ?Text,
+    input : TransactionsLib.TransactionInput,
+  ) {
+    switch (reference) {
+      case (?value) {
+        ignore TransactionsLib.recordOnce(transactionState, user, value, input);
+      };
+      case null {
+        ignore TransactionsLib.record(transactionState, user, input);
+      };
+    };
+  };
+
+  func recordNFTTransferPair(
+    sender : Principal,
+    recipient : Principal,
+    collection : CollectionTypes.Collection,
+    nft : WalletTypes.WalletNFT,
+    reference : ?Text,
+  ) {
+    recordTransferForUser(
+      sender,
+      switch (reference) {
+        case (?value) ?(value # ":out");
+        case null null;
+      },
+      {
+        kind = #NFTTransferOut;
+        direction = #Out;
+        status = #Completed;
+        amountE8s = null;
+        feeE8s = null;
+        title = "NFT sent";
+        detail = nftTransferDetail(collection, nft, "to", recipient);
+        blockIndex = null;
+        reference = null;
+      },
+    );
+    if (not Principal.equal(sender, recipient)) {
+      recordTransferForUser(
+        recipient,
+        switch (reference) {
+          case (?value) ?(value # ":in");
+          case null null;
+        },
+        {
+          kind = #NFTTransferIn;
+          direction = #In;
+          status = #Completed;
+          amountE8s = null;
+          feeE8s = null;
+          title = "NFT received";
+          detail = nftTransferDetail(collection, nft, "from", sender);
+          blockIndex = null;
+          reference = null;
+        },
+      );
     };
   };
 
@@ -392,7 +479,9 @@ mixin (
           collection,
         );
         switch (result) {
-          case (#ok(_)) {};
+          case (#ok(_)) {
+            recordNFTTransferPair(caller, recipient, collection, nft, null);
+          };
           case (#err(_)) {};
         };
         result;
@@ -405,10 +494,19 @@ mixin (
         if (Principal.equal(collection.canisterId, canisterId)) {
           switch (MintLib.transferToken(mintState, mintTokenId, caller, recipient)) {
             case (#err(message)) #err(message);
-            case (#ok(_)) {
+            case (#ok(transfer)) {
               switch (WalletLib.transferManagedNFT(walletState, nftId, caller, recipient, #Minted)) {
                 case (#err(message)) #err(message);
-                case (#ok(_)) #ok("Minted NFT transferred successfully");
+                case (#ok(_)) {
+                  recordNFTTransferPair(
+                    caller,
+                    recipient,
+                    collection,
+                    nft,
+                    ?("nft-transfer:" # Nat.toText(collection.id) # ":" # nft.tokenId # ":" # Nat.toText(transfer.transactionId)),
+                  );
+                  #ok("Minted NFT transferred successfully");
+                };
               };
             };
           };
@@ -421,10 +519,19 @@ mixin (
           };
           switch (transferResult) {
             case (#err(message)) #err(message);
-            case (#ok(_)) {
+            case (#ok(transactionId)) {
               switch (WalletLib.transferManagedNFT(walletState, nftId, caller, recipient, #Minted)) {
                 case (#err(message)) #err(message);
-                case (#ok(_)) #ok("Minted NFT transferred successfully");
+                case (#ok(_)) {
+                  recordNFTTransferPair(
+                    caller,
+                    recipient,
+                    collection,
+                    nft,
+                    ?("nft-transfer:" # Nat.toText(collection.id) # ":" # nft.tokenId # ":" # Nat.toText(transactionId)),
+                  );
+                  #ok("Minted NFT transferred successfully");
+                };
               };
             };
           };
@@ -472,7 +579,8 @@ mixin (
     owner : Principal,
   ) : async* { #ok : WalletTypes.WalletNFT; #err : Text } {
     let collectionId = collection.id;
-    let metadataFallback = switch (WalletLib.findByCollectionToken(walletState, collectionId, canonicalTokenId)) {
+    let knownNFT = WalletLib.findByCollectionToken(walletState, collectionId, canonicalTokenId);
+    let metadataFallback = switch (knownNFT) {
       case (?knownNFT) {
         if (
           not Principal.equal(owner, caller) and
@@ -527,6 +635,14 @@ mixin (
             metadataWithTokenDisplayHint(collection, canonicalTokenId, requestedTokenId, onChainMetadata),
             #Registered,
           );
+          switch (knownNFT) {
+            case (?previousNFT) {
+              if (not Principal.equal(previousNFT.owner, owner)) {
+                recordNFTTransferPair(previousNFT.owner, owner, collection, previousNFT, null);
+              };
+            };
+            case null {};
+          };
           #ok(nft);
         };
       };

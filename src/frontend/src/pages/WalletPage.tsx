@@ -66,6 +66,7 @@ import type {
   NFTStats,
   PendingMintPaymentView,
   PublicModerationConfig,
+  RecentTransaction,
   WalletCollectionSyncProgress,
   WalletNFT,
   WalletSyncSkip,
@@ -79,6 +80,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import {
+  ArrowDownLeft,
   ArrowUpRight,
   Check,
   CheckCircle2,
@@ -86,6 +88,7 @@ import {
   Copy,
   ExternalLink,
   Flag,
+  History,
   ImagePlus,
   Info,
   Layers,
@@ -163,6 +166,34 @@ function formatICP(e8s: bigint): string {
   const whole = e8s / E8S;
   const frac = (e8s % E8S).toString().padStart(8, "0").replace(/0+$/, "");
   return frac ? `${whole}.${frac}` : whole.toString();
+}
+
+function formatTransactionTime(timestampNanos: bigint): string {
+  const date = new Date(Number(timestampNanos / 1_000_000n));
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function nftTransactionIcon(tx: RecentTransaction) {
+  if (tx.direction === "In") {
+    return <ArrowDownLeft className="h-4 w-4 text-emerald-500" />;
+  }
+  return <ArrowUpRight className="h-4 w-4 text-amber-500" />;
+}
+
+function nftTransactionLabel(tx: RecentTransaction): string {
+  if (tx.amountE8s !== null) {
+    const prefix =
+      tx.direction === "In" ? "+" : tx.direction === "Out" ? "-" : "";
+    return `${prefix}${formatICP(tx.amountE8s)} ICP`;
+  }
+  if (tx.kind === "NFTTransferIn") return "Received";
+  if (tx.kind === "NFTTransferOut") return "Sent";
+  return tx.direction;
 }
 
 function pendingMintStatusLabel(status: PendingMintPaymentView["status"]) {
@@ -360,6 +391,126 @@ function CopyField({ label, value, ocid }: CopyFieldProps) {
   );
 }
 
+// ── RecentNFTTransactionsCard ──────────────────────────────────────────────
+
+interface RecentNFTTransactionsCardProps {
+  transactions: RecentTransaction[];
+  isLoading: boolean;
+}
+
+function RecentNFTTransactionRow({ tx }: { tx: RecentTransaction }) {
+  const label = nftTransactionLabel(tx);
+
+  return (
+    <div className="flex items-center gap-3 py-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40">
+        {nftTransactionIcon(tx)}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-center gap-2">
+          <p className="truncate text-sm font-medium text-foreground">
+            {tx.title}
+          </p>
+          {tx.status !== "Completed" && (
+            <Badge
+              variant="outline"
+              className="shrink-0 px-1.5 py-0 text-[10px]"
+            >
+              {tx.status}
+            </Badge>
+          )}
+        </div>
+        <p className="truncate text-xs text-muted-foreground">{tx.detail}</p>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          {formatTransactionTime(tx.occurredAt)}
+        </p>
+      </div>
+      <Badge
+        variant="secondary"
+        className="shrink-0 max-w-[112px] truncate font-mono text-[10px]"
+        title={label}
+      >
+        {label}
+      </Badge>
+    </div>
+  );
+}
+
+function RecentNFTTransactionsCard({
+  transactions,
+  isLoading,
+}: RecentNFTTransactionsCardProps) {
+  return (
+    <Card
+      className="border-border/50 bg-card shadow-sm"
+      data-ocid="wallet.recent_nft_transactions_card"
+    >
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center justify-between text-sm font-medium text-muted-foreground uppercase tracking-wider">
+          <span className="flex items-center gap-2">
+            <History className="h-4 w-4 text-accent" />
+            NFT Activity
+          </span>
+          {transactions.length > 0 && (
+            <Badge variant="secondary" className="font-mono text-[10px]">
+              {transactions.length}/10
+            </Badge>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div
+            className="grid gap-0 md:grid-cols-2 md:gap-x-6"
+            data-ocid="wallet.nft_transactions_loading_state"
+          >
+            {[0, 1, 2, 3].map((row) => (
+              <div key={row} className={row > 1 ? "hidden md:block" : ""}>
+                <div className="flex items-center gap-3 py-3">
+                  <Skeleton className="h-9 w-9 rounded-md" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-3 w-56 max-w-full" />
+                  </div>
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : transactions.length === 0 ? (
+          <div
+            className="flex flex-col items-center gap-2 py-6 text-center text-sm text-muted-foreground"
+            data-ocid="wallet.nft_transactions_empty_state"
+          >
+            <History className="h-5 w-5" />
+            <span>No NFT activity yet.</span>
+          </div>
+        ) : (
+          <div
+            className="grid gap-0 md:grid-cols-2 md:gap-x-6"
+            data-ocid="wallet.nft_transactions_list"
+          >
+            {transactions.map((tx, index) => (
+              <div
+                key={tx.id.toString()}
+                className={
+                  index === 0
+                    ? ""
+                    : index === 1
+                      ? "border-t border-border/50 md:border-t-0"
+                      : "border-t border-border/50"
+                }
+              >
+                <RecentNFTTransactionRow tx={tx} />
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ── SendNFTModal ───────────────────────────────────────────────────────────
 
 interface SendNFTModalProps {
@@ -462,6 +613,7 @@ function SendNFTModal({ open, onClose, nft, collection }: SendNFTModalProps) {
       }
       queryClient.invalidateQueries({ queryKey: ["userNFTs"] });
       queryClient.invalidateQueries({ queryKey: ["userStats"] });
+      queryClient.invalidateQueries({ queryKey: ["recent-nft-transactions"] });
       setRecipient("");
       setRecipientError("");
       onClose();
@@ -2654,6 +2806,19 @@ export default function WalletPage() {
     staleTime: 60_000,
   });
 
+  const {
+    data: recentNFTTransactions = [],
+    isLoading: nftTransactionsLoading,
+  } = useQuery<RecentTransaction[]>({
+    queryKey: ["recent-nft-transactions", principalText],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.getMyRecentNFTTransactions(10n);
+    },
+    enabled: !!actor && !isFetching && isAuthenticated,
+    refetchOnWindowFocus: false,
+  });
+
   // ── derived data ─────────────────────────────────────────────────────────
 
   const accountIdHex = accountIdBytes ? accountIdToHex(accountIdBytes) : null;
@@ -3415,6 +3580,11 @@ export default function WalletPage() {
             : undefined
         }
         syncStatus={syncStatus}
+      />
+
+      <RecentNFTTransactionsCard
+        transactions={recentNFTTransactions}
+        isLoading={nftTransactionsLoading}
       />
 
       <ImportSpecificNFTModal

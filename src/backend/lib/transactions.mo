@@ -89,6 +89,39 @@ module {
     );
   };
 
+  public func recentNFTForUser(
+    state : TransactionState,
+    user : Principal,
+    requestedLimit : ?Nat,
+  ) : [Types.RecentTransaction] {
+    let all = switch (Map.get(state.transactionsByUser, Principal.compare, user)) {
+      case (?values) values;
+      case null [];
+    };
+    let limit = normalizeLimit(requestedLimit);
+    var selected : [Types.RecentTransaction] = [];
+    var index = all.size();
+    while (index > 0 and selected.size() < limit) {
+      index -= 1;
+      let tx = all[index];
+      if (isNFTTransactionKind(tx.kind)) {
+        selected := Array.concat<Types.RecentTransaction>(selected, [tx]);
+      };
+    };
+    selected;
+  };
+
+  public func isNFTTransactionKind(kind : Types.TransactionKind) : Bool {
+    switch (kind) {
+      case (#NFTTransferOut) true;
+      case (#NFTTransferIn) true;
+      case (#Mint) true;
+      case (#MarketplacePurchase) true;
+      case (#MarketplaceSale) true;
+      case (_) false;
+    };
+  };
+
   func putForUser(
     state : TransactionState,
     user : Principal,

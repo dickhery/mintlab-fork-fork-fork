@@ -86,6 +86,8 @@ type TransactionKind =
    MarketplacePurchase;
    MarketplaceSale;
    Mint;
+   NFTTransferIn;
+   NFTTransferOut;
  };
 type TransactionDirection = 
  variant {
@@ -1307,6 +1309,8 @@ service : {
    opt nat) -> (SettlementStatusPage) query;
   getMyPendingAuctionRefunds: () -> (vec AuctionEscrow) query;
   getMyPendingMintPayments: () -> (vec PendingMintPaymentView) query;
+  getMyRecentNFTTransactions: (limit: opt nat) ->
+   (vec RecentTransaction) query;
   getMyRecentTransactions: (limit: opt nat) -> (vec RecentTransaction) query;
   getNFTStats: (user: principal) -> (NFTStats) query;
   getRegistry: () -> (vec record {

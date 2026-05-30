@@ -889,6 +889,8 @@ export const idlFactory = ({ IDL }) => {
   const TransactionKind = IDL.Variant({
     'ICPTransferOut' : IDL.Null,
     'Mint' : IDL.Null,
+    'NFTTransferOut' : IDL.Null,
+    'NFTTransferIn' : IDL.Null,
     'CollectionCreation' : IDL.Null,
     'CollectionCanisterTopUp' : IDL.Null,
     'AppCanisterTopUp' : IDL.Null,
@@ -1370,6 +1372,11 @@ export const idlFactory = ({ IDL }) => {
     'getUserAccountId' : IDL.Func([], [AccountIdentifier], ['query']),
     'getUserICPBalance' : IDL.Func([], [IDL.Nat64], []),
     'getMyRecentTransactions' : IDL.Func(
+        [IDL.Opt(IDL.Nat)],
+        [IDL.Vec(RecentTransaction)],
+        ['query'],
+      ),
+    'getMyRecentNFTTransactions' : IDL.Func(
         [IDL.Opt(IDL.Nat)],
         [IDL.Vec(RecentTransaction)],
         ['query'],
