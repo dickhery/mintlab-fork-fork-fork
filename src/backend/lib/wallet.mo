@@ -18,6 +18,7 @@ import NFTStandards "nft-standards";
 
 module {
   let OWNER_SYNC_SCAN_LIMIT : Nat = 500;
+  let DISPLAY_TOKEN_ID_ATTRIBUTE : Text = "Mintlab Display Token ID";
 
   public type WalletState = {
     nfts : Map.Map<Types.NFTId, Types.WalletNFT>;
@@ -82,6 +83,71 @@ module {
       } else {
         fallback.attributes;
       };
+    };
+  };
+
+  public func metadataWithDisplayTokenId(
+    metadata : Types.NFTMetadata,
+    displayTokenId : Text,
+  ) : Types.NFTMetadata {
+    let trimmed = Text.trim(displayTokenId, #char ' ');
+    if (Text.size(trimmed) == 0 or hasDisplayTokenIdAttribute(metadata)) {
+      return metadata;
+    };
+    {
+      metadata with
+      attributes = Array.concat<(Text, Text)>(
+        metadata.attributes,
+        [(DISPLAY_TOKEN_ID_ATTRIBUTE, trimmed)],
+      );
+    };
+  };
+
+  public func metadataWithEXTDisplayTokenId(
+    collection : CollectionTypes.Collection,
+    tokenIndex : Nat32,
+    metadata : Types.NFTMetadata,
+  ) : Types.NFTMetadata {
+    switch (collection.standard) {
+      case (#EXT) {
+        metadataWithDisplayTokenId(
+          metadata,
+          Nat.toText(extDisplayTokenNumber(collection, tokenIndex)),
+        );
+      };
+      case (_) metadata;
+    };
+  };
+
+  func hasDisplayTokenIdAttribute(metadata : Types.NFTMetadata) : Bool {
+    for ((key, _) in metadata.attributes.values()) {
+      let normalized = Text.toLower(Text.trim(key, #char ' '));
+      if (
+        normalized == Text.toLower(DISPLAY_TOKEN_ID_ATTRIBUTE) or
+        normalized == "mintlab:display_token_id" or
+        normalized == "display_token_id" or
+        normalized == "display token id"
+      ) {
+        return true;
+      };
+    };
+    false;
+  };
+
+  func extDisplayTokenNumber(
+    collection : CollectionTypes.Collection,
+    tokenIndex : Nat32,
+  ) : Nat {
+    let index = tokenIndex.toNat();
+    switch (collectionTokenRange(collection)) {
+      case (?range) {
+        if (index >= range.tokenIndexOffset) {
+          index - range.tokenIndexOffset + 1;
+        } else {
+          index + 1;
+        };
+      };
+      case null index + 1;
     };
   };
 
@@ -522,11 +588,12 @@ module {
         switch (await* fetchEXTOwnerAccountId(canister, tokenIdentifier)) {
           case (#ok(currentOwnerAccountId)) {
             let currentMatchesOwner = extOwnerMatches(currentOwnerAccountId, accountIdHex, principalText, principalHex);
-            let metadata = if (currentMatchesOwner) {
+            let baseMetadata = if (currentMatchesOwner) {
               await* fetchEXTMetadata(canister, collection.canisterId, tokenIdentifier, tokenIndex, collection.name);
             } else {
               fallbackEXTMetadata(collection.canisterId, tokenIdentifier, tokenIndex, collection.name);
             };
+            let metadata = metadataWithEXTDisplayTokenId(collection, tokenIndex, baseMetadata);
             putOwnershipIndexRecord(
               state,
               {
@@ -569,7 +636,11 @@ module {
             collectionId = collection.id;
             tokenId = tokenIdentifier;
             owner = #AccountIdText(registryOwnerAccountId);
-            metadata = fallbackEXTMetadata(collection.canisterId, tokenIdentifier, tokenIndex, collection.name);
+            metadata = metadataWithEXTDisplayTokenId(
+              collection,
+              tokenIndex,
+              fallbackEXTMetadata(collection.canisterId, tokenIdentifier, tokenIndex, collection.name),
+            );
             indexedAt;
           },
         );
@@ -772,12 +843,17 @@ module {
           case null 0;
         };
         let canister : NFTStandards.EXTActor = actor (collection.canisterId.toText());
-        let metadata = await* fetchEXTMetadata(
-          canister,
-          collection.canisterId,
-          tokenIdentifier,
-          Nat32.fromNat(tokenIndex),
-          collection.name,
+        let tokenIndex32 = Nat32.fromNat(tokenIndex);
+        let metadata = metadataWithEXTDisplayTokenId(
+          collection,
+          tokenIndex32,
+          await* fetchEXTMetadata(
+            canister,
+            collection.canisterId,
+            tokenIdentifier,
+            tokenIndex32,
+            collection.name,
+          ),
         );
         #ok(buildPreviewNFT(anonymousPrincipal(), collection.id, tokenIdentifier, metadata, #Registered, tokenIndex));
       };
@@ -1599,7 +1675,11 @@ module {
       let tokenIdentifier = extTokenIdentifier(collection.canisterId, tokenIndex);
       switch (await* fetchEXTOwnerAccountId(canister, tokenIdentifier)) {
         case (#ok(ownerAccountId)) {
-          let metadata = await* fetchEXTMetadata(canister, collection.canisterId, tokenIdentifier, tokenIndex, collection.name);
+          let metadata = metadataWithEXTDisplayTokenId(
+            collection,
+            tokenIndex,
+            await* fetchEXTMetadata(canister, collection.canisterId, tokenIdentifier, tokenIndex, collection.name),
+          );
           putOwnershipIndexRecord(
             state,
             {
@@ -1646,7 +1726,11 @@ module {
     while (position < registry.size() and scanned < limit) {
       let (tokenIndex, ownerAccountId) = registry[position];
       let tokenIdentifier = extTokenIdentifier(collection.canisterId, tokenIndex);
-      let metadata = await* fetchEXTMetadata(canister, collection.canisterId, tokenIdentifier, tokenIndex, collection.name);
+      let metadata = metadataWithEXTDisplayTokenId(
+        collection,
+        tokenIndex,
+        await* fetchEXTMetadata(canister, collection.canisterId, tokenIdentifier, tokenIndex, collection.name),
+      );
       putOwnershipIndexRecord(
         state,
         {
@@ -1910,11 +1994,12 @@ module {
       switch (await* fetchEXTOwnerAccountId(canister, tokenIdentifier)) {
         case (#ok(ownerAccountId)) {
           let matchesOwner = extOwnerMatches(ownerAccountId, accountIdHex, principalText, principalHex);
-          let metadata = if (matchesOwner) {
+          let baseMetadata = if (matchesOwner) {
             await* fetchEXTMetadata(canister, collection.canisterId, tokenIdentifier, tokenIndex, collection.name);
           } else {
             fallbackEXTMetadata(collection.canisterId, tokenIdentifier, tokenIndex, collection.name);
           };
+          let metadata = metadataWithEXTDisplayTokenId(collection, tokenIndex, baseMetadata);
           putOwnershipIndexRecord(
             state,
             {
@@ -2059,7 +2144,11 @@ module {
             var previews : [Types.WalletNFT] = [];
             for (tokenIndex in tokenIndices.values()) {
               let tokenIdentifier = extTokenIdentifier(collection.canisterId, tokenIndex);
-              let metadata = await* fetchEXTMetadata(canister, collection.canisterId, tokenIdentifier, tokenIndex, collection.name);
+              let metadata = metadataWithEXTDisplayTokenId(
+                collection,
+                tokenIndex,
+                await* fetchEXTMetadata(canister, collection.canisterId, tokenIdentifier, tokenIndex, collection.name),
+              );
               previews := Array.concat<Types.WalletNFT>(
                 previews,
                 [
@@ -3297,7 +3386,11 @@ module {
       switch (await* fetchEXTOwnerAccountId(canister, tokenIdentifier)) {
         case (#ok(ownerAccountId)) {
           if (extOwnerMatches(ownerAccountId, accountIdHex, principalText, principalHex)) {
-            let metadata = await* fetchEXTMetadata(canister, collection.canisterId, tokenIdentifier, tokenIndex, collection.name);
+            let metadata = metadataWithEXTDisplayTokenId(
+              collection,
+              tokenIndex,
+              await* fetchEXTMetadata(canister, collection.canisterId, tokenIdentifier, tokenIndex, collection.name),
+            );
             previews := Array.concat<Types.WalletNFT>(
               previews,
               [
@@ -3650,7 +3743,11 @@ module {
     while (current < end) {
       let tokenIndex = Nat32.fromNat(current);
       let tokenIdentifier = extTokenIdentifier(collection.canisterId, tokenIndex);
-      let metadata = fallbackEXTMetadata(collection.canisterId, tokenIdentifier, tokenIndex, collection.name);
+      let metadata = metadataWithEXTDisplayTokenId(
+        collection,
+        tokenIndex,
+        fallbackEXTMetadata(collection.canisterId, tokenIdentifier, tokenIndex, collection.name),
+      );
       previews := Array.concat<Types.WalletNFT>(
         previews,
         [

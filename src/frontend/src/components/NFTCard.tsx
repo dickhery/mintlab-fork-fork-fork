@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { nftCustodyClass, nftCustodyLabel } from "@/lib/nft-custody";
+import { getNFTDisplayName } from "@/lib/nft-display";
 import { cn } from "@/lib/utils";
 import type { Collection, CollectionTrustStatus, WalletNFT } from "@/types";
 import { Flag, ImageOff } from "lucide-react";
@@ -38,7 +39,7 @@ export function NFTCard({
   index = 0,
   "data-ocid": dataOcid,
 }: NFTCardProps) {
-  const name = nft.metadata.name ?? `NFT #${nft.tokenId}`;
+  const name = getNFTDisplayName(nft, collection);
   const description = nft.metadata.description;
   const custodyLabel = nftCustodyLabel(nft.location);
   const custodyClass = nftCustodyClass(nft.location);

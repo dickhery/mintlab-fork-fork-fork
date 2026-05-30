@@ -74,7 +74,7 @@ mixin (
   // Kept as stable fields for upgrade compatibility; sync uses the transient safe limits below.
   let AUTO_INDEX_PAGE_LIMIT : Nat = 40;
   let AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat = 2;
-  transient let SAFE_AUTO_INDEX_PAGE_LIMIT : Nat = 50;
+  transient let SAFE_AUTO_INDEX_PAGE_LIMIT : Nat = 12;
   transient let SAFE_AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat = 1;
   transient let SYNC_COLLECTION_PAGE_DEFAULT : Nat = 1;
   transient let SYNC_COLLECTION_PAGE_MAX : Nat = 3;
@@ -170,6 +170,27 @@ mixin (
     };
   };
 
+  func metadataWithTokenDisplayHint(
+    collection : CollectionTypes.Collection,
+    canonicalTokenId : Text,
+    requestedTokenId : Text,
+    metadata : WalletTypes.NFTMetadata,
+  ) : WalletTypes.NFTMetadata {
+    let hint = Text.trim(requestedTokenId, #char ' ');
+    if (hint == canonicalTokenId) {
+      return metadata;
+    };
+    switch (collection.standard) {
+      case (#EXT) {
+        switch (Nat.fromText(hint)) {
+          case (?_) WalletLib.metadataWithDisplayTokenId(metadata, hint);
+          case null metadata;
+        };
+      };
+      case (_) metadata;
+    };
+  };
+
   public shared ({ caller }) func registerNFT(
     collectionId : WalletTypes.CollectionId,
     tokenId : Text,
@@ -235,7 +256,12 @@ mixin (
         );
         switch (verification) {
           case (#err(message)) return #err(message);
-          case (#ok(onChainMetadata)) WalletLib.mergeMetadata(onChainMetadata, metadata);
+          case (#ok(onChainMetadata)) {
+            WalletLib.mergeMetadata(
+              metadataWithTokenDisplayHint(collection, canonicalTokenId, tokenId, onChainMetadata),
+              metadata,
+            );
+          };
         };
       };
     };
@@ -428,7 +454,7 @@ mixin (
     let candidates = externalTokenCandidateIds(collection, tokenId);
     var errors : [Text] = [];
     for (canonicalTokenId in candidates.values()) {
-      switch (await* syncExternalNFTOwnerCandidate(caller, collection, canonicalTokenId, owner)) {
+      switch (await* syncExternalNFTOwnerCandidate(caller, collection, canonicalTokenId, tokenId, owner)) {
         case (#ok(nft)) return #ok(nft);
         case (#err(message)) {
           errors := Array.concat<Text>(errors, [message]);
@@ -442,6 +468,7 @@ mixin (
     caller : Principal,
     collection : CollectionTypes.Collection,
     canonicalTokenId : Text,
+    requestedTokenId : Text,
     owner : Principal,
   ) : async* { #ok : WalletTypes.WalletNFT; #err : Text } {
     let collectionId = collection.id;
@@ -497,7 +524,7 @@ mixin (
             owner,
             collectionId,
             canonicalTokenId,
-            onChainMetadata,
+            metadataWithTokenDisplayHint(collection, canonicalTokenId, requestedTokenId, onChainMetadata),
             #Registered,
           );
           #ok(nft);
@@ -831,7 +858,7 @@ mixin (
     let candidates = externalTokenCandidateIds(collection, tokenId);
     var errors : [Text] = [];
     for (canonicalTokenId in candidates.values()) {
-      switch (await* syncKnownExternalCanonicalTokenHint(caller, collection, canonicalTokenId, userAccountId)) {
+      switch (await* syncKnownExternalCanonicalTokenHint(caller, collection, canonicalTokenId, tokenId, userAccountId)) {
         case (#ok(wasNew)) return #ok(wasNew);
         case (#err(message)) {
           errors := Array.concat<Text>(errors, [message]);
@@ -845,6 +872,7 @@ mixin (
     caller : Principal,
     collection : CollectionTypes.Collection,
     canonicalTokenId : Text,
+    requestedTokenId : Text,
     userAccountId : Blob,
   ) : async* { #ok : Bool; #err : Text } {
     if (not MarketplaceLib.acquireListingTokenLock(marketplaceListingLockState, collection.id, canonicalTokenId)) {
@@ -885,7 +913,7 @@ mixin (
             caller,
             collection.id,
             canonicalTokenId,
-            metadata,
+            metadataWithTokenDisplayHint(collection, canonicalTokenId, requestedTokenId, metadata),
             #Registered,
           );
           #ok(wasNew);
@@ -1257,6 +1285,38 @@ mixin (
       };
     };
 
+    switch (collection.standard) {
+      case (#EXT) {
+        let found = WalletLib.indexedNFTsForOwner(
+          ownershipIndexState,
+          collection.id,
+          caller,
+          userAccountIdHex,
+        );
+        if (found.size() > 0) {
+          return {
+            nfts = found;
+            errors = [];
+            skip = null;
+            complete = false;
+          };
+        };
+        return {
+          nfts = [];
+          errors = [];
+          skip = ?{
+            collectionId = collection.id;
+            collectionName = collection.name;
+            reason = "INDEX_REQUIRED";
+            message = "Mintlab checked this EXT collection's owner-token methods first, but the collection did not expose a bounded owner list for this wallet. " #
+            "Broad collection scans are skipped during all-wallet sync to keep sync responsive. Use Sync selected with a token ID, or import a known token ID directly.";
+          };
+          complete = false;
+        };
+      };
+      case (_) {};
+    };
+
     var pages : Nat = 0;
     var scanned : Nat = 0;
     var indexed : Nat = 0;
@@ -1408,58 +1468,20 @@ mixin (
     switch (collection.standard) {
       case (#EXT) {
         if (not collectionHasBrowseRange(collection)) {
-          switch (
-            await* WalletLib.indexEXTRegistryForOwnerBounded(
-              ownershipIndexState,
-              collection,
-              caller,
-              userAccountIdHex,
-              EXT_SELECTED_REGISTRY_SYNC_MAX_ENTRIES,
-            )
-          ) {
-            case (#ok(page)) {
-              let status = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id);
-              let skip = switch (page.error) {
-                case (?message) {
-                  ?{
-                    collectionId = collection.id;
-                    collectionName = collection.name;
-                    reason = "INDEX_REQUIRED";
-                    message = "Mintlab checked this EXT collection registry, but one or more possible owner matches could not be verified before registration. " #
-                    "If you know the token ID, enter it and run Sync selected. Details: " #
-                    message;
-                  };
-                };
-                case null null;
-              };
-              return {
-                nfts = page.nfts;
-                errors = [];
-                skip;
-                scannedThisRun = page.scanned;
-                indexedThisRun = page.indexed;
-                complete = page.complete;
-                status;
-              };
+          return {
+            nfts = [];
+            errors = [];
+            skip = ?{
+              collectionId = collection.id;
+              collectionName = collection.name;
+              reason = "INDEX_REQUIRED";
+              message = "Mintlab checked this EXT collection's owner-token methods first, but it does not have a safe token range configured for selected sync. " #
+              "Enter a known token ID to verify it directly, or add total supply/token offset setup before automatic discovery scans it.";
             };
-            case (#err(message)) {
-              return {
-                nfts = [];
-                errors = [];
-                skip = ?{
-                  collectionId = collection.id;
-                  collectionName = collection.name;
-                  reason = "INDEX_REQUIRED";
-                  message = "Mintlab tried a bounded EXT registry lookup for this selected collection, but it could not complete within safe sync limits. " #
-                  "If you know the token ID, enter it and run Sync selected, or add total supply/token range setup for automatic discovery. Details: " #
-                  message;
-                };
-                scannedThisRun = 0;
-                indexedThisRun = 0;
-                complete = false;
-                status = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id);
-              };
-            };
+            scannedThisRun = 0;
+            indexedThisRun = 0;
+            complete = false;
+            status = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id);
           };
         };
       };

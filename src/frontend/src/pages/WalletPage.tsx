@@ -47,6 +47,12 @@ import {
   nftCustodyDescription,
   nftCustodyLabel,
 } from "@/lib/nft-custody";
+import {
+  getNFTDisplayName,
+  getNFTDisplayTokenId,
+  getNFTTokenLabel,
+  getNFTVisibleAttributes,
+} from "@/lib/nft-display";
 import type {
   ActiveListingDetail,
   Collection,
@@ -370,7 +376,7 @@ function SendNFTModal({ open, onClose, nft, collection }: SendNFTModalProps) {
   const [recipient, setRecipient] = useState("");
   const [recipientError, setRecipientError] = useState("");
 
-  const nftName = nft.metadata.name ?? `NFT #${nft.tokenId}`;
+  const nftName = getNFTDisplayName(nft, collection);
   const isRegisteredExternal = nft.location === "Registered";
   const isVaultedExternal = nft.location === "Vaulted";
   const actionLabel = isVaultedExternal
@@ -517,7 +523,7 @@ function SendNFTModal({ open, onClose, nft, collection }: SendNFTModalProps) {
                 {nftName}
               </p>
               <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                Token #{nft.tokenId}
+                {getNFTTokenLabel(nft)}
               </p>
               {collection && (
                 <CollectionBadge
@@ -652,7 +658,9 @@ function NFTDetailsModal({
   onReport,
   onSend,
 }: NFTDetailsModalProps) {
-  const nftName = nft.metadata.name ?? `NFT #${nft.tokenId}`;
+  const nftName = getNFTDisplayName(nft, collection);
+  const displayTokenId = getNFTDisplayTokenId(nft);
+  const visibleAttributes = getNFTVisibleAttributes(nft.metadata);
   const imageUrl = resolveImageUrl(nft.metadata.imageUrl, {
     canisterId: collection?.canisterId.toString(),
     tokenId: nft.tokenId,
@@ -731,7 +739,7 @@ function NFTDetailsModal({
                 {nftName}
               </DialogTitle>
               <p className="text-sm text-muted-foreground font-mono">
-                Token #{nft.tokenId}
+                {getNFTTokenLabel(nft)}
               </p>
             </DialogHeader>
 
@@ -754,8 +762,15 @@ function NFTDetailsModal({
             </div>
 
             <div className="grid grid-cols-1 gap-3">
+              {displayTokenId && (
+                <CopyField
+                  label="Display Token ID"
+                  value={displayTokenId}
+                  ocid="wallet.nft_details.copy_display_token_id"
+                />
+              )}
               <CopyField
-                label="Token ID"
+                label={displayTokenId ? "Canonical Token ID" : "Token ID"}
                 value={nft.tokenId}
                 ocid="wallet.nft_details.copy_token_id"
               />
@@ -775,14 +790,14 @@ function NFTDetailsModal({
               )}
             </div>
 
-            {nft.metadata.attributes.length > 0 && (
+            {visibleAttributes.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <Tag className="w-3 h-3" />
                   Attributes
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {nft.metadata.attributes.map(([key, value]) => (
+                  {visibleAttributes.map(([key, value]) => (
                     <div
                       key={`wallet-detail-${key}-${value}`}
                       className="rounded-lg border border-border/50 bg-muted/35 px-3 py-2"
@@ -1420,7 +1435,7 @@ function MintComposer({
       return result.ok;
     },
     onSuccess: (nft) => {
-      const displayName = nft.metadata.name ?? `#${nft.tokenId}`;
+      const displayName = getNFTDisplayName(nft, targetCollection);
       toast.success(
         `Minted ${displayName} into ${targetCollection?.name ?? "the collection"}`,
       );
@@ -2404,7 +2419,7 @@ function CollectionSection({
               }
               index={i}
               onReport={() => onReportNFT(collection, nft)}
-              reportLabel={`Report ${nft.metadata.name ?? `NFT #${nft.tokenId}`}`}
+              reportLabel={`Report ${getNFTDisplayName(nft, collection)}`}
               onClick={() => setDetailNft(nft)}
               data-ocid={`wallet.nft.item.${sectionIndex * 100 + i + 1}`}
             />
@@ -2417,7 +2432,7 @@ function CollectionSection({
                 setSendNft(nft);
               }}
               data-ocid={`wallet.send_nft_button.${sectionIndex * 100 + i + 1}`}
-              aria-label={`${nft.location === "Vaulted" ? WITHDRAW_TO_EXTERNAL_WALLET_LABEL : "Send NFT"} ${nft.metadata.name ?? `NFT #${nft.tokenId}`}`}
+              aria-label={`${nft.location === "Vaulted" ? WITHDRAW_TO_EXTERNAL_WALLET_LABEL : "Send NFT"} ${getNFTDisplayName(nft, collection)}`}
               disabled={isNFTListed(nft)}
               hidden={isNFTListed(nft)}
             >
@@ -2727,7 +2742,7 @@ export default function WalletPage() {
       if (!actor) throw new Error("Backend not connected");
       const result = await actor.reportCollection(
         collection.id,
-        `Wallet report for token #${nft.tokenId} in ${collection.name}`,
+        `Wallet report for ${getNFTTokenLabel(nft)} in ${collection.name}`,
       );
       if (result.__kind__ === "err") throw new Error(result.err);
       return result.ok;
@@ -3066,10 +3081,17 @@ export default function WalletPage() {
         if (result.__kind__ === "err") {
           if (isSyncAlreadyRunningMessage(result.err)) {
             if (!silent) {
-              setSyncStatus({ kind: "syncing", slow: true });
+              setSyncStatus({
+                kind: "partial",
+                newCount: 0,
+                message:
+                  "A previous wallet sync is still finishing on-chain. Mintlab refreshed your wallet; try Sync again shortly.",
+                errors: [],
+                skipped: [],
+              });
               toast("Wallet sync is already running", {
                 description:
-                  "Mintlab is still checking your wallet. New NFTs found during that sync will appear shortly.",
+                  "Mintlab refreshed your wallet while the previous on-chain check finishes. Known token ID imports still work immediately.",
               });
             }
             return;
