@@ -173,6 +173,10 @@ mixin (
     };
   };
 
+  func mintlabUserAccountId(caller : Principal) : Blob {
+    IcpLib.accountIdentifier(canisterId, IcpLib.principalToSubaccount(caller));
+  };
+
   func nftDisplayName(nft : WalletTypes.WalletNFT) : Text {
     switch (nft.metadata.name) {
       case (?name) {
@@ -926,6 +930,14 @@ mixin (
         };
 
         if (shouldRunSelectedScan) {
+          let appAccountSynced = await* syncMintlabEXTAccountCollection(caller, collection);
+          newCount += appAccountSynced.newCount;
+          if (appAccountSynced.foundCount > 0) {
+            shouldRunSelectedScan := false;
+          };
+        };
+
+        if (shouldRunSelectedScan) {
           scan := await* autoScanSelectedCollectionForOwner(
             collection,
             caller,
@@ -1006,16 +1018,15 @@ mixin (
         case (?knownNFT) ?knownNFT.metadata;
         case null null;
       };
-      switch (
+      let registeredVerification =
         await* WalletLib.verifyKnownOwnedNFTWithFallback(
           collection,
           caller,
           userAccountId,
           canonicalTokenId,
           metadataFallback,
-        )
-      ) {
-        case (#err(message)) #err(message);
+        );
+      switch (registeredVerification) {
         case (#ok(metadata)) {
           switch (MarketplaceLib.findActiveEscrowedNFT(marketplaceState, collection.id, canonicalTokenId)) {
             case (?_) {
@@ -1034,6 +1045,49 @@ mixin (
             #Registered,
           );
           #ok(wasNew);
+        };
+        case (#err(registeredMessage)) {
+          switch (collection.standard) {
+            case (#EXT) {
+              let appAccountId = mintlabUserAccountId(caller);
+              switch (
+                await* WalletLib.verifyKnownEXTAccountNFTWithFallback(
+                  collection,
+                  appAccountId,
+                  canonicalTokenId,
+                  metadataFallback,
+                )
+              ) {
+                case (#ok(metadata)) {
+                  switch (MarketplaceLib.findActiveEscrowedNFT(marketplaceState, collection.id, canonicalTokenId)) {
+                    case (?_) {
+                      return #err("This NFT is locked in an active marketplace listing. Cancel or settle the listing first.");
+                    };
+                    case null {};
+                  };
+                  let existing = WalletLib.findByCollectionToken(walletState, collection.id, canonicalTokenId);
+                  let wasNew = countsAsNewWalletNFT(existing, caller);
+                  ignore WalletLib.registerNFT(
+                    walletState,
+                    caller,
+                    collection.id,
+                    canonicalTokenId,
+                    metadataWithTokenDisplayHint(collection, canonicalTokenId, requestedTokenId, metadata),
+                    #Vaulted,
+                  );
+                  #ok(wasNew);
+                };
+                case (#err(appAccountMessage)) {
+                  #err(
+                    registeredMessage #
+                    " Mintlab also checked your app deposit account: " #
+                    appAccountMessage
+                  );
+                };
+              };
+            };
+            case (_) #err(registeredMessage);
+          };
         };
       };
     } finally {
@@ -1375,6 +1429,8 @@ mixin (
             );
           };
         };
+        let appAccountSynced = await* syncMintlabEXTAccountCollection(caller, collection);
+        newCount += appAccountSynced.newCount;
       };
     };
 
@@ -1761,6 +1817,31 @@ mixin (
             status;
           };
         };
+      };
+    };
+  };
+
+  func syncMintlabEXTAccountCollection(
+    caller : Principal,
+    collection : CollectionTypes.Collection,
+  ) : async* { newCount : Nat; foundCount : Nat } {
+    switch (collection.standard) {
+      case (#EXT) {};
+      case (_) return { newCount = 0; foundCount = 0 };
+    };
+    let appAccountId = mintlabUserAccountId(caller);
+    switch (
+      await* WalletLib.previewEXTAccountNFTsFromOwnerIndex(
+        collection,
+        canisterId,
+        appAccountId,
+        #Vaulted,
+      )
+    ) {
+      case (#err(_)) return { newCount = 0; foundCount = 0 };
+      case (#ok(nfts)) {
+        let registered = registerPreviewNFTs(caller, collection, nfts, #Vaulted);
+        return { newCount = registered.newCount; foundCount = nfts.size() };
       };
     };
   };

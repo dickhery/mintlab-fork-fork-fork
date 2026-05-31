@@ -2268,21 +2268,21 @@ function ReceivingInstructions({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {principalText && (
             <CopyField
-              label="Principal ID — use to receive NFTs"
+              label="Principal ID — use for ICRC-7/DIP721 NFTs"
               value={principalText}
               ocid="wallet.copy_principal_button"
             />
           )}
           {accountIdHex ? (
             <CopyField
-              label="Account ID — use to receive ICP"
+              label="Account ID — use for ICP and EXT NFTs"
               value={accountIdHex}
               ocid="wallet.copy_account_id_button"
             />
           ) : (
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Account ID — use to receive ICP
+                Account ID — use for ICP and EXT NFTs
               </span>
               <Skeleton className="h-9 w-full rounded-lg" />
             </div>

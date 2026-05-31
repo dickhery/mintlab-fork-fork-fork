@@ -14,6 +14,7 @@ import Time "mo:core/Time";
 import Types "../types/wallet";
 import BrowseTypes "../types/browse";
 import CollectionTypes "../types/collections";
+import IcpLib "icp";
 import NFTStandards "nft-standards";
 
 module {
@@ -703,6 +704,48 @@ module {
     await* previewOwnedNFTsWithLocation(collection, owner, accountId, #Registered, false);
   };
 
+  public func previewEXTAccountNFTsFromOwnerIndex(
+    collection : CollectionTypes.Collection,
+    owner : Principal,
+    accountId : Blob,
+    location : Types.WalletLocation,
+  ) : async* { #ok : [Types.WalletNFT]; #err : Text } {
+    switch (collection.standard) {
+      case (#EXT) {};
+      case (_) return #err("Account-based EXT preview only supports EXT collections");
+    };
+    let canister : NFTStandards.EXTActor = actor (collection.canisterId.toText());
+    let accountIdHex = blobToHex(accountId);
+    switch (await* fetchEXTTokenIndicesForExactAccount(canister, accountIdHex, collection.name)) {
+      case (#err(message)) #err(message);
+      case (#ok(tokenIndices)) {
+        var previews : [Types.WalletNFT] = [];
+        for (tokenIndex in tokenIndices.values()) {
+          let tokenIdentifier = extTokenIdentifier(collection.canisterId, tokenIndex);
+          let metadata = metadataWithEXTDisplayTokenId(
+            collection,
+            tokenIndex,
+            await* fetchEXTMetadata(canister, collection.canisterId, tokenIdentifier, tokenIndex, collection.name),
+          );
+          previews := Array.concat<Types.WalletNFT>(
+            previews,
+            [
+              buildPreviewNFT(
+                owner,
+                collection.id,
+                tokenIdentifier,
+                metadata,
+                location,
+                tokenIndex.toNat(),
+              )
+            ],
+          );
+        };
+        #ok(previews);
+      };
+    };
+  };
+
   public func previewCollectionNFTs(
     collection : CollectionTypes.Collection
   ) : async* { #ok : [Types.WalletNFT]; #err : Text } {
@@ -923,6 +966,38 @@ module {
     };
   };
 
+  public func verifyKnownEXTAccountNFTWithFallback(
+    collection : CollectionTypes.Collection,
+    accountId : Blob,
+    tokenId : Text,
+    metadataFallback : ?Types.NFTMetadata,
+  ) : async* { #ok : Types.NFTMetadata; #err : Text } {
+    switch (collection.standard) {
+      case (#EXT) {};
+      case (_) return #err("Account-based EXT verification only supports EXT collections");
+    };
+    let canister : NFTStandards.EXTActor = actor (collection.canisterId.toText());
+    let accountIdHex = blobToHex(accountId);
+    let tokenIdentifier = normalizeEXTTokenIdentifier(collection.canisterId, tokenId);
+    let ownsToken = switch (await* fetchEXTOwnerAccountId(canister, tokenIdentifier)) {
+      case (#ok(ownerAccountId)) Text.toLower(ownerAccountId) == Text.toLower(accountIdHex);
+      case (#err(_)) {
+        switch (await* fetchEXTBalanceForUser(canister, tokenIdentifier, #address(accountIdHex))) {
+          case (#ok(balance)) balance > 0;
+          case (#err(message)) return #err(message);
+        };
+      };
+    };
+    if (not ownsToken) {
+      return #err("NFT not found in the Mintlab account for this user");
+    };
+    let metadata = switch (metadataFallback) {
+      case (?value) value;
+      case null await* fetchTokenMetadata(collection, tokenIdentifier);
+    };
+    #ok(metadata);
+  };
+
   public func canonicalTokenId(
     collection : CollectionTypes.Collection,
     tokenId : Text,
@@ -1052,7 +1127,7 @@ module {
       };
       case (#EXT) {
         let canister : NFTStandards.EXTActor = actor (collection.canisterId.toText());
-        let request : NFTStandards.ExtTransferRequest = {
+        let defaultVaultRequest : NFTStandards.ExtTransferRequest = {
           from = #principal(canisterPrincipal);
           to = #principal(recipient);
           token = normalizeEXTTokenIdentifier(collection.canisterId, nft.tokenId);
@@ -1062,9 +1137,32 @@ module {
           notify = false;
           subaccount = null;
         };
-        switch (await* transferEXTNFT(canister, request)) {
+        switch (await* transferEXTNFT(canister, defaultVaultRequest)) {
           case (#ok) {};
-          case (#err(message)) return #err(message);
+          case (#err(defaultVaultMessage)) {
+            let userSubaccount = IcpLib.principalToSubaccount(nft.owner);
+            let userVaultAccountId = IcpLib.accountIdentifier(canisterPrincipal, userSubaccount);
+            let userVaultRequest : NFTStandards.ExtTransferRequest = {
+              from = #address(blobToHex(userVaultAccountId));
+              to = #principal(recipient);
+              token = normalizeEXTTokenIdentifier(collection.canisterId, nft.tokenId);
+              amount = 1;
+              fee = null;
+              memo = Blob.fromArray([]);
+              notify = false;
+              subaccount = ?userSubaccount;
+            };
+            switch (await* transferEXTNFT(canister, userVaultRequest)) {
+              case (#ok) {};
+              case (#err(userVaultMessage)) {
+                return #err(
+                  defaultVaultMessage #
+                  " Mintlab also checked the user-specific EXT deposit account: " #
+                  userVaultMessage
+                );
+              };
+            };
+          };
         };
       };
       case (#ICRC7) {
@@ -2963,6 +3061,49 @@ module {
     };
 
     if (tokenIndices.size() > 0 or sawAvailableMethod) {
+      #ok(tokenIndices);
+    } else {
+      switch (lastError) {
+        case (?message) #err("Collection '" # collectionName # "': " # message);
+        case null #err("Collection '" # collectionName # "': EXT token ownership method not available");
+      };
+    };
+  };
+
+  func fetchEXTTokenIndicesForExactAccount(
+    canister : NFTStandards.EXTActor,
+    accountIdHex : Text,
+    collectionName : Text,
+  ) : async* { #ok : [NFTStandards.TokenIndex]; #err : Text } {
+    var tokenIndices : [NFTStandards.TokenIndex] = [];
+    var sawAvailableMethod = false;
+    var lastError : ?Text = null;
+
+    switch (await* fetchEXTTokenIndicesForAccount(canister, accountIdHex)) {
+      case (#ok(values)) {
+        sawAvailableMethod := true;
+        tokenIndices := appendUniqueTokenIndices(tokenIndices, values);
+      };
+      case (#err(message)) {
+        if (message != "method unavailable") {
+          lastError := ?message;
+        };
+      };
+    };
+
+    switch (await* fetchEXTLegacyTokensForAccount(canister, accountIdHex)) {
+      case (#ok(values)) {
+        sawAvailableMethod := true;
+        tokenIndices := appendUniqueTokenIndices(tokenIndices, values);
+      };
+      case (#err(message)) {
+        if (message != "method unavailable") {
+          lastError := ?message;
+        };
+      };
+    };
+
+    if (sawAvailableMethod) {
       #ok(tokenIndices);
     } else {
       switch (lastError) {
