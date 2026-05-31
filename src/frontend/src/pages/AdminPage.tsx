@@ -49,6 +49,7 @@ import type {
   CollectionTrustStatus,
   MintlabFeeRecoveryQuote,
   ModerationCategorySettings,
+  NFTReportMeta,
   NFTStandard,
   SettlementEscrowRepairQuote,
 } from "@/types";
@@ -178,6 +179,38 @@ function collectionTrustVariant(
     return "destructive";
   }
   return "outline";
+}
+
+function nftReportStatusLabel(status: NFTReportMeta["status"]): string {
+  switch (status) {
+    case "AutoHidden":
+      return "Auto-hidden";
+    case "Approved":
+      return "Approved";
+    case "Hidden":
+      return "Hidden";
+    case "Open":
+      return "Needs review";
+  }
+}
+
+function nftReportStatusVariant(
+  status: NFTReportMeta["status"],
+): "default" | "secondary" | "outline" | "destructive" {
+  if (status === "Approved") return "secondary";
+  if (status === "AutoHidden" || status === "Hidden") return "destructive";
+  return "outline";
+}
+
+function formatReportTime(value: bigint | null): string {
+  if (value === null) return "Not reviewed";
+  const date = new Date(Number(value / 1_000_000n));
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function collectionCreationStatusLabel(
@@ -3597,6 +3630,191 @@ function AddCollectionForm({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
+function NFTReportsPanel({ collections }: { collections: Collection[] }) {
+  const { actor, isFetching } = useBackend();
+  const queryClient = useQueryClient();
+
+  const { data: reports = [], isLoading } = useQuery<NFTReportMeta[]>({
+    queryKey: ["nftReportMetas"],
+    queryFn: async () => {
+      if (!actor) return [];
+      const values: NFTReportMeta[] = [];
+      let cursor: bigint | null = null;
+      do {
+        const page = await actor.listNFTReportMetasPage(cursor, 100n);
+        values.push(...page.reports);
+        cursor = page.nextCursor;
+      } while (cursor !== null);
+      return values;
+    },
+    enabled: !!actor && !isFetching,
+  });
+
+  const collectionById = useMemo(() => {
+    const map = new Map<string, Collection>();
+    for (const collection of collections) {
+      map.set(collection.id.toString(), collection);
+    }
+    return map;
+  }, [collections]);
+
+  const sortedReports = useMemo(() => {
+    const priority = (status: NFTReportMeta["status"]) => {
+      if (status === "AutoHidden") return 0;
+      if (status === "Open") return 1;
+      if (status === "Hidden") return 2;
+      return 3;
+    };
+    return [...reports].sort((a, b) => {
+      const byStatus = priority(a.status) - priority(b.status);
+      if (byStatus !== 0) return byStatus;
+      return Number((b.lastReportedAt ?? 0n) - (a.lastReportedAt ?? 0n));
+    });
+  }, [reports]);
+
+  const reviewMutation = useMutation({
+    mutationFn: async ({
+      report,
+      action,
+    }: {
+      report: NFTReportMeta;
+      action: "approve" | "hide";
+    }) => {
+      if (!actor) throw new Error("Backend not ready");
+      const result =
+        action === "approve"
+          ? await actor.adminApproveNFTReport(
+              report.collectionId,
+              report.tokenId,
+            )
+          : await actor.adminHideNFTReport(report.collectionId, report.tokenId);
+      if (result.__kind__ === "err") throw new Error(result.err);
+      return result.ok;
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["nftReportMetas"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["activeListingDetails"],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["collectionNFTPage"] });
+      toast.success("NFT report reviewed.");
+    },
+    onError: (err: unknown) => {
+      toast.error(`Failed to review NFT report: ${extractError(err)}`);
+    },
+  });
+
+  return (
+    <Card className="border-primary/20 bg-card" data-ocid="admin.nft_reports">
+      <CardHeader>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <CardTitle className="text-base flex items-center gap-2">
+              <AlertCircle className="h-4 w-4 text-primary" />
+              Flagged NFTs
+            </CardTitle>
+            <CardDescription>
+              User NFT reports and automatic 4-report hiding review queue.
+            </CardDescription>
+          </div>
+          <Badge variant="outline">{reports.length}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-2">
+            {[1, 2].map((item) => (
+              <Skeleton key={item} className="h-20 rounded-lg" />
+            ))}
+          </div>
+        ) : sortedReports.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-border bg-muted/20 px-3 py-8 text-center text-sm text-muted-foreground">
+            No NFT reports yet.
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {sortedReports.map((report) => {
+              const collection = collectionById.get(
+                report.collectionId.toString(),
+              );
+              const reviewed =
+                report.status === "Approved" || report.status === "Hidden";
+              return (
+                <div
+                  key={`${report.collectionId.toString()}:${report.tokenId}`}
+                  className="rounded-lg border border-border bg-muted/20 px-3 py-2.5"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-semibold text-sm text-foreground">
+                          {collection?.name ??
+                            `Collection ${report.collectionId.toString()}`}
+                        </span>
+                        <Badge variant={nftReportStatusVariant(report.status)}>
+                          {nftReportStatusLabel(report.status)}
+                        </Badge>
+                        <Badge variant="outline">
+                          {report.reportCount.toString()} report
+                          {report.reportCount === 1n ? "" : "s"}
+                        </Badge>
+                      </div>
+                      <p className="text-xs font-mono text-muted-foreground break-all">
+                        Token {report.tokenId}
+                      </p>
+                      {report.lastReportReason && (
+                        <p className="text-xs text-muted-foreground">
+                          {report.lastReportReason}
+                        </p>
+                      )}
+                      <p className="text-[11px] text-muted-foreground">
+                        Last flagged {formatReportTime(report.lastReportedAt)}
+                        {report.reviewedAt
+                          ? ` · Reviewed ${formatReportTime(report.reviewedAt)}`
+                          : ""}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="gap-2"
+                        onClick={() =>
+                          reviewMutation.mutate({ report, action: "approve" })
+                        }
+                        disabled={reviewMutation.isPending || reviewed}
+                        data-ocid="admin.nft_reports.approve"
+                      >
+                        <ShieldCheck size={14} />
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() =>
+                          reviewMutation.mutate({ report, action: "hide" })
+                        }
+                        disabled={
+                          reviewMutation.isPending || report.status === "Hidden"
+                        }
+                        data-ocid="admin.nft_reports.hide"
+                      >
+                        <EyeOff size={14} />
+                        Hide
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── AdminPage ────────────────────────────────────────────────────────────────
 
 export default function AdminPage() {
@@ -3732,6 +3950,8 @@ export default function AdminPage() {
       <AddCollectionForm onSuccess={() => {}} />
 
       <MintConfigForm />
+
+      <NFTReportsPanel collections={collections ?? []} />
 
       <MarketplaceEscrowRepairPanel />
 

@@ -11,6 +11,7 @@ import Time "mo:core/Time";
 
 mixin (
   collectionsState : CollectionsLib.CollectionsState,
+  nftModerationState : CollectionsLib.NFTModerationState,
   authState : AuthLib.AdminState,
   ownershipIndexState : WalletLib.OwnershipIndexState,
 ) {
@@ -190,6 +191,70 @@ mixin (
     };
   };
 
+  public shared ({ caller }) func reportNFT(
+    collectionId : CollectionTypes.CollectionId,
+    tokenId : Text,
+    reason : Text,
+  ) : async { #ok : CollectionTypes.NFTReportMeta; #err : Text } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("Anonymous caller not allowed");
+    };
+    let normalizedTokenId = Text.trim(tokenId, #char ' ');
+    if (normalizedTokenId == "") {
+      return #err("Token ID is required");
+    };
+    if (Text.size(normalizedTokenId) > 256) {
+      return #err("Token ID is too long");
+    };
+    if (Text.size(reason) > 500) {
+      return #err("Report reason is too long");
+    };
+    switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
+      case null return #err("Collection not found");
+      case (?_) {};
+    };
+    #ok(
+      CollectionsLib.reportNFT(
+        nftModerationState,
+        collectionId,
+        normalizedTokenId,
+        caller,
+        reason,
+      )
+    );
+  };
+
+  public shared query ({ caller }) func listNFTReportMetasPage(
+    cursor : ?Nat,
+    limit : ?Nat,
+  ) : async CollectionTypes.NFTReportMetaPage {
+    if (Principal.isAnonymous(caller) or not AuthLib.isAdmin(authState, caller)) {
+      Runtime.trap("Unauthorized: admin only");
+    };
+    CollectionsLib.getNFTReportMetasPage(
+      nftModerationState,
+      cursor,
+      switch (limit) {
+        case (?value) value;
+        case null 0;
+      },
+    );
+  };
+
+  public shared ({ caller }) func adminApproveNFTReport(
+    collectionId : CollectionTypes.CollectionId,
+    tokenId : Text,
+  ) : async { #ok : CollectionTypes.NFTReportMeta; #err : Text } {
+    adminSetNFTReportStatus(caller, collectionId, tokenId, #Approved);
+  };
+
+  public shared ({ caller }) func adminHideNFTReport(
+    collectionId : CollectionTypes.CollectionId,
+    tokenId : Text,
+  ) : async { #ok : CollectionTypes.NFTReportMeta; #err : Text } {
+    adminSetNFTReportStatus(caller, collectionId, tokenId, #Hidden);
+  };
+
   public shared ({ caller }) func adminVerifyCollection(
     collectionId : CollectionTypes.CollectionId
   ) : async { #ok : CollectionTypes.CollectionImportMeta; #err : Text } {
@@ -359,6 +424,40 @@ mixin (
     switch (CollectionsLib.setCollectionTrustStatus(collectionsState, collectionId, status)) {
       case (?meta) #ok(meta);
       case null #err("Collection not found");
+    };
+  };
+
+  func adminSetNFTReportStatus(
+    caller : Principal,
+    collectionId : CollectionTypes.CollectionId,
+    tokenId : Text,
+    status : CollectionTypes.NFTReportStatus,
+  ) : { #ok : CollectionTypes.NFTReportMeta; #err : Text } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("Anonymous caller not allowed");
+    };
+    if (not AuthLib.isAdmin(authState, caller)) {
+      return #err("Unauthorized: admin only");
+    };
+    let normalizedTokenId = Text.trim(tokenId, #char ' ');
+    if (normalizedTokenId == "") {
+      return #err("Token ID is required");
+    };
+    switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
+      case null return #err("Collection not found");
+      case (?_) {};
+    };
+    switch (
+      CollectionsLib.setNFTReportStatus(
+        nftModerationState,
+        collectionId,
+        normalizedTokenId,
+        status,
+        caller,
+      )
+    ) {
+      case (?meta) #ok(meta);
+      case null #err("NFT report not found");
     };
   };
 

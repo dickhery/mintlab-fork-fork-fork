@@ -192,7 +192,6 @@ interface FixedCardProps {
   onBuy: (id: ListingId) => void;
   onCancel: (id: ListingId) => void;
   onDetails: () => void;
-  onReport?: () => void;
   isBuying: boolean;
   isCancelling: boolean;
 }
@@ -208,7 +207,6 @@ function FixedListingCard({
   onBuy,
   onCancel,
   onDetails,
-  onReport,
   isBuying,
   isCancelling,
 }: FixedCardProps) {
@@ -239,20 +237,6 @@ function FixedListingCard({
         <Badge className="absolute top-2 left-2 bg-primary/90 text-primary-foreground text-xs font-mono uppercase">
           Fixed
         </Badge>
-        {onReport && (
-          <button
-            type="button"
-            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 bg-card/85 text-muted-foreground opacity-0 shadow-sm backdrop-blur-sm transition-opacity hover:text-foreground group-hover:opacity-100 focus:opacity-100"
-            title="Report this NFT"
-            aria-label="Report this NFT"
-            onClick={(event) => {
-              event.stopPropagation();
-              onReport();
-            }}
-          >
-            <Flag className="h-4 w-4" />
-          </button>
-        )}
       </div>
 
       <div className="p-3 flex flex-col gap-2 flex-1">
@@ -632,7 +616,6 @@ interface AuctionCardProps {
   onSettle: (id: ListingId) => void;
   onCancel: (id: ListingId) => void;
   onDetails: () => void;
-  onReport?: () => void;
   isSettling: boolean;
   isCancelling: boolean;
 }
@@ -650,7 +633,6 @@ function AuctionListingCard({
   onSettle,
   onCancel,
   onDetails,
-  onReport,
   isSettling,
   isCancelling,
 }: AuctionCardProps) {
@@ -692,20 +674,6 @@ function AuctionListingCard({
         >
           {ended ? "Ended" : "Live"}
         </Badge>
-        {onReport && (
-          <button
-            type="button"
-            className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 bg-card/85 text-muted-foreground opacity-0 shadow-sm backdrop-blur-sm transition-opacity hover:text-foreground group-hover:opacity-100 focus:opacity-100"
-            title="Report this NFT"
-            aria-label="Report this NFT"
-            onClick={(event) => {
-              event.stopPropagation();
-              onReport();
-            }}
-          >
-            <Flag className="h-4 w-4" />
-          </button>
-        )}
       </div>
 
       <div className="p-3 flex flex-col gap-2 flex-1">
@@ -1744,8 +1712,9 @@ export default function MarketplacePage() {
       nft: WalletNFT;
     }) => {
       if (!actor) throw new Error("Not connected");
-      const result = await actor.reportCollection(
+      const result = await actor.reportNFT(
         collection.id,
+        nft.tokenId,
         `Marketplace report for token #${nft.tokenId} in ${collection.name}`,
       );
       if (result.__kind__ === "err") throw new Error(result.err);
@@ -1754,7 +1723,9 @@ export default function MarketplacePage() {
     onSuccess: () => {
       toast.success("Report sent to Mintlab admins.");
       void qc.invalidateQueries({ queryKey: ["collectionImportMetas"] });
+      void qc.invalidateQueries({ queryKey: ["nftReportMetas"] });
       void qc.invalidateQueries({ queryKey: ["collections"] });
+      void qc.invalidateQueries({ queryKey: ["activeListingDetails"] });
     },
     onError: (e: Error) => toast.error(`Report failed: ${e.message}`),
   });
@@ -2182,7 +2153,6 @@ export default function MarketplacePage() {
                           currentPrincipal={principalStr}
                           onBuy={(id) => setBuyTarget(id)}
                           onCancel={(id) => setCancelTarget(id)}
-                          onReport={() => handleReportListing(collection, nft)}
                           onDetails={() =>
                             setDetailTarget({
                               listing: { __kind__: "Fixed", Fixed: listing },
@@ -2235,9 +2205,6 @@ export default function MarketplacePage() {
                             currentPrincipal={principalStr}
                             onBuy={(id) => setBuyTarget(id)}
                             onCancel={(id) => setCancelTarget(id)}
-                            onReport={() =>
-                              handleReportListing(collection, nft)
-                            }
                             onDetails={() =>
                               setDetailTarget({
                                 listing: { __kind__: "Fixed", Fixed: listing },
@@ -2314,7 +2281,6 @@ export default function MarketplacePage() {
                           onBid={(l) => setBidTarget(l)}
                           onSettle={(id) => settleAuction(id)}
                           onCancel={(id) => setCancelTarget(id)}
-                          onReport={() => handleReportListing(collection, nft)}
                           onDetails={() =>
                             setDetailTarget({
                               listing: {
@@ -2374,9 +2340,6 @@ export default function MarketplacePage() {
                             onBid={(l) => setBidTarget(l)}
                             onSettle={(id) => settleAuction(id)}
                             onCancel={(id) => setCancelTarget(id)}
-                            onReport={() =>
-                              handleReportListing(collection, nft)
-                            }
                             onDetails={() =>
                               setDetailTarget({
                                 listing: {

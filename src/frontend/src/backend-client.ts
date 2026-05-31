@@ -113,6 +113,8 @@ export type CollectionTrustStatus =
   | "NeedsBrowseInfo"
   | "Reported";
 
+export type NFTReportStatus = "Open" | "AutoHidden" | "Approved" | "Hidden";
+
 export interface CollectionImportMeta {
   collectionId: CollectionId;
   importedBy: Principal;
@@ -126,6 +128,24 @@ export interface CollectionImportMeta {
 
 export interface CollectionImportMetaPage {
   metas: Array<CollectionImportMeta>;
+  nextCursor: bigint | null;
+  totalCount: bigint;
+}
+
+export interface NFTReportMeta {
+  collectionId: CollectionId;
+  tokenId: string;
+  status: NFTReportStatus;
+  reportCount: bigint;
+  createdAt: Timestamp;
+  lastReportedAt: Timestamp | null;
+  lastReportReason: string | null;
+  reviewedAt: Timestamp | null;
+  reviewedBy: Principal | null;
+}
+
+export interface NFTReportMetaPage {
+  reports: Array<NFTReportMeta>;
   nextCursor: bigint | null;
   totalCount: bigint;
 }
@@ -780,6 +800,12 @@ export interface backendInterface {
     | { __kind__: "ok"; ok: CollectionImportMeta }
     | { __kind__: "err"; err: string }
   >;
+  adminApproveNFTReport(
+    collectionId: CollectionId,
+    tokenId: string,
+  ): Promise<
+    { __kind__: "ok"; ok: NFTReportMeta } | { __kind__: "err"; err: string }
+  >;
   adminDeleteCollectionCreationRequest(
     requestId: bigint,
   ): Promise<
@@ -815,6 +841,12 @@ export interface backendInterface {
   ): Promise<
     | { __kind__: "ok"; ok: CollectionImportMeta }
     | { __kind__: "err"; err: string }
+  >;
+  adminHideNFTReport(
+    collectionId: CollectionId,
+    tokenId: string,
+  ): Promise<
+    { __kind__: "ok"; ok: NFTReportMeta } | { __kind__: "err"; err: string }
   >;
   adminMarkCollectionNeedsBrowseInfo(
     collectionId: CollectionId,
@@ -1055,6 +1087,10 @@ export interface backendInterface {
     cursor: bigint | null,
     limit: bigint | null,
   ): Promise<CollectionImportMetaPage>;
+  listNFTReportMetasPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<NFTReportMetaPage>;
   listCollections(): Promise<Array<Collection>>;
   listCollectionsPage(
     cursor: bigint | null,
@@ -1168,6 +1204,13 @@ export interface backendInterface {
     | { __kind__: "ok"; ok: CollectionImportMeta }
     | { __kind__: "err"; err: string }
   >;
+  reportNFT(
+    collectionId: CollectionId,
+    tokenId: string,
+    reason: string,
+  ): Promise<
+    { __kind__: "ok"; ok: NFTReportMeta } | { __kind__: "err"; err: string }
+  >;
   syncExternalNFTOwner(
     collectionId: CollectionId,
     tokenId: string,
@@ -1239,6 +1282,11 @@ type RawCollectionTrustStatus =
   | { SyncDisabled: null }
   | { NeedsBrowseInfo: null }
   | { Reported: null };
+type RawNFTReportStatus =
+  | { Open: null }
+  | { AutoHidden: null }
+  | { Approved: null }
+  | { Hidden: null };
 type RawWalletLocation =
   | { Minted: null }
   | { Registered: null }
@@ -1365,6 +1413,22 @@ type RawCollectionImportMeta = {
 };
 type RawCollectionImportMetaPage = {
   metas: Array<RawCollectionImportMeta>;
+  nextCursor: [] | [bigint];
+  totalCount: bigint;
+};
+type RawNFTReportMeta = {
+  collectionId: CollectionId;
+  tokenId: string;
+  status: RawNFTReportStatus;
+  reportCount: bigint;
+  createdAt: Timestamp;
+  lastReportedAt: [] | [Timestamp];
+  lastReportReason: [] | [string];
+  reviewedAt: [] | [Timestamp];
+  reviewedBy: [] | [Principal];
+};
+type RawNFTReportMetaPage = {
+  reports: Array<RawNFTReportMeta>;
   nextCursor: [] | [bigint];
   totalCount: bigint;
 };
@@ -1809,6 +1873,13 @@ function fromRawCollectionTrustStatus(
   return "CommunityImported";
 }
 
+function fromRawNFTReportStatus(value: RawNFTReportStatus): NFTReportStatus {
+  if ("AutoHidden" in value) return "AutoHidden";
+  if ("Approved" in value) return "Approved";
+  if ("Hidden" in value) return "Hidden";
+  return "Open";
+}
+
 function fromRawCollectionBrowseCoverage(
   value: RawCollectionBrowseCoverage,
 ): CollectionBrowseCoverage {
@@ -1966,6 +2037,30 @@ function fromRawCollectionImportMetaPage(
 ): CollectionImportMetaPage {
   return {
     metas: value.metas.map(fromRawCollectionImportMeta),
+    nextCursor: fromRawOption(value.nextCursor),
+    totalCount: value.totalCount,
+  };
+}
+
+function fromRawNFTReportMeta(value: RawNFTReportMeta): NFTReportMeta {
+  return {
+    collectionId: value.collectionId,
+    tokenId: value.tokenId,
+    status: fromRawNFTReportStatus(value.status),
+    reportCount: value.reportCount,
+    createdAt: value.createdAt,
+    lastReportedAt: fromRawOption(value.lastReportedAt),
+    lastReportReason: fromRawOption(value.lastReportReason),
+    reviewedAt: fromRawOption(value.reviewedAt),
+    reviewedBy: fromRawOption(value.reviewedBy),
+  };
+}
+
+function fromRawNFTReportMetaPage(
+  value: RawNFTReportMetaPage,
+): NFTReportMetaPage {
+  return {
+    reports: value.reports.map(fromRawNFTReportMeta),
     nextCursor: fromRawOption(value.nextCursor),
     totalCount: value.totalCount,
   };
@@ -2861,6 +2956,15 @@ function fromCollectionImportMetaResult(
   return { __kind__: "err", err: value.err };
 }
 
+function fromNFTReportMetaResult(
+  value: { ok: RawNFTReportMeta } | { err: string },
+): { __kind__: "ok"; ok: NFTReportMeta } | { __kind__: "err"; err: string } {
+  if ("ok" in value) {
+    return { __kind__: "ok", ok: fromRawNFTReportMeta(value.ok) };
+  }
+  return { __kind__: "err", err: value.err };
+}
+
 function fromCollectionCanisterControllersResult(
   value: { ok: RawCollectionCanisterControllers } | { err: string },
 ):
@@ -3200,6 +3304,19 @@ export class Backend implements backendInterface {
     );
   }
 
+  async adminApproveNFTReport(
+    collectionId: CollectionId,
+    tokenId: string,
+  ): Promise<
+    { __kind__: "ok"; ok: NFTReportMeta } | { __kind__: "err"; err: string }
+  > {
+    return fromNFTReportMetaResult(
+      await this.run(() =>
+        this.actor.adminApproveNFTReport(collectionId, tokenId),
+      ),
+    );
+  }
+
   async adminDeleteCollectionCreationRequest(
     requestId: bigint,
   ): Promise<
@@ -3278,6 +3395,19 @@ export class Backend implements backendInterface {
   > {
     return fromCollectionImportMetaResult(
       await this.run(() => this.actor.adminHideCollection(collectionId)),
+    );
+  }
+
+  async adminHideNFTReport(
+    collectionId: CollectionId,
+    tokenId: string,
+  ): Promise<
+    { __kind__: "ok"; ok: NFTReportMeta } | { __kind__: "err"; err: string }
+  > {
+    return fromNFTReportMetaResult(
+      await this.run(() =>
+        this.actor.adminHideNFTReport(collectionId, tokenId),
+      ),
     );
   }
 
@@ -4099,6 +4229,15 @@ export class Backend implements backendInterface {
     );
   }
 
+  async listNFTReportMetasPage(
+    cursor: bigint | null,
+    limit: bigint | null,
+  ): Promise<NFTReportMetaPage> {
+    return fromRawNFTReportMetaPage(
+      await this.run(() => this.actor.listNFTReportMetasPage(cursor, limit)),
+    );
+  }
+
   async listCollections(): Promise<Array<Collection>> {
     const collections: Array<Collection> = [];
     let cursor: bigint | null = null;
@@ -4380,6 +4519,18 @@ export class Backend implements backendInterface {
   > {
     return fromCollectionImportMetaResult(
       await this.run(() => this.actor.reportCollection(collectionId, reason)),
+    );
+  }
+
+  async reportNFT(
+    collectionId: CollectionId,
+    tokenId: string,
+    reason: string,
+  ): Promise<
+    { __kind__: "ok"; ok: NFTReportMeta } | { __kind__: "err"; err: string }
+  > {
+    return fromNFTReportMetaResult(
+      await this.run(() => this.actor.reportNFT(collectionId, tokenId, reason)),
     );
   }
 

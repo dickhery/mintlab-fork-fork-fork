@@ -2570,8 +2570,6 @@ function CollectionSection({
                 0n
               }
               index={i}
-              onReport={() => onReportNFT(collection, nft)}
-              reportLabel={`Report ${getNFTDisplayName(nft, collection)}`}
               onClick={() => setDetailNft(nft)}
               data-ocid={`wallet.nft.item.${sectionIndex * 100 + i + 1}`}
             />
@@ -2905,8 +2903,9 @@ export default function WalletPage() {
       nft: WalletNFT;
     }) => {
       if (!actor) throw new Error("Backend not connected");
-      const result = await actor.reportCollection(
+      const result = await actor.reportNFT(
         collection.id,
+        nft.tokenId,
         `Wallet report for ${getNFTTokenLabel(nft)} in ${collection.name}`,
       );
       if (result.__kind__ === "err") throw new Error(result.err);
@@ -2917,7 +2916,11 @@ export default function WalletPage() {
       void queryClient.invalidateQueries({
         queryKey: ["collectionImportMetas"],
       });
+      void queryClient.invalidateQueries({ queryKey: ["nftReportMetas"] });
       void queryClient.invalidateQueries({ queryKey: ["collections"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["activeListingDetails"],
+      });
     },
     onError: (err: Error) => toast.error(`Report failed: ${err.message}`),
   });

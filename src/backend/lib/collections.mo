@@ -3,16 +3,35 @@ import Iter "mo:core/Iter";
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
 import Principal "mo:core/Principal";
+import Text "mo:core/Text";
 import Time "mo:core/Time";
 import Types "../types/collections";
 
 module {
+  let NFT_AUTO_HIDE_REPORT_THRESHOLD : Nat = 4;
+
   public type CollectionsState = {
     collections : Map.Map<Types.CollectionId, Types.Collection>;
     var importMetas : ?Map.Map<Types.CollectionId, Types.CollectionImportMeta>;
     var importsByUser : ?Map.Map<Principal, [Types.CollectionId]>;
     var lastImportAtByUser : ?Map.Map<Principal, Int>;
     var nextId : Nat;
+  };
+
+  public type NFTReportRecord = {
+    collectionId : Types.CollectionId;
+    tokenId : Text;
+    reporters : [Principal];
+    status : Types.NFTReportStatus;
+    createdAt : Int;
+    lastReportedAt : ?Int;
+    lastReportReason : ?Text;
+    reviewedAt : ?Int;
+    reviewedBy : ?Principal;
+  };
+
+  public type NFTModerationState = {
+    reports : Map.Map<Text, NFTReportRecord>;
   };
 
   public func newState() : CollectionsState {
@@ -22,6 +41,12 @@ module {
       var importsByUser = ?Map.empty<Principal, [Types.CollectionId]>();
       var lastImportAtByUser = ?Map.empty<Principal, Int>();
       var nextId = 1;
+    };
+  };
+
+  public func newNFTModerationState() : NFTModerationState {
+    {
+      reports = Map.empty<Text, NFTReportRecord>();
     };
   };
 
@@ -415,6 +440,166 @@ module {
     };
   };
 
+  public func getNFTReportMeta(
+    state : NFTModerationState,
+    collectionId : Types.CollectionId,
+    tokenId : Text,
+  ) : ?Types.NFTReportMeta {
+    switch (Map.get(state.reports, Text.compare, nftReportKey(collectionId, tokenId))) {
+      case (?record) ?toNFTReportMeta(record);
+      case null null;
+    };
+  };
+
+  public func getNFTReportMetasPage(
+    state : NFTModerationState,
+    cursor : ?Nat,
+    limit : Nat,
+  ) : Types.NFTReportMetaPage {
+    let start = switch (cursor) {
+      case (?value) value;
+      case null 0;
+    };
+    let pageSize = normalizePageLimit(limit);
+    var reports : [Types.NFTReportMeta] = [];
+    var index : Nat = 0;
+    var added : Nat = 0;
+    for ((_, record) in Map.entries(state.reports)) {
+      if (index < start) {
+        index += 1;
+      } else if (added < pageSize) {
+        reports := Array.concat<Types.NFTReportMeta>(reports, [toNFTReportMeta(record)]);
+        added += 1;
+        index += 1;
+      } else {
+        index += 1;
+      };
+    };
+    let next = start + added;
+    {
+      reports;
+      nextCursor = if (next < index) ?next else null;
+      totalCount = index;
+    };
+  };
+
+  public func reportNFT(
+    state : NFTModerationState,
+    collectionId : Types.CollectionId,
+    tokenId : Text,
+    reporter : Principal,
+    reason : Text,
+  ) : Types.NFTReportMeta {
+    let key = nftReportKey(collectionId, tokenId);
+    let now = Time.now();
+    let updated = switch (Map.get(state.reports, Text.compare, key)) {
+      case (?current) {
+        if (
+          current.status == #Approved or
+          current.status == #AutoHidden or
+          current.status == #Hidden
+        ) {
+          current;
+        } else if (containsPrincipal(current.reporters, reporter)) {
+          current;
+        } else {
+          let reporters = Array.concat<Principal>(current.reporters, [reporter]);
+          {
+            current with
+            reporters;
+            status = if (reporters.size() >= NFT_AUTO_HIDE_REPORT_THRESHOLD) #AutoHidden else current.status;
+            lastReportedAt = ?now;
+            lastReportReason = ?reason;
+          };
+        };
+      };
+      case null {
+        {
+          collectionId;
+          tokenId;
+          reporters = [reporter];
+          status = #Open;
+          createdAt = now;
+          lastReportedAt = ?now;
+          lastReportReason = ?reason;
+          reviewedAt = null;
+          reviewedBy = null;
+        };
+      };
+    };
+    Map.add(state.reports, Text.compare, key, updated);
+    toNFTReportMeta(updated);
+  };
+
+  public func setNFTReportStatus(
+    state : NFTModerationState,
+    collectionId : Types.CollectionId,
+    tokenId : Text,
+    status : Types.NFTReportStatus,
+    reviewer : Principal,
+  ) : ?Types.NFTReportMeta {
+    let key = nftReportKey(collectionId, tokenId);
+    let current = switch (Map.get(state.reports, Text.compare, key)) {
+      case (?record) record;
+      case null return null;
+    };
+    let updated : NFTReportRecord = {
+      current with
+      status;
+      reviewedAt = ?Time.now();
+      reviewedBy = ?reviewer;
+    };
+    Map.add(state.reports, Text.compare, key, updated);
+    ?toNFTReportMeta(updated);
+  };
+
+  public func isNFTPubliclyVisible(
+    state : NFTModerationState,
+    collectionId : Types.CollectionId,
+    tokenId : Text,
+  ) : Bool {
+    switch (Map.get(state.reports, Text.compare, nftReportKey(collectionId, tokenId))) {
+      case (?record) record.status != #AutoHidden and record.status != #Hidden;
+      case null true;
+    };
+  };
+
+  public func canViewerSeeNFT(
+    state : NFTModerationState,
+    nft : { collectionId : Types.CollectionId; tokenId : Text; owner : Principal },
+    viewer : Principal,
+    viewerIsAdmin : Bool,
+  ) : Bool {
+    isNFTPubliclyVisible(state, nft.collectionId, nft.tokenId) or
+    viewerIsAdmin or
+    Principal.equal(nft.owner, viewer);
+  };
+
+  public func hiddenNFTCountForCollection(
+    state : NFTModerationState,
+    collectionId : Types.CollectionId,
+  ) : Nat {
+    var count : Nat = 0;
+    for ((_, record) in Map.entries(state.reports)) {
+      if (
+        record.collectionId == collectionId and
+        (record.status == #AutoHidden or record.status == #Hidden)
+      ) {
+        count += 1;
+      };
+    };
+    count;
+  };
+
+  public func visibleNFTTotal(
+    state : NFTModerationState,
+    collectionId : Types.CollectionId,
+    totalCount : Nat,
+  ) : Nat {
+    let hiddenCount = hiddenNFTCountForCollection(state, collectionId);
+    if (hiddenCount >= totalCount) 0 else totalCount - hiddenCount;
+  };
+
   public func findExternalCollectionByCanister(
     state : CollectionsState,
     canisterId : Principal,
@@ -459,6 +644,33 @@ module {
       };
     };
     Array.concat<Nat>(values, [value]);
+  };
+
+  func containsPrincipal(values : [Principal], value : Principal) : Bool {
+    for (existing in values.values()) {
+      if (Principal.equal(existing, value)) {
+        return true;
+      };
+    };
+    false;
+  };
+
+  func nftReportKey(collectionId : Types.CollectionId, tokenId : Text) : Text {
+    Nat.toText(collectionId) # ":" # tokenId;
+  };
+
+  func toNFTReportMeta(record : NFTReportRecord) : Types.NFTReportMeta {
+    {
+      collectionId = record.collectionId;
+      tokenId = record.tokenId;
+      status = record.status;
+      reportCount = record.reporters.size();
+      createdAt = record.createdAt;
+      lastReportedAt = record.lastReportedAt;
+      lastReportReason = record.lastReportReason;
+      reviewedAt = record.reviewedAt;
+      reviewedBy = record.reviewedBy;
+    };
   };
 
   public func findCollectionByCanister(

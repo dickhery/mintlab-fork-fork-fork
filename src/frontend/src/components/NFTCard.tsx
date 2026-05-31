@@ -3,7 +3,7 @@ import { nftCustodyClass, nftCustodyLabel } from "@/lib/nft-custody";
 import { getNFTDisplayName } from "@/lib/nft-display";
 import { cn } from "@/lib/utils";
 import type { Collection, CollectionTrustStatus, WalletNFT } from "@/types";
-import { Flag, ImageOff } from "lucide-react";
+import { ImageOff } from "lucide-react";
 import { motion } from "motion/react";
 import { CollectionBadge } from "./CollectionBadge";
 import { DividendBalanceBadge } from "./DividendBalanceBadge";
@@ -18,8 +18,6 @@ interface NFTCardProps {
   trustStatus?: CollectionTrustStatus | null;
   isAuction?: boolean;
   isListed?: boolean;
-  onReport?: () => void;
-  reportLabel?: string;
   onClick?: () => void;
   index?: number;
   "data-ocid"?: string;
@@ -33,8 +31,6 @@ export function NFTCard({
   trustStatus,
   isAuction,
   isListed = false,
-  onReport,
-  reportLabel = "Report NFT",
   onClick,
   index = 0,
   "data-ocid": dataOcid,
@@ -76,20 +72,6 @@ export function NFTCard({
           <Badge className="absolute top-2 right-2 bg-accent/90 text-accent-foreground text-xs font-mono">
             AUCTION
           </Badge>
-        )}
-        {onReport && (
-          <button
-            type="button"
-            className="absolute left-2 top-2 flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 bg-card/85 text-muted-foreground opacity-0 shadow-sm backdrop-blur-sm transition-opacity hover:text-foreground group-hover:opacity-100 focus:opacity-100"
-            title={reportLabel}
-            aria-label={reportLabel}
-            onClick={(event) => {
-              event.stopPropagation();
-              onReport();
-            }}
-          >
-            <Flag className="h-4 w-4" />
-          </button>
         )}
       </div>
 

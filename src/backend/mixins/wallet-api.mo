@@ -27,6 +27,7 @@ mixin (
   marketplaceListingLockState : MarketplaceLib.MarketplaceListingLockState,
   mintState : MintLib.MintState,
   authState : AuthLib.AdminState,
+  nftModerationState : CollectionLib.NFTModerationState,
   transactionState : TransactionsLib.TransactionState,
   canisterId : Principal,
 ) {
@@ -2164,7 +2165,10 @@ mixin (
       switch (CollectionLib.getCollection(collectionsState, nft.collectionId)) {
         case null {};
         case (?collection) {
-          if (CollectionLib.canViewerSeeCollection(collectionsState, collection, viewer, isAdmin)) {
+          if (
+            CollectionLib.canViewerSeeCollection(collectionsState, collection, viewer, isAdmin) and
+            CollectionLib.canViewerSeeNFT(nftModerationState, nft, viewer, isAdmin)
+          ) {
             visible := Array.concat<WalletTypes.WalletNFT>(visible, [nft]);
           };
         };

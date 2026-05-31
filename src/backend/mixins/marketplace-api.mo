@@ -40,6 +40,7 @@ mixin (
   moderationState : MintLib.ModerationState,
   collectionsState : CollectionsLib.CollectionsState,
   authState : AuthLib.AdminState,
+  nftModerationState : CollectionsLib.NFTModerationState,
   transactionState : TransactionsLib.TransactionState,
   canisterId : Principal,
 ) {
@@ -479,6 +480,9 @@ mixin (
     if (not CollectionsLib.isMarketplaceAllowed(collectionsState, collection)) {
       Runtime.trap("This collection is hidden or blocked and cannot be listed on the marketplace.");
     };
+    if (not CollectionsLib.isNFTPubliclyVisible(nftModerationState, nft.collectionId, nft.tokenId)) {
+      Runtime.trap("This NFT is hidden while admins review user reports.");
+    };
   };
 
   func ensureListingCollectionCanTrade(listingId : MarketplaceTypes.ListingId) {
@@ -492,6 +496,9 @@ mixin (
     };
     if (not CollectionsLib.isMarketplaceAllowed(collectionsState, collection)) {
       Runtime.trap("This listing is hidden while the collection is reviewed.");
+    };
+    if (not CollectionsLib.isNFTPubliclyVisible(nftModerationState, nft.collectionId, nft.tokenId)) {
+      Runtime.trap("This listing is hidden while the NFT is reviewed.");
     };
   };
 
@@ -1299,12 +1306,14 @@ mixin (
     switch (CollectionsLib.getCollection(collectionsState, nft.collectionId)) {
       case null false;
       case (?collection) {
+        let isAdmin = AuthLib.isAdmin(authState, viewer);
         CollectionsLib.canViewerSeeCollection(
           collectionsState,
           collection,
           viewer,
-          AuthLib.isAdmin(authState, viewer),
-        );
+          isAdmin,
+        ) and
+        CollectionsLib.canViewerSeeNFT(nftModerationState, nft, viewer, isAdmin);
       };
     };
   };

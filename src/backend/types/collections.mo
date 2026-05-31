@@ -12,6 +12,12 @@ module {
     #NeedsBrowseInfo;
     #Reported;
   };
+  public type NFTReportStatus = {
+    #Open;
+    #AutoHidden;
+    #Approved;
+    #Hidden;
+  };
   public type CollectionDividendConfig = {
     enabled : Bool;
   };
@@ -52,6 +58,24 @@ module {
 
   public type CollectionImportMetaPage = {
     metas : [CollectionImportMeta];
+    nextCursor : ?Nat;
+    totalCount : Nat;
+  };
+
+  public type NFTReportMeta = {
+    collectionId : CollectionId;
+    tokenId : Text;
+    status : NFTReportStatus;
+    reportCount : Nat;
+    createdAt : Int;
+    lastReportedAt : ?Int;
+    lastReportReason : ?Text;
+    reviewedAt : ?Int;
+    reviewedBy : ?Principal;
+  };
+
+  public type NFTReportMetaPage = {
+    reports : [NFTReportMeta];
     nextCursor : ?Nat;
     totalCount : Nat;
   };

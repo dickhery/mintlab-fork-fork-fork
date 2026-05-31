@@ -59,6 +59,28 @@ export const idlFactory = ({ IDL }) => {
     'nextCursor' : IDL.Opt(IDL.Nat),
     'totalCount' : IDL.Nat,
   });
+  const NFTReportStatus = IDL.Variant({
+    'Open' : IDL.Null,
+    'AutoHidden' : IDL.Null,
+    'Approved' : IDL.Null,
+    'Hidden' : IDL.Null,
+  });
+  const NFTReportMeta = IDL.Record({
+    'collectionId' : CollectionId,
+    'tokenId' : IDL.Text,
+    'status' : NFTReportStatus,
+    'reviewedAt' : IDL.Opt(IDL.Int),
+    'createdAt' : IDL.Int,
+    'lastReportReason' : IDL.Opt(IDL.Text),
+    'lastReportedAt' : IDL.Opt(IDL.Int),
+    'reportCount' : IDL.Nat,
+    'reviewedBy' : IDL.Opt(IDL.Principal),
+  });
+  const NFTReportMetaPage = IDL.Record({
+    'reports' : IDL.Vec(NFTReportMeta),
+    'nextCursor' : IDL.Opt(IDL.Nat),
+    'totalCount' : IDL.Nat,
+  });
   const CollectionCanisterControllers = IDL.Record({
     'controllers' : IDL.Vec(IDL.Principal),
     'collectionId' : CollectionId,
@@ -961,6 +983,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : CollectionImportMeta, 'err' : IDL.Text })],
         [],
       ),
+    'adminApproveNFTReport' : IDL.Func(
+        [CollectionId, IDL.Text],
+        [IDL.Variant({ 'ok' : NFTReportMeta, 'err' : IDL.Text })],
+        [],
+      ),
     'adminDeleteCollectionCreationRequest' : IDL.Func(
         [IDL.Nat],
         [IDL.Variant({ 'ok' : IDL.Bool, 'err' : IDL.Text })],
@@ -984,6 +1011,11 @@ export const idlFactory = ({ IDL }) => {
     'adminHideCollection' : IDL.Func(
         [CollectionId],
         [IDL.Variant({ 'ok' : CollectionImportMeta, 'err' : IDL.Text })],
+        [],
+      ),
+    'adminHideNFTReport' : IDL.Func(
+        [CollectionId, IDL.Text],
+        [IDL.Variant({ 'ok' : NFTReportMeta, 'err' : IDL.Text })],
         [],
       ),
     'adminListMarketplaceRecoveryState' : IDL.Func(
@@ -1471,6 +1503,11 @@ export const idlFactory = ({ IDL }) => {
         [CollectionImportMetaPage],
         ['query'],
       ),
+    'listNFTReportMetasPage' : IDL.Func(
+        [IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
+        [NFTReportMetaPage],
+        ['query'],
+      ),
     'listCollections' : IDL.Func([], [IDL.Vec(Collection)], ['query']),
     'listCollectionsPage' : IDL.Func(
         [IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
@@ -1604,6 +1641,11 @@ export const idlFactory = ({ IDL }) => {
     'reportCollection' : IDL.Func(
         [CollectionId, IDL.Text],
         [IDL.Variant({ 'ok' : CollectionImportMeta, 'err' : IDL.Text })],
+        [],
+      ),
+    'reportNFT' : IDL.Func(
+        [CollectionId, IDL.Text, IDL.Text],
+        [IDL.Variant({ 'ok' : NFTReportMeta, 'err' : IDL.Text })],
         [],
       ),
     'setCollectionCanisterWasm' : IDL.Func([IDL.Vec(IDL.Nat8)], [], []),

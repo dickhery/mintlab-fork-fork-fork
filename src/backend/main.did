@@ -300,6 +300,31 @@ type NFTStandard =
    ICRC7;
    Other: text;
  };
+type NFTReportStatus =
+ variant {
+   Approved;
+   AutoHidden;
+   Hidden;
+   Open;
+ };
+type NFTReportMetaPage =
+ record {
+   nextCursor: opt nat;
+   reports: vec NFTReportMeta;
+   totalCount: nat;
+ };
+type NFTReportMeta =
+ record {
+   collectionId: CollectionId;
+   createdAt: int;
+   lastReportReason: opt text;
+   lastReportedAt: opt int;
+   reportCount: nat;
+   reviewedAt: opt int;
+   reviewedBy: opt principal;
+   status: NFTReportStatus;
+   tokenId: text;
+ };
 type NFTMetadata = 
  record {
    attributes: vec record {
@@ -1089,6 +1114,11 @@ service : {
                     err: text;
                     ok: CollectionCanisterControllers;
                   });
+  adminApproveNFTReport: (collectionId: CollectionId, tokenId: text) ->
+   (variant {
+      err: text;
+      ok: NFTReportMeta;
+    });
   adminAttachExistingCanisterToCreationRequest: (requestId: nat,
    childCanisterId: principal) ->
    (variant {
@@ -1118,6 +1148,11 @@ service : {
    (variant {
       err: text;
       ok: CollectionImportMeta;
+    });
+  adminHideNFTReport: (collectionId: CollectionId, tokenId: text) ->
+   (variant {
+      err: text;
+      ok: NFTReportMeta;
     });
   adminListMarketplaceRecoveryState: () ->
    (MarketplaceRecoverySnapshot) query;
@@ -1370,6 +1405,8 @@ service : {
   listCollections: () -> (vec Collection) query;
   listCollectionsPage: (cursor: opt nat, limit: opt nat) ->
    (CollectionPage) query;
+  listNFTReportMetasPage: (cursor: opt nat, limit: opt nat) ->
+   (NFTReportMetaPage) query;
   lookupCollectionNFT: (collectionId: CollectionId, tokenId: text) ->
    (variant {
       err: text;
@@ -1446,6 +1483,11 @@ service : {
    (variant {
       err: text;
       ok: CollectionImportMeta;
+    });
+  reportNFT: (collectionId: CollectionId, tokenId: text, reason: text) ->
+   (variant {
+      err: text;
+      ok: NFTReportMeta;
     });
   retryAuctionRefund: (escrowId: nat) -> (MarketplaceActionResult);
   retryCollectionCreationRequest: (requestId: nat) ->

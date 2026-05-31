@@ -7,24 +7,28 @@ import WalletLib "../lib/wallet";
 import IcpLib "../lib/icp";
 import MarketplaceLib "../lib/marketplace";
 import MintLib "../lib/mint";
+import AuthLib "../lib/auth";
 import CollectionLib "../lib/collections";
 import NFTStandards "../lib/nft-standards";
 import BrowseTypes "../types/browse";
 import WalletTypes "../types/wallet";
 import CollectionTypes "../types/collections";
+import MintTypes "../types/mint";
 
 mixin (
   walletState : WalletLib.WalletState,
   collectionsState : CollectionLib.CollectionsState,
   marketplaceState : MarketplaceLib.MarketplaceState,
   mintState : MintLib.MintState,
+  authState : AuthLib.AdminState,
+  nftModerationState : CollectionLib.NFTModerationState,
   canisterId : Principal,
 ) {
   let DEFAULT_COLLECTION_PAGE_SIZE : Nat = 24;
   let MAX_COLLECTION_PAGE_SIZE : Nat = 40;
   let MAX_RICH_METADATA_PAGE_SIZE : Nat = 8;
 
-  public func getCollectionBrowseStats(
+  public shared ({ caller }) func getCollectionBrowseStats(
     collectionId : CollectionTypes.CollectionId
   ) : async BrowseTypes.CollectionBrowseStats {
     let collection = switch (CollectionLib.getCollection(collectionsState, collectionId)) {
@@ -39,10 +43,10 @@ mixin (
       };
       case (?value) value;
     };
-    await* loadCollectionBrowseStats(collection);
+    await* loadCollectionBrowseStats(collection, caller);
   };
 
-  public func getCollectionNFTPage(
+  public shared ({ caller }) func getCollectionNFTPage(
     collectionId : CollectionTypes.CollectionId,
     cursor : ?Text,
     limit : ?Nat,
@@ -59,10 +63,10 @@ mixin (
       };
       case (?value) value;
     };
-    await* loadCollectionNFTPage(collection, cursor, normalizeCollectionPageSize(collection, limit));
+    await* loadCollectionNFTPage(collection, cursor, normalizeCollectionPageSize(collection, limit), caller);
   };
 
-  public func getCollectionNFTs(
+  public shared ({ caller }) func getCollectionNFTs(
     collectionId : CollectionTypes.CollectionId,
   ) : async [WalletTypes.WalletNFT] {
     let collection = switch (CollectionLib.getCollection(collectionsState, collectionId)) {
@@ -78,6 +82,7 @@ mixin (
         collection,
         null,
         normalizeCollectionPageSize(collection, ?MAX_COLLECTION_PAGE_SIZE),
+        caller,
       );
       return page.nfts;
     };
@@ -87,6 +92,7 @@ mixin (
         collection,
         cursor,
         normalizeCollectionPageSize(collection, ?MAX_COLLECTION_PAGE_SIZE),
+        caller,
       );
       allNFTs := Array.concat<WalletTypes.WalletNFT>(allNFTs, page.nfts);
       switch (page.nextCursor) {
@@ -98,14 +104,19 @@ mixin (
     allNFTs;
   };
 
-  public query func getCollectionNFT(
+  public shared query ({ caller }) func getCollectionNFT(
     collectionId : CollectionTypes.CollectionId,
     tokenId : Text,
   ) : async ?WalletTypes.WalletNFT {
-    knownCollectionNFT(collectionId, tokenId);
+    switch (knownCollectionNFT(collectionId, tokenId)) {
+      case (?nft) {
+        if (viewerCanSeeNFT(nft, caller)) ?nft else null;
+      };
+      case null null;
+    };
   };
 
-  public func lookupCollectionNFT(
+  public shared ({ caller }) func lookupCollectionNFT(
     collectionId : CollectionTypes.CollectionId,
     tokenId : Text,
   ) : async { #ok : ?WalletTypes.WalletNFT; #err : Text } {
@@ -114,7 +125,10 @@ mixin (
       return #err("Enter a token ID to search this collection");
     };
     switch (knownCollectionNFT(collectionId, requestedTokenId)) {
-      case (?nft) return #ok(?nft);
+      case (?nft) {
+        let visible = if (viewerCanSeeNFT(nft, caller)) ?nft else null;
+        return #ok(visible);
+      };
       case null {};
     };
     let collection = switch (CollectionLib.getCollection(collectionsState, collectionId)) {
@@ -138,20 +152,24 @@ mixin (
           ) {
             return #ok(null);
           };
-          return #ok(
-            ?resolveMintedCollectionNFT(
+          let nft = resolveMintedCollectionNFT(
               collection.id,
               Nat.toText(token.tokenId),
               token.owner,
               token.metadata,
               token.tokenId,
-            )
-          );
+            );
+          let visible = if (viewerCanSeeNFT(nft, caller)) ?nft else null;
+          return #ok(visible);
         };
       };
     };
     switch (await* WalletLib.previewCollectionNFT(collection, requestedTokenId)) {
-      case (#ok(nft)) #ok(?reconcileCollectionNFT(nft));
+      case (#ok(nft)) {
+        let reconciled = reconcileCollectionNFT(nft);
+        let visible = if (viewerCanSeeNFT(reconciled, caller)) ?reconciled else null;
+        #ok(visible);
+      };
       case (#err(message)) #err(message);
     };
   };
@@ -265,9 +283,11 @@ mixin (
   };
 
   func loadCollectionBrowseStats(
-    collection : CollectionTypes.Collection
+    collection : CollectionTypes.Collection,
+    viewer : Principal,
   ) : async* BrowseTypes.CollectionBrowseStats {
-    let visibleNFTs = visibleCollectionNFTs(collection.id);
+    let visibleNFTs = visibleCollectionNFTs(collection.id, viewer);
+    let viewerIsAdmin = AuthLib.isAdmin(authState, viewer);
     switch (collection.kind) {
       case (#Minted) {
         if (not Principal.equal(collection.canisterId, canisterId)) {
@@ -280,7 +300,7 @@ mixin (
                 return {
                   collectionId = collection.id;
                   totalCount = configuredTotal;
-                  visibleCount = configuredTotal;
+                  visibleCount = if (viewerIsAdmin) configuredTotal else CollectionLib.visibleNFTTotal(nftModerationState, collection.id, configuredTotal);
                   coverage = #Full;
                   note = "Mintlab can browse this dedicated ICRC-7 collection using the configured token range.";
                 };
@@ -297,20 +317,22 @@ mixin (
           return {
             collectionId = collection.id;
             totalCount;
-            visibleCount = totalCount;
+            visibleCount = if (viewerIsAdmin) totalCount else CollectionLib.visibleNFTTotal(nftModerationState, collection.id, totalCount);
             coverage = #Full;
             note = "Mintlab can browse this dedicated ICRC-7 collection canister directly.";
           };
         };
-        let totalCount = MintLib.tokensForCollection(
+        let tokens = MintLib.tokensForCollection(
           mintState,
           collection.id,
           MintLib.getConfig(mintState).collectionId,
-        ).size();
+        );
+        let totalCount = tokens.size();
+        let visibleCount = if (viewerIsAdmin) totalCount else countVisibleMintedTokens(collection.id, tokens, viewer);
         {
           collectionId = collection.id;
           totalCount;
-          visibleCount = totalCount;
+          visibleCount;
           coverage = #Full;
           note = "Mintlab can browse every NFT minted in this collection.";
         };
@@ -328,7 +350,7 @@ mixin (
                   {
                     collectionId = collection.id;
                     totalCount = configuredTotal;
-                    visibleCount = configuredTotal;
+                    visibleCount = if (viewerIsAdmin) configuredTotal else CollectionLib.visibleNFTTotal(nftModerationState, collection.id, configuredTotal);
                     coverage = #Full;
                     note = "Mintlab can browse the full ICRC-7 collection using the imported token range.";
                   };
@@ -345,7 +367,7 @@ mixin (
             {
               collectionId = collection.id;
               totalCount;
-              visibleCount = totalCount;
+              visibleCount = if (viewerIsAdmin) totalCount else CollectionLib.visibleNFTTotal(nftModerationState, collection.id, totalCount);
               coverage = #Full;
               note = "Mintlab can browse the full ICRC-7 collection directly from the collection canister.";
             };
@@ -356,7 +378,7 @@ mixin (
                 {
                   collectionId = collection.id;
                   totalCount;
-                  visibleCount = totalCount;
+                  visibleCount = if (viewerIsAdmin) totalCount else CollectionLib.visibleNFTTotal(nftModerationState, collection.id, totalCount);
                   coverage = #Full;
                   note = "Mintlab can browse the full EXT collection using the imported token range.";
                 };
@@ -376,7 +398,7 @@ mixin (
                 {
                   collectionId = collection.id;
                   totalCount;
-                  visibleCount = totalCount;
+                  visibleCount = if (viewerIsAdmin) totalCount else CollectionLib.visibleNFTTotal(nftModerationState, collection.id, totalCount);
                   coverage = #Full;
                   note = "Mintlab can browse the full DIP721 collection using the imported token range.";
                 };
@@ -406,18 +428,21 @@ mixin (
     collection : CollectionTypes.Collection,
     cursor : ?Text,
     limit : Nat,
+    viewer : Principal,
   ) : async* BrowseTypes.CollectionNFTPage {
     switch (collection.kind) {
-      case (#Minted) await* mintedCollectionPage(collection, cursor, limit);
+      case (#Minted) await* mintedCollectionPage(collection, cursor, limit, viewer);
       case (#External) {
         switch (await* WalletLib.previewCollectionNFTPage(collection, cursor, limit)) {
           case (#ok(page)) {
+            let reconciled = reconcileCollectionNFTs(page.nfts);
             {
               page with
-              nfts = reconcileCollectionNFTs(page.nfts);
+              nfts = filterNFTsForViewer(reconciled, viewer);
+              totalCount = if (AuthLib.isAdmin(authState, viewer)) page.totalCount else CollectionLib.visibleNFTTotal(nftModerationState, collection.id, page.totalCount);
             };
           };
-          case (#err(_)) partialCollectionPage(collection, cursor, limit);
+          case (#err(_)) partialCollectionPage(collection, cursor, limit, viewer);
         };
       };
     };
@@ -427,17 +452,20 @@ mixin (
     collection : CollectionTypes.Collection,
     cursor : ?Text,
     limit : Nat,
+    viewer : Principal,
   ) : async* BrowseTypes.CollectionNFTPage {
     if (not Principal.equal(collection.canisterId, canisterId)) {
       switch (await* WalletLib.previewCollectionNFTPage(collection, cursor, limit)) {
         case (#ok(page)) {
+          let reconciled = reconcileCollectionNFTs(page.nfts);
           return {
             page with
-            nfts = reconcileCollectionNFTs(page.nfts);
+            nfts = filterNFTsForViewer(reconciled, viewer);
+            totalCount = if (AuthLib.isAdmin(authState, viewer)) page.totalCount else CollectionLib.visibleNFTTotal(nftModerationState, collection.id, page.totalCount);
             note = "Mintlab can browse this dedicated ICRC-7 collection canister directly.";
           };
         };
-        case (#err(_)) return partialCollectionPage(collection, cursor, limit);
+        case (#err(_)) return partialCollectionPage(collection, cursor, limit, viewer);
       };
     };
     let previousTokenId = textToNatOrDefault(cursor, 0);
@@ -447,7 +475,7 @@ mixin (
       collection.id,
       MintLib.getConfig(mintState).collectionId,
     );
-    let totalCount = tokens.size();
+    let totalCount = countVisibleMintedTokens(collection.id, tokens, viewer);
     var pageNFTs : [WalletTypes.WalletNFT] = [];
     var pageCount : Nat = 0;
     var lastTokenId : ?Text = null;
@@ -457,22 +485,24 @@ mixin (
       if (token.tokenId <= previousTokenId) {
         continue;
       };
+      let tokenId = Nat.toText(token.tokenId);
+      let nft = resolveMintedCollectionNFT(
+        collection.id,
+        tokenId,
+        token.owner,
+        token.metadata,
+        token.tokenId,
+      );
+      if (not viewerCanSeeNFT(nft, viewer)) {
+        continue;
+      };
       if (pageCount >= pageSize) {
         hasMore := true;
         continue;
       };
-      let tokenId = Nat.toText(token.tokenId);
       pageNFTs := Array.concat<WalletTypes.WalletNFT>(
         pageNFTs,
-        [
-          resolveMintedCollectionNFT(
-            collection.id,
-            tokenId,
-            token.owner,
-            token.metadata,
-            token.tokenId,
-          ),
-        ],
+        [nft],
       );
       pageCount += 1;
       lastTokenId := ?tokenId;
@@ -491,8 +521,9 @@ mixin (
     collection : CollectionTypes.Collection,
     cursor : ?Text,
     limit : Nat,
+    viewer : Principal,
   ) : BrowseTypes.CollectionNFTPage {
-    let visibleNFTs = visibleCollectionNFTs(collection.id);
+    let visibleNFTs = visibleCollectionNFTs(collection.id, viewer);
     let start = textToNatOrDefault(cursor, 0);
     let pageSize = normalizePageSize(?limit);
     let pageNFTs = sliceNFTs(visibleNFTs, start, pageSize);
@@ -608,7 +639,8 @@ mixin (
   };
 
   func visibleCollectionNFTs(
-    collectionId : CollectionTypes.CollectionId
+    collectionId : CollectionTypes.CollectionId,
+    viewer : Principal,
   ) : [WalletTypes.WalletNFT] {
     var knownNFTs : [WalletTypes.WalletNFT] = [];
     for ((_, nft) in Map.entries(walletState.nfts)) {
@@ -616,13 +648,60 @@ mixin (
         knownNFTs := Array.concat<WalletTypes.WalletNFT>(knownNFTs, [browseEnrichKnownMintedNFT(nft)]);
       };
     };
-    browseMergeDistinctNFTs(
+    filterNFTsForViewer(
+      browseMergeDistinctNFTs(
       knownNFTs,
       MarketplaceLib.getActiveEscrowedNFTsByCollection(
         marketplaceState,
         collectionId,
       ),
+      ),
+      viewer,
     );
+  };
+
+  func filterNFTsForViewer(
+    nfts : [WalletTypes.WalletNFT],
+    viewer : Principal,
+  ) : [WalletTypes.WalletNFT] {
+    var visible : [WalletTypes.WalletNFT] = [];
+    for (nft in nfts.values()) {
+      if (viewerCanSeeNFT(nft, viewer)) {
+        visible := Array.concat<WalletTypes.WalletNFT>(visible, [nft]);
+      };
+    };
+    visible;
+  };
+
+  func viewerCanSeeNFT(nft : WalletTypes.WalletNFT, viewer : Principal) : Bool {
+    CollectionLib.canViewerSeeNFT(
+      nftModerationState,
+      nft,
+      viewer,
+      AuthLib.isAdmin(authState, viewer),
+    );
+  };
+
+  func countVisibleMintedTokens(
+    collectionId : CollectionTypes.CollectionId,
+    tokens : [MintTypes.MintedToken],
+    viewer : Principal,
+  ) : Nat {
+    var count : Nat = 0;
+    for (token in tokens.values()) {
+      let tokenId = Nat.toText(token.tokenId);
+      let nft = resolveMintedCollectionNFT(
+        collectionId,
+        tokenId,
+        token.owner,
+        token.metadata,
+        token.tokenId,
+      );
+      if (viewerCanSeeNFT(nft, viewer)) {
+        count += 1;
+      };
+    };
+    count;
   };
 
   func partialBrowseStats(

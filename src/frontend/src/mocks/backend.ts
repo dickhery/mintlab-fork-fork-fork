@@ -2,6 +2,7 @@ import type {
   backendInterface,
   Collection,
   CollectionImportMeta,
+  NFTReportMeta,
   WalletNFT,
   ActiveListing,
   ActiveListingDetail,
@@ -99,6 +100,8 @@ const sampleCollectionImportMetas: CollectionImportMeta[] =
       lastReportedAt: null,
       lastReportReason: null,
     }));
+
+const sampleNFTReportMetas: NFTReportMeta[] = [];
 
 const sampleNFTs: WalletNFT[] = [
   {
@@ -462,6 +465,32 @@ function mockCollectionMeta(
   );
 }
 
+function mockNFTReportMeta(
+  collectionId: bigint,
+  tokenId: string,
+  status: NFTReportMeta["status"],
+): NFTReportMeta {
+  return (
+    sampleNFTReportMetas.find(
+      (meta) => meta.collectionId === collectionId && meta.tokenId === tokenId,
+    ) ?? {
+      collectionId,
+      tokenId,
+      status,
+      reportCount: 1n,
+      createdAt: BigInt(Date.now()) * BigInt(1_000_000),
+      lastReportedAt: BigInt(Date.now()) * BigInt(1_000_000),
+      lastReportReason: null,
+      reviewedAt:
+        status === "Approved" || status === "Hidden"
+          ? BigInt(Date.now()) * BigInt(1_000_000)
+          : null,
+      reviewedBy:
+        status === "Approved" || status === "Hidden" ? samplePrincipal : null,
+    }
+  );
+}
+
 export const mockBackend: backendInterface = {
   getAgent: (): Agent => {
     throw new Error("Mock backend does not provide an authenticated agent");
@@ -492,6 +521,10 @@ export const mockBackend: backendInterface = {
     __kind__: "ok" as const,
     ok: mockCollectionMeta(collectionId, "Blocked"),
   }),
+  adminApproveNFTReport: async (collectionId, tokenId) => ({
+    __kind__: "ok" as const,
+    ok: mockNFTReportMeta(collectionId, tokenId, "Approved"),
+  }),
   adminDisableCollectionSync: async (collectionId) => ({
     __kind__: "ok" as const,
     ok: mockCollectionMeta(collectionId, "SyncDisabled"),
@@ -499,6 +532,10 @@ export const mockBackend: backendInterface = {
   adminHideCollection: async (collectionId) => ({
     __kind__: "ok" as const,
     ok: mockCollectionMeta(collectionId, "Hidden"),
+  }),
+  adminHideNFTReport: async (collectionId, tokenId) => ({
+    __kind__: "ok" as const,
+    ok: mockNFTReportMeta(collectionId, tokenId, "Hidden"),
   }),
   adminMarkCollectionNeedsBrowseInfo: async (collectionId) => ({
     __kind__: "ok" as const,
@@ -1146,6 +1183,14 @@ export const mockBackend: backendInterface = {
       totalCount: page.totalCount,
     };
   },
+  listNFTReportMetasPage: async (cursor, limit) => {
+    const page = paginateMock(sampleNFTReportMetas, cursor, limit);
+    return {
+      reports: page.items,
+      nextCursor: page.nextCursor,
+      totalCount: page.totalCount,
+    };
+  },
   listCollectionsPage: async (cursor, limit) => {
     const page = paginateMock(sampleCollections, cursor, limit);
     return {
@@ -1311,6 +1356,13 @@ export const mockBackend: backendInterface = {
       trustStatus: "Reported" as const,
       reportCount: 1n,
       lastReportedAt: BigInt(Date.now()) * BigInt(1_000_000),
+      lastReportReason: reason,
+    },
+  }),
+  reportNFT: async (collectionId, tokenId, reason) => ({
+    __kind__: "ok" as const,
+    ok: {
+      ...mockNFTReportMeta(collectionId, tokenId, "Open"),
       lastReportReason: reason,
     },
   }),

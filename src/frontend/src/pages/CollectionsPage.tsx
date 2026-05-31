@@ -1530,6 +1530,32 @@ function NFTDetailModal({
     },
   });
 
+  const reportMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("Backend not connected");
+      const result = await actor.reportNFT(
+        collection.id,
+        nft.tokenId,
+        `Collections page report for token #${nft.tokenId} in ${collection.name}`,
+      );
+      if (result.__kind__ === "err") throw new Error(result.err);
+      return result.ok;
+    },
+    onSuccess: () => {
+      toast.success("Report sent to Mintlab admins.");
+      void queryClient.invalidateQueries({ queryKey: ["nftReportMetas"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["collectionNFTPage", collection.id.toString()],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["activeListingDetails"],
+      });
+    },
+    onError: (err: unknown) => {
+      toast.error(`Report failed: ${extractError(err)}`);
+    },
+  });
+
   const nftName = nft.metadata.name ?? `#${nft.tokenId}`;
   const imageUrl = resolveImageUrl(nft.metadata.imageUrl, {
     canisterId: collection.canisterId.toString(),
@@ -1602,6 +1628,24 @@ function NFTDetailModal({
                     </Badge>
                   )}
                   <DividendBalanceBadge e8s={dividendE8s} size="md" />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1.5 text-xs"
+                    onClick={() => {
+                      if (!isAuthenticated) {
+                        toast("Sign in to report this NFT.");
+                        return;
+                      }
+                      reportMutation.mutate();
+                    }}
+                    disabled={reportMutation.isPending}
+                    data-ocid="collections.nft_detail.report_button"
+                  >
+                    <Flag className="h-3.5 w-3.5" />
+                    Report
+                  </Button>
                 </div>
               </DialogHeader>
 

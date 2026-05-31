@@ -22,6 +22,7 @@ persistent actor Backend {
   // ── Stable state ──────────────────────────────────────────────────────────
   let authState = AuthLib.newState();
   let collectionsState = CollectionsLib.newState();
+  let nftModerationState = CollectionsLib.newNFTModerationState();
   let mintState = MintLib.newState();
   let collectionCreationState = MintLib.newCollectionCreationState();
   let collectionCreationPayoutSplitState = MintLib.newCollectionCreationPayoutSplitState();
@@ -47,7 +48,7 @@ persistent actor Backend {
 
   // ── Mixin composition ─────────────────────────────────────────────────────
   include AuthApi(authState);
-  include CollectionsApi(collectionsState, authState, ownershipIndexState);
+  include CollectionsApi(collectionsState, nftModerationState, authState, ownershipIndexState);
   include MintApi(
     mintState,
     collectionCreationState,
@@ -70,6 +71,7 @@ persistent actor Backend {
     marketplaceListingLockState,
     mintState,
     authState,
+    nftModerationState,
     transactionState,
     Principal.fromActor(Backend),
   );
@@ -95,6 +97,7 @@ persistent actor Backend {
     moderationState,
     collectionsState,
     authState,
+    nftModerationState,
     transactionState,
     Principal.fromActor(Backend),
   );
@@ -117,6 +120,8 @@ persistent actor Backend {
     collectionsState,
     marketplaceState,
     mintState,
+    authState,
+    nftModerationState,
     Principal.fromActor(Backend),
   );
   include TransactionsApi(transactionState);
