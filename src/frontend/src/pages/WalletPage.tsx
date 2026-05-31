@@ -403,13 +403,13 @@ function RecentNFTTransactionRow({ tx }: { tx: RecentTransaction }) {
   const label = nftTransactionLabel(tx);
 
   return (
-    <div className="flex items-center gap-3 py-3">
+    <div className="flex min-w-0 items-center gap-3 overflow-hidden py-3">
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/40">
         {nftTransactionIcon(tx)}
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-2">
-          <p className="truncate text-sm font-medium text-foreground">
+      <div className="min-w-0 flex-1 overflow-hidden">
+        <div className="flex min-w-0 max-w-full items-center gap-2 overflow-hidden">
+          <p className="min-w-0 truncate text-sm font-medium text-foreground">
             {tx.title}
           </p>
           {tx.status !== "Completed" && (
@@ -421,14 +421,19 @@ function RecentNFTTransactionRow({ tx }: { tx: RecentTransaction }) {
             </Badge>
           )}
         </div>
-        <p className="truncate text-xs text-muted-foreground">{tx.detail}</p>
-        <p className="mt-1 text-[11px] text-muted-foreground">
+        <p
+          className="min-w-0 max-w-full truncate text-xs text-muted-foreground"
+          title={tx.detail}
+        >
+          {tx.detail}
+        </p>
+        <p className="mt-1 truncate text-[11px] text-muted-foreground">
           {formatTransactionTime(tx.occurredAt)}
         </p>
       </div>
       <Badge
         variant="secondary"
-        className="shrink-0 max-w-[112px] truncate font-mono text-[10px]"
+        className="max-w-[112px] shrink-0 overflow-hidden truncate font-mono text-[10px]"
         title={label}
       >
         {label}
@@ -443,12 +448,12 @@ function RecentNFTTransactionsCard({
 }: RecentNFTTransactionsCardProps) {
   return (
     <Card
-      className="border-border/50 bg-card shadow-sm"
+      className="min-w-0 overflow-hidden border-border/50 bg-card shadow-sm"
       data-ocid="wallet.recent_nft_transactions_card"
     >
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center justify-between text-sm font-medium text-muted-foreground uppercase tracking-wider">
-          <span className="flex items-center gap-2">
+      <CardHeader className="min-w-0 pb-3">
+        <CardTitle className="flex min-w-0 items-center justify-between text-sm font-medium text-muted-foreground uppercase tracking-wider">
+          <span className="flex min-w-0 items-center gap-2">
             <History className="h-4 w-4 text-accent" />
             NFT Activity
           </span>
@@ -459,21 +464,28 @@ function RecentNFTTransactionsCard({
           )}
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="min-w-0 overflow-hidden">
         {isLoading ? (
           <div
-            className="grid gap-0 md:grid-cols-2 md:gap-x-6"
+            className="grid min-w-0 gap-0 overflow-hidden md:grid-cols-2 md:gap-x-6"
             data-ocid="wallet.nft_transactions_loading_state"
           >
             {[0, 1, 2, 3].map((row) => (
-              <div key={row} className={row > 1 ? "hidden md:block" : ""}>
-                <div className="flex items-center gap-3 py-3">
+              <div
+                key={row}
+                className={
+                  row > 1
+                    ? "hidden min-w-0 overflow-hidden md:block"
+                    : "min-w-0 overflow-hidden"
+                }
+              >
+                <div className="flex min-w-0 items-center gap-3 overflow-hidden py-3">
                   <Skeleton className="h-9 w-9 rounded-md" />
                   <div className="min-w-0 flex-1 space-y-2">
                     <Skeleton className="h-4 w-32" />
                     <Skeleton className="h-3 w-56 max-w-full" />
                   </div>
-                  <Skeleton className="h-5 w-16 rounded-full" />
+                  <Skeleton className="h-5 w-16 shrink-0 rounded-full" />
                 </div>
               </div>
             ))}
@@ -488,7 +500,7 @@ function RecentNFTTransactionsCard({
           </div>
         ) : (
           <div
-            className="grid gap-0 md:grid-cols-2 md:gap-x-6"
+            className="grid min-w-0 gap-0 overflow-hidden md:grid-cols-2 md:gap-x-6"
             data-ocid="wallet.nft_transactions_list"
           >
             {transactions.map((tx, index) => (
@@ -496,10 +508,10 @@ function RecentNFTTransactionsCard({
                 key={tx.id.toString()}
                 className={
                   index === 0
-                    ? ""
+                    ? "min-w-0 overflow-hidden"
                     : index === 1
-                      ? "border-t border-border/50 md:border-t-0"
-                      : "border-t border-border/50"
+                      ? "min-w-0 overflow-hidden border-t border-border/50 md:border-t-0"
+                      : "min-w-0 overflow-hidden border-t border-border/50"
                 }
               >
                 <RecentNFTTransactionRow tx={tx} />
