@@ -1016,7 +1016,7 @@ mixin (
         };
 
         if (shouldRunSelectedScan) {
-          let appAccountSynced = await* syncMintlabAppAccountCollection(caller, collection);
+          let appAccountSynced = await* syncMintlabAppAccountCollection(caller, collection, #Always, true);
           newCount += appAccountSynced.newCount;
           if (appAccountSynced.foundCount > 0) {
             shouldRunSelectedScan := false;
@@ -1553,7 +1553,7 @@ mixin (
             );
           };
         };
-        let appAccountSynced = await* syncMintlabAppAccountCollection(caller, collection);
+        let appAccountSynced = await* syncMintlabAppAccountCollection(caller, collection, #WhenBalancePositive, false);
         newCount += appAccountSynced.newCount;
       };
     };
@@ -1948,16 +1948,38 @@ mixin (
   func syncMintlabAppAccountCollection(
     caller : Principal,
     collection : CollectionTypes.Collection,
+    icrc7ScanMode : WalletLib.ICRC7OwnerScanMode,
+    allowEXTRegistryFallback : Bool,
   ) : async* { newCount : Nat; foundCount : Nat } {
     switch (collection.standard) {
       case (#EXT) {
         let appAccountId = mintlabUserAccountId(caller);
+        let directPreview = await* WalletLib.previewEXTAccountNFTsFromOwnerIndex(
+          collection,
+          caller,
+          appAccountId,
+          #Vaulted,
+        );
+        switch (directPreview) {
+          case (#ok(nfts)) {
+            if (nfts.size() > 0 or not allowEXTRegistryFallback) {
+              let registered = registerPreviewNFTs(caller, collection, nfts, #Vaulted);
+              return { newCount = registered.newCount; foundCount = nfts.size() };
+            };
+          };
+          case (#err(_)) {
+            if (not allowEXTRegistryFallback) {
+              return { newCount = 0; foundCount = 0 };
+            };
+          };
+        };
         switch (
-          await* WalletLib.previewEXTAccountNFTsFromOwnerIndex(
+          await* WalletLib.previewEXTAccountNFTsFromRegistryBounded(
             collection,
-            canisterId,
+            caller,
             appAccountId,
             #Vaulted,
+            EXT_SELECTED_REGISTRY_SYNC_MAX_ENTRIES,
           )
         ) {
           case (#err(_)) return { newCount = 0; foundCount = 0 };
@@ -1975,6 +1997,7 @@ mixin (
             caller,
             appAccount,
             #Vaulted,
+            icrc7ScanMode,
           )
         ) {
           case (#err(_)) return { newCount = 0; foundCount = 0 };

@@ -44,6 +44,12 @@ module {
     error : ?Text;
   };
 
+  public type ICRC7OwnerScanMode = {
+    #Never;
+    #WhenBalancePositive;
+    #Always;
+  };
+
   public func newState() : WalletState {
     {
       nfts = Map.empty<Types.NFTId, Types.WalletNFT>();
@@ -706,7 +712,7 @@ module {
 
   public func previewEXTAccountNFTsFromOwnerIndex(
     collection : CollectionTypes.Collection,
-    owner : Principal,
+    walletOwner : Principal,
     accountId : Blob,
     location : Types.WalletLocation,
   ) : async* { #ok : [Types.WalletNFT]; #err : Text } {
@@ -731,7 +737,7 @@ module {
             previews,
             [
               buildPreviewNFT(
-                owner,
+                walletOwner,
                 collection.id,
                 tokenIdentifier,
                 metadata,
@@ -746,18 +752,90 @@ module {
     };
   };
 
+  public func previewEXTAccountNFTsFromRegistryBounded(
+    collection : CollectionTypes.Collection,
+    walletOwner : Principal,
+    accountId : Blob,
+    location : Types.WalletLocation,
+    maxRegistryEntries : Nat,
+  ) : async* { #ok : [Types.WalletNFT]; #err : Text } {
+    switch (collection.standard) {
+      case (#EXT) {};
+      case (_) return #err("Account-based EXT registry preview only supports EXT collections");
+    };
+    let canister : NFTStandards.EXTActor = actor (collection.canisterId.toText());
+    let accountIdHex = blobToHex(accountId);
+    let normalizedAccountIdHex = Text.toLower(accountIdHex);
+    let registry = try {
+      await canister.getRegistry();
+    } catch (error) {
+      return #err("Collection '" # collection.name # "': EXT registry lookup failed: " # Error.message(error));
+    };
+
+    if (registry.size() > maxRegistryEntries) {
+      return #err(
+        "Collection '" #
+        collection.name #
+        "' has " #
+        Nat.toText(registry.size()) #
+        " EXT registry entries, above the selected app-account sync limit of " #
+        Nat.toText(maxRegistryEntries) #
+        ". Enter a known token ID to verify it directly."
+      );
+    };
+
+    var previews : [Types.WalletNFT] = [];
+    for ((tokenIndex, registryOwnerAccountId) in registry.values()) {
+      if (Text.toLower(registryOwnerAccountId) == normalizedAccountIdHex) {
+        let tokenIdentifier = extTokenIdentifier(collection.canisterId, tokenIndex);
+        let currentMatchesAccount = switch (await* fetchEXTOwnerAccountId(canister, tokenIdentifier)) {
+          case (#ok(currentOwnerAccountId)) Text.toLower(currentOwnerAccountId) == normalizedAccountIdHex;
+          case (#err(_)) {
+            switch (await* fetchEXTBalanceForUser(canister, tokenIdentifier, #address(accountIdHex))) {
+              case (#ok(balance)) balance > 0;
+              case (#err(_)) false;
+            };
+          };
+        };
+        if (currentMatchesAccount) {
+          let metadata = metadataWithEXTDisplayTokenId(
+            collection,
+            tokenIndex,
+            await* fetchEXTMetadata(canister, collection.canisterId, tokenIdentifier, tokenIndex, collection.name),
+          );
+          previews := Array.concat<Types.WalletNFT>(
+            previews,
+            [
+              buildPreviewNFT(
+                walletOwner,
+                collection.id,
+                tokenIdentifier,
+                metadata,
+                location,
+                tokenIndex.toNat(),
+              )
+            ],
+          );
+        };
+      };
+    };
+
+    #ok(previews);
+  };
+
   public func previewICRC7AccountNFTs(
     collection : CollectionTypes.Collection,
     walletOwner : Principal,
     account : NFTStandards.ICRC7Account,
     location : Types.WalletLocation,
+    scanMode : ICRC7OwnerScanMode,
   ) : async* { #ok : [Types.WalletNFT]; #err : Text } {
     switch (collection.standard) {
       case (#ICRC7) {};
       case (_) return #err("Account-based ICRC-7 preview only supports ICRC-7 collections");
     };
     let canister : NFTStandards.ICRC7Actor = actor (collection.canisterId.toText());
-    await* fetchICRC7AccountPreviews(canister, collection, walletOwner, account, location);
+    await* fetchICRC7AccountPreviews(canister, collection, walletOwner, account, location, scanMode);
   };
 
   public func previewCollectionNFTs(
@@ -3409,18 +3487,45 @@ module {
     walletOwner : Principal,
     account : NFTStandards.ICRC7Account,
     location : Types.WalletLocation,
+    scanMode : ICRC7OwnerScanMode,
   ) : async* { #ok : [Types.WalletNFT]; #err : Text } {
     let pageSize : Nat = 100;
     var prev : ?Nat = null;
     var previews : [Types.WalletNFT] = [];
 
     label paginate loop {
-      let tokenIds = try {
-        await canister.icrc7_tokens_of(account, prev, ?pageSize);
+      let tokenIdsResult = try {
+        #ok(await canister.icrc7_tokens_of(account, prev, ?pageSize));
       } catch (error) {
-        return #err("Collection '" # collection.name # "': icrc7_tokens_of failed: " # Error.message(error));
+        #err(Error.message(error));
+      };
+      let tokenIds = switch (tokenIdsResult) {
+        case (#ok(value)) value;
+        case (#err(message)) {
+          if (await* shouldRunICRC7OwnerScan(canister, account, scanMode)) {
+            return await* fetchICRC7AccountPreviewsByAccountScan(
+              canister,
+              collection,
+              walletOwner,
+              account,
+              location,
+              ?OWNER_SYNC_SCAN_LIMIT,
+            );
+          };
+          return #err("Collection '" # collection.name # "': icrc7_tokens_of failed: " # message);
+        };
       };
       if (tokenIds.size() == 0) {
+        if (await* shouldRunICRC7OwnerScan(canister, account, scanMode)) {
+          return await* fetchICRC7AccountPreviewsByAccountScan(
+            canister,
+            collection,
+            walletOwner,
+            account,
+            location,
+            ?OWNER_SYNC_SCAN_LIMIT,
+          );
+        };
         break paginate;
       };
 
@@ -3463,6 +3568,44 @@ module {
     };
 
     #ok(previews);
+  };
+
+  func shouldRunICRC7OwnerScan(
+    canister : NFTStandards.ICRC7Actor,
+    account : NFTStandards.ICRC7Account,
+    scanMode : ICRC7OwnerScanMode,
+  ) : async* Bool {
+    switch (scanMode) {
+      case (#Never) false;
+      case (#WhenBalancePositive) {
+        let balances = try {
+          ?(await canister.icrc7_balance_of([account]));
+        } catch (_) {
+          null;
+        };
+        switch (balances) {
+          case (?values) values.size() > 0 and values[0] > 0;
+          case null false;
+        };
+      };
+      case (#Always) {
+        let balances = try {
+          ?(await canister.icrc7_balance_of([account]));
+        } catch (_) {
+          null;
+        };
+        switch (balances) {
+          case (?values) {
+            if (values.size() == 0) {
+              true;
+            } else {
+              values[0] > 0;
+            };
+          };
+          case null true;
+        };
+      };
+    };
   };
 
   func fetchICRC7Previews(
@@ -3561,6 +3704,21 @@ module {
     location : Types.WalletLocation,
     maxScan : ?Nat,
   ) : async* { #ok : [Types.WalletNFT]; #err : Text } {
+    let account : NFTStandards.ICRC7Account = {
+      owner;
+      subaccount = null;
+    };
+    await* fetchICRC7AccountPreviewsByAccountScan(canister, collection, owner, account, location, maxScan);
+  };
+
+  func fetchICRC7AccountPreviewsByAccountScan(
+    canister : NFTStandards.ICRC7Actor,
+    collection : CollectionTypes.Collection,
+    walletOwner : Principal,
+    expectedAccount : NFTStandards.ICRC7Account,
+    location : Types.WalletLocation,
+    maxScan : ?Nat,
+  ) : async* { #ok : [Types.WalletNFT]; #err : Text } {
     let pageSize : Nat = 100;
     var prev : ?Nat = null;
     var previews : [Types.WalletNFT] = [];
@@ -3620,8 +3778,8 @@ module {
         scanned += 1;
         if (ownerIndex < owners.size()) {
           switch (owners[ownerIndex]) {
-            case (?account) {
-              if (icrc7DefaultAccountMatchesOwner(account, owner)) {
+            case (?actualAccount) {
+              if (icrc7AccountMatches(expectedAccount, actualAccount)) {
                 ownedTokenIds := Array.concat<Nat>(ownedTokenIds, [tokenId]);
               };
             };
@@ -3652,7 +3810,7 @@ module {
             previews,
             [
               buildPreviewNFT(
-                owner,
+                walletOwner,
                 collection.id,
                 Nat.toText(tokenId),
                 metadata,
