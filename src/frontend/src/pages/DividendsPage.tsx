@@ -7,6 +7,7 @@ import { TermsAgreementNotice } from "@/components/TermsAcceptance";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import { isLowCyclesError } from "@/lib/cycles";
@@ -50,6 +51,92 @@ function activeListingSeller(detail: ActiveListingDetail): string {
     : detail.listing.Auction.seller.toString();
 }
 
+interface DividendStatCardProps {
+  label: string;
+  value: string;
+  valueClassName?: string;
+  isLoading: boolean;
+}
+
+function DividendStatCard({
+  label,
+  value,
+  valueClassName = "text-foreground",
+  isLoading,
+}: DividendStatCardProps) {
+  return (
+    <Card className="border-border bg-card">
+      <CardContent className="p-4">
+        <p className="text-xs uppercase tracking-wider text-muted-foreground">
+          {label}
+        </p>
+        {isLoading ? (
+          <Skeleton className="mt-3 h-8 w-28 bg-muted" />
+        ) : (
+          <p className={`font-mono text-2xl font-bold mt-1 ${valueClassName}`}>
+            {value}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function DividendLoadingState() {
+  return (
+    <div
+      className="space-y-4"
+      aria-live="polite"
+      data-ocid="dividends.loading_state"
+    >
+      <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-5 sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="shrink-0">
+            <LoadingSpinner size="lg" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="font-display text-lg font-semibold text-foreground">
+              Loading your dividend-eligible NFTs
+            </h2>
+            <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+              Mintlab is checking your wallet, dividend balances, listings, and
+              the current ICP fee. This can take up to a minute for wallets with
+              multiple NFTs or imported collections.
+            </p>
+            <p className="text-xs font-medium text-emerald-700">
+              Nothing is wrong; keep this page open while the information
+              finishes loading.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        {[0, 1, 2, 3].map((item) => (
+          <Card
+            key={item}
+            className="border-border bg-card overflow-hidden"
+            data-ocid={`dividends.loading_card.${item + 1}`}
+          >
+            <CardContent className="p-0 flex min-h-36">
+              <Skeleton className="w-32 sm:w-40 shrink-0 rounded-none bg-muted" />
+              <div className="flex flex-1 flex-col gap-3 p-4">
+                <div className="flex flex-wrap gap-2">
+                  <Skeleton className="h-6 w-24 bg-muted" />
+                  <Skeleton className="h-6 w-14 bg-muted" />
+                </div>
+                <Skeleton className="h-5 w-44 max-w-full bg-muted" />
+                <Skeleton className="h-4 w-32 max-w-full bg-muted" />
+                <Skeleton className="mt-auto h-9 w-28 bg-muted" />
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function DividendsPage() {
   const { actor, isFetching } = useBackend();
   const { principal, isAuthenticated, principalText, login } = useAuth();
@@ -64,7 +151,7 @@ export default function DividendsPage() {
     data: dividends = [],
     error: dividendsError,
     isError: dividendsFailed,
-    isLoading,
+    isLoading: dividendsLoading,
     refetch,
   } = useQuery<NFTDividend[]>({
     queryKey: ["myDividendNFTs", principalText],
@@ -94,7 +181,10 @@ export default function DividendsPage() {
     staleTime: 60_000,
   });
 
-  const { data: listedDividendKeys = [] } = useQuery<string[]>({
+  const {
+    data: listedDividendKeys = [],
+    isLoading: listedDividendKeysLoading,
+  } = useQuery<string[]>({
     queryKey: ["myListedDividendNFTs", principalText],
     queryFn: async () => {
       if (!actor || !principalText) return [];
@@ -111,16 +201,17 @@ export default function DividendsPage() {
     staleTime: 30_000,
   });
 
-  const { data: marketplaceFeeConfig } = useQuery({
-    queryKey: ["marketplaceFeeConfig"],
-    queryFn: async () => {
-      if (!actor) return null;
-      return actor.getMarketplaceFeeConfig();
-    },
-    enabled: !!actor && !isFetching && isAuthenticated,
-    refetchOnWindowFocus: false,
-    staleTime: 60_000,
-  });
+  const { data: marketplaceFeeConfig, isLoading: marketplaceFeeConfigLoading } =
+    useQuery({
+      queryKey: ["marketplaceFeeConfig"],
+      queryFn: async () => {
+        if (!actor) return null;
+        return actor.getMarketplaceFeeConfig();
+      },
+      enabled: !!actor && !isFetching && isAuthenticated,
+      refetchOnWindowFocus: false,
+      staleTime: 60_000,
+    });
 
   const claimMutation = useMutation({
     mutationFn: async (item: NFTDividend) => {
@@ -218,6 +309,13 @@ export default function DividendsPage() {
     [listedDividendKeys],
   );
   const dividendLedgerFee = marketplaceFeeConfig?.ledgerFeeE8s ?? ICP_FEE;
+  const actorLoading =
+    isAuthenticated && (isFetching || !actor || !principalText);
+  const dividendDecisionDataLoading =
+    dividends.length > 0 &&
+    (listedDividendKeysLoading || marketplaceFeeConfigLoading);
+  const dividendInfoLoading =
+    actorLoading || dividendsLoading || dividendDecisionDataLoading;
 
   if (!isAuthenticated) {
     return (
@@ -287,7 +385,11 @@ export default function DividendsPage() {
             variant="outline"
             className="gap-2"
             onClick={() => syncMutation.mutate()}
-            disabled={syncMutation.isPending || dividends.length === 0}
+            disabled={
+              syncMutation.isPending ||
+              dividendInfoLoading ||
+              dividends.length === 0
+            }
             data-ocid="dividends.sync_button"
           >
             {syncMutation.isPending ? (
@@ -314,39 +416,25 @@ export default function DividendsPage() {
         <TermsAgreementNotice actionLabel="checking deposits or collecting dividend ICP" />
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Card className="border-border bg-card">
-            <CardContent className="p-4">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                Claimable
-              </p>
-              <p className="font-mono text-2xl font-bold text-emerald-600 mt-1">
-                {formatICP(totalClaimable)} ICP
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="border-border bg-card">
-            <CardContent className="p-4">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                Eligible NFTs
-              </p>
-              <p className="font-mono text-2xl font-bold text-foreground mt-1">
-                {dividends.length}
-              </p>
-            </CardContent>
-          </Card>
-          <Card className="border-border bg-card">
-            <CardContent className="p-4">
-              <p className="text-xs uppercase tracking-wider text-muted-foreground">
-                Ready To Collect
-              </p>
-              <p className="font-mono text-2xl font-bold text-foreground mt-1">
-                {claimableItems.length}
-              </p>
-            </CardContent>
-          </Card>
+          <DividendStatCard
+            label="Claimable"
+            value={`${formatICP(totalClaimable)} ICP`}
+            valueClassName="text-emerald-600"
+            isLoading={dividendInfoLoading}
+          />
+          <DividendStatCard
+            label="Eligible NFTs"
+            value={dividends.length.toString()}
+            isLoading={dividendInfoLoading}
+          />
+          <DividendStatCard
+            label="Ready To Collect"
+            value={claimableItems.length.toString()}
+            isLoading={dividendInfoLoading}
+          />
         </div>
 
-        {belowFeeItems.length > 0 && (
+        {!dividendInfoLoading && belowFeeItems.length > 0 && (
           <div
             className="rounded-xl border border-amber-500/25 bg-amber-500/10 px-4 py-3 text-sm text-amber-800"
             data-ocid="dividends.below_fee_notice"
@@ -359,15 +447,20 @@ export default function DividendsPage() {
           </div>
         )}
 
-        {isLoading ? (
-          <div className="min-h-[32vh] flex items-center justify-center">
-            <LoadingSpinner size="lg" label="Loading dividends..." />
-          </div>
+        {dividendInfoLoading ? (
+          <DividendLoadingState />
         ) : dividendsFailed ? (
           <EmptyState
             icon={CircleDollarSign}
             title="Dividend NFTs could not load"
             description={extractError(dividendsError)}
+            action={{
+              label: "Try again",
+              onClick: () => {
+                void refetch();
+              },
+              "data-ocid": "dividends.retry_button",
+            }}
             data-ocid="dividends.error_state"
           />
         ) : dividends.length === 0 ? (
