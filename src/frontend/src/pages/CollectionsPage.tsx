@@ -996,11 +996,22 @@ function CreateCollectionCard({
         title="Review Collection Settings"
         description={
           moderationConfig?.enabled
-            ? "Review the settings below. Mintlab checks the uploaded image before any ICP is transferred."
-            : "Review the settings below before Mintlab debits your in-app ICP balance and creates your collection canister."
+            ? "Review the settings below. Payment starts only after you choose Confirm Settings and Pay, and Mintlab checks the uploaded image before any ICP is transferred."
+            : "Review the settings below. Payment starts only after you choose Confirm Settings and Pay, then Mintlab debits your in-app ICP balance and creates your collection canister."
         }
         cancelLabel="Make Changes"
         lines={[
+          {
+            label: "Payment source",
+            value: "In-app ICP balance",
+          },
+          {
+            label: "Dividend setup",
+            value: collectionReview.dividendsLabel,
+            helper: dividendsEnabled
+              ? "Creates a dedicated ICP dividend address."
+              : "No dedicated dividend account will be created.",
+          },
           {
             label: "Collection fee",
             value: `${formatICP(mintConfig?.collectionCreationPriceE8s ?? 0n)} ICP`,
@@ -1047,6 +1058,15 @@ function CreateCollectionCard({
         }}
         ocid="collections.create.payment_dialog"
       >
+        <div className="flex items-start gap-2 rounded-lg border border-accent/20 bg-accent/10 p-3 text-xs leading-relaxed text-muted-foreground">
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent" />
+          <span>
+            Choose Make Changes to edit the collection setup. Confirm Settings
+            and Pay authorizes the payment using exactly the settings shown
+            here.
+          </span>
+        </div>
+
         <div
           className="space-y-3 rounded-lg border border-border bg-muted/20 p-3"
           data-ocid="collections.create.settings_review"

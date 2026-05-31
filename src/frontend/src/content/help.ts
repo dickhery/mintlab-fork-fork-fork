@@ -157,6 +157,7 @@ export const helpSections: HelpSection[] = [
       "Import external collections by adding the collection canister ID, standard, collection image, and browse details.",
       "Mintlab supports EXT, DIP721, and ICRC-7 collection imports.",
       "Create Your Mintlab Collection launches a dedicated ICRC-7 canister for your collection after the admin-set payment is confirmed.",
+      "The final review dialog shows the collection settings, dividend setup, payment source, fees, and cycle allocation before payment starts.",
       "Enable collection dividends during collection creation to create a dedicated ICP dividend address for deposits.",
       "Creator collection cards show cycle status, controller tools, top-up actions, and update actions when you can manage the canister.",
       "Collection browse supports search, direct token lookup, attribute filters, dividend balance badges, and canister links.",
