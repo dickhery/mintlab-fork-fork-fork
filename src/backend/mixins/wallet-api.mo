@@ -1396,7 +1396,7 @@ mixin (
           collectionName = collection.name;
           reason = "INDEX_REQUIRED";
           message = "This collection needs token range setup before automatic wallet sync can scan it safely. " #
-          "Add total supply and token offset in the collection import settings, or import a known token ID directly.";
+          "Select this collection and run Sync selected to use the safest targeted fallback, or enter a known token ID to verify it directly.";
         };
         complete = false;
       };
@@ -1426,7 +1426,7 @@ mixin (
             collectionName = collection.name;
             reason = "INDEX_REQUIRED";
             message = "Mintlab checked this EXT collection's owner-token methods first, but the collection did not expose a bounded owner list for this wallet. " #
-            "Broad collection scans are skipped during all-wallet sync to keep sync responsive. Use Sync selected with a token ID, or import a known token ID directly.";
+            "Broad scans are skipped during all-wallet sync to keep sync responsive. Select this collection and run Sync selected for a bounded registry check, or enter a known token ID.";
           };
           complete = false;
         };
@@ -1522,8 +1522,8 @@ mixin (
             collectionId = collection.id;
             collectionName = collection.name;
             reason = "INDEX_REQUIRED";
-            message = "Mintlab tried automatic ownership indexing, but this collection needs extra setup before new NFTs can be discovered automatically. " #
-            "Known token IDs can still be imported directly. Details: " #
+            message = "Mintlab tried automatic ownership indexing, but this collection needs targeted discovery before new NFTs can be found automatically. " #
+            "Select the collection and run Sync selected, or enter a known token ID. Details: " #
             message;
           };
           complete = false;
@@ -1564,41 +1564,56 @@ mixin (
     userAccountIdHex : Text,
     maxIndexPages : Nat,
   ) : async* WalletSelectedScanResult {
-    let existingStatus = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id);
-    switch (existingStatus) {
-      case (?status) {
-        if (status.complete) {
-          return {
-            nfts = [];
-            errors = [];
-            skip = null;
-            scannedThisRun = 0;
-            indexedThisRun = 0;
-            complete = true;
-            status = existingStatus;
-          };
-        };
-      };
-      case null {};
-    };
-
     switch (collection.standard) {
       case (#EXT) {
         if (not collectionHasBrowseRange(collection)) {
-          return {
-            nfts = [];
-            errors = [];
-            skip = ?{
-              collectionId = collection.id;
-              collectionName = collection.name;
-              reason = "INDEX_REQUIRED";
-              message = "Mintlab checked this EXT collection's owner-token methods first, but it does not have a safe token range configured for selected sync. " #
-              "Enter a known token ID to verify it directly, or add total supply/token offset setup before automatic discovery scans it.";
+          switch (
+            await* WalletLib.indexEXTRegistryForOwnerBounded(
+              ownershipIndexState,
+              collection,
+              caller,
+              userAccountIdHex,
+              EXT_SELECTED_REGISTRY_SYNC_MAX_ENTRIES,
+            )
+          ) {
+            case (#ok(page)) {
+              let status = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id);
+              return {
+                nfts = page.nfts;
+                errors = [];
+                skip = switch (page.error) {
+                  case null null;
+                  case (?message) ?{
+                    collectionId = collection.id;
+                    collectionName = collection.name;
+                    reason = "INDEX_REQUIRED";
+                    message;
+                  };
+                };
+                scannedThisRun = page.scanned;
+                indexedThisRun = page.indexed;
+                complete = page.complete;
+                status;
+              };
             };
-            scannedThisRun = 0;
-            indexedThisRun = 0;
-            complete = false;
-            status = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id);
+            case (#err(message)) {
+              return {
+                nfts = [];
+                errors = [];
+                skip = ?{
+                  collectionId = collection.id;
+                  collectionName = collection.name;
+                  reason = "INDEX_REQUIRED";
+                  message = "Mintlab checked this EXT collection's owner-token methods first, then tried a bounded registry fallback for selected sync. " #
+                  message #
+                  " Enter a known token ID to verify it directly.";
+                };
+                scannedThisRun = 0;
+                indexedThisRun = 0;
+                complete = false;
+                status = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id);
+              };
+            };
           };
         };
       };
@@ -1636,17 +1651,8 @@ mixin (
         break selectedScan;
       };
       let status = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collection.id);
-      switch (status) {
-        case (?value) {
-          if (value.complete) {
-            complete := true;
-            break selectedScan;
-          };
-        };
-        case null {};
-      };
       let cursor = switch (status) {
-        case (?value) value.cursor;
+        case (?value) { if (value.complete) null else value.cursor };
         case null null;
       };
       switch (
@@ -1714,7 +1720,7 @@ mixin (
             collectionId = collection.id;
             collectionName = collection.name;
             reason = "INDEX_REQUIRED";
-            message = "Mintlab tried selected ownership scanning, but this collection needs extra setup before new NFTs can be discovered automatically. " #
+            message = "Mintlab tried selected ownership scanning, but this collection needs a token range or token ID before new NFTs can be discovered automatically. " #
             "Known token IDs can still be verified directly. Details: " #
             message;
           };

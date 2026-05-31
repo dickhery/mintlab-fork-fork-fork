@@ -136,6 +136,8 @@ module {
       #err : CommonError;
     };
     tokens_ext : shared query (accountId : EXTAccountIdentifier) -> async ExtTokensExtResult;
+    // Legacy principal-only EXT-style collections enumerate tokens by principal.
+    user_tokens : shared query (owner : Principal) -> async [TokenIndex];
     // Query collection-wide token ownership. Older EXT canisters such as
     // Motoko Ghosts expose this even when account-specific lookups are not
     // usable for wallet sync.

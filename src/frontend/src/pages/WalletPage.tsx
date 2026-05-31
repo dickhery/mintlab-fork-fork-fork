@@ -157,6 +157,8 @@ const TARGET_SYNC_INDEX_PAGE_LIMIT = 3n;
 const MAX_SYNC_PAGES_PER_CLICK = 5;
 const SYNC_SLOW_NOTICE_MS = 15_000;
 const SYNC_REFRESH_INTERVAL_MS = 6_000;
+const SYNC_FINISHED_STATUS_CLEAR_MS = 6_000;
+const SYNC_PARTIAL_STATUS_CLEAR_MS = 45_000;
 const WALLET_NFT_PAGE_SIZE = 50n;
 const WALLET_COLLECTION_PAGE_SIZE = 50n;
 const WALLET_LISTING_PAGE_SIZE = 25n;
@@ -282,9 +284,9 @@ function summarizeSyncSkipped(skipped: WalletSyncSkip[]): string {
       : `${indexing.length} imported collections are still indexing automatically.`;
   }
   if (needsSetup.length === 1) {
-    return `${needsSetup[0].collectionName} needs extra setup before automatic discovery can find new NFTs.`;
+    return `${needsSetup[0].collectionName} needs targeted sync or a token ID before automatic discovery can find new NFTs.`;
   }
-  return `${needsSetup.length} imported collections need extra setup before automatic discovery can find new NFTs.`;
+  return `${needsSetup.length} imported collections need targeted sync or token IDs before automatic discovery can find new NFTs.`;
 }
 
 function summarizeSyncAttention(
@@ -1402,7 +1404,7 @@ function CollectionIndexingDialog({
 
           <div className="rounded-lg border border-accent/20 bg-accent/5 p-3 text-xs text-muted-foreground">
             <p className="font-medium text-foreground">
-              Automatic discovery setup
+              Ownership discovery
             </p>
             <p className="mt-1 leading-relaxed">
               Indexing reads ownership in small pages so wallet Sync can find
@@ -2176,7 +2178,7 @@ function ReceivingInstructions({
               {syncStatus.skipped.length > 0
                 ? onlyAutoIndexing
                   ? `${indexingSkips.length} indexing`
-                  : `${setupSkips.length} need setup`
+                  : `${setupSkips.length} need action`
                 : syncStatus.newCount > 0
                   ? `${syncStatus.newCount} synced; some warnings`
                   : "Some collections need attention"}
@@ -2299,7 +2301,7 @@ function ReceivingInstructions({
                         ? "Selected collection sync progress"
                         : onlyAutoIndexing
                           ? "Automatic discovery is indexing"
-                          : "Some collections need discovery setup"}
+                          : "Some collections need targeted sync"}
                     </p>
                     <p className="text-xs leading-relaxed text-muted-foreground">
                       {progress
@@ -2309,7 +2311,7 @@ function ReceivingInstructions({
                           )
                         : onlyAutoIndexing
                           ? "Sync is indexing imported collections in safe pages. New NFTs appear as soon as they are found; known token IDs can still be imported directly."
-                          : "Sync tried automatic ownership indexing, but these imported collections need extra setup before new NFTs can be found automatically. Known token IDs can still be imported directly."}
+                          : "All-collection sync skips broad discovery scans to stay responsive. Select a collection and run Sync selected, or enter a known token ID to verify it directly."}
                     </p>
                   </div>
                 </div>
@@ -2338,7 +2340,7 @@ function ReceivingInstructions({
                       </Button>
                     ) : (
                       <Badge variant="secondary" className="shrink-0">
-                        {isAutoIndexingSkip(skip) ? "Indexing" : "Needs setup"}
+                        {isAutoIndexingSkip(skip) ? "Indexing" : "Action needed"}
                       </Badge>
                     )}
                   </div>
@@ -2348,7 +2350,7 @@ function ReceivingInstructions({
                     {syncStatus.skipped.length - 4} more collections{" "}
                     {onlyAutoIndexing
                       ? "are indexing automatically."
-                      : "need discovery setup."}
+                      : "need targeted sync."}
                   </p>
                 )}
               </div>
@@ -2933,7 +2935,7 @@ export default function WalletPage() {
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({ kind: "idle" });
 
-  // Auto-clear finished sync statuses after 6 seconds
+  // Auto-clear finished sync statuses; keep partial guidance visible longer.
   useEffect(() => {
     if (
       syncStatus.kind === "ok" ||
@@ -2943,7 +2945,9 @@ export default function WalletPage() {
     ) {
       const id = setTimeout(
         () => setSyncStatus({ kind: "idle" }),
-        syncStatus.kind === "partial" ? 15_000 : 6000,
+        syncStatus.kind === "partial"
+          ? SYNC_PARTIAL_STATUS_CLEAR_MS
+          : SYNC_FINISHED_STATUS_CLEAR_MS,
       );
       return () => clearTimeout(id);
     }
@@ -3317,7 +3321,7 @@ export default function WalletPage() {
                     syncSkipped.length > 0
                       ? onlyAutoIndexing
                         ? `${indexingSkipped.length} collection(s) are still indexing automatically.`
-                        : `${setupSkipped.length} collection(s) need extra discovery setup.`
+                        : `${setupSkipped.length} collection(s) need targeted sync or a token ID.`
                       : "Some collections could not be checked.",
                 },
               );
@@ -3329,7 +3333,7 @@ export default function WalletPage() {
                 {
                   description: onlyAutoIndexing
                     ? "Automatic discovery is catching up in small batches. Click Sync again shortly, or import a known token ID directly."
-                    : `${setupSkipped.length} collection(s) need extra discovery setup before automatic discovery can find new NFTs.`,
+                    : `${setupSkipped.length} collection(s) need targeted sync or a token ID before automatic discovery can find new NFTs.`,
                 },
               );
             } else {

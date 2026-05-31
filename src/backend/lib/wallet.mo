@@ -2125,7 +2125,7 @@ module {
         let accountIdHex = blobToHex(accountId);
         let principalText = owner.toText();
         let principalHex = blobToHex(owner.toBlob());
-        switch (await* fetchEXTTokenIndices(canister, accountIdHex, principalText, principalHex, collection.name, allowOwnerScan)) {
+        switch (await* fetchEXTTokenIndices(canister, owner, accountIdHex, principalText, principalHex, collection.name, allowOwnerScan)) {
           case (#err(message)) {
             if (not allowOwnerScan) {
               return #err(ownerIndexRequiredMessage(collection.name));
@@ -2833,6 +2833,7 @@ module {
 
   func fetchEXTTokenIndices(
     canister : NFTStandards.EXTActor,
+    owner : Principal,
     accountIdHex : Text,
     principalText : Text,
     principalHex : Text,
@@ -2915,6 +2916,20 @@ module {
       };
     };
 
+    if (tokenIndices.size() == 0) {
+      switch (await* fetchEXTPrincipalUserTokens(canister, owner)) {
+        case (#ok(values)) {
+          sawAvailableMethod := true;
+          tokenIndices := appendUniqueTokenIndices(tokenIndices, values);
+        };
+        case (#err(message)) {
+          if (message != "method unavailable") {
+            lastError := ?message;
+          };
+        };
+      };
+    };
+
     if (tokenIndices.size() > 0 or (sawAvailableMethod and not allowRegistryFallback)) {
       return #ok(tokenIndices);
     };
@@ -2954,6 +2969,21 @@ module {
         case (?message) #err("Collection '" # collectionName # "': " # message);
         case null #err("Collection '" # collectionName # "': EXT token ownership method not available");
       };
+    };
+  };
+
+  func fetchEXTPrincipalUserTokens(
+    canister : NFTStandards.EXTActor,
+    owner : Principal,
+  ) : async* { #ok : [NFTStandards.TokenIndex]; #err : Text } {
+    let result = try {
+      ?(await canister.user_tokens(owner));
+    } catch (_) {
+      null;
+    };
+    switch (result) {
+      case null #err("method unavailable");
+      case (?tokenIndices) #ok(tokenIndices);
     };
   };
 
@@ -3018,7 +3048,13 @@ module {
     };
     switch (result) {
       case null #err("method unavailable");
-      case (?#err(error)) #err(extCommonErrorToText(error));
+      case (?#err(error)) {
+        if (extCommonErrorIsNoTokens(error)) {
+          #ok([]);
+        } else {
+          #err(extCommonErrorToText(error));
+        };
+      };
       case (?#ok(entries)) {
         var tokenIndices : [NFTStandards.TokenIndex] = [];
         for ((tokenIndex, _, _) in entries.values()) {
@@ -3040,7 +3076,13 @@ module {
     };
     switch (result) {
       case null #err("method unavailable");
-      case (?#err(error)) #err(extCommonErrorToText(error));
+      case (?#err(error)) {
+        if (extCommonErrorIsNoTokens(error)) {
+          #ok([]);
+        } else {
+          #err(extCommonErrorToText(error));
+        };
+      };
       case (?#ok(tokenIndices)) #ok(tokenIndices);
     };
   };
@@ -4031,6 +4073,13 @@ module {
     switch (error) {
       case (#InvalidToken(tokenId)) "Invalid token: " # tokenId;
       case (#Other(message)) message;
+    };
+  };
+
+  func extCommonErrorIsNoTokens(error : NFTStandards.CommonError) : Bool {
+    switch (error) {
+      case (#Other(message)) Text.toLower(Text.trim(message, #char ' ')) == "no tokens";
+      case (_) false;
     };
   };
 
