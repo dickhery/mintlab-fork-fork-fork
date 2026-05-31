@@ -177,6 +177,13 @@ mixin (
     IcpLib.accountIdentifier(canisterId, IcpLib.principalToSubaccount(caller));
   };
 
+  func mintlabUserICRC7Account(caller : Principal) : NFTStandards.ICRC7Account {
+    {
+      owner = canisterId;
+      subaccount = ?IcpLib.principalToSubaccount(caller);
+    };
+  };
+
   func nftDisplayName(nft : WalletTypes.WalletNFT) : Text {
     switch (nft.metadata.name) {
       case (?name) {
@@ -624,7 +631,86 @@ mixin (
         metadataFallback,
       );
       switch (verification) {
-        case (#err(message)) #err(message);
+        case (#err(registeredMessage)) {
+          if (not Principal.equal(owner, caller)) {
+            return #err(registeredMessage);
+          };
+          switch (collection.standard) {
+            case (#EXT) {
+              let appAccountId = mintlabUserAccountId(caller);
+              switch (
+                await* WalletLib.verifyKnownEXTAccountNFTWithFallback(
+                  collection,
+                  appAccountId,
+                  canonicalTokenId,
+                  metadataFallback,
+                )
+              ) {
+                case (#err(appAccountMessage)) {
+                  #err(
+                    registeredMessage #
+                    " Mintlab also checked your app deposit account: " #
+                    appAccountMessage
+                  );
+                };
+                case (#ok(onChainMetadata)) {
+                  switch (MarketplaceLib.findActiveEscrowedNFT(marketplaceState, collectionId, canonicalTokenId)) {
+                    case (?_) {
+                      return #err("This NFT is locked in an active marketplace listing. Cancel or settle the listing first.");
+                    };
+                    case null {};
+                  };
+                  let nft = WalletLib.registerNFT(
+                    walletState,
+                    owner,
+                    collectionId,
+                    canonicalTokenId,
+                    metadataWithTokenDisplayHint(collection, canonicalTokenId, requestedTokenId, onChainMetadata),
+                    #Vaulted,
+                  );
+                  #ok(nft);
+                };
+              };
+            };
+            case (#ICRC7) {
+              let appAccount = mintlabUserICRC7Account(caller);
+              switch (
+                await* WalletLib.verifyKnownICRC7AccountNFTWithFallback(
+                  collection,
+                  appAccount,
+                  canonicalTokenId,
+                  metadataFallback,
+                )
+              ) {
+                case (#err(appAccountMessage)) {
+                  #err(
+                    registeredMessage #
+                    " Mintlab also checked your app ICRC-7 deposit account: " #
+                    appAccountMessage
+                  );
+                };
+                case (#ok(onChainMetadata)) {
+                  switch (MarketplaceLib.findActiveEscrowedNFT(marketplaceState, collectionId, canonicalTokenId)) {
+                    case (?_) {
+                      return #err("This NFT is locked in an active marketplace listing. Cancel or settle the listing first.");
+                    };
+                    case null {};
+                  };
+                  let nft = WalletLib.registerNFT(
+                    walletState,
+                    owner,
+                    collectionId,
+                    canonicalTokenId,
+                    metadataWithTokenDisplayHint(collection, canonicalTokenId, requestedTokenId, onChainMetadata),
+                    #Vaulted,
+                  );
+                  #ok(nft);
+                };
+              };
+            };
+            case (_) #err(registeredMessage);
+          };
+        };
         case (#ok(onChainMetadata)) {
           switch (MarketplaceLib.findActiveEscrowedNFT(marketplaceState, collectionId, canonicalTokenId)) {
             case (?_) {
@@ -930,7 +1016,7 @@ mixin (
         };
 
         if (shouldRunSelectedScan) {
-          let appAccountSynced = await* syncMintlabEXTAccountCollection(caller, collection);
+          let appAccountSynced = await* syncMintlabAppAccountCollection(caller, collection);
           newCount += appAccountSynced.newCount;
           if (appAccountSynced.foundCount > 0) {
             shouldRunSelectedScan := false;
@@ -1081,6 +1167,44 @@ mixin (
                   #err(
                     registeredMessage #
                     " Mintlab also checked your app deposit account: " #
+                    appAccountMessage
+                  );
+                };
+              };
+            };
+            case (#ICRC7) {
+              let appAccount = mintlabUserICRC7Account(caller);
+              switch (
+                await* WalletLib.verifyKnownICRC7AccountNFTWithFallback(
+                  collection,
+                  appAccount,
+                  canonicalTokenId,
+                  metadataFallback,
+                )
+              ) {
+                case (#ok(metadata)) {
+                  switch (MarketplaceLib.findActiveEscrowedNFT(marketplaceState, collection.id, canonicalTokenId)) {
+                    case (?_) {
+                      return #err("This NFT is locked in an active marketplace listing. Cancel or settle the listing first.");
+                    };
+                    case null {};
+                  };
+                  let existing = WalletLib.findByCollectionToken(walletState, collection.id, canonicalTokenId);
+                  let wasNew = countsAsNewWalletNFT(existing, caller);
+                  ignore WalletLib.registerNFT(
+                    walletState,
+                    caller,
+                    collection.id,
+                    canonicalTokenId,
+                    metadataWithTokenDisplayHint(collection, canonicalTokenId, requestedTokenId, metadata),
+                    #Vaulted,
+                  );
+                  #ok(wasNew);
+                };
+                case (#err(appAccountMessage)) {
+                  #err(
+                    registeredMessage #
+                    " Mintlab also checked your app ICRC-7 deposit account: " #
                     appAccountMessage
                   );
                 };
@@ -1429,7 +1553,7 @@ mixin (
             );
           };
         };
-        let appAccountSynced = await* syncMintlabEXTAccountCollection(caller, collection);
+        let appAccountSynced = await* syncMintlabAppAccountCollection(caller, collection);
         newCount += appAccountSynced.newCount;
       };
     };
@@ -1821,28 +1945,46 @@ mixin (
     };
   };
 
-  func syncMintlabEXTAccountCollection(
+  func syncMintlabAppAccountCollection(
     caller : Principal,
     collection : CollectionTypes.Collection,
   ) : async* { newCount : Nat; foundCount : Nat } {
     switch (collection.standard) {
-      case (#EXT) {};
-      case (_) return { newCount = 0; foundCount = 0 };
-    };
-    let appAccountId = mintlabUserAccountId(caller);
-    switch (
-      await* WalletLib.previewEXTAccountNFTsFromOwnerIndex(
-        collection,
-        canisterId,
-        appAccountId,
-        #Vaulted,
-      )
-    ) {
-      case (#err(_)) return { newCount = 0; foundCount = 0 };
-      case (#ok(nfts)) {
-        let registered = registerPreviewNFTs(caller, collection, nfts, #Vaulted);
-        return { newCount = registered.newCount; foundCount = nfts.size() };
+      case (#EXT) {
+        let appAccountId = mintlabUserAccountId(caller);
+        switch (
+          await* WalletLib.previewEXTAccountNFTsFromOwnerIndex(
+            collection,
+            canisterId,
+            appAccountId,
+            #Vaulted,
+          )
+        ) {
+          case (#err(_)) return { newCount = 0; foundCount = 0 };
+          case (#ok(nfts)) {
+            let registered = registerPreviewNFTs(caller, collection, nfts, #Vaulted);
+            return { newCount = registered.newCount; foundCount = nfts.size() };
+          };
+        };
       };
+      case (#ICRC7) {
+        let appAccount = mintlabUserICRC7Account(caller);
+        switch (
+          await* WalletLib.previewICRC7AccountNFTs(
+            collection,
+            caller,
+            appAccount,
+            #Vaulted,
+          )
+        ) {
+          case (#err(_)) return { newCount = 0; foundCount = 0 };
+          case (#ok(nfts)) {
+            let registered = registerPreviewNFTs(caller, collection, nfts, #Vaulted);
+            return { newCount = registered.newCount; foundCount = nfts.size() };
+          };
+        };
+      };
+      case (_) return { newCount = 0; foundCount = 0 };
     };
   };
 

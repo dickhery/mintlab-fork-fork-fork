@@ -746,6 +746,20 @@ module {
     };
   };
 
+  public func previewICRC7AccountNFTs(
+    collection : CollectionTypes.Collection,
+    walletOwner : Principal,
+    account : NFTStandards.ICRC7Account,
+    location : Types.WalletLocation,
+  ) : async* { #ok : [Types.WalletNFT]; #err : Text } {
+    switch (collection.standard) {
+      case (#ICRC7) {};
+      case (_) return #err("Account-based ICRC-7 preview only supports ICRC-7 collections");
+    };
+    let canister : NFTStandards.ICRC7Actor = actor (collection.canisterId.toText());
+    await* fetchICRC7AccountPreviews(canister, collection, walletOwner, account, location);
+  };
+
   public func previewCollectionNFTs(
     collection : CollectionTypes.Collection
   ) : async* { #ok : [Types.WalletNFT]; #err : Text } {
@@ -998,6 +1012,43 @@ module {
     #ok(metadata);
   };
 
+  public func verifyKnownICRC7AccountNFTWithFallback(
+    collection : CollectionTypes.Collection,
+    account : NFTStandards.ICRC7Account,
+    tokenId : Text,
+    metadataFallback : ?Types.NFTMetadata,
+  ) : async* { #ok : Types.NFTMetadata; #err : Text } {
+    switch (collection.standard) {
+      case (#ICRC7) {};
+      case (_) return #err("Account-based ICRC-7 verification only supports ICRC-7 collections");
+    };
+    let tokenNat = switch (Nat.fromText(tokenId)) {
+      case null return #err("Invalid ICRC-7 token ID");
+      case (?value) value;
+    };
+    let canister : NFTStandards.ICRC7Actor = actor (collection.canisterId.toText());
+    let owners = try {
+      await canister.icrc7_owner_of([tokenNat]);
+    } catch (error) {
+      return #err("Collection '" # collection.name # "': " # Error.message(error));
+    };
+    if (owners.size() == 0) {
+      return #err("NFT not found in the Mintlab ICRC-7 account for this user");
+    };
+    let ownsToken = switch (owners[0]) {
+      case (?currentAccount) icrc7AccountMatches(account, currentAccount);
+      case null false;
+    };
+    if (not ownsToken) {
+      return #err("NFT not found in the Mintlab ICRC-7 account for this user");
+    };
+    let metadata = switch (metadataFallback) {
+      case (?value) value;
+      case null await* fetchTokenMetadata(collection, tokenId);
+    };
+    #ok(metadata);
+  };
+
   public func canonicalTokenId(
     collection : CollectionTypes.Collection,
     tokenId : Text,
@@ -1031,7 +1082,7 @@ module {
         };
         switch (owners[0]) {
           case null #ok(false);
-          case (?account) #ok(Principal.equal(account.owner, owner));
+          case (?account) #ok(icrc7DefaultAccountMatchesOwner(account, owner));
         };
       };
       case (#DIP721) {
@@ -1171,30 +1222,20 @@ module {
           case (?value) value;
         };
         let canister : NFTStandards.ICRC7Actor = actor (collection.canisterId.toText());
-        let result = try {
-          await canister.icrc7_transfer([
-            {
-              from_subaccount = null;
-              to = {
-                owner = recipient;
-                subaccount = null;
+        switch (await* transferICRC7NFT(canister, null, recipient, tokenNat)) {
+          case (#ok) {};
+          case (#err(defaultVaultMessage)) {
+            let userSubaccount = IcpLib.principalToSubaccount(nft.owner);
+            switch (await* transferICRC7NFT(canister, ?userSubaccount, recipient, tokenNat)) {
+              case (#ok) {};
+              case (#err(userVaultMessage)) {
+                return #err(
+                  defaultVaultMessage #
+                  " Mintlab also checked the user-specific ICRC-7 deposit account: " #
+                  userVaultMessage
+                );
               };
-              token_id = tokenNat;
-              memo = null;
-              created_at_time = null;
-            },
-          ]);
-        } catch (error) {
-          return #err("Transfer call failed: " # Error.message(error));
-        };
-        if (result.size() == 0) {
-          return #err("ICRC-7 transfer returned no result");
-        };
-        switch (result[0]) {
-          case null return #err("ICRC-7 transfer was not processed");
-          case (?(#Ok(_))) {};
-          case (?(#Err(error))) {
-            return #err("ICRC-7 transfer rejected: " # icrc7TransferErrorToText(error));
+            };
           };
         };
       };
@@ -1665,7 +1706,7 @@ module {
               {
                 collectionId = collection.id;
                 tokenId = Nat.toText(tokenId);
-                owner = #Principal(account.owner);
+                owner = icrc7IndexedOwner(account);
                 metadata;
                 indexedAt;
               },
@@ -1936,13 +1977,13 @@ module {
               {
                 collectionId = collection.id;
                 tokenId = Nat.toText(tokenId);
-                owner = #Principal(account.owner);
+                owner = icrc7IndexedOwner(account);
                 metadata = fallback;
                 indexedAt;
               },
             );
             indexed += 1;
-            if (Principal.equal(account.owner, owner)) {
+            if (icrc7DefaultAccountMatchesOwner(account, owner)) {
               ownedTokenIds := Array.concat<Nat>(ownedTokenIds, [tokenId]);
             };
           };
@@ -3330,6 +3371,100 @@ module {
     };
   };
 
+  func transferICRC7NFT(
+    canister : NFTStandards.ICRC7Actor,
+    fromSubaccount : ?Blob,
+    recipient : Principal,
+    tokenId : Nat,
+  ) : async* { #ok; #err : Text } {
+    let result = try {
+      await canister.icrc7_transfer([
+        {
+          from_subaccount = fromSubaccount;
+          to = {
+            owner = recipient;
+            subaccount = null;
+          };
+          token_id = tokenId;
+          memo = null;
+          created_at_time = null;
+        },
+      ]);
+    } catch (error) {
+      return #err("Transfer call failed: " # Error.message(error));
+    };
+    if (result.size() == 0) {
+      return #err("ICRC-7 transfer returned no result");
+    };
+    switch (result[0]) {
+      case null #err("ICRC-7 transfer was not processed");
+      case (?(#Ok(_))) #ok;
+      case (?(#Err(error))) #err("ICRC-7 transfer rejected: " # icrc7TransferErrorToText(error));
+    };
+  };
+
+  func fetchICRC7AccountPreviews(
+    canister : NFTStandards.ICRC7Actor,
+    collection : CollectionTypes.Collection,
+    walletOwner : Principal,
+    account : NFTStandards.ICRC7Account,
+    location : Types.WalletLocation,
+  ) : async* { #ok : [Types.WalletNFT]; #err : Text } {
+    let pageSize : Nat = 100;
+    var prev : ?Nat = null;
+    var previews : [Types.WalletNFT] = [];
+
+    label paginate loop {
+      let tokenIds = try {
+        await canister.icrc7_tokens_of(account, prev, ?pageSize);
+      } catch (error) {
+        return #err("Collection '" # collection.name # "': icrc7_tokens_of failed: " # Error.message(error));
+      };
+      if (tokenIds.size() == 0) {
+        break paginate;
+      };
+
+      let metadatas = try {
+        await canister.icrc7_token_metadata(tokenIds);
+      } catch (_) {
+        Array.tabulate<?NFTStandards.ICRC7TokenMetadata>(
+          tokenIds.size(),
+          func(_) { null },
+        );
+      };
+
+      var index : Nat = 0;
+      for (tokenId in tokenIds.values()) {
+        let metadata = if (index < metadatas.size()) {
+          metadataFromICRC7(metadatas[index], collection.name, tokenId);
+        } else {
+          fallbackICRC7Metadata(collection.name, tokenId);
+        };
+        previews := Array.concat<Types.WalletNFT>(
+          previews,
+          [
+            buildPreviewNFT(
+              walletOwner,
+              collection.id,
+              Nat.toText(tokenId),
+              metadata,
+              location,
+              tokenId,
+            )
+          ],
+        );
+        index += 1;
+      };
+
+      if (tokenIds.size() < pageSize) {
+        break paginate;
+      };
+      prev := ?tokenIds[tokenIds.size() - 1];
+    };
+
+    #ok(previews);
+  };
+
   func fetchICRC7Previews(
     canister : NFTStandards.ICRC7Actor,
     collection : CollectionTypes.Collection,
@@ -3486,7 +3621,7 @@ module {
         if (ownerIndex < owners.size()) {
           switch (owners[ownerIndex]) {
             case (?account) {
-              if (Principal.equal(account.owner, owner)) {
+              if (icrc7DefaultAccountMatchesOwner(account, owner)) {
                 ownedTokenIds := Array.concat<Nat>(ownedTokenIds, [tokenId]);
               };
             };
@@ -3608,6 +3743,72 @@ module {
     normalizedOwner == Text.toLower(accountIdHex) or
     normalizedOwner == Text.toLower(principalText) or
     normalizedOwner == Text.toLower(principalHex);
+  };
+
+  func icrc7DefaultAccountMatchesOwner(
+    account : NFTStandards.ICRC7Account,
+    owner : Principal,
+  ) : Bool {
+    Principal.equal(account.owner, owner) and icrc7SubaccountMatches(null, account.subaccount);
+  };
+
+  func icrc7AccountMatches(
+    expected : NFTStandards.ICRC7Account,
+    actual : NFTStandards.ICRC7Account,
+  ) : Bool {
+    Principal.equal(expected.owner, actual.owner) and icrc7SubaccountMatches(expected.subaccount, actual.subaccount);
+  };
+
+  func icrc7IndexedOwner(account : NFTStandards.ICRC7Account) : Types.IndexedOwner {
+    if (icrc7SubaccountMatches(null, account.subaccount)) {
+      #Principal(account.owner);
+    } else {
+      #Unknown;
+    };
+  };
+
+  func icrc7SubaccountMatches(expected : ?Blob, actual : ?Blob) : Bool {
+    switch (expected, actual) {
+      case (null, null) true;
+      case (null, ?actualSubaccount) blobIsDefaultSubaccount(actualSubaccount);
+      case (?expectedSubaccount, null) blobIsDefaultSubaccount(expectedSubaccount);
+      case (?expectedSubaccount, ?actualSubaccount) {
+        blobBytesEqual(expectedSubaccount, actualSubaccount) or
+        (blobIsDefaultSubaccount(expectedSubaccount) and blobIsDefaultSubaccount(actualSubaccount));
+      };
+    };
+  };
+
+  func blobIsDefaultSubaccount(blob : Blob) : Bool {
+    let bytes = blob.toArray();
+    if (bytes.size() == 0) {
+      return true;
+    };
+    if (bytes.size() != 32) {
+      return false;
+    };
+    for (byte in bytes.values()) {
+      if (byte != 0) {
+        return false;
+      };
+    };
+    true;
+  };
+
+  func blobBytesEqual(left : Blob, right : Blob) : Bool {
+    let leftBytes = left.toArray();
+    let rightBytes = right.toArray();
+    if (leftBytes.size() != rightBytes.size()) {
+      return false;
+    };
+    var index : Nat = 0;
+    while (index < leftBytes.size()) {
+      if (leftBytes[index] != rightBytes[index]) {
+        return false;
+      };
+      index += 1;
+    };
+    true;
   };
 
   func fetchDIP721PreviewsByOwnerScan(

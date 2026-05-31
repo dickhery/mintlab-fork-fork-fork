@@ -158,7 +158,6 @@ const MAX_SYNC_PAGES_PER_CLICK = 5;
 const SYNC_SLOW_NOTICE_MS = 15_000;
 const SYNC_REFRESH_INTERVAL_MS = 6_000;
 const SYNC_FINISHED_STATUS_CLEAR_MS = 6_000;
-const SYNC_PARTIAL_STATUS_CLEAR_MS = 45_000;
 const WALLET_NFT_PAGE_SIZE = 50n;
 const WALLET_COLLECTION_PAGE_SIZE = 50n;
 const WALLET_LISTING_PAGE_SIZE = 25n;
@@ -1123,12 +1122,14 @@ interface ImportSpecificNFTModalProps {
   open: boolean;
   onClose: () => void;
   collections: Collection[];
+  initialCollectionId?: bigint | null;
 }
 
 function ImportSpecificNFTModal({
   open,
   onClose,
   collections,
+  initialCollectionId = null,
 }: ImportSpecificNFTModalProps) {
   const { actor } = useBackend();
   const { principal } = useAuth();
@@ -1136,12 +1137,25 @@ function ImportSpecificNFTModal({
   const [collectionId, setCollectionId] = useState("");
   const [tokenId, setTokenId] = useState("");
 
-  const externalCollections = collections.filter(
-    (collection) => collection.kind === "External",
+  const externalCollections = useMemo(
+    () => collections.filter((collection) => collection.kind === "External"),
+    [collections],
   );
   const selectedCollection = externalCollections.find(
     (collection) => collection.id.toString() === collectionId,
   );
+
+  useEffect(() => {
+    if (!open || initialCollectionId == null) return;
+    const nextCollectionId = initialCollectionId.toString();
+    if (
+      externalCollections.some(
+        (collection) => collection.id.toString() === nextCollectionId,
+      )
+    ) {
+      setCollectionId(nextCollectionId);
+    }
+  }, [open, initialCollectionId, externalCollections]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -1403,9 +1417,7 @@ function CollectionIndexingDialog({
           </div>
 
           <div className="rounded-lg border border-accent/20 bg-accent/5 p-3 text-xs text-muted-foreground">
-            <p className="font-medium text-foreground">
-              Ownership discovery
-            </p>
+            <p className="font-medium text-foreground">Ownership discovery</p>
             <p className="mt-1 leading-relaxed">
               Indexing reads ownership in small pages so wallet Sync can find
               NFTs from older imported collections. Direct token ID import still
@@ -2072,7 +2084,7 @@ interface ReceivingInstructionsProps {
   collections: Collection[];
   onSync: () => void;
   onSyncCollection?: (collectionId: bigint, tokenHints?: string[]) => void;
-  onImportSpecificNFT: () => void;
+  onImportSpecificNFT: (collectionId?: bigint) => void;
   onIndexCollection?: (collectionId: bigint) => void;
   syncStatus: SyncStatus;
 }
@@ -2199,7 +2211,7 @@ function ReceivingInstructions({
             size="sm"
             variant="ghost"
             className="h-7 px-2 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            onClick={onImportSpecificNFT}
+            onClick={() => onImportSpecificNFT()}
             data-ocid="wallet.import_specific_nft_button"
             aria-label="Import NFT by token ID"
             title="Import NFT by token ID"
@@ -2315,36 +2327,81 @@ function ReceivingInstructions({
                     </p>
                   </div>
                 </div>
-                {syncStatus.skipped.slice(0, 4).map((skip) => (
-                  <div
-                    key={skip.collectionId.toString()}
-                    className="flex flex-col gap-2 border-t border-amber-200/60 pt-2 sm:flex-row sm:items-center sm:justify-between dark:border-amber-900/40"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {skip.collectionName}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {skip.message ||
-                          "Automatic discovery is still catching up for this collection."}
-                      </p>
+                {syncStatus.skipped.slice(0, 4).map((skip) => {
+                  const isIndexing = isAutoIndexingSkip(skip);
+                  const canTargetCollection =
+                    skip.collectionId !== 0n &&
+                    syncableCollections.some(
+                      (collection) => collection.id === skip.collectionId,
+                    );
+                  return (
+                    <div
+                      key={skip.collectionId.toString()}
+                      className="flex flex-col gap-2 border-t border-amber-200/60 pt-2 sm:flex-row sm:items-center sm:justify-between dark:border-amber-900/40"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {skip.collectionName}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {skip.message ||
+                            "Automatic discovery is still catching up for this collection."}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                        {canTargetCollection && onSyncCollection && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 shrink-0 gap-1.5 text-xs"
+                            onClick={() => {
+                              setSyncTargetCollectionId(
+                                skip.collectionId.toString(),
+                              );
+                              setSyncTokenHint("");
+                              onSyncCollection(skip.collectionId, []);
+                            }}
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                            Sync collection
+                          </Button>
+                        )}
+                        {canTargetCollection && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 shrink-0 gap-1.5 text-xs"
+                            onClick={() =>
+                              onImportSpecificNFT(skip.collectionId)
+                            }
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                            Enter token ID
+                          </Button>
+                        )}
+                        {!isIndexing &&
+                          canTargetCollection &&
+                          onIndexCollection && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 shrink-0"
+                              onClick={() =>
+                                onIndexCollection(skip.collectionId)
+                              }
+                            >
+                              Open Indexing
+                            </Button>
+                          )}
+                        {!canTargetCollection && (
+                          <Badge variant="secondary" className="shrink-0">
+                            {isIndexing ? "Indexing" : "Action needed"}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                    {!isAutoIndexingSkip(skip) && onIndexCollection ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-8 shrink-0"
-                        onClick={() => onIndexCollection(skip.collectionId)}
-                      >
-                        Open Indexing
-                      </Button>
-                    ) : (
-                      <Badge variant="secondary" className="shrink-0">
-                        {isAutoIndexingSkip(skip) ? "Indexing" : "Action needed"}
-                      </Badge>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
                 {syncStatus.skipped.length > 4 && (
                   <p className="text-xs text-muted-foreground">
                     {syncStatus.skipped.length - 4} more collections{" "}
@@ -2658,6 +2715,8 @@ export default function WalletPage() {
   const syncScopeRef = useRef<string | null>(null);
   const syncResumeCursorRef = useRef<bigint | null>(null);
   const [importSpecificOpen, setImportSpecificOpen] = useState(false);
+  const [preferredImportCollectionId, setPreferredImportCollectionId] =
+    useState<bigint | null>(null);
   const [indexingCollectionId, setIndexingCollectionId] = useState<
     bigint | null
   >(null);
@@ -2935,19 +2994,16 @@ export default function WalletPage() {
 
   const [syncStatus, setSyncStatus] = useState<SyncStatus>({ kind: "idle" });
 
-  // Auto-clear finished sync statuses; keep partial guidance visible longer.
+  // Auto-clear finished sync statuses; keep partial guidance visible until the next sync status update.
   useEffect(() => {
     if (
       syncStatus.kind === "ok" ||
       syncStatus.kind === "upToDate" ||
-      syncStatus.kind === "partial" ||
       syncStatus.kind === "error"
     ) {
       const id = setTimeout(
         () => setSyncStatus({ kind: "idle" }),
-        syncStatus.kind === "partial"
-          ? SYNC_PARTIAL_STATUS_CLEAR_MS
-          : SYNC_FINISHED_STATUS_CLEAR_MS,
+        SYNC_FINISHED_STATUS_CLEAR_MS,
       );
       return () => clearTimeout(id);
     }
@@ -3490,6 +3546,16 @@ export default function WalletPage() {
     [handleSync],
   );
 
+  const openImportSpecificNFT = useCallback((collectionId?: bigint) => {
+    setPreferredImportCollectionId(collectionId ?? null);
+    setImportSpecificOpen(true);
+  }, []);
+
+  const closeImportSpecificNFT = useCallback(() => {
+    setImportSpecificOpen(false);
+    setPreferredImportCollectionId(null);
+  }, []);
+
   useEffect(() => {
     if (
       !actor ||
@@ -3580,7 +3646,7 @@ export default function WalletPage() {
           void handleSync();
         }}
         onSyncCollection={handleSyncCollection}
-        onImportSpecificNFT={() => setImportSpecificOpen(true)}
+        onImportSpecificNFT={openImportSpecificNFT}
         onIndexCollection={
           isAdmin
             ? (collectionId) => setIndexingCollectionId(collectionId)
@@ -3596,8 +3662,9 @@ export default function WalletPage() {
 
       <ImportSpecificNFTModal
         open={importSpecificOpen}
-        onClose={() => setImportSpecificOpen(false)}
+        onClose={closeImportSpecificNFT}
         collections={collections ?? []}
+        initialCollectionId={preferredImportCollectionId}
       />
 
       <CollectionIndexingDialog
