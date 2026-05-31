@@ -280,6 +280,19 @@ type NFTMetadata__480568277 =
     imageUrl : ?Text;
     name : ?Text
   };
+type NFTReportRecord__33536435 =
+  {
+    collectionId : CollectionId__674876002;
+    createdAt : Int;
+    lastReportReason : ?Text;
+    lastReportedAt : ?Int;
+    reporters : [Principal];
+    reviewedAt : ?Int;
+    reviewedBy : ?Principal;
+    status : NFTReportStatus__987127096;
+    tokenId : Text
+  };
+type NFTReportStatus__987127096 = {#Approved; #AutoHidden; #Hidden; #Open};
 type NFTStandard__49470003 = {#DIP721; #EXT; #ICRC7; #Other : Text};
 type Nat__490723111 = Nat__920180692;
 type Nat__920180692 = Nat;
@@ -587,6 +600,8 @@ actor {
       var tokensByOwnerCollection : ?Map__605269027<Text, [Nat]>
     };
   stable moderationState : {var config : ModerationConfig__323099261};
+  stable nftModerationState :
+    {reports : Map__605269027<Text, NFTReportRecord__33536435>};
   stable ownershipIndexState :
     {
       records : Map__605269027<Text, OwnershipIndexRecord__80260664>;

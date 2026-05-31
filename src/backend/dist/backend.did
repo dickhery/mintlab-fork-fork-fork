@@ -300,20 +300,20 @@ type NFTStandard =
    ICRC7;
    Other: text;
  };
-type NFTReportStatus =
+type NFTReportStatus = 
  variant {
    Approved;
    AutoHidden;
    Hidden;
    Open;
  };
-type NFTReportMetaPage =
+type NFTReportMetaPage = 
  record {
    nextCursor: opt nat;
    reports: vec NFTReportMeta;
    totalCount: nat;
  };
-type NFTReportMeta =
+type NFTReportMeta = 
  record {
    collectionId: CollectionId;
    createdAt: int;
