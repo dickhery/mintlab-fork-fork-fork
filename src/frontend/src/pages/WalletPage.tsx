@@ -675,7 +675,7 @@ function SendNFTModal({ open, onClose, nft, collection }: SendNFTModalProps) {
                 {nftName}
               </p>
               <p className="text-xs text-muted-foreground font-mono mt-0.5">
-                {getNFTTokenLabel(nft)}
+                {getNFTTokenLabel(nft, collection)}
               </p>
               {collection && (
                 <CollectionBadge
@@ -811,7 +811,7 @@ function NFTDetailsModal({
   onSend,
 }: NFTDetailsModalProps) {
   const nftName = getNFTDisplayName(nft, collection);
-  const displayTokenId = getNFTDisplayTokenId(nft);
+  const displayTokenId = getNFTDisplayTokenId(nft, collection);
   const visibleAttributes = getNFTVisibleAttributes(nft.metadata);
   const imageUrl = resolveImageUrl(nft.metadata.imageUrl, {
     canisterId: collection?.canisterId.toString(),
@@ -891,7 +891,7 @@ function NFTDetailsModal({
                 {nftName}
               </DialogTitle>
               <p className="text-sm text-muted-foreground font-mono">
-                {getNFTTokenLabel(nft)}
+                {getNFTTokenLabel(nft, collection)}
               </p>
             </DialogHeader>
 
@@ -2906,7 +2906,7 @@ export default function WalletPage() {
       const result = await actor.reportNFT(
         collection.id,
         nft.tokenId,
-        `Wallet report for ${getNFTTokenLabel(nft)} in ${collection.name}`,
+        `Wallet report for ${getNFTTokenLabel(nft, collection)} in ${collection.name}`,
       );
       if (result.__kind__ === "err") throw new Error(result.err);
       return result.ok;

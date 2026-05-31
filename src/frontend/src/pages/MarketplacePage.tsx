@@ -47,6 +47,7 @@ import {
   nftCustodyDescription,
   nftCustodyLabel,
 } from "@/lib/nft-custody";
+import { getNFTDisplayName, getNFTTokenLabel } from "@/lib/nft-display";
 import type {
   ActiveListing,
   ActiveListingDetail,
@@ -210,7 +211,7 @@ function FixedListingCard({
   isBuying,
   isCancelling,
 }: FixedCardProps) {
-  const name = nft?.metadata.name ?? `NFT #${nft?.tokenId ?? "?"}`;
+  const name = nft ? getNFTDisplayName(nft, collection) : "NFT #?";
   const sellerText = listing.seller.toString();
   const isOwner = currentPrincipal === sellerText;
   const custodyLabel = nft ? nftCustodyLabel(nft.location) : null;
@@ -248,7 +249,7 @@ function FixedListingCard({
             {truncatePrincipal(sellerText)}
           </p>
           <p className="text-[11px] text-muted-foreground mt-1 font-mono">
-            Token #{nft?.tokenId ?? "?"}
+            {nft ? getNFTTokenLabel(nft, collection) : "Token #?"}
           </p>
         </div>
 
@@ -349,7 +350,7 @@ function ListingDetailModal({
   if (!detail) return null;
 
   const { listing, nft, collection, trustStatus, dividendE8s } = detail;
-  const name = nft.metadata.name ?? `NFT #${nft.tokenId}`;
+  const name = getNFTDisplayName(nft, collection);
   const canisterId = collection?.canisterId.toString();
   const fixed = listing.__kind__ === "Fixed" ? listing.Fixed : null;
   const auction = listing.__kind__ === "Auction" ? listing.Auction : null;
@@ -435,7 +436,7 @@ function ListingDetailModal({
                 {name}
               </DialogTitle>
               <p className="text-sm text-muted-foreground font-mono">
-                Token #{nft.tokenId}
+                {getNFTTokenLabel(nft, collection)}
               </p>
             </DialogHeader>
 
@@ -638,7 +639,7 @@ function AuctionListingCard({
 }: AuctionCardProps) {
   const remaining = useCountdown(listing.endTime);
   const ended = remaining <= 0;
-  const name = nft?.metadata.name ?? `NFT #${nft?.tokenId ?? "?"}`;
+  const name = nft ? getNFTDisplayName(nft, collection) : "NFT #?";
   const sellerText = listing.seller.toString();
   const isOwner = currentPrincipal === sellerText;
   const isWinner = isViewerWinningAuction(listing, currentPrincipal, bidStatus);
@@ -685,7 +686,7 @@ function AuctionListingCard({
             {truncatePrincipal(sellerText)}
           </p>
           <p className="text-[11px] text-muted-foreground mt-1 font-mono">
-            Token #{nft?.tokenId ?? "?"}
+            {nft ? getNFTTokenLabel(nft, collection) : "Token #?"}
           </p>
         </div>
 
@@ -952,10 +953,10 @@ function ListNFTModal({
             ) : (
               <div className="grid grid-cols-3 gap-2 max-h-48 overflow-y-auto pr-1">
                 {userNFTs.map((nft) => {
-                  const nftName = nft.metadata.name ?? `#${nft.tokenId}`;
                   const collection = collections.find(
                     (item) => item.id === nft.collectionId,
                   );
+                  const nftName = getNFTDisplayName(nft, collection);
                   const selected = selectedNFT === nft.id;
                   return (
                     <button
@@ -1173,6 +1174,7 @@ function ListNFTModal({
 interface BidModalProps {
   listing: AuctionListing | null;
   nft: WalletNFT | undefined;
+  collection?: Collection;
   ledgerFeeE8s: bigint;
   auctionBidFeeReserveE8s: bigint;
   mintlabFeeBps: bigint;
@@ -1184,6 +1186,7 @@ interface BidModalProps {
 function PlaceBidModal({
   listing,
   nft,
+  collection,
   ledgerFeeE8s,
   auctionBidFeeReserveE8s,
   mintlabFeeBps,
@@ -1209,7 +1212,7 @@ function PlaceBidModal({
 
   const minBid = nextAuctionMinimumBid(listing);
   const minBidICP = formatICPAmount(minBid);
-  const name = nft?.metadata.name ?? `NFT #${nft?.tokenId ?? "?"}`;
+  const name = nft ? getNFTDisplayName(nft, collection) : "NFT #?";
   const pendingAmount = pendingBidAmount ?? 0n;
   const pendingMintlabFee = marketplaceFee(pendingAmount, mintlabFeeBps);
   const escrowDeposit = pendingAmount + auctionBidFeeReserveE8s;
@@ -1715,7 +1718,7 @@ export default function MarketplacePage() {
       const result = await actor.reportNFT(
         collection.id,
         nft.tokenId,
-        `Marketplace report for token #${nft.tokenId} in ${collection.name}`,
+        `Marketplace report for ${getNFTTokenLabel(nft, collection)} in ${collection.name}`,
       );
       if (result.__kind__ === "err") throw new Error(result.err);
       return result.ok;
@@ -2555,6 +2558,12 @@ export default function MarketplacePage() {
           bidTarget
             ? auctionListings.find(({ listing }) => listing.id === bidTarget.id)
                 ?.nft
+            : undefined
+        }
+        collection={
+          bidTarget
+            ? auctionListings.find(({ listing }) => listing.id === bidTarget.id)
+                ?.collection
             : undefined
         }
         ledgerFeeE8s={ledgerFeeE8s}

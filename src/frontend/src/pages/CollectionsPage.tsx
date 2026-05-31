@@ -56,6 +56,12 @@ import {
 import { isLowCyclesError } from "@/lib/cycles";
 import { compressModerationImage } from "@/lib/imageUtils";
 import { resolveImageUrl } from "@/lib/media";
+import {
+  getNFTDisplayName,
+  getNFTDisplayTokenId,
+  getNFTTokenLabel,
+  getNFTVisibleAttributes,
+} from "@/lib/nft-display";
 import type {
   ActiveListingDetail,
   Collection,
@@ -1536,7 +1542,7 @@ function NFTDetailModal({
       const result = await actor.reportNFT(
         collection.id,
         nft.tokenId,
-        `Collections page report for token #${nft.tokenId} in ${collection.name}`,
+        `Collections page report for ${getNFTTokenLabel(nft, collection)} in ${collection.name}`,
       );
       if (result.__kind__ === "err") throw new Error(result.err);
       return result.ok;
@@ -1556,7 +1562,9 @@ function NFTDetailModal({
     },
   });
 
-  const nftName = nft.metadata.name ?? `#${nft.tokenId}`;
+  const nftName = getNFTDisplayName(nft, collection);
+  const displayTokenId = getNFTDisplayTokenId(nft, collection);
+  const visibleAttributes = getNFTVisibleAttributes(nft.metadata);
   const imageUrl = resolveImageUrl(nft.metadata.imageUrl, {
     canisterId: collection.canisterId.toString(),
     tokenId: nft.tokenId,
@@ -1614,7 +1622,7 @@ function NFTDetailModal({
                     variant="secondary"
                     className="font-mono text-xs bg-muted/60 text-muted-foreground border border-border/40"
                   >
-                    #{nft.tokenId}
+                    {getNFTTokenLabel(nft, collection)}
                   </Badge>
                   <Badge
                     variant="secondary"
@@ -1673,8 +1681,15 @@ function NFTDetailModal({
               </div>
 
               <div className="grid grid-cols-1 gap-3">
+                {displayTokenId && (
+                  <CopyField
+                    label="Display Token ID"
+                    value={displayTokenId}
+                    ocid="collections.nft_detail.copy_display_token_id"
+                  />
+                )}
                 <CopyField
-                  label="Token ID"
+                  label={displayTokenId ? "Canonical Token ID" : "Token ID"}
                   value={nft.tokenId}
                   ocid="collections.nft_detail.copy_token_id"
                 />
@@ -1717,13 +1732,13 @@ function NFTDetailModal({
               </div>
 
               {/* Attributes */}
-              {nft.metadata.attributes.length > 0 && (
+              {visibleAttributes.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                     <Tag className="w-3 h-3" /> Attributes
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {nft.metadata.attributes.map(([key, value]) => (
+                    {visibleAttributes.map(([key, value]) => (
                       <div
                         key={`attr-detail-${key}-${value}`}
                         className="bg-muted/40 border border-border/50 rounded-lg px-3 py-2 text-center"
@@ -2239,7 +2254,7 @@ function NFTBrowser({
     onSuccess: (nft) => {
       setDirectLookupNFT(nft);
       setSelectedNFT(nft);
-      toast.success(`Loaded NFT #${nft.tokenId}`);
+      toast.success(`Loaded ${getNFTTokenLabel(nft, collection)}`);
     },
     onError: (err: unknown) => {
       toast.error(extractError(err));
@@ -2267,8 +2282,12 @@ function NFTBrowser({
     return browsableNFTs.filter((nft) => {
       // text search
       if (q) {
-        const nameMatch = (nft.metadata.name ?? "").toLowerCase().includes(q);
-        const idMatch = nft.tokenId.toLowerCase().includes(q);
+        const nameMatch = getNFTDisplayName(nft, collection)
+          .toLowerCase()
+          .includes(q);
+        const idMatch =
+          nft.tokenId.toLowerCase().includes(q) ||
+          getNFTTokenLabel(nft, collection).toLowerCase().includes(q);
         if (!nameMatch && !idMatch) return false;
       }
       // attribute filter
@@ -2280,7 +2299,7 @@ function NFTBrowser({
       }
       return true;
     });
-  }, [browsableNFTs, search, attrFilter]);
+  }, [browsableNFTs, search, attrFilter, collection]);
 
   const clearFilters = useCallback(() => {
     setSearch("");
@@ -2745,8 +2764,9 @@ function BrowseNFTCard({
   index,
   onClick,
 }: BrowseNFTCardProps) {
-  const name = nft.metadata.name ?? `#${nft.tokenId}`;
-  const topAttrs = nft.metadata.attributes.slice(0, 2);
+  const name = getNFTDisplayName(nft, collection);
+  const tokenLabel = getNFTTokenLabel(nft, collection);
+  const topAttrs = getNFTVisibleAttributes(nft.metadata).slice(0, 2);
 
   return (
     <motion.div
@@ -2797,9 +2817,7 @@ function BrowseNFTCard({
         <p className="font-display font-semibold text-xs text-foreground truncate">
           {name}
         </p>
-        <p className="font-mono text-xs text-muted-foreground">
-          #{nft.tokenId}
-        </p>
+        <p className="font-mono text-xs text-muted-foreground">{tokenLabel}</p>
         {topAttrs.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {topAttrs.map(([key, value]) => (

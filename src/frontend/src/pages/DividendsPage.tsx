@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import { isLowCyclesError } from "@/lib/cycles";
+import { getNFTDisplayName, getNFTTokenLabel } from "@/lib/nft-display";
 import type { ActiveListingDetail, NFTDividend, WalletNFT } from "@/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
@@ -474,10 +475,10 @@ export default function DividendsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {dividends.map((item, index) => {
               const hydratedNFT = mediaByDividendKey.get(dividendKey(item));
-              const nftName =
-                item.nft.metadata.name ??
-                hydratedNFT?.metadata.name ??
-                `NFT #${item.nft.tokenId}`;
+              const nftName = getNFTDisplayName(
+                hydratedNFT ?? item.nft,
+                item.collection,
+              );
               const imageSrc =
                 item.nft.metadata.imageUrl ?? hydratedNFT?.metadata.imageUrl;
               const isListed = listedDividendKeySet.has(dividendKey(item));
@@ -518,7 +519,7 @@ export default function DividendsPage() {
                             variant="secondary"
                             className="font-mono text-xs bg-muted/60 text-muted-foreground border border-border/40"
                           >
-                            #{item.nft.tokenId}
+                            {getNFTTokenLabel(item.nft, item.collection)}
                           </Badge>
                         </div>
                         <h2 className="font-display font-semibold text-foreground truncate mt-2">
