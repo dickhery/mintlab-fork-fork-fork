@@ -799,6 +799,20 @@ function CreateCollectionCard({
     }
   }
 
+  const collectionReview = {
+    name: name.trim() || "Not set",
+    symbol: symbol.trim().toUpperCase() || "Not set",
+    description: description.trim() || "Not set",
+    imageLabel: imageFileName || "Uploaded collection image",
+    imagePreviewUrl: resolveImageUrl(imageDataUrl),
+    standard: "ICRC-7",
+    controllers: "You and Mintlab",
+    dividendsLabel: dividendsEnabled ? "Enabled" : "Disabled",
+    dividendsDetail: dividendsEnabled
+      ? "A dedicated ICP dividend address will be created for this collection."
+      : "No dedicated dividend account will be created. Choose Make Changes if you meant to enable dividends.",
+  };
+
   return (
     <>
       <Card className="border-border bg-card">
@@ -979,12 +993,13 @@ function CreateCollectionCard({
       <PaymentConfirmationDialog
         open={confirmCreateOpen}
         onOpenChange={setConfirmCreateOpen}
-        title="Confirm Collection Payment"
+        title="Review Collection Settings"
         description={
           moderationConfig?.enabled
-            ? "Mintlab checks the uploaded image before any ICP is transferred."
-            : "Confirm the ICP payment from your in-app account before Mintlab creates your collection canister."
+            ? "Review the settings below. Mintlab checks the uploaded image before any ICP is transferred."
+            : "Review the settings below before Mintlab debits your in-app ICP balance and creates your collection canister."
         }
+        cancelLabel="Make Changes"
         lines={[
           {
             label: "Collection fee",
@@ -1024,14 +1039,93 @@ function CreateCollectionCard({
               : "Loading",
           },
         ]}
-        confirmLabel="Create Collection"
+        confirmLabel="Confirm Settings and Pay"
         isPending={createMutation.isPending}
         onConfirm={() => {
           setConfirmCreateOpen(false);
           createMutation.mutate();
         }}
         ocid="collections.create.payment_dialog"
-      />
+      >
+        <div
+          className="space-y-3 rounded-lg border border-border bg-muted/20 p-3"
+          data-ocid="collections.create.settings_review"
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background">
+              {collectionReview.imagePreviewUrl ? (
+                <img
+                  src={collectionReview.imagePreviewUrl}
+                  alt="Collection preview"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <ImageOff className="h-5 w-5 text-muted-foreground" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Collection settings
+              </p>
+              <p className="mt-1 truncate font-display text-base font-semibold text-foreground">
+                {collectionReview.name}
+              </p>
+              <p className="mt-1 break-words text-xs text-muted-foreground">
+                {collectionReview.imageLabel}
+              </p>
+            </div>
+          </div>
+
+          <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-muted-foreground">Symbol</dt>
+              <dd className="font-mono text-foreground">
+                {collectionReview.symbol}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">NFT standard</dt>
+              <dd className="font-mono text-foreground">
+                {collectionReview.standard}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Controllers</dt>
+              <dd className="text-foreground">
+                {collectionReview.controllers}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Dividends</dt>
+              <dd className="font-medium text-foreground">
+                {collectionReview.dividendsLabel}
+              </dd>
+            </div>
+          </dl>
+
+          <div className="rounded-md border border-border/70 bg-background/50 p-3">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Description
+            </p>
+            <p className="mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap break-words text-sm text-foreground">
+              {collectionReview.description}
+            </p>
+          </div>
+
+          <div
+            className={`rounded-md border p-3 text-xs leading-relaxed ${
+              dividendsEnabled
+                ? "border-accent/25 bg-accent/10 text-muted-foreground"
+                : "border-amber-500/25 bg-amber-500/10 text-muted-foreground"
+            }`}
+          >
+            <span className="font-medium text-foreground">
+              Dividends {collectionReview.dividendsLabel.toLowerCase()}.
+            </span>{" "}
+            {collectionReview.dividendsDetail}
+          </div>
+        </div>
+      </PaymentConfirmationDialog>
       <AppCanisterTopUpDialog
         open={cycleTopUpReason != null}
         reason={cycleTopUpReason}

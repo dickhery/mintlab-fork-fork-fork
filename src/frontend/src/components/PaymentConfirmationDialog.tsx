@@ -10,6 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import type { ReactNode } from "react";
 
 interface PaymentLine {
   label: string;
@@ -23,6 +24,8 @@ interface PaymentConfirmationDialogProps {
   title: string;
   description: string;
   lines: PaymentLine[];
+  children?: ReactNode;
+  cancelLabel?: string;
   confirmLabel?: string;
   isPending?: boolean;
   onConfirm: () => void;
@@ -35,6 +38,8 @@ export function PaymentConfirmationDialog({
   title,
   description,
   lines,
+  children,
+  cancelLabel = "Cancel",
   confirmLabel = "Confirm Payment",
   isPending = false,
   onConfirm,
@@ -42,16 +47,20 @@ export function PaymentConfirmationDialog({
 }: PaymentConfirmationDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="bg-card border-border" data-ocid={ocid}>
+      <AlertDialogContent
+        className="max-h-[90vh] overflow-y-auto bg-card border-border sm:max-w-xl"
+        data-ocid={ocid}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle className="font-display">{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>
         </AlertDialogHeader>
+        {children}
         <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-sm">
           {lines.map((line) => (
             <div
               key={line.label}
-              className="flex items-start justify-between gap-4"
+              className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4"
             >
               <span className="text-muted-foreground">
                 {line.label}
@@ -61,7 +70,7 @@ export function PaymentConfirmationDialog({
                   </span>
                 )}
               </span>
-              <span className="font-mono text-foreground text-right">
+              <span className="break-words text-right font-mono text-foreground">
                 {line.value}
               </span>
             </div>
@@ -70,7 +79,7 @@ export function PaymentConfirmationDialog({
         <TermsAgreementNotice />
         <AlertDialogFooter>
           <AlertDialogCancel className="border-border" disabled={isPending}>
-            Cancel
+            {cancelLabel}
           </AlertDialogCancel>
           <AlertDialogAction
             className="bg-accent text-accent-foreground hover:bg-accent/90"

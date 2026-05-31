@@ -1,6 +1,6 @@
-export const TERMS_VERSION = "2026-05-29";
-export const TERMS_LAST_UPDATED = "May 29, 2026";
-export const TERMS_EFFECTIVE_DATE = "May 29, 2026";
+export const TERMS_VERSION = "2026-05-31";
+export const TERMS_LAST_UPDATED = "May 31, 2026";
+export const TERMS_EFFECTIVE_DATE = "May 31, 2026";
 
 export interface TermsSection {
   title: string;
@@ -11,6 +11,7 @@ export interface TermsSection {
 export const termsRiskHighlights = [
   "Blockchain and canister transactions can be final, irreversible, delayed, or fail.",
   "ICP, NFTs, and dividend balances can change in value and may become worthless.",
+  "Collection creation settings, including dividend enablement, must be reviewed before confirming payment.",
   "The in-app ICP account, marketplace escrow, vault, dividend, and cycle top-up flows depend on canister code and ICP ledger behavior.",
   "Smart contracts, external collection canisters, moderation services, gateways, and network infrastructure can contain bugs or become unavailable.",
 ];
@@ -52,6 +53,8 @@ export const termsSections: TermsSection[] = [
     bullets: [
       "NFT ownership is determined by the applicable on-chain canister logic, including Mintlab-created ICRC-7 collection canisters and imported external collection canisters.",
       "Minting and collection creation can require ICP payments, ledger fees, moderation checks, canister creation, cycle conversion, and asynchronous recovery steps.",
+      "Before confirming a collection creation payment, Mintlab may show a review screen with the collection name, symbol, description, image, NFT standard, controller model, dividend setting, fee quote, and cycle allocation. You are responsible for reviewing these settings before confirming payment.",
+      "Dividend configuration is selected during collection creation in the current setup flow. If dividends are not enabled before payment, a dedicated dividend account may not be created for that collection.",
       "Mintlab-created collections may use dedicated canisters. Creators should keep enough cycles available and understand that controller changes can affect app-managed updates, top-ups, and recovery tools.",
       "Minted metadata, images, attributes, collection names, and collection descriptions may be stored on-chain or displayed publicly and may be difficult or impossible to remove completely.",
     ],
