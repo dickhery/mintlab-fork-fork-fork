@@ -283,9 +283,9 @@ function summarizeSyncSkipped(skipped: WalletSyncSkip[]): string {
       : `${indexing.length} imported collections are still indexing automatically.`;
   }
   if (needsSetup.length === 1) {
-    return `${needsSetup[0].collectionName} needs targeted sync or a token ID before automatic discovery can find new NFTs.`;
+    return `${needsSetup[0].collectionName} needs one more check. Select it in the sync menu and click Sync selected, or import the token ID directly.`;
   }
-  return `${needsSetup.length} imported collections need targeted sync or token IDs before automatic discovery can find new NFTs.`;
+  return `${needsSetup.length} imported collections need one more check. Select a collection in the sync menu and click Sync selected, or import a token ID directly.`;
 }
 
 function summarizeSyncAttention(
@@ -2202,10 +2202,10 @@ function ReceivingInstructions({
               {syncStatus.skipped.length > 0
                 ? onlyAutoIndexing
                   ? `${indexingSkips.length} indexing`
-                  : `${setupSkips.length} need action`
+                  : `${setupSkips.length} need selected sync`
                 : syncStatus.newCount > 0
                   ? `${syncStatus.newCount} synced; some warnings`
-                  : "Some collections need attention"}
+                  : "Review sync details"}
             </motion.span>
           )}
           {syncStatus.kind === "error" && (
@@ -2325,7 +2325,7 @@ function ReceivingInstructions({
                         ? "Selected collection sync progress"
                         : onlyAutoIndexing
                           ? "Automatic discovery is indexing"
-                          : "Some collections need targeted sync"}
+                          : "Select a collection to finish sync"}
                     </p>
                     <p className="text-xs leading-relaxed text-muted-foreground">
                       {progress
@@ -2335,7 +2335,7 @@ function ReceivingInstructions({
                           )
                         : onlyAutoIndexing
                           ? "Sync is indexing imported collections in safe pages. New NFTs appear as soon as they are found; known token IDs can still be imported directly."
-                          : "All-collection sync skips broad discovery scans to stay responsive. Select a collection and run Sync selected, or enter a known token ID to verify it directly."}
+                          : "Use the collection menu above, choose the named collection, then click Sync selected. If you know the NFT token ID, Import NFT checks it directly."}
                     </p>
                   </div>
                 </div>
@@ -2419,7 +2419,7 @@ function ReceivingInstructions({
                     {syncStatus.skipped.length - 4} more collections{" "}
                     {onlyAutoIndexing
                       ? "are indexing automatically."
-                      : "need targeted sync."}
+                      : "need selected sync."}
                   </p>
                 )}
               </div>
@@ -2446,13 +2446,13 @@ function ReceivingInstructions({
         <div className="flex items-start gap-2 p-3 bg-muted/30 rounded-lg">
           <Info className="w-4 h-4 text-accent shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground leading-relaxed">
-            <strong className="text-foreground">To receive NFTs:</strong> Share
-            your <strong className="text-foreground">Principal ID</strong> with
-            the sender (Plug wallet, other ICP apps). After sending, click{" "}
-            <strong className="text-foreground">Sync</strong> to check on-chain
-            ownership and auto-register any new NFTs. Use your{" "}
-            <strong className="text-foreground">Account ID</strong> for
-            receiving ICP token transfers.
+            <strong className="text-foreground">To receive NFTs:</strong> Use
+            the field the sending wallet asks for. ICRC-7 and DIP721 use your{" "}
+            <strong className="text-foreground">Principal ID</strong>; EXT
+            collections may use either your Principal ID or the{" "}
+            <strong className="text-foreground">Account ID</strong>. After
+            sending, click <strong className="text-foreground">Sync</strong> to
+            check on-chain ownership and auto-register any new NFTs.
           </p>
         </div>
       </div>
@@ -3389,7 +3389,7 @@ export default function WalletPage() {
                     syncSkipped.length > 0
                       ? onlyAutoIndexing
                         ? `${indexingSkipped.length} collection(s) are still indexing automatically.`
-                        : `${setupSkipped.length} collection(s) need targeted sync or a token ID.`
+                        : `${setupSkipped.length} collection(s) need selected sync or a token ID.`
                       : "Some collections could not be checked.",
                 },
               );
@@ -3401,7 +3401,7 @@ export default function WalletPage() {
                 {
                   description: onlyAutoIndexing
                     ? "Automatic discovery is catching up in small batches. Click Sync again shortly, or import a known token ID directly."
-                    : `${setupSkipped.length} collection(s) need targeted sync or a token ID before automatic discovery can find new NFTs.`,
+                    : `${setupSkipped.length} collection(s) need selected sync from the collection menu, or a direct token ID import.`,
                 },
               );
             } else {

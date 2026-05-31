@@ -74,6 +74,12 @@ mixin (
     status : ?WalletTypes.CollectionIndexStatus;
   };
 
+  type EXTRegistryFallbackMode = {
+    #Never;
+    #WhenDirectUnavailable;
+    #WhenDirectEmptyOrUnavailable;
+  };
+
   // Kept as stable fields for upgrade compatibility; sync uses the transient safe limits below.
   let AUTO_INDEX_PAGE_LIMIT : Nat = 40;
   let AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat = 2;
@@ -84,7 +90,7 @@ mixin (
   transient let TARGET_SYNC_INDEX_PAGE_DEFAULT : Nat = 3;
   transient let TARGET_SYNC_INDEX_PAGE_MAX : Nat = 3;
   transient let TARGET_SYNC_TOKEN_HINT_MAX : Nat = 3;
-  transient let EXT_SELECTED_REGISTRY_SYNC_MAX_ENTRIES : Nat = 2_000;
+  transient let EXT_SELECTED_REGISTRY_SYNC_MAX_ENTRIES : Nat = 5_000;
   transient let CHILD_NFT_SYNC_PAGE_SIZE : Nat = 25;
   transient let CHILD_TOKEN_SYNC_PAGE_SIZE : Nat = 25;
   transient let PUBLIC_PAGE_DEFAULT : Nat = 50;
@@ -1016,7 +1022,7 @@ mixin (
         };
 
         if (shouldRunSelectedScan) {
-          let appAccountSynced = await* syncMintlabAppAccountCollection(caller, collection, #Always, true);
+          let appAccountSynced = await* syncMintlabAppAccountCollection(caller, collection, #Always, #WhenDirectEmptyOrUnavailable);
           newCount += appAccountSynced.newCount;
           if (appAccountSynced.foundCount > 0) {
             shouldRunSelectedScan := false;
@@ -1553,7 +1559,7 @@ mixin (
             );
           };
         };
-        let appAccountSynced = await* syncMintlabAppAccountCollection(caller, collection, #WhenBalancePositive, false);
+        let appAccountSynced = await* syncMintlabAppAccountCollection(caller, collection, #WhenBalancePositive, #WhenDirectUnavailable);
         newCount += appAccountSynced.newCount;
       };
     };
@@ -1590,25 +1596,46 @@ mixin (
           caller,
           userAccountIdHex,
         );
-        if (found.size() > 0) {
-          return {
-            nfts = found;
-            errors = [];
-            skip = null;
-            complete = false;
+        switch (
+          await* WalletLib.indexEXTRegistryForOwnerBounded(
+            ownershipIndexState,
+            collection,
+            caller,
+            userAccountIdHex,
+            EXT_SELECTED_REGISTRY_SYNC_MAX_ENTRIES,
+          )
+        ) {
+          case (#ok(page)) {
+            return {
+              nfts = page.nfts;
+              errors = [];
+              skip = switch (page.error) {
+                case null null;
+                case (?message) ?{
+                  collectionId = collection.id;
+                  collectionName = collection.name;
+                  reason = "INDEX_REQUIRED";
+                  message;
+                };
+              };
+              complete = page.complete;
+            };
           };
-        };
-        return {
-          nfts = [];
-          errors = [];
-          skip = ?{
-            collectionId = collection.id;
-            collectionName = collection.name;
-            reason = "INDEX_REQUIRED";
-            message = "Mintlab checked this EXT collection's owner-token methods first, but the collection did not expose a bounded owner list for this wallet. " #
-            "Broad scans are skipped during all-wallet sync to keep sync responsive. Select this collection and run Sync selected for a bounded registry check, or enter a known token ID.";
+          case (#err(message)) {
+            return {
+              nfts = found;
+              errors = [];
+              skip = ?{
+                collectionId = collection.id;
+                collectionName = collection.name;
+                reason = "INDEX_REQUIRED";
+                message = "Mintlab checked this EXT collection's owner-token methods, then tried an automatic bounded registry scan. " #
+                message #
+                " Select this collection and run Sync selected with a known token ID if the NFT still does not appear.";
+              };
+              complete = false;
+            };
           };
-          complete = false;
         };
       };
       case (_) {};
@@ -1949,7 +1976,7 @@ mixin (
     caller : Principal,
     collection : CollectionTypes.Collection,
     icrc7ScanMode : WalletLib.ICRC7OwnerScanMode,
-    allowEXTRegistryFallback : Bool,
+    extRegistryFallbackMode : EXTRegistryFallbackMode,
   ) : async* { newCount : Nat; foundCount : Nat } {
     switch (collection.standard) {
       case (#EXT) {
@@ -1962,14 +1989,19 @@ mixin (
         );
         switch (directPreview) {
           case (#ok(nfts)) {
-            if (nfts.size() > 0 or not allowEXTRegistryFallback) {
+            if (nfts.size() > 0) {
               let registered = registerPreviewNFTs(caller, collection, nfts, #Vaulted);
               return { newCount = registered.newCount; foundCount = nfts.size() };
             };
+            switch (extRegistryFallbackMode) {
+              case (#WhenDirectEmptyOrUnavailable) {};
+              case (_) return { newCount = 0; foundCount = 0 };
+            };
           };
           case (#err(_)) {
-            if (not allowEXTRegistryFallback) {
-              return { newCount = 0; foundCount = 0 };
+            switch (extRegistryFallbackMode) {
+              case (#Never) return { newCount = 0; foundCount = 0 };
+              case (_) {};
             };
           };
         };
