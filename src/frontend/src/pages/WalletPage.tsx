@@ -14,11 +14,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -81,6 +83,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -1172,6 +1175,7 @@ interface ImportSpecificNFTModalProps {
   onClose: () => void;
   collections: Collection[];
   initialCollectionId?: bigint | null;
+  initialTokenId?: string | null;
 }
 
 function ImportSpecificNFTModal({
@@ -1179,6 +1183,7 @@ function ImportSpecificNFTModal({
   onClose,
   collections,
   initialCollectionId = null,
+  initialTokenId = null,
 }: ImportSpecificNFTModalProps) {
   const { actor } = useBackend();
   const { principal } = useAuth();
@@ -1205,6 +1210,11 @@ function ImportSpecificNFTModal({
       setCollectionId(nextCollectionId);
     }
   }, [open, initialCollectionId, externalCollections]);
+
+  useEffect(() => {
+    if (!open || initialTokenId == null) return;
+    setTokenId(initialTokenId);
+  }, [open, initialTokenId]);
 
   const mutation = useMutation({
     mutationFn: async () => {
@@ -2127,6 +2137,362 @@ type SyncResult =
     }
   | { __kind__: "err"; err: string };
 
+type SyncWizardStep = "collection" | "missingCollection" | "broad";
+
+interface WalletSyncWizardDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  syncableCollections: Collection[];
+  selectedCollectionId: string;
+  onSelectedCollectionIdChange: (value: string) => void;
+  tokenHint: string;
+  onTokenHintChange: (value: string) => void;
+  selectedReadiness: CollectionSyncReadiness | null;
+  isSyncing: boolean;
+  onSyncAll: () => void;
+  onSyncCollection?: (collectionId: bigint, tokenHints?: string[]) => void;
+  onImportCollection: () => void;
+  onImportSpecificNFT: (collectionId?: bigint, tokenId?: string) => void;
+}
+
+function WalletSyncWizardDialog({
+  open,
+  onOpenChange,
+  syncableCollections,
+  selectedCollectionId,
+  onSelectedCollectionIdChange,
+  tokenHint,
+  onTokenHintChange,
+  selectedReadiness,
+  isSyncing,
+  onSyncAll,
+  onSyncCollection,
+  onImportCollection,
+  onImportSpecificNFT,
+}: WalletSyncWizardDialogProps) {
+  const [step, setStep] = useState<SyncWizardStep>("collection");
+  const selectedCollection =
+    syncableCollections.find(
+      (collection) => collection.id.toString() === selectedCollectionId,
+    ) ?? null;
+  const trimmedTokenHint = tokenHint.trim();
+
+  useEffect(() => {
+    if (!open) return;
+    if (syncableCollections.length === 0) {
+      setStep("missingCollection");
+    } else {
+      setStep("collection");
+    }
+  }, [open, syncableCollections.length]);
+
+  function handleSelectedSync() {
+    if (!selectedCollection || !onSyncCollection) {
+      toast.error("Choose the imported collection this NFT belongs to.");
+      return;
+    }
+    onSyncCollection(
+      selectedCollection.id,
+      trimmedTokenHint ? [trimmedTokenHint] : [],
+    );
+    onOpenChange(false);
+  }
+
+  function handleBroadSync() {
+    onSelectedCollectionIdChange("all");
+    onTokenHintChange("");
+    onSyncAll();
+    onOpenChange(false);
+  }
+
+  const options: Array<{
+    value: SyncWizardStep;
+    title: string;
+    description: string;
+    icon: typeof Layers;
+  }> = [
+    {
+      value: "collection",
+      title: "I know the collection",
+      description: "Fastest when you can also enter the token ID.",
+      icon: Layers,
+    },
+    {
+      value: "missingCollection",
+      title: "I do not see it",
+      description: "Import the collection before syncing that NFT.",
+      icon: Plus,
+    },
+    {
+      value: "broad",
+      title: "I do not know",
+      description: "Checks imported collections in small pages.",
+      icon: RefreshCw,
+    },
+  ];
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className="max-h-[90vh] overflow-y-auto border-border bg-card sm:max-w-2xl"
+        data-ocid="wallet.sync_wizard.dialog"
+      >
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 font-display text-foreground">
+            <RefreshCw className="h-4 w-4 text-accent" />
+            Guided NFT Sync
+          </DialogTitle>
+          <DialogDescription>
+            Start with the collection when you know it. Mintlab checks a known
+            token ID directly before doing any slower collection indexing.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <RadioGroup
+            value={step}
+            onValueChange={(value) => setStep(value as SyncWizardStep)}
+            className="grid gap-2 sm:grid-cols-3"
+            data-ocid="wallet.sync_wizard.mode_group"
+          >
+            {options.map(({ value, title, description, icon: Icon }) => (
+              <label
+                key={value}
+                htmlFor={`sync-mode-${value}`}
+                className={`flex cursor-pointer items-start gap-2 rounded-lg border p-3 transition-smooth ${
+                  step === value
+                    ? "border-accent bg-accent/10 text-foreground"
+                    : "border-border bg-background/60 text-muted-foreground hover:border-accent/40"
+                }`}
+              >
+                <RadioGroupItem
+                  id={`sync-mode-${value}`}
+                  value={value}
+                  className="mt-0.5"
+                />
+                <span className="min-w-0">
+                  <span className="flex items-center gap-1.5 text-sm font-medium">
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    {title}
+                  </span>
+                  <span className="mt-1 block text-xs leading-relaxed">
+                    {description}
+                  </span>
+                </span>
+              </label>
+            ))}
+          </RadioGroup>
+
+          {step === "collection" && (
+            <div className="space-y-4 rounded-lg border border-border bg-background/60 p-4">
+              <div className="grid gap-3 md:grid-cols-[1fr_11rem]">
+                <div className="space-y-1.5">
+                  <Label htmlFor="syncWizardCollection">Collection</Label>
+                  <Select
+                    value={selectedCollectionId}
+                    onValueChange={onSelectedCollectionIdChange}
+                  >
+                    <SelectTrigger
+                      id="syncWizardCollection"
+                      className="bg-muted/30"
+                      data-ocid="wallet.sync_wizard.collection_select"
+                    >
+                      <SelectValue placeholder="Choose collection" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Choose collection</SelectItem>
+                      {syncableCollections.map((collection) => (
+                        <SelectItem
+                          key={collection.id.toString()}
+                          value={collection.id.toString()}
+                        >
+                          {collection.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="syncWizardTokenId">Token ID</Label>
+                  <Input
+                    id="syncWizardTokenId"
+                    value={tokenHint}
+                    onChange={(event) => onTokenHintChange(event.target.value)}
+                    placeholder="Optional"
+                    className="bg-muted/30 font-mono"
+                    data-ocid="wallet.sync_wizard.token_id_input"
+                  />
+                </div>
+              </div>
+
+              {selectedCollection ? (
+                <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-sm font-medium text-foreground">
+                        {selectedCollection.name}
+                      </p>
+                      <Badge variant="secondary">
+                        {nftStandardLabel(selectedCollection)}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                      {selectedReadiness?.recommendedAction ??
+                        "Mintlab will check owner lookups first, then continue saved selected indexing only when needed."}
+                    </p>
+                  </div>
+                  <Badge
+                    variant={
+                      selectedReadiness?.allowsSync === false
+                        ? "destructive"
+                        : "outline"
+                    }
+                    className="shrink-0"
+                  >
+                    {readinessStatusLabel(
+                      selectedReadiness,
+                      selectedCollection,
+                    )}
+                  </Badge>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-amber-200/70 bg-amber-50/70 p-3 text-xs leading-relaxed text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/20 dark:text-amber-100">
+                  Choose the imported collection that sent the NFT. If it is not
+                  listed, import the collection first.
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="justify-start gap-1.5 text-muted-foreground"
+                  onClick={() => setStep("missingCollection")}
+                >
+                  <Plus className="h-4 w-4" />I do not see the collection
+                </Button>
+                <div className="flex flex-wrap gap-2 sm:justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      if (selectedCollection) {
+                        onImportSpecificNFT(
+                          selectedCollection.id,
+                          trimmedTokenHint || undefined,
+                        );
+                      } else {
+                        onImportSpecificNFT();
+                      }
+                      onOpenChange(false);
+                    }}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Import by token ID
+                  </Button>
+                  <Button
+                    type="button"
+                    className="gap-2"
+                    disabled={
+                      isSyncing || !selectedCollection || !onSyncCollection
+                    }
+                    onClick={handleSelectedSync}
+                    data-ocid="wallet.sync_wizard.selected_submit"
+                  >
+                    <RefreshCw
+                      className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`}
+                    />
+                    {trimmedTokenHint ? "Check token ID" : "Sync collection"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === "missingCollection" && (
+            <div className="space-y-4 rounded-lg border border-border bg-background/60 p-4">
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">
+                  Import the collection first
+                </p>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Mintlab can only sync external NFTs from collections already
+                  added to the shared directory. After importing, return here
+                  and sync the specific collection or token ID.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  className="gap-2"
+                  onClick={onImportCollection}
+                  data-ocid="wallet.sync_wizard.import_collection_button"
+                >
+                  <Plus className="h-4 w-4" />
+                  Import collection
+                </Button>
+                {syncableCollections.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setStep("collection")}
+                  >
+                    <Layers className="h-4 w-4" />
+                    Choose existing collection
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {step === "broad" && (
+            <div className="space-y-4 rounded-lg border border-amber-200/70 bg-amber-50/70 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
+              <div className="flex items-start gap-2">
+                <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-foreground">
+                    Broad sync can take longer
+                  </p>
+                  <p className="text-sm leading-relaxed text-muted-foreground">
+                    Mintlab checks imported collections in small safe pages and
+                    saves progress. Some external canisters do not expose a
+                    complete owner index, so collection and token ID details are
+                    still the most reliable path.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  className="gap-2"
+                  disabled={isSyncing}
+                  onClick={handleBroadSync}
+                  data-ocid="wallet.sync_wizard.broad_submit"
+                >
+                  <RefreshCw
+                    className={`h-4 w-4 ${isSyncing ? "animate-spin" : ""}`}
+                  />
+                  Run broad sync
+                </Button>
+                {syncableCollections.length > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setStep("collection")}
+                  >
+                    <Layers className="h-4 w-4" />
+                    Choose collection
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 interface ReceivingInstructionsProps {
   actor: backendInterface | null;
   principalText: string | null;
@@ -2134,7 +2500,7 @@ interface ReceivingInstructionsProps {
   collections: Collection[];
   onSync: () => void;
   onSyncCollection?: (collectionId: bigint, tokenHints?: string[]) => void;
-  onImportSpecificNFT: (collectionId?: bigint) => void;
+  onImportSpecificNFT: (collectionId?: bigint, tokenId?: string) => void;
   onIndexCollection?: (collectionId: bigint) => void;
   syncStatus: SyncStatus;
 }
@@ -2152,6 +2518,8 @@ function ReceivingInstructions({
 }: ReceivingInstructionsProps) {
   const [syncTargetCollectionId, setSyncTargetCollectionId] = useState("all");
   const [syncTokenHint, setSyncTokenHint] = useState("");
+  const [syncWizardOpen, setSyncWizardOpen] = useState(false);
+  const navigate = useNavigate();
   const isSyncing = syncStatus.kind === "syncing";
   const skipped = syncStatus.kind === "partial" ? syncStatus.skipped : [];
   const progress = syncStatus.kind === "partial" ? syncStatus.progress : null;
@@ -2197,13 +2565,9 @@ function ReceivingInstructions({
     }
   }, [syncTargetCollectionId, syncableCollections]);
 
-  function handleSyncClick() {
-    if (selectedSyncCollection && onSyncCollection) {
-      const hint = syncTokenHint.trim();
-      onSyncCollection(selectedSyncCollection.id, hint ? [hint] : []);
-      return;
-    }
-    onSync();
+  function handleImportCollection() {
+    setSyncWizardOpen(false);
+    void navigate({ to: "/collections", hash: "import-collection" });
   }
 
   return (
@@ -2289,47 +2653,11 @@ function ReceivingInstructions({
             <Plus className="w-3 h-3" />
             Import NFT
           </Button>
-          {syncableCollections.length > 0 && (
-            <Select
-              value={syncTargetCollectionId}
-              onValueChange={setSyncTargetCollectionId}
-            >
-              <SelectTrigger
-                aria-label="Choose sync collection"
-                className="h-7 w-[min(100%,13rem)] border-border bg-background/60 px-2 text-xs"
-                data-ocid="wallet.sync_collection_select"
-              >
-                <Layers className="mr-1.5 h-3 w-3 shrink-0 text-muted-foreground" />
-                <SelectValue placeholder="All collections" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All collections</SelectItem>
-                {syncableCollections.map((collection) => (
-                  <SelectItem
-                    key={collection.id.toString()}
-                    value={collection.id.toString()}
-                  >
-                    {collection.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          {selectedSyncCollection && (
-            <Input
-              value={syncTokenHint}
-              onChange={(event) => setSyncTokenHint(event.target.value)}
-              placeholder="Optional token ID"
-              className="h-7 w-[min(100%,9rem)] border-border bg-background/60 px-2 text-xs"
-              data-ocid="wallet.sync_token_hint_input"
-              aria-label="Optional token ID for selected sync"
-            />
-          )}
           <Button
             size="sm"
             variant="ghost"
             className="h-7 px-2 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-            onClick={handleSyncClick}
+            onClick={() => setSyncWizardOpen(true)}
             disabled={isSyncing}
             data-ocid="wallet.refresh_button"
             aria-label="Sync NFTs from chain"
@@ -2337,14 +2665,26 @@ function ReceivingInstructions({
             <RefreshCw
               className={`w-3 h-3 ${isSyncing ? "animate-spin" : ""}`}
             />
-            {isSyncing
-              ? "Syncing…"
-              : selectedSyncCollection
-                ? "Sync selected"
-                : "Sync"}
+            {isSyncing ? "Syncing…" : "Sync"}
           </Button>
         </div>
       </div>
+
+      <WalletSyncWizardDialog
+        open={syncWizardOpen}
+        onOpenChange={setSyncWizardOpen}
+        syncableCollections={syncableCollections}
+        selectedCollectionId={syncTargetCollectionId}
+        onSelectedCollectionIdChange={setSyncTargetCollectionId}
+        tokenHint={syncTokenHint}
+        onTokenHintChange={setSyncTokenHint}
+        selectedReadiness={selectedReadiness}
+        isSyncing={isSyncing}
+        onSyncAll={onSync}
+        onSyncCollection={onSyncCollection}
+        onImportCollection={handleImportCollection}
+        onImportSpecificNFT={onImportSpecificNFT}
+      />
 
       <div className="p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -2487,7 +2827,7 @@ function ReceivingInstructions({
                           )
                         : onlyAutoIndexing
                           ? "Sync is indexing imported collections in safe pages. New NFTs appear as soon as they are found; known token IDs can still be imported directly."
-                          : "Use the collection menu above, choose the named collection, then click Sync selected. If you know the NFT token ID, Import NFT checks it directly."}
+                          : "Open Sync, choose the named collection, then run selected sync. If you know the NFT token ID, enter it there for the fastest check."}
                     </p>
                   </div>
                 </div>
@@ -2603,8 +2943,10 @@ function ReceivingInstructions({
             <strong className="text-foreground">Principal ID</strong>; EXT
             collections may use either your Principal ID or the{" "}
             <strong className="text-foreground">Account ID</strong>. After
-            sending, click <strong className="text-foreground">Sync</strong> to
-            check on-chain ownership and auto-register any new NFTs.
+            sending, click <strong className="text-foreground">Sync</strong>,
+            choose the collection and token ID when you know them, or import the
+            collection first if it is missing. Broad sync checks imported
+            collections in small saved pages.
           </p>
         </div>
       </div>
@@ -2881,6 +3223,9 @@ export default function WalletPage() {
   const [importSpecificOpen, setImportSpecificOpen] = useState(false);
   const [preferredImportCollectionId, setPreferredImportCollectionId] =
     useState<bigint | null>(null);
+  const [preferredImportTokenId, setPreferredImportTokenId] = useState<
+    string | null
+  >(null);
   const [indexingCollectionId, setIndexingCollectionId] = useState<
     bigint | null
   >(null);
@@ -3717,14 +4062,19 @@ export default function WalletPage() {
     [handleSync],
   );
 
-  const openImportSpecificNFT = useCallback((collectionId?: bigint) => {
-    setPreferredImportCollectionId(collectionId ?? null);
-    setImportSpecificOpen(true);
-  }, []);
+  const openImportSpecificNFT = useCallback(
+    (collectionId?: bigint, tokenId?: string) => {
+      setPreferredImportCollectionId(collectionId ?? null);
+      setPreferredImportTokenId(tokenId?.trim() || null);
+      setImportSpecificOpen(true);
+    },
+    [],
+  );
 
   const closeImportSpecificNFT = useCallback(() => {
     setImportSpecificOpen(false);
     setPreferredImportCollectionId(null);
+    setPreferredImportTokenId(null);
   }, []);
 
   useEffect(() => {
@@ -3837,6 +4187,7 @@ export default function WalletPage() {
         onClose={closeImportSpecificNFT}
         collections={collections ?? []}
         initialCollectionId={preferredImportCollectionId}
+        initialTokenId={preferredImportTokenId}
       />
 
       <CollectionIndexingDialog

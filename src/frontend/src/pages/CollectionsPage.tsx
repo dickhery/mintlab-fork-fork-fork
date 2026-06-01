@@ -438,7 +438,7 @@ function ImportCollectionCard({
   const imagePreviewUrl = resolveImageUrl(selectedImage);
 
   return (
-    <Card className="border-border bg-card">
+    <Card id="import-collection" className="scroll-mt-24 border-border bg-card">
       <CardHeader className="space-y-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <Plus className="w-4 h-4 text-accent" />

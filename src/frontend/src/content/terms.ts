@@ -1,6 +1,6 @@
-export const TERMS_VERSION = "2026-05-31.1";
-export const TERMS_LAST_UPDATED = "May 31, 2026";
-export const TERMS_EFFECTIVE_DATE = "May 31, 2026";
+export const TERMS_VERSION = "2026-06-01.1";
+export const TERMS_LAST_UPDATED = "June 1, 2026";
+export const TERMS_EFFECTIVE_DATE = "June 1, 2026";
 
 export interface TermsSection {
   title: string;
@@ -12,6 +12,7 @@ export const termsRiskHighlights = [
   "Blockchain and canister transactions can be final, irreversible, delayed, or fail.",
   "ICP, NFTs, and dividend balances can change in value and may become worthless.",
   "Collection creation settings, including dividend enablement, must be reviewed in the confirmation dialog before payment.",
+  "External NFTs may need the collection and token ID entered during guided sync before they appear in your Mintlab wallet view.",
   "The in-app ICP account, marketplace escrow, vault, dividend, and cycle top-up flows depend on canister code and ICP ledger behavior.",
   "Smart contracts, external collection canisters, moderation services, gateways, and network infrastructure can contain bugs or become unavailable.",
 ];
@@ -57,6 +58,8 @@ export const termsSections: TermsSection[] = [
       "Choosing Confirm Settings and Pay authorizes Mintlab to debit your in-app ICP account using the settings shown in the review dialog. Choose Make Changes if any setting is wrong or if you meant to enable dividends.",
       "Dividend configuration is selected during collection creation in the current setup flow. If dividends are not enabled before payment, a dedicated dividend account may not be created for that collection.",
       "Mintlab-created collections may use dedicated canisters. Creators should keep enough cycles available and understand that controller changes can affect app-managed updates, top-ups, and recovery tools.",
+      "External NFTs sent to your principal, account ID, or app deposit account may not appear automatically. Mintlab can usually check fastest when you know the imported collection and token ID. If the collection is not listed in Mintlab, import the collection before syncing that NFT.",
+      "Broad wallet sync only checks collections already imported into Mintlab, runs in small saved pages, may need repeated attempts, and may not find NFTs from external canisters that do not expose reliable owner or token index data.",
       "Minted metadata, images, attributes, collection names, and collection descriptions may be stored on-chain or displayed publicly and may be difficult or impossible to remove completely.",
     ],
   },
