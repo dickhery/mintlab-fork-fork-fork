@@ -44,6 +44,7 @@ export type {
   CollectionNFTPage,
   CollectionNFTLookupResult,
   CollectionIndexStatus,
+  CollectionSyncReadiness,
   CollectionIndexPageResult,
   WalletSyncSkip,
   WalletSyncV2Result,

@@ -599,6 +599,15 @@ export const idlFactory = ({ IDL }) => {
     'lastError' : IDL.Opt(IDL.Text),
     'indexed' : IDL.Nat,
   });
+  const CollectionSyncReadiness = IDL.Record({
+    'collectionId' : CollectionId,
+    'trustStatus' : IDL.Opt(CollectionTrustStatus),
+    'standard' : NFTStandard,
+    'recommendedAction' : IDL.Text,
+    'indexStatus' : IDL.Opt(CollectionIndexStatus),
+    'allowsSync' : IDL.Bool,
+    'hasBrowseInfo' : IDL.Bool,
+  });
   const CollectionNFTPage = IDL.Record({
     'nfts' : IDL.Vec(WalletNFT),
     'note' : IDL.Text,
@@ -856,6 +865,7 @@ export const idlFactory = ({ IDL }) => {
     'collectionId' : CollectionId,
     'newCount' : IDL.Nat,
     'complete' : IDL.Bool,
+    'directHintChecked' : IDL.Bool,
     'nextCursor' : IDL.Opt(IDL.Text),
     'scannedThisRun' : IDL.Nat,
   });
@@ -1325,6 +1335,16 @@ export const idlFactory = ({ IDL }) => {
     'getCollectionIndexStatus' : IDL.Func(
         [CollectionId],
         [IDL.Opt(CollectionIndexStatus)],
+        ['query'],
+      ),
+    'getCollectionSyncReadiness' : IDL.Func(
+        [CollectionId],
+        [
+          IDL.Variant({
+            'ok' : CollectionSyncReadiness,
+            'err' : IDL.Text,
+          }),
+        ],
         ['query'],
       ),
     'getCollectionNFT' : IDL.Func(

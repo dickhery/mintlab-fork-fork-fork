@@ -90,7 +90,7 @@ mixin (
   transient let TARGET_SYNC_INDEX_PAGE_DEFAULT : Nat = 3;
   transient let TARGET_SYNC_INDEX_PAGE_MAX : Nat = 3;
   transient let TARGET_SYNC_TOKEN_HINT_MAX : Nat = 3;
-  transient let EXT_SELECTED_REGISTRY_SYNC_MAX_ENTRIES : Nat = 5_000;
+  transient let EXT_SELECTED_REGISTRY_SYNC_MAX_ENTRIES : Nat = WalletLib.EXT_SAFE_FULL_REGISTRY_FALLBACK_MAX_ENTRIES;
   transient let CHILD_NFT_SYNC_PAGE_SIZE : Nat = 25;
   transient let CHILD_TOKEN_SYNC_PAGE_SIZE : Nat = 25;
   transient let PUBLIC_PAGE_DEFAULT : Nat = 50;
@@ -800,6 +800,34 @@ mixin (
     WalletLib.getOwnershipIndexStatus(ownershipIndexState, collectionId);
   };
 
+  public query func getCollectionSyncReadiness(
+    collectionId : WalletTypes.CollectionId
+  ) : async {
+    #ok : WalletTypes.CollectionSyncReadiness;
+    #err : Text;
+  } {
+    let collection = switch (CollectionLib.getCollection(collectionsState, collectionId)) {
+      case null return #err("Collection not found");
+      case (?value) value;
+    };
+    let visible = CollectionLib.isPubliclyVisible(collectionsState, collection);
+    let allowsSync = visible and CollectionLib.collectionAllowsSync(collectionsState, collection);
+    let status = WalletLib.getOwnershipIndexStatus(ownershipIndexState, collectionId);
+    let trustStatus = switch (CollectionLib.getImportMeta(collectionsState, collectionId)) {
+      case (?meta) ?meta.trustStatus;
+      case null null;
+    };
+    #ok({
+      collectionId;
+      standard = collection.standard;
+      hasBrowseInfo = collectionHasBrowseRange(collection);
+      allowsSync;
+      trustStatus;
+      indexStatus = status;
+      recommendedAction = collectionSyncRecommendedAction(collection, visible, allowsSync, status);
+    });
+  };
+
   public shared ({ caller }) func indexCollectionOwnershipPage(
     collectionId : WalletTypes.CollectionId,
     cursor : ?Text,
@@ -1062,7 +1090,8 @@ mixin (
           case (?value) value.cursor;
           case null null;
         };
-        complete = hintCount > 0 or scan.complete;
+        complete = scan.complete;
+        directHintChecked = hintCount > 0;
         status;
       });
     } finally {
@@ -1590,50 +1619,52 @@ mixin (
 
     switch (collection.standard) {
       case (#EXT) {
-        let found = WalletLib.indexedNFTsForOwner(
-          ownershipIndexState,
-          collection.id,
-          caller,
-          userAccountIdHex,
-        );
-        switch (
-          await* WalletLib.indexEXTRegistryForOwnerBounded(
+        if (canUseFullExtRegistryFallback(collection)) {
+          let found = WalletLib.indexedNFTsForOwner(
             ownershipIndexState,
-            collection,
+            collection.id,
             caller,
             userAccountIdHex,
-            EXT_SELECTED_REGISTRY_SYNC_MAX_ENTRIES,
-          )
-        ) {
-          case (#ok(page)) {
-            return {
-              nfts = page.nfts;
-              errors = [];
-              skip = switch (page.error) {
-                case null null;
-                case (?message) ?{
+          );
+          switch (
+            await* WalletLib.indexEXTRegistryForOwnerBounded(
+              ownershipIndexState,
+              collection,
+              caller,
+              userAccountIdHex,
+              EXT_SELECTED_REGISTRY_SYNC_MAX_ENTRIES,
+            )
+          ) {
+            case (#ok(page)) {
+              return {
+                nfts = page.nfts;
+                errors = [];
+                skip = switch (page.error) {
+                  case null null;
+                  case (?message) ?{
+                    collectionId = collection.id;
+                    collectionName = collection.name;
+                    reason = "INDEX_REQUIRED";
+                    message;
+                  };
+                };
+                complete = page.complete;
+              };
+            };
+            case (#err(message)) {
+              return {
+                nfts = found;
+                errors = [];
+                skip = ?{
                   collectionId = collection.id;
                   collectionName = collection.name;
                   reason = "INDEX_REQUIRED";
-                  message;
+                  message = "Mintlab checked this EXT collection's owner-token methods, then tried an automatic bounded registry scan. " #
+                  message #
+                  " Select this collection and run Sync selected with a known token ID if the NFT still does not appear.";
                 };
+                complete = false;
               };
-              complete = page.complete;
-            };
-          };
-          case (#err(message)) {
-            return {
-              nfts = found;
-              errors = [];
-              skip = ?{
-                collectionId = collection.id;
-                collectionName = collection.name;
-                reason = "INDEX_REQUIRED";
-                message = "Mintlab checked this EXT collection's owner-token methods, then tried an automatic bounded registry scan. " #
-                message #
-                " Select this collection and run Sync selected with a known token ID if the NFT still does not appear.";
-              };
-              complete = false;
             };
           };
         };
@@ -1773,7 +1804,7 @@ mixin (
   ) : async* WalletSelectedScanResult {
     switch (collection.standard) {
       case (#EXT) {
-        if (not collectionHasBrowseRange(collection)) {
+        if (canUseFullExtRegistryFallback(collection)) {
           switch (
             await* WalletLib.indexEXTRegistryForOwnerBounded(
               ownershipIndexState,
@@ -2004,6 +2035,9 @@ mixin (
               case (_) {};
             };
           };
+        };
+        if (not canUseFullExtRegistryFallback(collection)) {
+          return { newCount = 0; foundCount = 0 };
         };
         switch (
           await* WalletLib.previewEXTAccountNFTsFromRegistryBounded(
@@ -2315,6 +2349,60 @@ mixin (
         switch (browseInfo.totalSupply) {
           case null false;
           case (?_) true;
+        };
+      };
+    };
+  };
+
+  func canUseFullExtRegistryFallback(collection : CollectionTypes.Collection) : Bool {
+    WalletLib.canUseFullExtRegistryFallback(collection, EXT_SELECTED_REGISTRY_SYNC_MAX_ENTRIES);
+  };
+
+  func collectionSyncRecommendedAction(
+    collection : CollectionTypes.Collection,
+    visible : Bool,
+    allowsSync : Bool,
+    status : ?WalletTypes.CollectionIndexStatus,
+  ) : Text {
+    if (not visible) {
+      return "This collection is hidden or blocked while it is reviewed.";
+    };
+    if (not allowsSync) {
+      return "Automatic wallet sync is disabled for this collection. Import a known token ID directly or wait for admin review.";
+    };
+    switch (status) {
+      case (?value) {
+        if (value.complete) {
+          return "Ownership index is complete. Sync should use the saved owner index plus direct token checks.";
+        };
+        if (value.scanned > 0) {
+          return "Safe indexing progress is saved. Continue selected indexing or enter a known token ID.";
+        };
+      };
+      case null {};
+    };
+    switch (collection.kind) {
+      case (#Minted) "Mintlab-managed collection syncs directly.";
+      case (#External) {
+        switch (collection.standard) {
+          case (#EXT) {
+            if (collectionHasBrowseRange(collection)) {
+              "Ready for safe selected indexing using the configured token range.";
+            } else if (canUseFullExtRegistryFallback(collection)) {
+              "Ready for direct owner lookup and small EXT registry fallback.";
+            } else {
+              "Needs safe indexing setup. Enter a known token ID, or ask an admin to add total supply/token offset.";
+            };
+          };
+          case (#DIP721) {
+            if (collectionHasBrowseRange(collection)) {
+              "Ready for safe selected indexing using the configured token range.";
+            } else {
+              "Needs safe indexing setup. Enter a known token ID, or ask an admin to add total supply/token offset.";
+            };
+          };
+          case (#ICRC7) "Ready for direct owner lookup; selected sync can continue with conservative owner checks.";
+          case (#Other(name)) "Wallet sync is not supported for '" # name # "' collections.";
         };
       };
     };

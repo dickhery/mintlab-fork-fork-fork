@@ -1406,6 +1406,27 @@ export const mockBackend: backendInterface = {
     lastError: null,
     updatedAt: BigInt(Date.now()) * BigInt(1_000_000),
   }),
+  getCollectionSyncReadiness: async (collectionId) => {
+    const collection = sampleCollections.find((item) => item.id === collectionId);
+    if (!collection) {
+      return { __kind__: "err" as const, err: "Collection not found" };
+    }
+    return {
+      __kind__: "ok" as const,
+      ok: {
+        collectionId,
+        standard: collection.standard,
+        hasBrowseInfo: collection.browseInfo?.totalSupply != null,
+        allowsSync: true,
+        trustStatus: "Verified" as const,
+        indexStatus: null,
+        recommendedAction:
+          collection.kind === "External"
+            ? "Ready for direct owner lookup and selected sync."
+            : "Mintlab-managed collection syncs directly.",
+      },
+    };
+  },
   indexCollectionOwnershipPage: async (collectionId, cursor, limit) => ({
     __kind__: "ok" as const,
     ok: {
@@ -1490,6 +1511,7 @@ export const mockBackend: backendInterface = {
       indexedThisRun: 50n,
       nextCursor: "50",
       complete: false,
+      directHintChecked: false,
       status: {
         collectionId,
         cursor: "50",

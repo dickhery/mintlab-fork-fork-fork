@@ -59,6 +59,7 @@ import type {
   CollectionImportMeta,
   CollectionIndexPageResult,
   CollectionIndexStatus,
+  CollectionSyncReadiness,
   CollectionTrustStatus,
   MintConfig,
   NFTDividend,
@@ -71,6 +72,7 @@ import type {
   WalletNFT,
   WalletSyncSkip,
   WalletSyncV2Result,
+  backendInterface,
 } from "@/types";
 import { Principal } from "@icp-sdk/core/principal";
 import {
@@ -307,6 +309,7 @@ function selectedSyncProgressMessage(
   collection?: Collection | null,
 ): string {
   const checkedDirectHint =
+    progress.directHintChecked &&
     progress.scannedThisRun === 0n &&
     progress.indexedThisRun === 0n &&
     progress.nextCursor === null;
@@ -315,6 +318,9 @@ function selectedSyncProgressMessage(
   }
   if (checkedDirectHint && progress.newCount > 0n) {
     return "Selected sync verified the token ID directly and registered it.";
+  }
+  if (checkedDirectHint) {
+    return "Selected sync checked the token ID directly. The wider collection index is still not complete.";
   }
   const scannedTotal = progress.status?.scanned ?? progress.scannedThisRun;
   const totalSupply = collection?.browseInfo?.totalSupply ?? null;
@@ -332,6 +338,37 @@ function selectedSyncProgressMessage(
       : `Selected sync checked ${scope} and finished this collection.`;
   }
   return `Selected sync checked ${scope}. Continue Sync selected to keep checking this collection, or enter a known token ID to verify it directly.`;
+}
+
+function nftStandardLabel(collection?: Collection | null): string {
+  if (!collection) return "Collection";
+  const standard = collection.standard;
+  if (standard.__kind__ === "Other") return standard.Other;
+  return standard.__kind__;
+}
+
+function readinessStatusLabel(
+  readiness: CollectionSyncReadiness | null | undefined,
+  collection?: Collection | null,
+): string {
+  if (!readiness) {
+    if (
+      collection?.kind === "External" &&
+      collection.browseInfo?.totalSupply == null
+    ) {
+      return "Needs safe indexing setup";
+    }
+    return "Ready";
+  }
+  if (!readiness.allowsSync) return "Sync disabled";
+  if (readiness.indexStatus?.complete) return "Indexed";
+  if ((readiness.indexStatus?.scanned ?? 0n) > 0n) {
+    return "Indexing in progress";
+  }
+  if (!readiness.hasBrowseInfo && collection?.standard.__kind__ !== "ICRC7") {
+    return "Needs safe indexing setup";
+  }
+  return "Ready for selected sync";
 }
 
 function isSyncAlreadyRunningMessage(message: string): boolean {
@@ -2091,6 +2128,7 @@ type SyncResult =
   | { __kind__: "err"; err: string };
 
 interface ReceivingInstructionsProps {
+  actor: backendInterface | null;
   principalText: string | null;
   accountIdHex: string | null;
   collections: Collection[];
@@ -2102,6 +2140,7 @@ interface ReceivingInstructionsProps {
 }
 
 function ReceivingInstructions({
+  actor,
   principalText,
   accountIdHex,
   collections,
@@ -2127,6 +2166,25 @@ function ReceivingInstructions({
     syncableCollections.find(
       (collection) => collection.id.toString() === syncTargetCollectionId,
     ) ?? null;
+  const { data: selectedReadiness = null } =
+    useQuery<CollectionSyncReadiness | null>({
+      queryKey: [
+        "collectionSyncReadiness",
+        selectedSyncCollection?.id.toString() ?? null,
+      ],
+      enabled: actor != null && selectedSyncCollection != null,
+      staleTime: 15_000,
+      queryFn: async () => {
+        if (!actor || !selectedSyncCollection) return null;
+        const result = await actor.getCollectionSyncReadiness(
+          selectedSyncCollection.id,
+        );
+        if (result.__kind__ === "err") {
+          throw new Error(result.err);
+        }
+        return result.ok;
+      },
+    });
 
   useEffect(() => {
     if (
@@ -2312,6 +2370,98 @@ function ReceivingInstructions({
             </div>
           )}
         </div>
+
+        {selectedSyncCollection && (
+          <div className="rounded-lg border border-border bg-background/60 p-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-medium text-foreground">
+                    {selectedSyncCollection.name}
+                  </p>
+                  <Badge variant="secondary">
+                    {nftStandardLabel(selectedSyncCollection)}
+                  </Badge>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {selectedReadiness?.recommendedAction ??
+                    "Mintlab will use direct owner lookups first, then continue safe selected indexing when collection range data is available."}
+                </p>
+              </div>
+              <Badge
+                variant={
+                  selectedReadiness?.allowsSync === false
+                    ? "destructive"
+                    : "outline"
+                }
+                className="shrink-0"
+              >
+                {readinessStatusLabel(
+                  selectedReadiness,
+                  selectedSyncCollection,
+                )}
+              </Badge>
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
+              <div className="space-y-1.5 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-accent" />
+                  <span>Direct owner lookup</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Check className="h-3.5 w-3.5 text-accent" />
+                  <span>App deposit account lookup</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Info className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                  <span>
+                    {selectedSyncCollection.standard.__kind__ === "EXT" &&
+                    selectedReadiness?.hasBrowseInfo === false
+                      ? "Full EXT registry scan disabled for cycle safety"
+                      : "Collection indexing uses small saved pages"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 md:justify-end">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 gap-1.5 text-xs"
+                  onClick={() => onImportSpecificNFT(selectedSyncCollection.id)}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Enter token ID
+                </Button>
+                {onSyncCollection && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 gap-1.5 text-xs"
+                    disabled={isSyncing}
+                    onClick={() =>
+                      onSyncCollection(selectedSyncCollection.id, [])
+                    }
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Continue indexing
+                  </Button>
+                )}
+                {onIndexCollection && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    onClick={() => onIndexCollection(selectedSyncCollection.id)}
+                  >
+                    Open Indexing
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {syncStatus.kind === "partial" &&
           (syncStatus.skipped.length > 0 || progress) && (
@@ -3107,12 +3257,19 @@ export default function WalletPage() {
 
             const skipped = [...progressResult.ok.skipped];
             if (!progressResult.ok.complete && skipped.length === 0) {
+              const directHintOnly =
+                progressResult.ok.directHintChecked &&
+                progressResult.ok.scannedThisRun === 0n &&
+                progressResult.ok.indexedThisRun === 0n;
               skipped.push({
                 collectionId: targetCollectionId,
                 collectionName,
-                reason: "INDEXING_IN_PROGRESS",
-                message:
-                  "Mintlab saved selected sync progress for this collection. Click Sync selected again to continue, or enter a known token ID.",
+                reason: directHintOnly
+                  ? "TOKEN_HINT_CHECKED"
+                  : "INDEXING_IN_PROGRESS",
+                message: directHintOnly
+                  ? "Mintlab checked that token ID directly. The wider collection index is still not complete."
+                  : "Mintlab saved selected sync progress for this collection. Click Sync selected again to continue, or enter a known token ID.",
               });
             }
             return {
@@ -3651,6 +3808,7 @@ export default function WalletPage() {
 
       {/* Receiving instructions — prominent address section */}
       <ReceivingInstructions
+        actor={actor}
         principalText={principalText}
         accountIdHex={accountIdHex}
         collections={collections ?? []}

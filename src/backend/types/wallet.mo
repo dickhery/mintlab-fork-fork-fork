@@ -102,7 +102,18 @@ module {
     indexedThisRun : Nat;
     nextCursor : ?Text;
     complete : Bool;
+    directHintChecked : Bool;
     status : ?CollectionIndexStatus;
+  };
+
+  public type CollectionSyncReadiness = {
+    collectionId : CollectionId;
+    standard : CollectionTypes.NFTStandard;
+    hasBrowseInfo : Bool;
+    allowsSync : Bool;
+    trustStatus : ?CollectionTypes.CollectionTrustStatus;
+    indexStatus : ?CollectionIndexStatus;
+    recommendedAction : Text;
   };
 
   public type WalletNFTPage = {

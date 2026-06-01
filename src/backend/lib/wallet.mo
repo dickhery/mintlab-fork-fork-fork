@@ -20,6 +20,7 @@ import NFTStandards "nft-standards";
 module {
   let OWNER_SYNC_SCAN_LIMIT : Nat = 500;
   let DISPLAY_TOKEN_ID_ATTRIBUTE : Text = "Mintlab Display Token ID";
+  public let EXT_SAFE_FULL_REGISTRY_FALLBACK_MAX_ENTRIES : Nat = 5_000;
 
   public type WalletState = {
     nfts : Map.Map<Types.NFTId, Types.WalletNFT>;
@@ -405,6 +406,37 @@ module {
     Map.get(state.status, Nat.compare, collectionId);
   };
 
+  public func canUseFullExtRegistryFallback(
+    collection : CollectionTypes.Collection,
+    maxRegistryEntries : Nat,
+  ) : Bool {
+    switch (collection.standard) {
+      case (#EXT) {};
+      case (_) return false;
+    };
+    switch (collection.browseInfo) {
+      case null false;
+      case (?info) {
+        switch (info.totalSupply) {
+          case null false;
+          case (?supply) supply <= maxRegistryEntries;
+        };
+      };
+    };
+  };
+
+  func fullEXTRegistryFallbackDisabledMessage(
+    collection : CollectionTypes.Collection,
+    maxRegistryEntries : Nat,
+  ) : Text {
+    "Collection '" #
+    collection.name #
+    "' needs safe token range setup before Mintlab can use EXT registry fallback. " #
+    "Public full-registry scans are disabled unless the collection has total supply at or below " #
+    Nat.toText(maxRegistryEntries) #
+    " tokens. Enter a known token ID, or ask an admin to add total supply/token offset.";
+  };
+
   public func clearOwnershipIndexForCollection(
     state : OwnershipIndexState,
     collectionId : Types.CollectionId,
@@ -559,6 +591,12 @@ module {
     switch (collection.standard) {
       case (#EXT) {};
       case (_) return #err("Selected EXT registry sync only supports EXT collections");
+    };
+
+    if (not canUseFullExtRegistryFallback(collection, maxRegistryEntries)) {
+      let message = fullEXTRegistryFallbackDisabledMessage(collection, maxRegistryEntries);
+      recordIndexFailure(state, collection.id, null, message);
+      return #err(message);
     };
 
     let canister : NFTStandards.EXTActor = actor (collection.canisterId.toText());
@@ -762,6 +800,9 @@ module {
     switch (collection.standard) {
       case (#EXT) {};
       case (_) return #err("Account-based EXT registry preview only supports EXT collections");
+    };
+    if (not canUseFullExtRegistryFallback(collection, maxRegistryEntries)) {
+      return #err(fullEXTRegistryFallbackDisabledMessage(collection, maxRegistryEntries));
     };
     let canister : NFTStandards.EXTActor = actor (collection.canisterId.toText());
     let accountIdHex = blobToHex(accountId);
@@ -1006,7 +1047,7 @@ module {
     location : Types.WalletLocation,
   ) : async* { #ok : Types.NFTMetadata; #err : Text } {
     var previewError : ?Text = null;
-    let previewResult = await* previewOwnedNFTsWithLocation(collection, owner, accountId, location, true);
+    let previewResult = await* previewOwnedNFTsWithLocation(collection, owner, accountId, location, false);
     switch (previewResult) {
       case (#err(message)) previewError := ?message;
       case (#ok(nfts)) {
@@ -1865,7 +1906,16 @@ module {
         await* indexEXTByRangePage(state, canister, collection, cursor, limit, range);
       };
       case null {
-        await* indexEXTByRegistryPage(state, canister, collection, cursor, limit);
+        if (canUseFullExtRegistryFallback(collection, EXT_SAFE_FULL_REGISTRY_FALLBACK_MAX_ENTRIES)) {
+          await* indexEXTByRegistryPage(state, canister, collection, cursor, limit);
+        } else {
+          let message = fullEXTRegistryFallbackDisabledMessage(
+            collection,
+            EXT_SAFE_FULL_REGISTRY_FALLBACK_MAX_ENTRIES,
+          );
+          recordIndexFailure(state, collection.id, cursor, message);
+          #err(message);
+        };
       };
     };
   };
@@ -2342,7 +2392,11 @@ module {
         let accountIdHex = blobToHex(accountId);
         let principalText = owner.toText();
         let principalHex = blobToHex(owner.toBlob());
-        switch (await* fetchEXTTokenIndices(canister, owner, accountIdHex, principalText, principalHex, collection.name, allowOwnerScan)) {
+        let allowRegistryFallback = allowOwnerScan and canUseFullExtRegistryFallback(
+          collection,
+          EXT_SAFE_FULL_REGISTRY_FALLBACK_MAX_ENTRIES,
+        );
+        switch (await* fetchEXTTokenIndices(canister, owner, accountIdHex, principalText, principalHex, collection.name, allowRegistryFallback)) {
           case (#err(message)) {
             if (not allowOwnerScan) {
               return #err(ownerIndexRequiredMessage(collection.name));

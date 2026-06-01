@@ -175,6 +175,7 @@ export interface WalletCollectionSyncProgress extends WalletSyncV2Result {
   indexedThisRun: bigint;
   nextCursor: string | null;
   complete: boolean;
+  directHintChecked: boolean;
   status: CollectionIndexStatus | null;
 }
 
@@ -186,6 +187,16 @@ export interface CollectionIndexStatus {
   complete: boolean;
   lastError: string | null;
   updatedAt: Timestamp;
+}
+
+export interface CollectionSyncReadiness {
+  collectionId: CollectionId;
+  standard: NFTStandard;
+  hasBrowseInfo: boolean;
+  allowsSync: boolean;
+  trustStatus: CollectionTrustStatus | null;
+  indexStatus: CollectionIndexStatus | null;
+  recommendedAction: string;
 }
 
 export interface CollectionIndexPageResult {
@@ -994,6 +1005,12 @@ export interface backendInterface {
   getCollectionIndexStatus(
     collectionId: CollectionId,
   ): Promise<CollectionIndexStatus | null>;
+  getCollectionSyncReadiness(
+    collectionId: CollectionId,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionSyncReadiness }
+    | { __kind__: "err"; err: string }
+  >;
   getMyCollectionCanisterStatuses(): Promise<Array<CollectionCanisterStatus>>;
   getCollectionCanisterControllers(
     collectionId: CollectionId,
@@ -1454,6 +1471,7 @@ type RawWalletCollectionSyncProgress = RawWalletSyncV2Result & {
   indexedThisRun: bigint;
   nextCursor: [] | [string];
   complete: boolean;
+  directHintChecked: boolean;
   status: [] | [RawCollectionIndexStatus];
 };
 type RawCollectionIndexStatus = {
@@ -1464,6 +1482,15 @@ type RawCollectionIndexStatus = {
   lastError: [] | [string];
   scanned: bigint;
   updatedAt: Timestamp;
+};
+type RawCollectionSyncReadiness = {
+  collectionId: CollectionId;
+  standard: RawNFTStandard;
+  hasBrowseInfo: boolean;
+  allowsSync: boolean;
+  trustStatus: [] | [RawCollectionTrustStatus];
+  indexStatus: [] | [RawCollectionIndexStatus];
+  recommendedAction: string;
 };
 type RawCollectionIndexPageResult = {
   collectionId: CollectionId;
@@ -2107,6 +2134,7 @@ function fromRawWalletCollectionSyncProgress(
     indexedThisRun: value.indexedThisRun,
     nextCursor: fromRawOption(value.nextCursor),
     complete: value.complete,
+    directHintChecked: value.directHintChecked,
     status: status == null ? null : fromRawCollectionIndexStatus(status),
   };
 }
@@ -2122,6 +2150,24 @@ function fromRawCollectionIndexStatus(
     complete: value.complete,
     lastError: fromRawOption(value.lastError),
     updatedAt: value.updatedAt,
+  };
+}
+
+function fromRawCollectionSyncReadiness(
+  value: RawCollectionSyncReadiness,
+): CollectionSyncReadiness {
+  const trustStatus = fromRawOption(value.trustStatus);
+  const indexStatus = fromRawOption(value.indexStatus);
+  return {
+    collectionId: value.collectionId,
+    standard: fromRawNFTStandard(value.standard),
+    hasBrowseInfo: value.hasBrowseInfo,
+    allowsSync: value.allowsSync,
+    trustStatus:
+      trustStatus == null ? null : fromRawCollectionTrustStatus(trustStatus),
+    indexStatus:
+      indexStatus == null ? null : fromRawCollectionIndexStatus(indexStatus),
+    recommendedAction: value.recommendedAction,
   };
 }
 
@@ -3085,6 +3131,20 @@ function fromCollectionSyncProgressResult(
   return { __kind__: "err", err: value.err };
 }
 
+function fromCollectionSyncReadinessResult(
+  value: { ok: RawCollectionSyncReadiness } | { err: string },
+):
+  | { __kind__: "ok"; ok: CollectionSyncReadiness }
+  | { __kind__: "err"; err: string } {
+  if ("ok" in value) {
+    return {
+      __kind__: "ok",
+      ok: fromRawCollectionSyncReadiness(value.ok),
+    };
+  }
+  return { __kind__: "err", err: value.err };
+}
+
 function fromCollectionIndexPageResult(
   value: { ok: RawCollectionIndexPageResult } | { err: string },
 ):
@@ -3891,6 +3951,17 @@ export class Backend implements backendInterface {
     )) as [] | [RawCollectionIndexStatus];
     const value = fromRawOption(result);
     return value == null ? null : fromRawCollectionIndexStatus(value);
+  }
+
+  async getCollectionSyncReadiness(
+    collectionId: CollectionId,
+  ): Promise<
+    | { __kind__: "ok"; ok: CollectionSyncReadiness }
+    | { __kind__: "err"; err: string }
+  > {
+    return fromCollectionSyncReadinessResult(
+      await this.run(() => this.actor.getCollectionSyncReadiness(collectionId)),
+    );
   }
 
   async getCollectionNFT(
