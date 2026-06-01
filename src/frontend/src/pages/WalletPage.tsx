@@ -2418,8 +2418,10 @@ function ReceivingInstructions({
                   <span>
                     {selectedSyncCollection.standard.__kind__ === "EXT" &&
                     selectedReadiness?.hasBrowseInfo === false
-                      ? "Full EXT registry scan disabled for cycle safety"
-                      : "Collection indexing uses small saved pages"}
+                      ? "Full EXT registry scan disabled until total supply is set"
+                      : selectedSyncCollection.standard.__kind__ === "EXT"
+                        ? "EXT indexing uses bounded registry or small saved pages"
+                        : "Collection indexing uses small saved pages"}
                   </span>
                 </div>
               </div>

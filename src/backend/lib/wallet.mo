@@ -20,6 +20,8 @@ import NFTStandards "nft-standards";
 module {
   let OWNER_SYNC_SCAN_LIMIT : Nat = 500;
   let DISPLAY_TOKEN_ID_ATTRIBUTE : Text = "Mintlab Display Token ID";
+  // This limits public full `getRegistry()` fallbacks only. Larger EXT
+  // collections still sync through browseInfo-backed token-range pages.
   public let EXT_SAFE_FULL_REGISTRY_FALLBACK_MAX_ENTRIES : Nat = 5_000;
 
   public type WalletState = {
@@ -429,6 +431,25 @@ module {
     collection : CollectionTypes.Collection,
     maxRegistryEntries : Nat,
   ) : Text {
+    switch (collection.browseInfo) {
+      case (?info) {
+        switch (info.totalSupply) {
+          case (?supply) {
+            if (supply > maxRegistryEntries) {
+              return "Collection '" #
+              collection.name #
+              "' has configured total supply " #
+              Nat.toText(supply) #
+              ", above Mintlab's public full EXT registry fallback limit of " #
+              Nat.toText(maxRegistryEntries) #
+              " tokens. Mintlab will sync this collection with safe token-range pages instead; run Sync selected again to continue, or enter a known token ID.";
+            };
+          };
+          case null {};
+        };
+      };
+      case null {};
+    };
     "Collection '" #
     collection.name #
     "' needs safe token range setup before Mintlab can use EXT registry fallback. " #

@@ -90,6 +90,8 @@ mixin (
   transient let TARGET_SYNC_INDEX_PAGE_DEFAULT : Nat = 3;
   transient let TARGET_SYNC_INDEX_PAGE_MAX : Nat = 3;
   transient let TARGET_SYNC_TOKEN_HINT_MAX : Nat = 3;
+  // Full-registry fallback is intentionally capped below common 10k drops;
+  // configured large collections sync through the small range-page path.
   transient let EXT_SELECTED_REGISTRY_SYNC_MAX_ENTRIES : Nat = WalletLib.EXT_SAFE_FULL_REGISTRY_FALLBACK_MAX_ENTRIES;
   transient let CHILD_NFT_SYNC_PAGE_SIZE : Nat = 25;
   transient let CHILD_TOKEN_SYNC_PAGE_SIZE : Nat = 25;
@@ -2387,7 +2389,11 @@ mixin (
         switch (collection.standard) {
           case (#EXT) {
             if (collectionHasBrowseRange(collection)) {
-              "Ready for safe selected indexing using the configured token range.";
+              if (canUseFullExtRegistryFallback(collection)) {
+                "Ready for direct owner lookup, small EXT registry fallback, and safe selected indexing.";
+              } else {
+                "Ready for safe token-range indexing. Larger EXT collections sync in small pages instead of public full-registry scans.";
+              };
             } else if (canUseFullExtRegistryFallback(collection)) {
               "Ready for direct owner lookup and small EXT registry fallback.";
             } else {
