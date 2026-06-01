@@ -99,11 +99,30 @@ const DEFAULT_MINTLAB_FEE_BPS = 200n;
 const BPS_DENOMINATOR = 10_000n;
 const MIN_AUCTION_STARTING_BID_E8S = 1_000_000n;
 const MIN_AUCTION_BID_INCREMENT_E8S = 1_000_000n;
-const MARKETPLACE_LISTING_PAGE_SIZE = 25n;
 const MARKETPLACE_COLLECTION_PAGE_SIZE = 50n;
 const MARKETPLACE_WALLET_PAGE_SIZE = 50n;
 const MARKETPLACE_DIVIDEND_PAGE_SIZE = 50n;
 const MARKETPLACE_STATUS_PAGE_SIZE = 25n;
+
+type MarketplaceTab = "all" | "fixed" | "auctions";
+
+type FixedListingItem = {
+  kind: "fixed";
+  listing: FixedListing;
+  nft: WalletNFT;
+  collection?: Collection;
+  trustStatus?: CollectionTrustStatus | null;
+};
+
+type AuctionListingItem = {
+  kind: "auction";
+  listing: AuctionListing;
+  nft: WalletNFT;
+  collection?: Collection;
+  trustStatus?: CollectionTrustStatus | null;
+};
+
+type MarketplaceListingItem = FixedListingItem | AuctionListingItem;
 
 function marketplaceFee(amount: bigint, feeBps: bigint): bigint {
   return (amount * feeBps) / BPS_DENOMINATOR;
@@ -189,6 +208,7 @@ interface FixedCardProps {
   dividendE8s?: bigint;
   trustStatus?: CollectionTrustStatus | null;
   index: number;
+  ocidPrefix?: string;
   currentPrincipal: string | null;
   onBuy: (id: ListingId) => void;
   onCancel: (id: ListingId) => void;
@@ -204,6 +224,7 @@ function FixedListingCard({
   dividendE8s = 0n,
   trustStatus,
   index,
+  ocidPrefix = "marketplace.fixed",
   currentPrincipal,
   onBuy,
   onCancel,
@@ -223,7 +244,7 @@ function FixedListingCard({
       transition={{ duration: 0.35, delay: index * 0.07 }}
       className="nft-card-glow group relative rounded-xl border border-border bg-card overflow-hidden flex flex-col hover:nft-card-glow-hover hover:border-accent/40 transition-smooth cursor-pointer"
       onClick={onDetails}
-      data-ocid={`marketplace.fixed.item.${index + 1}`}
+      data-ocid={`${ocidPrefix}.item.${index + 1}`}
     >
       <div className="aspect-square overflow-hidden bg-muted relative">
         <MediaImage
@@ -282,7 +303,7 @@ function FixedListingCard({
                 onCancel(listing.id);
               }}
               disabled={isCancelling}
-              data-ocid={`marketplace.fixed.cancel_button.${index + 1}`}
+              data-ocid={`${ocidPrefix}.cancel_button.${index + 1}`}
             >
               {isCancelling ? (
                 <LoadingSpinner size="sm" />
@@ -302,7 +323,7 @@ function FixedListingCard({
                 onBuy(listing.id);
               }}
               disabled={isBuying}
-              data-ocid={`marketplace.fixed.buy_button.${index + 1}`}
+              data-ocid={`${ocidPrefix}.buy_button.${index + 1}`}
             >
               {isBuying ? (
                 <>
@@ -611,6 +632,7 @@ interface AuctionCardProps {
   dividendE8s?: bigint;
   trustStatus?: CollectionTrustStatus | null;
   index: number;
+  ocidPrefix?: string;
   currentPrincipal: string | null;
   bidStatus?: AuctionBidStatus;
   onBid: (listing: AuctionListing) => void;
@@ -628,6 +650,7 @@ function AuctionListingCard({
   dividendE8s = 0n,
   trustStatus,
   index,
+  ocidPrefix = "marketplace.auction",
   currentPrincipal,
   bidStatus,
   onBid,
@@ -654,7 +677,7 @@ function AuctionListingCard({
       transition={{ duration: 0.35, delay: index * 0.07 }}
       className="nft-card-glow group relative rounded-xl border border-border bg-card overflow-hidden flex flex-col hover:nft-card-glow-hover hover:border-accent/40 transition-smooth cursor-pointer"
       onClick={onDetails}
-      data-ocid={`marketplace.auction.item.${index + 1}`}
+      data-ocid={`${ocidPrefix}.item.${index + 1}`}
     >
       <div className="aspect-square overflow-hidden bg-muted relative">
         <MediaImage
@@ -752,7 +775,7 @@ function AuctionListingCard({
                     onSettle(listing.id);
                   }}
                   disabled={isSettling}
-                  data-ocid={`marketplace.auction.settle_button.${index + 1}`}
+                  data-ocid={`${ocidPrefix}.settle_button.${index + 1}`}
                 >
                   {isSettling ? <LoadingSpinner size="sm" /> : "Settle"}
                 </Button>
@@ -767,7 +790,7 @@ function AuctionListingCard({
                     onCancel(listing.id);
                   }}
                   disabled={isCancelling}
-                  data-ocid={`marketplace.auction.cancel_button.${index + 1}`}
+                  data-ocid={`${ocidPrefix}.cancel_button.${index + 1}`}
                 >
                   {isCancelling ? (
                     <LoadingSpinner size="sm" />
@@ -786,7 +809,7 @@ function AuctionListingCard({
                     variant="outline"
                     className="border-border text-muted-foreground"
                     disabled
-                    data-ocid={`marketplace.auction.cancel_locked_button.${index + 1}`}
+                    data-ocid={`${ocidPrefix}.cancel_locked_button.${index + 1}`}
                   >
                     <Lock className="w-3 h-3 mr-1" />
                     Bid Locked
@@ -806,7 +829,7 @@ function AuctionListingCard({
                 onSettle(listing.id);
               }}
               disabled={isSettling}
-              data-ocid={`marketplace.auction.collect_button.${index + 1}`}
+              data-ocid={`${ocidPrefix}.collect_button.${index + 1}`}
             >
               {isSettling ? <LoadingSpinner size="sm" /> : "Collect"}
             </Button>
@@ -818,7 +841,7 @@ function AuctionListingCard({
                 event.stopPropagation();
                 onBid(listing);
               }}
-              data-ocid={`marketplace.auction.bid_button.${index + 1}`}
+              data-ocid={`${ocidPrefix}.bid_button.${index + 1}`}
             >
               <Gavel className="w-3 h-3 mr-1" />
               Bid
@@ -1398,7 +1421,7 @@ export default function MarketplacePage() {
   const navigate = useNavigate();
   const principalStr = principal?.toString() ?? null;
 
-  const [activeTab, setActiveTab] = useState<"fixed" | "auctions">("fixed");
+  const [activeTab, setActiveTab] = useState<MarketplaceTab>("all");
   const [buyTarget, setBuyTarget] = useState<ListingId | null>(null);
   const [cancelTarget, setCancelTarget] = useState<ListingId | null>(null);
   const [bidTarget, setBidTarget] = useState<AuctionListing | null>(null);
@@ -1428,18 +1451,10 @@ export default function MarketplacePage() {
   const { data: listingDetails = [], isLoading: listingsLoading } = useQuery<
     ActiveListingDetail[]
   >({
-    queryKey: [
-      "activeListingDetails",
-      "marketplace",
-      MARKETPLACE_LISTING_PAGE_SIZE.toString(),
-    ],
+    queryKey: ["activeListingDetails", "marketplace", "all"],
     queryFn: async () => {
       if (!actor) return [];
-      const page = await actor.getActiveListingDetailsPage(
-        null,
-        MARKETPLACE_LISTING_PAGE_SIZE,
-      );
-      return page.details;
+      return actor.getActiveListingDetails();
     },
     enabled: !!actor && !actorLoading,
     refetchInterval: 30_000,
@@ -1563,25 +1578,36 @@ export default function MarketplacePage() {
 
   // ── Derived lists ──────────────────────────────────────────────────────────
 
-  const fixedListings = listingDetails.flatMap((detail) =>
-    detail.listing.__kind__ === "Fixed"
-      ? (() => {
-          const collection = collectionMap.get(detail.nft.collectionId);
-          return [
-            {
-              listing: detail.listing.Fixed,
-              nft: detail.nft,
-              collection,
-              trustStatus: collection
-                ? collectionTrustStatus(
-                    collection,
-                    importMetaMap.get(collection.id.toString()),
-                  )
-                : null,
-            },
-          ];
-        })()
-      : [],
+  const allListings: MarketplaceListingItem[] = listingDetails.map((detail) => {
+    const collection = collectionMap.get(detail.nft.collectionId);
+    const trustStatus = collection
+      ? collectionTrustStatus(
+          collection,
+          importMetaMap.get(collection.id.toString()),
+        )
+      : null;
+
+    if (detail.listing.__kind__ === "Fixed") {
+      return {
+        kind: "fixed",
+        listing: detail.listing.Fixed,
+        nft: detail.nft,
+        collection,
+        trustStatus,
+      };
+    }
+
+    return {
+      kind: "auction",
+      listing: detail.listing.Auction,
+      nft: detail.nft,
+      collection,
+      trustStatus,
+    };
+  });
+
+  const fixedListings = allListings.filter(
+    (item): item is FixedListingItem => item.kind === "fixed",
   );
 
   const buyListingDetail =
@@ -1589,25 +1615,8 @@ export default function MarketplacePage() {
       ? null
       : (fixedListings.find(({ listing }) => listing.id === buyTarget) ?? null);
 
-  const auctionListings = listingDetails.flatMap((detail) =>
-    detail.listing.__kind__ === "Auction"
-      ? (() => {
-          const collection = collectionMap.get(detail.nft.collectionId);
-          return [
-            {
-              listing: detail.listing.Auction,
-              nft: detail.nft,
-              collection,
-              trustStatus: collection
-                ? collectionTrustStatus(
-                    collection,
-                    importMetaMap.get(collection.id.toString()),
-                  )
-                : null,
-            },
-          ];
-        })()
-      : [],
+  const auctionListings = allListings.filter(
+    (item): item is AuctionListingItem => item.kind === "auction",
   );
 
   const isVerifiedListing = ({
@@ -1621,6 +1630,10 @@ export default function MarketplacePage() {
       importMetaMap.get(collection.id.toString()),
     );
 
+  const verifiedListings = allListings.filter(isVerifiedListing);
+  const communityListings = allListings.filter(
+    (item) => !isVerifiedListing(item),
+  );
   const verifiedFixedListings = fixedListings.filter(isVerifiedListing);
   const communityFixedListings = fixedListings.filter(
     (item) => !isVerifiedListing(item),
@@ -1945,6 +1958,77 @@ export default function MarketplacePage() {
     }
   }
 
+  function renderListingCard(
+    item: MarketplaceListingItem,
+    index: number,
+    ocidPrefix?: string,
+  ) {
+    const dividendE8s =
+      listingDividendMap.get(nftKey(item.nft.collectionId, item.nft.tokenId)) ??
+      0n;
+
+    if (item.kind === "fixed") {
+      return (
+        <FixedListingCard
+          key={`${ocidPrefix ?? "marketplace.fixed"}-${item.listing.id.toString()}`}
+          listing={item.listing}
+          nft={item.nft}
+          collection={item.collection}
+          trustStatus={item.trustStatus}
+          dividendE8s={dividendE8s}
+          index={index}
+          ocidPrefix={ocidPrefix}
+          currentPrincipal={principalStr}
+          onBuy={(id) => setBuyTarget(id)}
+          onCancel={(id) => setCancelTarget(id)}
+          onDetails={() =>
+            setDetailTarget({
+              listing: { __kind__: "Fixed", Fixed: item.listing },
+              nft: item.nft,
+              collection: item.collection,
+              trustStatus: item.trustStatus,
+              dividendE8s,
+            })
+          }
+          isBuying={isBuying && buyTarget === item.listing.id}
+          isCancelling={isCancelling && cancelTarget === item.listing.id}
+        />
+      );
+    }
+
+    return (
+      <AuctionListingCard
+        key={`${ocidPrefix ?? "marketplace.auction"}-${item.listing.id.toString()}`}
+        listing={item.listing}
+        nft={item.nft}
+        collection={item.collection}
+        trustStatus={item.trustStatus}
+        dividendE8s={dividendE8s}
+        index={index}
+        ocidPrefix={ocidPrefix}
+        currentPrincipal={principalStr}
+        bidStatus={myAuctionBidStatusMap.get(item.listing.id.toString())}
+        onBid={(listing) => setBidTarget(listing)}
+        onSettle={(id) => settleAuction(id)}
+        onCancel={(id) => setCancelTarget(id)}
+        onDetails={() =>
+          setDetailTarget({
+            listing: {
+              __kind__: "Auction",
+              Auction: item.listing,
+            },
+            nft: item.nft,
+            collection: item.collection,
+            trustStatus: item.trustStatus,
+            dividendE8s,
+          })
+        }
+        isSettling={isSettling}
+        isCancelling={isCancelling && cancelTarget === item.listing.id}
+      />
+    );
+  }
+
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const buyPrice = buyListingDetail?.listing.price ?? 0n;
@@ -2076,18 +2160,31 @@ export default function MarketplacePage() {
 
         <Tabs
           value={activeTab}
-          onValueChange={(v) => setActiveTab(v as "fixed" | "auctions")}
+          onValueChange={(v) => setActiveTab(v as MarketplaceTab)}
         >
           <TabsList
             className="bg-muted/60 border border-border mb-6"
             data-ocid="marketplace.tabs"
           >
             <TabsTrigger
+              value="all"
+              className="data-[state=active]:bg-foreground data-[state=active]:text-background font-medium"
+              data-ocid="marketplace.tab.all"
+            >
+              <ShoppingBag className="w-4 h-4 mr-2" />
+              All Listings
+              {allListings.length > 0 && (
+                <Badge className="ml-2 bg-background/20 text-current text-[10px] px-1.5 py-0 font-mono border-0">
+                  {allListings.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
               value="fixed"
               className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground font-medium"
               data-ocid="marketplace.tab.fixed"
             >
-              <ShoppingBag className="w-4 h-4 mr-2" />
+              <Tag className="w-4 h-4 mr-2" />
               Fixed Price
               {fixedListings.length > 0 && (
                 <Badge className="ml-2 bg-primary/20 text-primary text-[10px] px-1.5 py-0 font-mono border-0">
@@ -2109,6 +2206,76 @@ export default function MarketplacePage() {
               )}
             </TabsTrigger>
           </TabsList>
+
+          {/* All Listings Tab */}
+          <TabsContent value="all" className="mt-0">
+            {listingsLoading ? (
+              <div
+                className="flex items-center justify-center min-h-[40vh]"
+                data-ocid="marketplace.all.loading_state"
+              >
+                <LoadingSpinner size="lg" label="Loading listings…" />
+              </div>
+            ) : allListings.length === 0 ? (
+              <EmptyState
+                icon={ShoppingBag}
+                title="No marketplace listings"
+                description="No fixed-price listings or auctions are active right now. List yours to start the marketplace."
+                action={
+                  isAuthenticated
+                    ? {
+                        label: "List Your NFT",
+                        onClick: () => setListModalOpen(true),
+                        "data-ocid": "marketplace.all.list_cta",
+                      }
+                    : undefined
+                }
+                data-ocid="marketplace.all.empty_state"
+              />
+            ) : (
+              <div className="space-y-8">
+                {verifiedListings.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                    {verifiedListings.map((item, i) =>
+                      renderListingCard(
+                        item,
+                        i,
+                        item.kind === "fixed"
+                          ? "marketplace.all.fixed"
+                          : "marketplace.all.auction",
+                      ),
+                    )}
+                  </div>
+                )}
+
+                {communityListings.length > 0 && (
+                  <section className="space-y-4">
+                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+                      <p className="text-sm font-semibold text-foreground">
+                        Unverified community listings
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                        {COMMUNITY_COLLECTION_NOTICE} Check canister IDs
+                        carefully and report suspected counterfeits or unsafe
+                        content.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                      {communityListings.map((item, i) =>
+                        renderListingCard(
+                          item,
+                          verifiedListings.length + i,
+                          item.kind === "fixed"
+                            ? "marketplace.all.fixed"
+                            : "marketplace.all.auction",
+                        ),
+                      )}
+                    </div>
+                  </section>
+                )}
+              </div>
+            )}
+          </TabsContent>
 
           {/* Fixed Price Tab */}
           <TabsContent value="fixed" className="mt-0">
