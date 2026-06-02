@@ -95,6 +95,7 @@ export const helpSections: HelpSection[] = [
       "Use Wallet to mint NFTs into the main app collection when enabled, or into collections you created.",
       "Use Marketplace to list, buy, bid on, cancel eligible listings, and settle auctions.",
       "Use Dividends to check deposits and collect ICP assigned to NFTs you currently hold.",
+      "Uploads and imported collections may be checked by AI moderation and copyright review before they are shown publicly.",
     ],
     steps: [
       "Sign in with Internet Identity.",
@@ -120,7 +121,8 @@ export const helpSections: HelpSection[] = [
       "send",
     ],
     highlights: [
-      "Use the Wallet receive panel to choose a collection and copy the exact NFT destination Mintlab will check.",
+      "Use the Wallet receive panel to copy your Principal ID for NFT transfers. Use your ICP Account ID for ICP deposits.",
+      "Use Sync to choose a collection and show the exact collection-specific NFT destination Mintlab will check.",
       "Share your Account ID to receive ICP transfers into your in-app ICP account.",
       "Click Sync after receiving NFTs so Mintlab checks on-chain ownership across supported collections.",
       "Use Import NFT when you know a token ID from an imported external collection that automatic sync has not found yet.",
@@ -131,7 +133,9 @@ export const helpSections: HelpSection[] = [
       "Minting into the main app collection can require an admin-set ICP price and uses your in-app ICP balance.",
       "External collection sync can be slow when the original collection canister does not expose a complete ownership index.",
       "NFTs from unverified imported collections are separated from Mintlab verified NFTs and may be counterfeit, unsafe, or inaccurate.",
-      "Images may be compressed and, when moderation is enabled, checked before ICP is transferred.",
+      "Images may be compressed and, when moderation is enabled, checked by AI moderation and copyright review before ICP is transferred.",
+      "Avoid potentially copyrighted images, characters, logos, watermarks, and protected artwork unless you have permission to use them.",
+      "NFTs or collections that fail AI moderation or copyright checks may be hidden from public view in Mintlab.",
     ],
     links: [{ label: "Open Wallet", href: "/wallet" }],
   },
@@ -167,6 +171,7 @@ export const helpSections: HelpSection[] = [
       "Mintlab needs controller access for app-managed updates, top-ups, and recovery flows. Removing Mintlab as a controller can make those app tools stop working for that collection.",
       "External imports are shared with every Mintlab user unless hidden or blocked by admins. Mintlab may sample imported collection listings for moderation instead of checking every NFT.",
       "Unverified community imports can impersonate valuable collections. Check canister IDs and report suspected counterfeits, unsafe content, or misleading metadata.",
+      "A collection may be hidden from public view if AI moderation or copyright checks flag uploaded or imported content.",
     ],
     links: [{ label: "Open Collections", href: "/collections" }],
   },
@@ -282,6 +287,7 @@ export const helpSections: HelpSection[] = [
       "Payment failed: check the ICP Account balance and remember that fees or escrow reserves may be added.",
       "Low cycles: follow the Top Up prompt so the app or collection canister can keep completing the action.",
       "Image rejected: use JPG or PNG and reduce file size; moderation settings can block flagged content before payment.",
+      "Collection hidden: Mintlab follows AI moderation and copyright decisions for in-app visibility, so replace flagged content before retrying.",
       "Auction or sale still pending: refresh Marketplace and check whether settlement, refund, or admin recovery is required.",
     ],
     links: [{ label: "Check Wallet", href: "/wallet" }],
@@ -317,7 +323,12 @@ export const faqItems: FaqItem[] = [
   {
     question: "How does AI moderation affect payments?",
     answer:
-      "When moderation is enabled, Mintlab checks uploaded images before ICP is transferred. If an upload is blocked, the paid action should not continue.",
+      "When moderation is enabled, Mintlab checks uploaded images and metadata for moderation and copyright issues before ICP is transferred. If an upload is blocked, the paid action should not continue.",
+  },
+  {
+    question: "Can AI moderation hide my collection?",
+    answer:
+      "Yes. Mintlab follows AI moderation and copyright decisions for in-app visibility, so NFTs or collections that fail those checks may be hidden from public view. Avoid potentially copyrighted images, characters, logos, watermarks, and protected artwork unless you have permission.",
   },
   {
     question: "Why do auctions have minimum bids and increments?",
@@ -363,9 +374,14 @@ export const glossaryItems: GlossaryItem[] = [
       "An ICP NFT standard used by Mintlab-created collections and some external collections.",
   },
   {
+    term: "AI Moderation",
+    definition:
+      "Automated review used by Mintlab to check uploaded or imported content. Mintlab follows AI moderation and copyright decisions for in-app visibility.",
+  },
+  {
     term: "Principal ID",
     definition:
-      "Your Internet Computer identity. Some NFT standards receive to this ID; the Wallet receive panel shows when to use it.",
+      "Your Internet Computer identity. Send NFTs to this ID unless the selected collection shows a different NFT receive destination.",
   },
   {
     term: "Vaulted NFT",

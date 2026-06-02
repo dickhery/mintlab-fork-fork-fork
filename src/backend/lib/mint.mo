@@ -136,7 +136,7 @@ module {
   };
 
   public func defaultModerationUserMessage() : Text {
-    "Uploads cannot include sexual content, graphic violence, self-harm content, hateful or harassing text, dangerous illegal instructions, or obvious copyrighted characters, logos, watermarks, or protected artwork.";
+    "Uploads are checked by AI moderation and copyright review. Avoid potentially copyrighted images, characters, logos, watermarks, protected artwork, sexual content, graphic violence, self-harm content, hateful or harassing text, or dangerous illegal instructions. Items that fail checks may be hidden from public view.";
   };
 
   public func defaultModerationModel() : Text {
@@ -149,6 +149,10 @@ module {
 
   func legacyModerationUserMessage() : Text {
     "Uploads cannot include nudity or sexual content, graphic violence, explicit language, hate or harassment, hate symbols, illegal or dangerous activity, self-harm content, or other NSFW material.";
+  };
+
+  func previousDefaultModerationUserMessage() : Text {
+    "Uploads cannot include sexual content, graphic violence, self-harm content, hateful or harassing text, dangerous illegal instructions, or obvious copyrighted characters, logos, watermarks, or protected artwork.";
   };
 
   func lenientModerationUserMessage() : Text {
@@ -248,6 +252,7 @@ module {
       };
     if (
       config.userMessage == legacyModerationUserMessage() or
+      config.userMessage == previousDefaultModerationUserMessage() or
       config.userMessage == lenientModerationUserMessage() or
       config.userMessage == googleModerationUserMessage()
     ) {

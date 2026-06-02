@@ -1,6 +1,6 @@
-export const TERMS_VERSION = "2026-06-01.1";
-export const TERMS_LAST_UPDATED = "June 1, 2026";
-export const TERMS_EFFECTIVE_DATE = "June 1, 2026";
+export const TERMS_VERSION = "2026-06-02.1";
+export const TERMS_LAST_UPDATED = "June 2, 2026";
+export const TERMS_EFFECTIVE_DATE = "June 2, 2026";
 
 export interface TermsSection {
   title: string;
@@ -11,6 +11,7 @@ export interface TermsSection {
 export const termsRiskHighlights = [
   "Blockchain and canister transactions can be final, irreversible, delayed, or fail.",
   "ICP, NFTs, and dividend balances can change in value and may become worthless.",
+  "Uploads, NFTs, and collections can be checked by AI moderation and copyright systems and hidden from public view.",
   "Collection creation settings, including dividend enablement, must be reviewed in the confirmation dialog before payment.",
   "External NFTs may need the collection and token ID entered during guided sync before they appear in your Mintlab wallet view.",
   "The in-app ICP account, marketplace escrow, vault, dividend, and cycle top-up flows depend on canister code and ICP ledger behavior.",
@@ -54,6 +55,7 @@ export const termsSections: TermsSection[] = [
     bullets: [
       "NFT ownership is determined by the applicable on-chain canister logic, including Mintlab-created ICRC-7 collection canisters and imported external collection canisters.",
       "Minting and collection creation can require ICP payments, ledger fees, moderation checks, canister creation, cycle conversion, and asynchronous recovery steps.",
+      "Uploaded NFT images, collection images, names, descriptions, and metadata may be checked by AI moderation and copyright review before or after upload, minting, import, listing, or public display.",
       "Before confirming a collection creation payment, Mintlab shows a review dialog with the collection name, symbol, description, image, NFT standard, controller model, dividend setting, payment source, fee quote, and cycle allocation. You are responsible for reviewing these settings before confirming payment.",
       "Choosing Confirm Settings and Pay authorizes Mintlab to debit your in-app ICP account using the settings shown in the review dialog. Choose Make Changes if any setting is wrong or if you meant to enable dividends.",
       "Dividend configuration is selected during collection creation in the current setup flow. If dividends are not enabled before payment, a dedicated dividend account may not be created for that collection.",
@@ -94,9 +96,10 @@ export const termsSections: TermsSection[] = [
     bullets: [
       "You may not upload, mint, list, trade, or promote content that is illegal, harmful, misleading, infringing, abusive, exploitative, or otherwise violates these Terms.",
       "You may not use Mintlab for fraud, money laundering, terrorist financing, sanctions evasion, market manipulation, wash trading, bug exploitation, spam, phishing, or other unlawful or abusive conduct.",
-      "Mintlab may use automated moderation, including AI-assisted image or metadata review. Moderation can produce false positives or false negatives, and passing moderation is not legal approval of content.",
+      "Mintlab's in-app moderation and copyright checks are conducted by AI systems. Mintlab will follow the AI decision for app outcomes, including allowing, blocking, hiding, or restricting uploads, NFTs, listings, or collections.",
+      "AI moderation and copyright checks can produce false positives or false negatives, and passing moderation is not legal approval of content.",
       "Mintlab may sample imported external collections or early marketplace listings for moderation instead of reviewing every NFT in a collection.",
-      "Mintlab may hide, block, or remove imported NFT collections that include images, text, metadata, or other content currently blocked by the app moderation settings.",
+      "Mintlab may hide, block, or remove imported NFT collections that include images, text, metadata, or other content flagged by moderation settings or copyright review.",
       "Users should report inappropriate NFTs, suspected counterfeit collections, misleading metadata, or other unsafe imported collection issues through the reporting controls in the app.",
       "The operator may hide, block, restrict, or remove access to content or wallet principals through the frontend or app-admin tools when reasonably needed for security, legal, operational, or policy reasons.",
     ],
@@ -106,6 +109,7 @@ export const termsSections: TermsSection[] = [
     bullets: [
       "You represent that you have all rights needed for content, metadata, images, names, and other materials you upload or publish through Mintlab.",
       "You retain any rights you own in your content, subject to any NFT license or transfer terms you separately provide.",
+      "Avoid using potentially copyrighted or trademarked images, characters, logos, names, watermarks, or protected artwork unless you have permission or a clear legal right to use them.",
       "You grant Mintlab a non-exclusive, worldwide, royalty-free license to host, store, reproduce, display, index, moderate, and use your content as needed to operate, secure, promote, and improve the app.",
       "Mintlab names, branding, interface design, and source materials are owned by the operator or their licensors unless otherwise stated.",
     ],

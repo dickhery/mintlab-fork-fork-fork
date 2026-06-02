@@ -1938,7 +1938,13 @@ function MintComposer({
 
               {moderationConfig?.enabled && (
                 <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
-                  {moderationConfig.userMessage}
+                  <p>{moderationConfig.userMessage}</p>
+                  <p className="mt-2">
+                    Mintlab uses AI moderation and copyright checks for uploads.
+                    Avoid potentially copyrighted images, characters, logos,
+                    watermarks, and protected artwork. NFTs or collections that
+                    fail checks may be hidden from public view.
+                  </p>
                 </div>
               )}
 
@@ -1967,7 +1973,7 @@ function MintComposer({
                   <p className="text-xs text-muted-foreground">
                     {fileName ||
                       (moderationConfig?.enabled
-                        ? "Choose a JPG or PNG under about 1 MB"
+                        ? "Choose a JPG or PNG under about 1 MB and avoid potentially copyrighted artwork"
                         : "Choose an image to store with the minted NFT")}
                   </p>
                 </div>
@@ -2037,7 +2043,7 @@ function MintComposer({
         title="Confirm Mint Payment"
         description={
           moderationConfig?.enabled
-            ? "Mintlab checks the uploaded image before any ICP is transferred."
+            ? "Mintlab checks the uploaded image for moderation and copyright issues before any ICP is transferred."
             : "Confirm the ICP payment from your in-app account before this NFT is minted."
         }
         lines={[
@@ -2758,6 +2764,18 @@ function ReceivingInstructions({
           )}
         </div>
 
+        <div className="flex items-start gap-2 rounded-lg border border-accent/20 bg-accent/5 p-3">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-accent" />
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            <strong className="text-foreground">
+              Send NFTs to your Principal ID.
+            </strong>{" "}
+            Use your ICP Account ID only for ICP deposits. If Sync shows a
+            collection-specific NFT receive destination, use that exact value
+            for that collection, then sync or import the token ID.
+          </p>
+        </div>
+
         {selectedSyncCollection && (
           <div className="rounded-lg border border-border bg-background/60 p-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -3010,10 +3028,8 @@ function ReceivingInstructions({
         <div className="flex items-start gap-2 p-3 bg-muted/30 rounded-lg">
           <Info className="w-4 h-4 text-accent shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground leading-relaxed">
-            <strong className="text-foreground">To receive NFTs:</strong> Choose
-            a collection in Sync to show the one destination Mintlab will check
-            for that standard. After sending, click{" "}
-            <strong className="text-foreground">Sync</strong>, choose the
+            <strong className="text-foreground">After sending NFTs:</strong>{" "}
+            Click <strong className="text-foreground">Sync</strong>, choose the
             collection and token ID when you know them, or import the collection
             first if it is missing. Broad sync checks imported collections in
             small saved pages.

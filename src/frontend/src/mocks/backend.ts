@@ -935,7 +935,7 @@ export const mockBackend: backendInterface = {
     model: "openai-omni-moderation-latest",
     categories: mockModerationCategories,
     userMessage:
-      "Uploads cannot include sexual content, graphic violence, self-harm content, hateful or harassing text, dangerous illegal instructions, or obvious copyrighted characters, logos, watermarks, or protected artwork.",
+      "Uploads are checked by AI moderation and copyright review. Avoid potentially copyrighted images, characters, logos, watermarks, protected artwork, sexual content, graphic violence, self-harm content, hateful or harassing text, or dangerous illegal instructions. Items that fail checks may be hidden from public view.",
   }),
   configureModeration: async (
     enabled,
@@ -959,7 +959,7 @@ export const mockBackend: backendInterface = {
     model: "openai-omni-moderation-latest",
     categories: mockModerationCategories,
     userMessage:
-      "Uploads cannot include sexual content, graphic violence, self-harm content, hateful or harassing text, dangerous illegal instructions, or obvious copyrighted characters, logos, watermarks, or protected artwork.",
+      "Uploads are checked by AI moderation and copyright review. Avoid potentially copyrighted images, characters, logos, watermarks, protected artwork, sexual content, graphic violence, self-harm content, hateful or harassing text, or dangerous illegal instructions. Items that fail checks may be hidden from public view.",
   }),
   adminRecoverPaidCollectionCreation: async (
     _owner,
