@@ -329,6 +329,7 @@ export const idlFactory = ({ IDL }) => {
     'categories' : ModerationCategorySettings,
     'model' : IDL.Text,
     'apiKeyConfigured' : IDL.Bool,
+    'xaiApiKeyConfigured' : IDL.Bool,
     'userMessage' : IDL.Text,
     'enabled' : IDL.Bool,
   });
@@ -1188,6 +1189,11 @@ export const idlFactory = ({ IDL }) => {
         [PublicModerationConfig],
         [],
       ),
+    'configureXaiCopyrightModeration' : IDL.Func(
+        [IDL.Opt(IDL.Text), IDL.Bool],
+        [PublicModerationConfig],
+        [],
+      ),
     'createAuctionListing' : IDL.Func(
         [NFTId, IDL.Nat64, IDL.Int],
         [AuctionListing],
@@ -1776,6 +1782,16 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'transformModerationResponse' : IDL.Func(
+        [
+          IDL.Record({
+            'context' : IDL.Vec(IDL.Nat8),
+            'response' : HttpRequestResult,
+          }),
+        ],
+        [HttpRequestResult],
+        ['query'],
+      ),
+    'transformXaiCopyrightResponse' : IDL.Func(
         [
           IDL.Record({
             'context' : IDL.Vec(IDL.Nat8),

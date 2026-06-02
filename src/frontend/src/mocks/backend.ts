@@ -931,10 +931,11 @@ export const mockBackend: backendInterface = {
   getModerationConfig: async () => ({
     enabled: true,
     apiKeyConfigured: true,
+    xaiApiKeyConfigured: true,
     model: "openai-omni-moderation-latest",
     categories: mockModerationCategories,
     userMessage:
-      "Uploads cannot include sexual content, graphic violence, self-harm content, hateful or harassing text, or dangerous illegal instructions.",
+      "Uploads cannot include sexual content, graphic violence, self-harm content, hateful or harassing text, dangerous illegal instructions, or obvious copyrighted characters, logos, watermarks, or protected artwork.",
   }),
   configureModeration: async (
     enabled,
@@ -946,9 +947,19 @@ export const mockBackend: backendInterface = {
   ) => ({
     enabled,
     apiKeyConfigured: !clearApiKey,
+    xaiApiKeyConfigured: true,
     model,
     categories,
     userMessage,
+  }),
+  configureXaiCopyrightModeration: async (apiKey, clearApiKey) => ({
+    enabled: true,
+    apiKeyConfigured: true,
+    xaiApiKeyConfigured: !!apiKey || !clearApiKey,
+    model: "openai-omni-moderation-latest",
+    categories: mockModerationCategories,
+    userMessage:
+      "Uploads cannot include sexual content, graphic violence, self-harm content, hateful or harassing text, dangerous illegal instructions, or obvious copyrighted characters, logos, watermarks, or protected artwork.",
   }),
   adminRecoverPaidCollectionCreation: async (
     _owner,

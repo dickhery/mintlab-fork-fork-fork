@@ -396,6 +396,7 @@ export interface ModerationCategorySettings {
 export interface PublicModerationConfig {
   enabled: boolean;
   apiKeyConfigured: boolean;
+  xaiApiKeyConfigured: boolean;
   model: string;
   categories: ModerationCategorySettings;
   userMessage: string;
@@ -800,6 +801,10 @@ export interface backendInterface {
     model: string,
     categories: ModerationCategorySettings,
     userMessage: string,
+  ): Promise<PublicModerationConfig>;
+  configureXaiCopyrightModeration(
+    apiKey: string | null,
+    clearApiKey: boolean,
   ): Promise<PublicModerationConfig>;
   adminRecoverPaidCollectionCreation(
     owner: Principal,
@@ -1554,6 +1559,7 @@ type RawModerationCategorySettings = {
 type RawPublicModerationConfig = {
   enabled: boolean;
   apiKeyConfigured: boolean;
+  xaiApiKeyConfigured: boolean;
   model: string;
   categories: RawModerationCategorySettings;
   userMessage: string;
@@ -2484,6 +2490,7 @@ function fromRawPublicModerationConfig(
   return {
     enabled: value.enabled,
     apiKeyConfigured: value.apiKeyConfigured,
+    xaiApiKeyConfigured: value.xaiApiKeyConfigured,
     model: value.model,
     categories: fromRawModerationCategories(value.categories),
     userMessage: value.userMessage,
@@ -3368,6 +3375,20 @@ export class Backend implements backendInterface {
           model,
           toRawModerationCategories(categories),
           userMessage,
+        ),
+      ),
+    );
+  }
+
+  async configureXaiCopyrightModeration(
+    apiKey: string | null,
+    clearApiKey: boolean,
+  ): Promise<PublicModerationConfig> {
+    return fromRawPublicModerationConfig(
+      await this.run(() =>
+        this.actor.configureXaiCopyrightModeration(
+          toRawOption(apiKey),
+          clearApiKey,
         ),
       ),
     );

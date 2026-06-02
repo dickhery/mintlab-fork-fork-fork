@@ -75,6 +75,7 @@ module {
   public type PublicModerationConfig = {
     enabled : Bool;
     apiKeyConfigured : Bool;
+    xaiApiKeyConfigured : Bool;
     model : Text;
     categories : ModerationCategorySettings;
     userMessage : Text;

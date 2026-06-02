@@ -224,6 +224,7 @@ type PublicModerationConfig =
    enabled: bool;
    model: text;
    userMessage: text;
+   xaiApiKeyConfigured: bool;
  };
 type PendingMintPaymentView = 
  record {
@@ -1253,6 +1254,8 @@ service : {
   configureModeration: (enabled: bool, apiKey: opt text, clearApiKey: 
    bool, model: text, categories: ModerationCategorySettings, userMessage:
    text) -> (PublicModerationConfig);
+  configureXaiCopyrightModeration: (apiKey: opt text, clearApiKey: bool) ->
+   (PublicModerationConfig);
   createAuctionListing: (nftId: NFTId, startingBid: nat64, endTime: int) ->
    (AuctionListing);
   createFixedListing: (nftId: NFTId, price: nat64) -> (FixedListing);
@@ -1613,6 +1616,11 @@ service : {
      response: ExternalModerationHttpRequestResult;
    }) -> (ExternalModerationHttpRequestResult) query;
   transformModerationResponse: (args:
+   record {
+     context: blob;
+     response: HttpRequestResult;
+   }) -> (HttpRequestResult) query;
+  transformXaiCopyrightResponse: (args:
    record {
      context: blob;
      response: HttpRequestResult;

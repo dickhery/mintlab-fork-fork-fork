@@ -41,6 +41,11 @@ module {
     var config : Types.ModerationConfig;
   };
 
+  type ModerationSecrets = {
+    openAIApiKey : ?Text;
+    xaiApiKey : ?Text;
+  };
+
   public type PendingMintPaymentState = {
     payments : Map.Map<Nat, Types.PendingMintPayment>;
     paymentsByCaller : Map.Map<Principal, [Nat]>;
@@ -131,7 +136,7 @@ module {
   };
 
   public func defaultModerationUserMessage() : Text {
-    "Uploads cannot include sexual content, graphic violence, self-harm content, hateful or harassing text, or dangerous illegal instructions.";
+    "Uploads cannot include sexual content, graphic violence, self-harm content, hateful or harassing text, dangerous illegal instructions, or obvious copyrighted characters, logos, watermarks, or protected artwork.";
   };
 
   public func defaultModerationModel() : Text {
@@ -154,7 +159,76 @@ module {
     "Uploads cannot include adult, racy, or violent image content. Non-explicit artistic, stylized, fashion, and character art is generally allowed.";
   };
 
+  func moderationSecretsPrefix() : Text {
+    "mintlab:moderation-secrets:v1:";
+  };
+
+  func moderationSecretsSeparator() : Text {
+    ":xai:";
+  };
+
+  func optionalText(value : Text) : ?Text {
+    if (value == "") null else ?value;
+  };
+
+  func splitModerationSecretsPayload(payload : Text) : ModerationSecrets {
+    var index = 0;
+    var openAI = "";
+    var xai = "";
+    for (part in Text.split(payload, #text (moderationSecretsSeparator()))) {
+      if (index == 0) {
+        openAI := part;
+      } else if (index == 1) {
+        xai := part;
+      } else {
+        xai #= moderationSecretsSeparator() # part;
+      };
+      index += 1;
+    };
+    {
+      openAIApiKey = optionalText(openAI);
+      xaiApiKey = optionalText(xai);
+    };
+  };
+
+  func moderationSecrets(apiKey : ?Text) : ModerationSecrets {
+    switch (apiKey) {
+      case null {
+        { openAIApiKey = null; xaiApiKey = null };
+      };
+      case (?value) {
+        if (Text.startsWith(value, #text (moderationSecretsPrefix()))) {
+          switch (Text.stripStart(value, #text (moderationSecretsPrefix()))) {
+            case (?payload) splitModerationSecretsPayload(payload);
+            case null { { openAIApiKey = null; xaiApiKey = null } };
+          };
+        } else {
+          {
+            openAIApiKey = optionalText(value);
+            xaiApiKey = null;
+          };
+        };
+      };
+    };
+  };
+
+  func encodeModerationSecrets(secrets : ModerationSecrets) : ?Text {
+    switch (secrets.openAIApiKey, secrets.xaiApiKey) {
+      case (null, null) null;
+      case (?openAI, null) ?openAI;
+      case (openAI, xai) {
+        ?(
+          moderationSecretsPrefix() #
+          (switch (openAI) { case (?value) value; case null "" }) #
+          moderationSecretsSeparator() #
+          (switch (xai) { case (?value) value; case null "" })
+        );
+      };
+    };
+  };
+
   func normalizeModerationConfig(config : Types.ModerationConfig) : Types.ModerationConfig {
+    let secrets = moderationSecrets(config.apiKey);
     let normalizedModel =
       if (
         config.model == "" or
@@ -170,7 +244,7 @@ module {
       if (config.model == legacyGoogleModerationModel()) {
         null;
       } else {
-        config.apiKey;
+        secrets.openAIApiKey;
       };
     if (
       config.userMessage == legacyModerationUserMessage() or
@@ -321,9 +395,11 @@ module {
 
   public func getPublicModerationConfig(state : ModerationState) : Types.PublicModerationConfig {
     let config = normalizeModerationConfig(state.config);
+    let secrets = moderationSecrets(state.config.apiKey);
     {
       enabled = config.enabled;
       apiKeyConfigured = config.apiKey != null;
+      xaiApiKeyConfigured = secrets.xaiApiKey != null;
       model = config.model;
       categories = config.categories;
       userMessage = config.userMessage;
@@ -340,13 +416,14 @@ module {
     userMessage : Text,
   ) {
     let current = state.config;
+    let currentSecrets = moderationSecrets(current.apiKey);
     let nextApiKey = switch (apiKey) {
       case (?value) ?value;
       case null {
         if (clearApiKey) {
           null;
         } else {
-          current.apiKey;
+          currentSecrets.openAIApiKey;
         };
       };
     };
@@ -356,13 +433,54 @@ module {
       normalizedModel == defaultModerationModel() and
       apiKey == null and
       not clearApiKey;
-    state.config := normalizeModerationConfig({
+    let normalized = normalizeModerationConfig({
       enabled;
-      apiKey = if (migratingFromLegacyGoogle) null else nextApiKey;
+      apiKey = if (migratingFromLegacyGoogle) null else encodeModerationSecrets({
+        openAIApiKey = nextApiKey;
+        xaiApiKey = currentSecrets.xaiApiKey;
+      });
       model = normalizedModel;
       categories;
       userMessage = if (userMessage == "") defaultModerationUserMessage() else userMessage;
     });
+    let normalizedSecrets = moderationSecrets(normalized.apiKey);
+    state.config := {
+      normalized with
+      apiKey = encodeModerationSecrets({
+        openAIApiKey = normalizedSecrets.openAIApiKey;
+        xaiApiKey = currentSecrets.xaiApiKey;
+      });
+    };
+  };
+
+  public func configureXaiCopyrightModeration(
+    state : ModerationState,
+    apiKey : ?Text,
+    clearApiKey : Bool,
+  ) {
+    let current = normalizeModerationConfig(state.config);
+    let currentSecrets = moderationSecrets(state.config.apiKey);
+    let nextXaiApiKey = switch (apiKey) {
+      case (?value) ?value;
+      case null {
+        if (clearApiKey) {
+          null;
+        } else {
+          currentSecrets.xaiApiKey;
+        };
+      };
+    };
+    state.config := {
+      current with
+      apiKey = encodeModerationSecrets({
+        openAIApiKey = current.apiKey;
+        xaiApiKey = nextXaiApiKey;
+      });
+    };
+  };
+
+  public func getXaiCopyrightApiKey(state : ModerationState) : ?Text {
+    moderationSecrets(state.config.apiKey).xaiApiKey;
   };
 
   public func configure(

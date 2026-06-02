@@ -94,8 +94,9 @@ const MAX_ON_CHAIN_IMAGE_CHARS = 1_900_000;
 const MODERATION_IMAGE_ACCEPT = "image/png,image/jpeg";
 const COLLECTION_CREATION_REPAIR_GRACE_MS = 3 * 60 * 1000;
 const OPENAI_MODERATION_MODEL = "omni-moderation-latest";
+const XAI_COPYRIGHT_MODEL = "grok-4.3";
 const DEFAULT_MODERATION_MESSAGE =
-  "Uploads cannot include sexual content, graphic violence, self-harm content, hateful or harassing text, or dangerous illegal instructions.";
+  "Uploads cannot include sexual content, graphic violence, self-harm content, hateful or harassing text, dangerous illegal instructions, or obvious copyrighted characters, logos, watermarks, or protected artwork.";
 const FRONTEND_CANISTER_ENV_KEYS = [
   "CANISTER_ID_FRONTEND",
   "CANISTER_FRONTEND_CANISTER_ID",
@@ -2147,6 +2148,8 @@ function MintConfigForm() {
   const [moderationEnabled, setModerationEnabled] = useState(false);
   const [moderationApiKey, setModerationApiKey] = useState("");
   const [clearModerationApiKey, setClearModerationApiKey] = useState(false);
+  const [xaiApiKey, setXaiApiKey] = useState("");
+  const [clearXaiApiKey, setClearXaiApiKey] = useState(false);
   const [moderationMessage, setModerationMessage] = useState(
     DEFAULT_MODERATION_MESSAGE,
   );
@@ -2481,9 +2484,10 @@ function MintConfigForm() {
     mutationFn: async () => {
       if (!actor) throw new Error("Backend not ready");
       const apiKey = moderationApiKey.trim() || null;
+      const xaiKey = xaiApiKey.trim() || null;
       const model = OPENAI_MODERATION_MODEL;
       const message = moderationMessage.trim() || DEFAULT_MODERATION_MESSAGE;
-      return actor.configureModeration(
+      const updated = await actor.configureModeration(
         moderationEnabled,
         apiKey,
         clearModerationApiKey,
@@ -2491,10 +2495,16 @@ function MintConfigForm() {
         moderationCategories,
         message,
       );
+      if (xaiKey || clearXaiApiKey) {
+        return actor.configureXaiCopyrightModeration(xaiKey, clearXaiApiKey);
+      }
+      return updated;
     },
     onSuccess: () => {
       setModerationApiKey("");
       setClearModerationApiKey(false);
+      setXaiApiKey("");
+      setClearXaiApiKey(false);
       void queryClient.invalidateQueries({ queryKey: ["moderationConfig"] });
       toast.success("Moderation settings saved");
     },
@@ -3057,7 +3067,7 @@ function MintConfigForm() {
             <div className="space-y-1">
               <p className="text-sm font-semibold text-foreground flex items-center gap-2">
                 <Shield size={15} className="text-primary" />
-                OpenAI Image Moderation
+                AI Image Moderation
               </p>
               <p className="text-xs text-muted-foreground">
                 Checks uploaded JPG/PNG images and mint metadata before any ICP
@@ -3066,22 +3076,39 @@ function MintConfigForm() {
               <p className="text-xs text-muted-foreground">
                 Moderation uses OpenAI{" "}
                 <span className="font-mono">omni-moderation-latest</span> and
-                checks images, title, description, and metadata before any ICP
-                transfer.
+                optional xAI{" "}
+                <span className="font-mono">{XAI_COPYRIGHT_MODEL}</span>{" "}
+                copyright review before any ICP transfer.
               </p>
             </div>
             {moderationConfigLoading ? (
-              <Skeleton className="h-6 w-24 rounded-full" />
+              <div className="flex flex-wrap justify-end gap-2">
+                <Skeleton className="h-6 w-24 rounded-full" />
+                <Skeleton className="h-6 w-24 rounded-full" />
+              </div>
             ) : (
-              <Badge
-                variant={
-                  moderationConfig?.apiKeyConfigured ? "secondary" : "outline"
-                }
-              >
-                {moderationConfig?.apiKeyConfigured
-                  ? "OpenAI key set"
-                  : "No key"}
-              </Badge>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Badge
+                  variant={
+                    moderationConfig?.apiKeyConfigured ? "secondary" : "outline"
+                  }
+                >
+                  {moderationConfig?.apiKeyConfigured
+                    ? "OpenAI key set"
+                    : "No OpenAI key"}
+                </Badge>
+                <Badge
+                  variant={
+                    moderationConfig?.xaiApiKeyConfigured
+                      ? "secondary"
+                      : "outline"
+                  }
+                >
+                  {moderationConfig?.xaiApiKeyConfigured
+                    ? "xAI key set"
+                    : "No xAI key"}
+                </Badge>
+              </div>
             )}
           </div>
 
@@ -3104,6 +3131,24 @@ function MintConfigForm() {
                 data-ocid="admin.moderation.api_key_input"
               />
             </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="moderation-xai-api-key">xAI API key</Label>
+              <Input
+                id="moderation-xai-api-key"
+                type="password"
+                value={xaiApiKey}
+                onChange={(e) => {
+                  setXaiApiKey(e.target.value);
+                  if (e.target.value.trim()) setClearXaiApiKey(false);
+                }}
+                placeholder={
+                  moderationConfig?.xaiApiKeyConfigured
+                    ? "Leave blank to keep current key"
+                    : "xai-..."
+                }
+                data-ocid="admin.moderation.xai_api_key_input"
+              />
+            </div>
           </div>
 
           {moderationConfig?.apiKeyConfigured && (
@@ -3119,6 +3164,23 @@ function MintConfigForm() {
                   if (checked) setModerationApiKey("");
                 }}
                 data-ocid="admin.moderation.clear_key_switch"
+              />
+            </div>
+          )}
+
+          {moderationConfig?.xaiApiKeyConfigured && (
+            <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-background/60 p-3">
+              <Label htmlFor="moderation-clear-xai-key">
+                Clear stored xAI key on save
+              </Label>
+              <Switch
+                id="moderation-clear-xai-key"
+                checked={clearXaiApiKey}
+                onCheckedChange={(checked) => {
+                  setClearXaiApiKey(checked);
+                  if (checked) setXaiApiKey("");
+                }}
+                data-ocid="admin.moderation.clear_xai_key_switch"
               />
             </div>
           )}

@@ -264,6 +264,8 @@ mixin (
   transient let MODERATION_MAX_IMAGE_DATA_URL_CHARS : Nat = 320_000;
   transient let MODERATION_MAX_REQUEST_BODY_BYTES : Nat = 380_000;
   transient let MODERATION_MAX_RESPONSE_BYTES : Nat64 = 24_000;
+  transient let XAI_COPYRIGHT_MODEL : Text = "grok-4.3";
+  transient let XAI_COPYRIGHT_MAX_RESPONSE_BYTES : Nat64 = 16_000;
   transient let CMC_RATE_CACHE_TTL_NS : Nat64 = 60_000_000_000;
   transient let CYCLE_DEBUG_LOGS_ENABLED : Bool = false;
   transient let PAYOUT_BASIS_POINTS_TOTAL : Nat = 10_000;
@@ -487,6 +489,27 @@ mixin (
     MintLib.getPublicModerationConfig(moderationState);
   };
 
+  public shared ({ caller }) func configureXaiCopyrightModeration(
+    apiKey : ?Text,
+    clearApiKey : Bool,
+  ) : async MintTypes.PublicModerationConfig {
+    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (not AuthLib.isAdmin(authState, caller)) Runtime.trap("Unauthorized: admin only");
+    let normalizedApiKey = switch (apiKey) {
+      case (?value) {
+        let sanitized = sanitizeModerationApiKey(value);
+        if (sanitized == "") null else ?sanitized;
+      };
+      case null null;
+    };
+    MintLib.configureXaiCopyrightModeration(
+      moderationState,
+      normalizedApiKey,
+      clearApiKey,
+    );
+    MintLib.getPublicModerationConfig(moderationState);
+  };
+
   public query func transformModerationResponse(
     args : {
       context : Blob;
@@ -495,6 +518,23 @@ mixin (
   ) : async HttpRequestResult {
     let normalized = switch (Text.decodeUtf8(args.response.body)) {
       case (?body) openAIModerationSummaryFromResponse(args.response.status, body);
+      case null "ERROR_NON_UTF8";
+    };
+    {
+      status = args.response.status;
+      body = Text.encodeUtf8(normalized);
+      headers = [];
+    };
+  };
+
+  public query func transformXaiCopyrightResponse(
+    args : {
+      context : Blob;
+      response : HttpRequestResult;
+    }
+  ) : async HttpRequestResult {
+    let normalized = switch (Text.decodeUtf8(args.response.body)) {
+      case (?body) xaiCopyrightSummaryFromResponse(args.response.status, body);
       case null "ERROR_NON_UTF8";
     };
     {
@@ -536,6 +576,35 @@ mixin (
     };
   };
 
+  func xaiCopyrightSummaryFromResponse(status : Nat, body : Text) : Text {
+    if (status != 200) {
+      return moderationErrorDiagnostic(body);
+    };
+
+    let compact = compactModerationResponseBody(body);
+    if (Text.contains(compact, #text "\"error\":")) {
+      return moderationErrorDiagnostic(body);
+    };
+
+    switch (jsonBoolAny(compact, "has_copyright_risk")) {
+      case (?risk) {
+        let riskLevel = switch (jsonTextEnumAny(compact, "risk_level", ["low", "medium", "high"])) {
+          case (?value) value;
+          case null "unknown";
+        };
+        let recommendation = switch (jsonTextEnumAny(compact, "recommendation", ["allow", "review", "reject"])) {
+          case (?value) value;
+          case null "unknown";
+        };
+        "XAI_COPYRIGHT" #
+        ";risk=" # boolText(risk) #
+        ";level=" # riskLevel #
+        ";recommendation=" # recommendation;
+      };
+      case null "UNKNOWN";
+    };
+  };
+
   func jsonBool(body : Text, field : Text) : ?Bool {
     if (Text.contains(body, #text ("\"" # field # "\":true"))) {
       ?true;
@@ -551,6 +620,33 @@ mixin (
       case (?value) value;
       case null false;
     };
+  };
+
+  func jsonBoolAny(body : Text, field : Text) : ?Bool {
+    switch (jsonBool(body, field)) {
+      case (?value) ?value;
+      case null {
+        if (Text.contains(body, #text ("\\\"" # field # "\\\":true"))) {
+          ?true;
+        } else if (Text.contains(body, #text ("\\\"" # field # "\\\":false"))) {
+          ?false;
+        } else {
+          null;
+        };
+      };
+    };
+  };
+
+  func jsonTextEnumAny(body : Text, field : Text, allowed : [Text]) : ?Text {
+    for (value in allowed.values()) {
+      if (
+        Text.contains(body, #text ("\"" # field # "\":\"" # value # "\"")) or
+        Text.contains(body, #text ("\\\"" # field # "\\\":\\\"" # value # "\\\""))
+      ) {
+        return ?value;
+      };
+    };
+    null;
   };
 
   func boolText(value : Bool) : Text {
@@ -3306,18 +3402,30 @@ mixin (
     if (not config.enabled) {
       return null;
     };
-    if (not hasActiveModerationRules(config.categories)) {
-      return null;
-    };
-    let apiKey = switch (config.apiKey) {
+    let xaiApiKey = switch (MintLib.getXaiCopyrightApiKey(moderationState)) {
       case (?value) {
         let sanitized = sanitizeModerationApiKey(value);
-        if (sanitized == "") {
-          return ?moderationUnavailableReason("The OpenAI API key is not configured.");
-        };
-        sanitized;
+        if (sanitized == "") null else ?sanitized;
       };
-      case null return ?moderationUnavailableReason("The OpenAI API key is not configured.");
+      case null null;
+    };
+    let runOpenAI = hasActiveModerationRules(config.categories);
+    if (not runOpenAI and xaiApiKey == null) {
+      return null;
+    };
+    let openAIApiKey = if (runOpenAI) {
+      switch (config.apiKey) {
+        case (?value) {
+          let sanitized = sanitizeModerationApiKey(value);
+          if (sanitized == "") {
+            return ?moderationUnavailableReason("The OpenAI API key is not configured.");
+          };
+          ?sanitized;
+        };
+        case null return ?moderationUnavailableReason("The OpenAI API key is not configured.");
+      };
+    } else {
+      null;
     };
     if (not isSupportedModerationImage(imageUrl)) {
       return ?"Moderation currently supports JPG and PNG uploads. Please upload a JPG or PNG image. No ICP was transferred.";
@@ -3327,41 +3435,89 @@ mixin (
       case (#ok(value)) value;
       case (#err(message)) return ?moderationUnavailableReason(message);
     };
-    let response = try {
-      await callOpenAIModeration(apiKey, kind, title, description, extraText, preparedImage.imageUrl, preparedImage.requestId);
-    } catch (error) {
-      let errMsg = Error.message(error);
-      Debug.print("=== OPENAI MODERATION OUTCALL FAILURE ===");
-      Debug.print("Error: " # errMsg);
-      Debug.print("Request ID: " # preparedImage.requestId);
-      Debug.print("Original image kind: " # moderationImageKind(imageUrl));
-      Debug.print("Original image chars: " # Nat.toText(imageUrl.size()));
-      Debug.print("Prepared image kind: " # moderationImageKind(preparedImage.imageUrl));
-      Debug.print("Prepared image chars: " # Nat.toText(preparedImage.imageUrl.size()));
-      Debug.print("======================================");
-      return ?moderationUnavailableReason(moderationRequestFailureMessage(errMsg));
-    };
-    if (response.status != 200) {
-      let diagnostic = moderationResponseDiagnostic(response.body);
-      Debug.print("=== MODERATION DEBUG ===");
-      Debug.print("Status: " # Nat.toText(response.status));
-      Debug.print("Transformed response body: " # debug_show (response.body));
-      Debug.print("Diagnostic: " # diagnostic);
-      Debug.print("========================");
-      return ?moderationUnavailableReason(moderationStatusFailureMessage(response.status, diagnostic));
-    };
-    switch (Text.decodeUtf8(response.body)) {
-      case (?summary) {
-        if (Text.startsWith(summary, #text "ERROR") or summary == "UNKNOWN") {
-          return ?moderationUnavailableReason(moderationProviderFailureMessage(summary));
+
+    switch (openAIApiKey) {
+      case (?apiKey) {
+        let response = try {
+          await callOpenAIModeration(apiKey, kind, title, description, extraText, preparedImage.imageUrl, preparedImage.requestId);
+        } catch (error) {
+          let errMsg = Error.message(error);
+          Debug.print("=== OPENAI MODERATION OUTCALL FAILURE ===");
+          Debug.print("Error: " # errMsg);
+          Debug.print("Request ID: " # preparedImage.requestId);
+          Debug.print("Original image kind: " # moderationImageKind(imageUrl));
+          Debug.print("Original image chars: " # Nat.toText(imageUrl.size()));
+          Debug.print("Prepared image kind: " # moderationImageKind(preparedImage.imageUrl));
+          Debug.print("Prepared image chars: " # Nat.toText(preparedImage.imageUrl.size()));
+          Debug.print("======================================");
+          return ?moderationUnavailableReason(moderationRequestFailureMessage(errMsg));
         };
-        switch (openAIModerationDecision(summary, config.categories)) {
-          case ("ALLOW") null;
-          case ("BLOCK") ?moderationDeclineReason(config);
-          case (_) ?moderationUnavailableReason("The OpenAI moderation response could not be verified.");
+        if (response.status != 200) {
+          let diagnostic = moderationResponseDiagnostic(response.body);
+          Debug.print("=== MODERATION DEBUG ===");
+          Debug.print("Status: " # Nat.toText(response.status));
+          Debug.print("Transformed response body: " # debug_show (response.body));
+          Debug.print("Diagnostic: " # diagnostic);
+          Debug.print("========================");
+          return ?moderationUnavailableReason(moderationStatusFailureMessage(response.status, diagnostic));
+        };
+        switch (Text.decodeUtf8(response.body)) {
+          case (?summary) {
+            if (Text.startsWith(summary, #text "ERROR") or summary == "UNKNOWN") {
+              return ?moderationUnavailableReason(moderationProviderFailureMessage(summary));
+            };
+            switch (openAIModerationDecision(summary, config.categories)) {
+              case ("ALLOW") {};
+              case ("BLOCK") return ?moderationDeclineReason(config);
+              case (_) return ?moderationUnavailableReason("The OpenAI moderation response could not be verified.");
+            };
+          };
+          case null return ?moderationUnavailableReason("The OpenAI moderation response could not be verified.");
         };
       };
-      case null ?moderationUnavailableReason("The OpenAI moderation response could not be verified.");
+      case null {};
+    };
+
+    switch (xaiApiKey) {
+      case (?apiKey) {
+        let response = try {
+          await callXaiCopyrightCheck(apiKey, kind, title, description, extraText, preparedImage.imageUrl, preparedImage.requestId);
+        } catch (error) {
+          let errMsg = Error.message(error);
+          Debug.print("=== XAI COPYRIGHT OUTCALL FAILURE ===");
+          Debug.print("Error: " # errMsg);
+          Debug.print("Request ID: " # preparedImage.requestId);
+          Debug.print("Original image kind: " # moderationImageKind(imageUrl));
+          Debug.print("Original image chars: " # Nat.toText(imageUrl.size()));
+          Debug.print("Prepared image kind: " # moderationImageKind(preparedImage.imageUrl));
+          Debug.print("Prepared image chars: " # Nat.toText(preparedImage.imageUrl.size()));
+          Debug.print("====================================");
+          return ?moderationUnavailableReason(xaiCopyrightRequestFailureMessage(errMsg));
+        };
+        if (response.status != 200) {
+          let diagnostic = moderationResponseDiagnostic(response.body);
+          Debug.print("=== XAI COPYRIGHT DEBUG ===");
+          Debug.print("Status: " # Nat.toText(response.status));
+          Debug.print("Transformed response body: " # debug_show (response.body));
+          Debug.print("Diagnostic: " # diagnostic);
+          Debug.print("===========================");
+          return ?moderationUnavailableReason(xaiCopyrightStatusFailureMessage(response.status, diagnostic));
+        };
+        switch (Text.decodeUtf8(response.body)) {
+          case (?summary) {
+            if (Text.startsWith(summary, #text "ERROR") or summary == "UNKNOWN") {
+              return ?moderationUnavailableReason(xaiCopyrightProviderFailureMessage(summary));
+            };
+            switch (xaiCopyrightDecision(summary)) {
+              case ("ALLOW") null;
+              case ("BLOCK") ?xaiCopyrightDeclineReason();
+              case (_) ?moderationUnavailableReason("The xAI copyright response could not be verified.");
+            };
+          };
+          case null ?moderationUnavailableReason("The xAI copyright response could not be verified.");
+        };
+      };
+      case null null;
     };
   };
 
@@ -3427,6 +3583,81 @@ mixin (
     await (with cycles = cost) ic.http_request(request);
   };
 
+  func callXaiCopyrightCheck(
+    apiKey : Text,
+    kind : Text,
+    title : Text,
+    description : Text,
+    extraText : Text,
+    imageUrl : Text,
+    requestId : Text,
+  ) : async HttpRequestResult {
+    let body = Text.encodeUtf8(
+      "{" #
+      "\"model\":" # jsonString(XAI_COPYRIGHT_MODEL) # "," #
+      "\"store\":false," #
+      "\"input\":[{" #
+      "\"role\":\"user\"," #
+      "\"content\":[" #
+      "{\"type\":\"input_image\",\"image_url\":" # jsonString(imageUrl) # ",\"detail\":\"high\"}," #
+      "{\"type\":\"input_text\",\"text\":" # jsonString(xaiCopyrightPrompt(kind, title, description, extraText)) # "}" #
+      "]" #
+      "}]," #
+      "\"text\":{\"format\":{\"type\":\"json_schema\",\"name\":\"mintlab_copyright_check\",\"strict\":true,\"schema\":{" #
+      "\"type\":\"object\",\"additionalProperties\":false,\"properties\":{" #
+      "\"has_copyright_risk\":{\"type\":\"boolean\"}," #
+      "\"risk_level\":{\"type\":\"string\",\"enum\":[\"low\",\"medium\",\"high\"]}," #
+      "\"flagged_elements\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}," #
+      "\"reasoning\":{\"type\":\"string\"}," #
+      "\"recommendation\":{\"type\":\"string\",\"enum\":[\"allow\",\"review\",\"reject\"]}" #
+      "}," #
+      "\"required\":[\"has_copyright_risk\",\"risk_level\",\"flagged_elements\",\"reasoning\",\"recommendation\"]" #
+      "}}}" #
+      "}"
+    );
+    if (body.size() > MODERATION_MAX_REQUEST_BODY_BYTES) {
+      Runtime.trap("The xAI copyright request was too large.");
+    };
+    let request : HttpRequestArgs = {
+      url = "https://api.x.ai/v1/responses";
+      method = #post;
+      max_response_bytes = ?XAI_COPYRIGHT_MAX_RESPONSE_BYTES;
+      headers = [
+        { name = "Host"; value = "api.x.ai" },
+        { name = "Authorization"; value = "Bearer " # apiKey },
+        { name = "User-Agent"; value = "mintlab-xai-copyright" },
+        { name = "Content-Type"; value = "application/json" },
+        { name = "Idempotency-Key"; value = requestId # "-xai" },
+      ];
+      body = ?body;
+      transform = ?{
+        function = transformXaiCopyrightResponse;
+        context = Blob.fromArray([]);
+      };
+      is_replicated = null;
+    };
+    let ic : ManagementCanisterActor = actor "aaaaa-aa";
+    let requestSize = httpRequestSize(request);
+    let cost = httpRequestCost(requestSize, request.max_response_bytes);
+    if (Cycles.balance() <= cost + minimumFactoryOperatingReserveCycles()) {
+      Runtime.trap("The app canister does not have enough cycles to call xAI copyright moderation.");
+    };
+    if (CYCLE_DEBUG_LOGS_ENABLED) {
+      Debug.print(
+        "XAI COPYRIGHT OUTCALL" #
+        " requestBytes=" # Nat.toText(requestSize) #
+        " maxResponseBytes=" # (switch (request.max_response_bytes) { case (?b) Nat64.toText(b); case null "unlimited" }) #
+        " estimatedCycles=" # Nat.toText(cost) #
+        " canisterCycleBalance=" # Nat.toText(Cycles.balance()) #
+        " requestId=" # requestId #
+        " imageKind=" # moderationImageKind(imageUrl) #
+        " imageChars=" # Nat.toText(imageUrl.size())
+      );
+    };
+    assertCyclesForCall(cost, "xAI copyright HTTPS outcall");
+    await (with cycles = cost) ic.http_request(request);
+  };
+
   func moderationTextInput(kind : Text, title : Text, description : Text, extraText : Text) : Text {
     "Kind: " # kind #
     "\nTitle: " # title #
@@ -3434,11 +3665,20 @@ mixin (
     "\nMetadata: " # extraText;
   };
 
+  func xaiCopyrightPrompt(kind : Text, title : Text, description : Text, extraText : Text) : Text {
+    "You are an IP and copyright risk reviewer for an NFT minting platform. " #
+    "Inspect the uploaded image and metadata for recognizable copyrighted characters, brand logos, stock-agency watermarks, famous protected artworks, or other obvious protected IP. " #
+    "Recommend reject or review when protected material is clearly present or likely enough that Mintlab should not mint it automatically. " #
+    "Recommend allow only when the image appears to be original user-created artwork or has no obvious protected elements. " #
+    "Keep reasoning short and based on visible evidence.\n\n" #
+    moderationTextInput(kind, title, description, extraText);
+  };
+
   func prepareModerationImage(imageUrl : Text) : { #ok : PreparedModerationImage; #err : Text } {
     let token = newModerationToken();
     if (Text.startsWith(imageUrl, #text "data:image/")) {
       if (imageUrl.size() > MODERATION_MAX_IMAGE_DATA_URL_CHARS) {
-        return #err("The uploaded image is too large for OpenAI moderation. Please upload a smaller JPG or PNG.");
+        return #err("The uploaded image is too large for AI moderation. Please upload a smaller JPG or PNG.");
       };
       #ok({
         imageUrl;
@@ -3524,6 +3764,28 @@ mixin (
     };
   };
 
+  func xaiCopyrightDecision(summary : Text) : Text {
+    if (not Text.startsWith(summary, #text "XAI_COPYRIGHT;")) {
+      return "UNKNOWN";
+    };
+    if (
+      summaryFlag(summary, "risk") or
+      Text.contains(summary, #text "level=medium") or
+      Text.contains(summary, #text "level=high") or
+      Text.contains(summary, #text "recommendation=review") or
+      Text.contains(summary, #text "recommendation=reject")
+    ) {
+      "BLOCK";
+    } else if (
+      Text.contains(summary, #text "risk=false") and
+      Text.contains(summary, #text "recommendation=allow")
+    ) {
+      "ALLOW";
+    } else {
+      "UNKNOWN";
+    };
+  };
+
   func summaryFlag(summary : Text, field : Text) : Bool {
     Text.contains(summary, #text (field # "=true"));
   };
@@ -3568,6 +3830,10 @@ mixin (
 
   func moderationDeclineReason(config : MintTypes.ModerationConfig) : Text {
     "Upload declined by moderation. " # config.userMessage;
+  };
+
+  func xaiCopyrightDeclineReason() : Text {
+    "Upload declined by copyright review. Please upload original artwork without recognizable copyrighted characters, brand logos, stock watermarks, or protected artwork.";
   };
 
   func moderationUnavailableReason(detail : Text) : Text {
@@ -3653,6 +3919,55 @@ mixin (
     };
   };
 
+  func xaiCopyrightRequestFailureMessage(message : Text) : Text {
+    let lowerMessage = Text.toLower(message);
+    if (
+      Text.contains(lowerMessage, #text "replicated") or
+      Text.contains(lowerMessage, #text "non-replicated") or
+      Text.contains(lowerMessage, #text "is_replicated") or
+      Text.contains(lowerMessage, #text "update call") or
+      Text.contains(lowerMessage, #text "consensus")
+    ) {
+      "The xAI copyright outcall is configured incorrectly. Contact the admin to fix the moderation setup.";
+    } else if (
+      Text.contains(lowerMessage, #text "cycles") or
+      Text.contains(lowerMessage, #text "canisteroutofcycles") or
+      Text.contains(lowerMessage, #text "insufficientcycles") or
+      Text.contains(lowerMessage, #text "out of cycles")
+    ) {
+      "The backend is running low on cycles. Please ask the admin to top up the canister.";
+    } else if (
+      Text.contains(lowerMessage, #text "timeout") or
+      Text.contains(lowerMessage, #text "timed out") or
+      Text.contains(lowerMessage, #text "deadline") or
+      Text.contains(lowerMessage, #text "no response received") or
+      Text.contains(lowerMessage, #text "systransient")
+    ) {
+      "xAI copyright review is temporarily unavailable. Please try again in a moment.";
+    } else if (
+      Text.contains(lowerMessage, #text "request body") or
+      Text.contains(lowerMessage, #text "payload") or
+      Text.contains(lowerMessage, #text "message size") or
+      Text.contains(lowerMessage, #text "max message") or
+      Text.contains(lowerMessage, #text "maximum size") or
+      Text.contains(lowerMessage, #text "too large") or
+      Text.contains(lowerMessage, #text "size limit")
+    ) {
+      "The uploaded image is too large for copyright review. Please upload a smaller JPG or PNG image.";
+    } else if (
+      Text.contains(lowerMessage, #text "dns") or
+      Text.contains(lowerMessage, #text "certificate") or
+      Text.contains(lowerMessage, #text "tls") or
+      Text.contains(lowerMessage, #text "connect") or
+      Text.contains(lowerMessage, #text "connection") or
+      Text.contains(lowerMessage, #text "network")
+    ) {
+      "The IC HTTPS outcall could not connect to xAI copyright review.";
+    } else {
+      "The xAI copyright HTTPS outcall failed before xAI returned a usable response.";
+    };
+  };
+
   func moderationStatusFailureMessage(status : Nat, diagnostic : Text) : Text {
     if (status == 400) {
       if (diagnostic == "ERROR_AUTH") {
@@ -3677,6 +3992,30 @@ mixin (
     };
   };
 
+  func xaiCopyrightStatusFailureMessage(status : Nat, diagnostic : Text) : Text {
+    if (status == 400) {
+      if (diagnostic == "ERROR_AUTH") {
+        "The xAI API key is invalid or expired. Please ask the admin to update the xAI API key in the moderation settings.";
+      } else if (diagnostic == "ERROR_IMAGE_URL") {
+        "Unsupported image format. Please upload a JPG or PNG image for copyright review.";
+      } else if (diagnostic == "ERROR_CONTENT") {
+        "xAI rejected the uploaded image content before copyright review could complete.";
+      } else {
+        "The xAI copyright request was rejected as invalid.";
+      };
+    } else if (status == 401 or status == 403) {
+      "The xAI API key is invalid or expired. Please ask the admin to update the xAI API key in the moderation settings.";
+    } else if (status == 413) {
+      "The uploaded image is too large for copyright review. Please upload a smaller JPG or PNG image.";
+    } else if (status == 429) {
+      "xAI copyright review is temporarily unavailable. Please try again in a moment.";
+    } else if (status >= 500) {
+      "The xAI copyright review service is temporarily unavailable.";
+    } else {
+      "The xAI copyright review service returned HTTP status " # Nat.toText(status) # ".";
+    };
+  };
+
   func moderationProviderFailureMessage(diagnostic : Text) : Text {
     if (diagnostic == "ERROR_AUTH") {
       "The OpenAI API key was rejected. Ask an admin to update the moderation key.";
@@ -3688,6 +4027,20 @@ mixin (
       "OpenAI rejected the uploaded image content before moderation could complete.";
     } else {
       "The OpenAI moderation response could not be verified.";
+    };
+  };
+
+  func xaiCopyrightProviderFailureMessage(diagnostic : Text) : Text {
+    if (diagnostic == "ERROR_AUTH") {
+      "The xAI API key was rejected. Ask an admin to update the xAI moderation key.";
+    } else if (diagnostic == "ERROR_IMAGE_URL") {
+      "xAI could not fetch or read the uploaded image for copyright review.";
+    } else if (diagnostic == "ERROR_RATE_LIMIT") {
+      "The xAI service is rate limiting copyright review requests.";
+    } else if (diagnostic == "ERROR_CONTENT") {
+      "xAI rejected the uploaded image content before copyright review could complete.";
+    } else {
+      "The xAI copyright response could not be verified.";
     };
   };
 
