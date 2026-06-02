@@ -3596,16 +3596,16 @@ mixin (
     let body = Text.encodeUtf8(
       "{" #
       "\"model\":" # jsonString(XAI_COPYRIGHT_MODEL) # "," #
-      "\"store\":false," #
-      "\"max_output_tokens\":" # Nat.toText(XAI_COPYRIGHT_MAX_OUTPUT_TOKENS) # "," #
-      "\"input\":[{" #
+      "\"stream\":false," #
+      "\"max_tokens\":" # Nat.toText(XAI_COPYRIGHT_MAX_OUTPUT_TOKENS) # "," #
+      "\"messages\":[{" #
       "\"role\":\"user\"," #
       "\"content\":[" #
-      "{\"type\":\"input_image\",\"image_url\":" # jsonString(imageUrl) # ",\"detail\":\"high\"}," #
-      "{\"type\":\"input_text\",\"text\":" # jsonString(xaiCopyrightPrompt(kind, title, description, extraText)) # "}" #
+      "{\"type\":\"image_url\",\"image_url\":{\"url\":" # jsonString(imageUrl) # ",\"detail\":\"high\"}}," #
+      "{\"type\":\"text\",\"text\":" # jsonString(xaiCopyrightPrompt(kind, title, description, extraText)) # "}" #
       "]" #
       "}]," #
-      "\"text\":{\"format\":{\"type\":\"json_schema\",\"name\":\"mintlab_copyright_check\",\"strict\":true,\"schema\":{" #
+      "\"response_format\":{\"type\":\"json_schema\",\"json_schema\":{\"name\":\"mintlab_copyright_check\",\"strict\":true,\"schema\":{" #
       "\"type\":\"object\",\"additionalProperties\":false,\"properties\":{" #
       "\"has_copyright_risk\":{\"type\":\"boolean\"}," #
       "\"risk_level\":{\"type\":\"string\",\"enum\":[\"low\",\"medium\",\"high\"]}," #
@@ -3619,7 +3619,7 @@ mixin (
       Runtime.trap("The xAI copyright request was too large.");
     };
     let request : HttpRequestArgs = {
-      url = "https://api.x.ai/v1/responses";
+      url = "https://api.x.ai/v1/chat/completions";
       method = #post;
       max_response_bytes = ?XAI_COPYRIGHT_MAX_RESPONSE_BYTES;
       headers = [
@@ -3634,7 +3634,7 @@ mixin (
         function = transformXaiCopyrightResponse;
         context = Blob.fromArray([]);
       };
-      // Grok Responses is generative, so replicated calls can fail consensus when
+      // Grok image review is generative, so replicated calls can fail consensus when
       // replicas receive slightly different model outputs. One replica is enough
       // for this policy check and avoids duplicate provider requests.
       is_replicated = ?false;
@@ -3679,16 +3679,24 @@ mixin (
 
   func prepareModerationImage(imageUrl : Text) : { #ok : PreparedModerationImage; #err : Text } {
     let token = newModerationToken();
-    if (Text.startsWith(imageUrl, #text "data:image/")) {
-      if (imageUrl.size() > MODERATION_MAX_IMAGE_DATA_URL_CHARS) {
+    let normalizedImageUrl = normalizeModerationImageUrl(imageUrl);
+    if (Text.startsWith(normalizedImageUrl, #text "data:image/")) {
+      if (normalizedImageUrl.size() > MODERATION_MAX_IMAGE_DATA_URL_CHARS) {
         return #err("The uploaded image is too large for AI moderation. Please upload a smaller JPG or PNG.");
       };
       #ok({
-        imageUrl;
+        imageUrl = normalizedImageUrl;
         requestId = moderationRequestId(token);
       });
     } else {
-      #ok({ imageUrl; requestId = moderationRequestId(token) });
+      #ok({ imageUrl = normalizedImageUrl; requestId = moderationRequestId(token) });
+    };
+  };
+
+  func normalizeModerationImageUrl(imageUrl : Text) : Text {
+    switch (Text.stripStart(imageUrl, #text "data:image/jpg;base64,")) {
+      case (?payload) "data:image/jpeg;base64," # payload;
+      case null imageUrl;
     };
   };
 
