@@ -326,7 +326,7 @@ type NFTReportMeta =
    status: NFTReportStatus;
    tokenId: text;
  };
-type NFTReceiveInstructions =
+type NFTReceiveInstructions = 
  record {
    accountId: AccountIdentifier;
    accountKind: text;
