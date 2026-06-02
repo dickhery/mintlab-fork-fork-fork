@@ -266,6 +266,7 @@ mixin (
   transient let MODERATION_MAX_RESPONSE_BYTES : Nat64 = 24_000;
   transient let XAI_COPYRIGHT_MODEL : Text = "grok-4.3";
   transient let XAI_COPYRIGHT_MAX_RESPONSE_BYTES : Nat64 = 16_000;
+  transient let XAI_COPYRIGHT_MAX_OUTPUT_TOKENS : Nat = 96;
   transient let CMC_RATE_CACHE_TTL_NS : Nat64 = 60_000_000_000;
   transient let CYCLE_DEBUG_LOGS_ENABLED : Bool = false;
   transient let PAYOUT_BASIS_POINTS_TOTAL : Nat = 10_000;
@@ -3596,6 +3597,7 @@ mixin (
       "{" #
       "\"model\":" # jsonString(XAI_COPYRIGHT_MODEL) # "," #
       "\"store\":false," #
+      "\"max_output_tokens\":" # Nat.toText(XAI_COPYRIGHT_MAX_OUTPUT_TOKENS) # "," #
       "\"input\":[{" #
       "\"role\":\"user\"," #
       "\"content\":[" #
@@ -3607,11 +3609,9 @@ mixin (
       "\"type\":\"object\",\"additionalProperties\":false,\"properties\":{" #
       "\"has_copyright_risk\":{\"type\":\"boolean\"}," #
       "\"risk_level\":{\"type\":\"string\",\"enum\":[\"low\",\"medium\",\"high\"]}," #
-      "\"flagged_elements\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}," #
-      "\"reasoning\":{\"type\":\"string\"}," #
       "\"recommendation\":{\"type\":\"string\",\"enum\":[\"allow\",\"review\",\"reject\"]}" #
       "}," #
-      "\"required\":[\"has_copyright_risk\",\"risk_level\",\"flagged_elements\",\"reasoning\",\"recommendation\"]" #
+      "\"required\":[\"has_copyright_risk\",\"risk_level\",\"recommendation\"]" #
       "}}}" #
       "}"
     );
@@ -3634,7 +3634,10 @@ mixin (
         function = transformXaiCopyrightResponse;
         context = Blob.fromArray([]);
       };
-      is_replicated = null;
+      // Grok Responses is generative, so replicated calls can fail consensus when
+      // replicas receive slightly different model outputs. One replica is enough
+      // for this policy check and avoids duplicate provider requests.
+      is_replicated = ?false;
     };
     let ic : ManagementCanisterActor = actor "aaaaa-aa";
     let requestSize = httpRequestSize(request);
@@ -3670,7 +3673,7 @@ mixin (
     "Inspect the uploaded image and metadata for recognizable copyrighted characters, brand logos, stock-agency watermarks, famous protected artworks, or other obvious protected IP. " #
     "Recommend reject or review when protected material is clearly present or likely enough that Mintlab should not mint it automatically. " #
     "Recommend allow only when the image appears to be original user-created artwork or has no obvious protected elements. " #
-    "Keep reasoning short and based on visible evidence.\n\n" #
+    "Return only the requested structured decision fields.\n\n" #
     moderationTextInput(kind, title, description, extraText);
   };
 
@@ -3928,7 +3931,7 @@ mixin (
       Text.contains(lowerMessage, #text "update call") or
       Text.contains(lowerMessage, #text "consensus")
     ) {
-      "The xAI copyright outcall is configured incorrectly. Contact the admin to fix the moderation setup.";
+      "The xAI copyright outcall could not complete through the IC HTTPS outcall layer. Redeploy the backend with the single-replica xAI copyright outcall update, or temporarily clear the xAI key in admin moderation settings.";
     } else if (
       Text.contains(lowerMessage, #text "cycles") or
       Text.contains(lowerMessage, #text "canisteroutofcycles") or
