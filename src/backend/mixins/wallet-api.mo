@@ -185,10 +185,58 @@ mixin (
     IcpLib.accountIdentifier(canisterId, IcpLib.principalToSubaccount(caller));
   };
 
+  func mintlabVaultAccountId() : Blob {
+    IcpLib.accountIdentifier(canisterId, IcpLib.zeroSubaccount());
+  };
+
   func mintlabUserICRC7Account(caller : Principal) : NFTStandards.ICRC7Account {
     {
       owner = canisterId;
       subaccount = ?IcpLib.principalToSubaccount(caller);
+    };
+  };
+
+  func nftReceiveInstructions(
+    caller : Principal,
+    collection : CollectionTypes.Collection,
+  ) : WalletTypes.NFTReceiveInstructions {
+    switch (collection.standard) {
+      case (#EXT) {
+        {
+          principal = canisterId;
+          accountId = mintlabUserAccountId(caller);
+          accountKind = "Mintlab app Account ID";
+          standard = collection.standard;
+          warning = "Send EXT NFTs for this collection to this Account ID. It is unique to your Mintlab login; after sending, sync this collection or import the token ID.";
+        };
+      };
+      case (#DIP721) {
+        {
+          principal = caller;
+          accountId = IcpLib.accountIdentifier(caller, IcpLib.zeroSubaccount());
+          accountKind = "Principal ID";
+          standard = collection.standard;
+          warning = "Send DIP721 NFTs for this collection to your Principal ID, then sync this collection or import the token ID.";
+        };
+      };
+      case (#ICRC7) {
+        {
+          principal = caller;
+          accountId = IcpLib.accountIdentifier(caller, IcpLib.zeroSubaccount());
+          accountKind = "Principal ID";
+          standard = collection.standard;
+          warning = "Send ICRC-7 NFTs for this collection to your Principal ID unless the sending wallet explicitly supports ICRC-7 accounts with subaccounts.";
+        };
+      };
+      case (#Other(standardName)) {
+        {
+          principal = caller;
+          accountId = IcpLib.accountIdentifier(caller, IcpLib.zeroSubaccount());
+          accountKind = "Collection-specific";
+          standard = collection.standard;
+          warning = "Mintlab does not have canonical receive instructions for " # standardName # " collections. Follow the source collection wallet instructions, then import the token ID.";
+        };
+      };
     };
   };
 
@@ -436,29 +484,116 @@ mixin (
       };
       case null {};
     };
-    let vaultAccountId = IcpLib.accountIdentifier(canisterId, IcpLib.zeroSubaccount());
-    let verification = await* WalletLib.verifyOwnedNFT(
-      collection,
-      canisterId,
-      vaultAccountId,
-      canonicalTokenId,
-      #Vaulted,
-    );
-    switch (verification) {
-      case (#err(message)) return #err(message);
-      case (#ok(verifiedMetadata)) {
-        let nft = WalletLib.registerNFT(
-          walletState,
-          caller,
-          collectionId,
-          canonicalTokenId,
-          verifiedMetadata,
-          #Vaulted,
-        );
-        WalletLib.clearPreparedDeposit(walletState, collectionId, canonicalTokenId);
-        #ok(nft);
+    let metadataFallback = switch (WalletLib.findByCollectionToken(walletState, collectionId, canonicalTokenId)) {
+      case (?knownNFT) ?knownNFT.metadata;
+      case null null;
+    };
+    func completeClaim(verifiedMetadata : WalletTypes.NFTMetadata) : {
+      #ok : WalletTypes.WalletNFT;
+      #err : Text;
+    } {
+      let nft = WalletLib.registerNFT(
+        walletState,
+        caller,
+        collectionId,
+        canonicalTokenId,
+        metadataWithTokenDisplayHint(collection, canonicalTokenId, tokenId, verifiedMetadata),
+        #Vaulted,
+      );
+      WalletLib.clearPreparedDeposit(walletState, collectionId, canonicalTokenId);
+      #ok(nft);
+    };
+    switch (collection.standard) {
+      case (#EXT) {
+        let appAccountId = mintlabUserAccountId(caller);
+        switch (
+          await* WalletLib.verifyKnownEXTAccountNFTWithFallback(
+            collection,
+            appAccountId,
+            canonicalTokenId,
+            metadataFallback,
+          )
+        ) {
+          case (#ok(verifiedMetadata)) return completeClaim(verifiedMetadata);
+          case (#err(appAccountMessage)) {
+            let vaultAccountId = mintlabVaultAccountId();
+            switch (
+              await* WalletLib.verifyKnownOwnedNFTWithFallback(
+                collection,
+                canisterId,
+                vaultAccountId,
+                canonicalTokenId,
+                metadataFallback,
+              )
+            ) {
+              case (#ok(verifiedMetadata)) return completeClaim(verifiedMetadata);
+              case (#err(vaultMessage)) {
+                return #err(
+                  "NFT not found in the prepared Mintlab app deposit account or the default vault account. App deposit account: " #
+                  appAccountMessage #
+                  " Default vault: " #
+                  vaultMessage
+                );
+              };
+            };
+          };
+        };
+      };
+      case (#ICRC7) {
+        let appAccount = mintlabUserICRC7Account(caller);
+        switch (
+          await* WalletLib.verifyKnownICRC7AccountNFTWithFallback(
+            collection,
+            appAccount,
+            canonicalTokenId,
+            metadataFallback,
+          )
+        ) {
+          case (#ok(verifiedMetadata)) return completeClaim(verifiedMetadata);
+          case (#err(appAccountMessage)) {
+            let vaultAccountId = mintlabVaultAccountId();
+            switch (
+              await* WalletLib.verifyKnownOwnedNFTWithFallback(
+                collection,
+                canisterId,
+                vaultAccountId,
+                canonicalTokenId,
+                metadataFallback,
+              )
+            ) {
+              case (#ok(verifiedMetadata)) return completeClaim(verifiedMetadata);
+              case (#err(vaultMessage)) {
+                return #err(
+                  "NFT not found in the prepared Mintlab app ICRC-7 account or the default vault account. App ICRC-7 account: " #
+                  appAccountMessage #
+                  " Default vault: " #
+                  vaultMessage
+                );
+              };
+            };
+          };
+        };
+      };
+      case (#DIP721) {
+        let vaultAccountId = mintlabVaultAccountId();
+        switch (
+          await* WalletLib.verifyKnownOwnedNFTWithFallback(
+            collection,
+            canisterId,
+            vaultAccountId,
+            canonicalTokenId,
+            metadataFallback,
+          )
+        ) {
+          case (#ok(verifiedMetadata)) return completeClaim(verifiedMetadata);
+          case (#err(message)) return #err("NFT not found in the default vault principal. " # message);
+        };
+      };
+      case (#Other(standardName)) {
+        return #err("Vault deposits are not supported for '" # standardName # "' collections");
       };
     };
+    #err("Vault deposit claim failed");
   };
 
   public shared ({ caller }) func sendNFT(
@@ -779,7 +914,23 @@ mixin (
   };
 
   public shared query ({ caller }) func getUserAccountId() : async CommonTypes.AccountIdentifier {
-    IcpLib.accountIdentifier(canisterId, IcpLib.principalToSubaccount(caller));
+    mintlabUserAccountId(caller);
+  };
+
+  public shared query ({ caller }) func getNFTReceiveInstructions(
+    collectionId : WalletTypes.CollectionId
+  ) : async {
+    #ok : WalletTypes.NFTReceiveInstructions;
+    #err : Text;
+  } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("You must be logged in to get receive instructions");
+    };
+    let collection = switch (CollectionLib.getCollection(collectionsState, collectionId)) {
+      case null return #err("Collection not found");
+      case (?value) value;
+    };
+    #ok(nftReceiveInstructions(caller, collection));
   };
 
   public shared query ({ caller }) func getVaultPrincipal() : async Principal {
@@ -791,9 +942,9 @@ mixin (
 
   public shared query ({ caller }) func getVaultAccountId() : async CommonTypes.AccountIdentifier {
     if (Principal.isAnonymous(caller)) {
-      return IcpLib.accountIdentifier(canisterId, IcpLib.zeroSubaccount());
+      return mintlabVaultAccountId();
     };
-    IcpLib.accountIdentifier(canisterId, IcpLib.zeroSubaccount());
+    mintlabVaultAccountId();
   };
 
   public query func getCollectionIndexStatus(

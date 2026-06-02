@@ -66,6 +66,7 @@ import type {
   MintConfig,
   NFTDividend,
   NFTMetadata,
+  NFTReceiveInstructions,
   NFTStats,
   PendingMintPaymentView,
   PublicModerationConfig,
@@ -348,6 +349,31 @@ function nftStandardLabel(collection?: Collection | null): string {
   const standard = collection.standard;
   if (standard.__kind__ === "Other") return standard.Other;
   return standard.__kind__;
+}
+
+function receiveInstructionUsesAccountId(
+  instructions: NFTReceiveInstructions,
+): boolean {
+  return (
+    instructions.standard.__kind__ === "EXT" ||
+    instructions.accountKind.toLowerCase().includes("account")
+  );
+}
+
+function receiveInstructionValue(instructions: NFTReceiveInstructions): string {
+  return receiveInstructionUsesAccountId(instructions)
+    ? accountIdToHex(instructions.accountId)
+    : instructions.principal.toString();
+}
+
+function receiveInstructionLabel(
+  collection: Collection,
+  instructions: NFTReceiveInstructions,
+): string {
+  const destinationLabel = receiveInstructionUsesAccountId(instructions)
+    ? "Account ID"
+    : "Principal ID";
+  return `${nftStandardLabel(collection)} receive ${destinationLabel}`;
 }
 
 function readinessStatusLabel(
@@ -2553,6 +2579,27 @@ function ReceivingInstructions({
         return result.ok;
       },
     });
+  const {
+    data: selectedReceiveInstructions = null,
+    isLoading: receiveLoading,
+  } = useQuery<NFTReceiveInstructions | null>({
+    queryKey: [
+      "nftReceiveInstructions",
+      selectedSyncCollection?.id.toString() ?? null,
+    ],
+    enabled: actor != null && selectedSyncCollection != null,
+    staleTime: 60_000,
+    queryFn: async () => {
+      if (!actor || !selectedSyncCollection) return null;
+      const result = await actor.getNFTReceiveInstructions(
+        selectedSyncCollection.id,
+      );
+      if (result.__kind__ === "err") {
+        throw new Error(result.err);
+      }
+      return result.ok;
+    },
+  });
 
   useEffect(() => {
     if (
@@ -2690,21 +2737,21 @@ function ReceivingInstructions({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {principalText && (
             <CopyField
-              label="Principal ID — use for ICRC-7/DIP721 NFTs"
+              label="Your Principal ID"
               value={principalText}
               ocid="wallet.copy_principal_button"
             />
           )}
           {accountIdHex ? (
             <CopyField
-              label="Account ID — use for ICP and EXT NFTs"
+              label="ICP Account ID"
               value={accountIdHex}
               ocid="wallet.copy_account_id_button"
             />
           ) : (
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Account ID — use for ICP and EXT NFTs
+                ICP Account ID
               </span>
               <Skeleton className="h-9 w-full rounded-lg" />
             </div>
@@ -2741,6 +2788,31 @@ function ReceivingInstructions({
                   selectedSyncCollection,
                 )}
               </Badge>
+            </div>
+
+            <div className="mt-3">
+              {selectedReceiveInstructions ? (
+                <div className="space-y-2">
+                  <CopyField
+                    label={receiveInstructionLabel(
+                      selectedSyncCollection,
+                      selectedReceiveInstructions,
+                    )}
+                    value={receiveInstructionValue(selectedReceiveInstructions)}
+                    ocid="wallet.copy_collection_receive_destination"
+                  />
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    {selectedReceiveInstructions.warning}
+                  </p>
+                </div>
+              ) : receiveLoading ? (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Receive destination
+                  </span>
+                  <Skeleton className="h-9 w-full rounded-lg" />
+                </div>
+              ) : null}
             </div>
 
             <div className="mt-3 grid gap-3 md:grid-cols-[1fr_auto] md:items-end">
@@ -2938,15 +3010,13 @@ function ReceivingInstructions({
         <div className="flex items-start gap-2 p-3 bg-muted/30 rounded-lg">
           <Info className="w-4 h-4 text-accent shrink-0 mt-0.5" />
           <p className="text-xs text-muted-foreground leading-relaxed">
-            <strong className="text-foreground">To receive NFTs:</strong> Use
-            the field the sending wallet asks for. ICRC-7 and DIP721 use your{" "}
-            <strong className="text-foreground">Principal ID</strong>; EXT
-            collections may use either your Principal ID or the{" "}
-            <strong className="text-foreground">Account ID</strong>. After
-            sending, click <strong className="text-foreground">Sync</strong>,
-            choose the collection and token ID when you know them, or import the
-            collection first if it is missing. Broad sync checks imported
-            collections in small saved pages.
+            <strong className="text-foreground">To receive NFTs:</strong> Choose
+            a collection in Sync to show the one destination Mintlab will check
+            for that standard. After sending, click{" "}
+            <strong className="text-foreground">Sync</strong>, choose the
+            collection and token ID when you know them, or import the collection
+            first if it is missing. Broad sync checks imported collections in
+            small saved pages.
           </p>
         </div>
       </div>
@@ -4215,7 +4285,7 @@ export default function WalletPage() {
           <EmptyState
             icon={Wallet}
             title="No NFTs yet"
-            description="Register an NFT you received externally, import a supported collection, or create your own Mintlab collection first. Use your Principal ID above to receive NFTs from any ICP wallet."
+            description="Register an NFT you received externally, import a supported collection, or create your own Mintlab collection first. Choose a collection in Sync to see the exact receive destination."
             data-ocid="wallet.empty_state"
           />
           {/* Supported collections */}

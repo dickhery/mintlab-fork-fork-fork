@@ -326,6 +326,14 @@ type NFTReportMeta =
    status: NFTReportStatus;
    tokenId: text;
  };
+type NFTReceiveInstructions =
+ record {
+   accountId: AccountIdentifier;
+   accountKind: text;
+   "principal": principal;
+   standard: NFTStandard;
+   warning: text;
+ };
 type NFTMetadata = 
  record {
    attributes: vec record {
@@ -1361,6 +1369,11 @@ service : {
   getMyRecentNFTTransactions: (limit: opt nat) ->
    (vec RecentTransaction) query;
   getMyRecentTransactions: (limit: opt nat) -> (vec RecentTransaction) query;
+  getNFTReceiveInstructions: (collectionId: CollectionId) ->
+   (variant {
+      err: text;
+      ok: NFTReceiveInstructions;
+    }) query;
   getNFTStats: (user: principal) -> (NFTStats) query;
   getRegistry: () -> (vec record {
                             EXTTokenIndex;

@@ -51,6 +51,7 @@ export type {
   WalletSyncPageResult,
   WalletCollectionSyncProgress,
   NFTStats,
+  NFTReceiveInstructions,
   NFTMetadata,
   MintConfig,
   ModerationCategorySettings,

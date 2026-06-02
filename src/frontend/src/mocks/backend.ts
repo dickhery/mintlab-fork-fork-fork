@@ -858,6 +858,26 @@ export const mockBackend: backendInterface = {
       [BigInt(4), BigInt(1)],
     ],
   }),
+  getNFTReceiveInstructions: async (collectionId) => {
+    const collection = sampleCollections.find((item) => item.id === collectionId);
+    const standard = collection?.standard ?? { __kind__: "EXT" as const, EXT: null };
+    return {
+      __kind__: "ok" as const,
+      ok: {
+        principal: standard.__kind__ === "EXT" ? samplePrincipal : collectionPrincipal,
+        accountId: mockAccountId,
+        accountKind:
+          standard.__kind__ === "EXT"
+            ? "Mintlab app Account ID"
+            : "Principal ID",
+        standard,
+        warning:
+          standard.__kind__ === "EXT"
+            ? "Send EXT NFTs for this collection to this Account ID."
+            : "Send NFTs for this collection to this Principal ID.",
+      },
+    };
+  },
   getUserAccountId: async () => mockAccountId,
   getUserICPBalance: async () => BigInt(4_250_000_000),
   getMyRecentTransactions: async (limit) => {

@@ -38,6 +38,14 @@ module {
     preparedAt : CommonTypes.Timestamp;
   };
 
+  public type NFTReceiveInstructions = {
+    principal : Principal;
+    accountId : AccountIdentifier;
+    accountKind : Text;
+    standard : CollectionTypes.NFTStandard;
+    warning : Text;
+  };
+
   public type IndexedOwner = {
     #Principal : Principal;
     #AccountIdText : Text;

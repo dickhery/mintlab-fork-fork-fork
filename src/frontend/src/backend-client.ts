@@ -199,6 +199,14 @@ export interface CollectionSyncReadiness {
   recommendedAction: string;
 }
 
+export interface NFTReceiveInstructions {
+  principal: Principal;
+  accountId: AccountIdentifier;
+  accountKind: string;
+  standard: NFTStandard;
+  warning: string;
+}
+
 export interface CollectionIndexPageResult {
   collectionId: CollectionId;
   scanned: bigint;
@@ -1070,6 +1078,12 @@ export interface backendInterface {
     limit: bigint | null,
   ): Promise<NFTDividendPage>;
   getNFTStats(user: Principal): Promise<NFTStats>;
+  getNFTReceiveInstructions(
+    collectionId: CollectionId,
+  ): Promise<
+    | { __kind__: "ok"; ok: NFTReceiveInstructions }
+    | { __kind__: "err"; err: string }
+  >;
   getUserAccountId(): Promise<AccountIdentifier>;
   getUserICPBalance(): Promise<bigint>;
   getMyRecentTransactions(
@@ -1491,6 +1505,13 @@ type RawCollectionSyncReadiness = {
   trustStatus: [] | [RawCollectionTrustStatus];
   indexStatus: [] | [RawCollectionIndexStatus];
   recommendedAction: string;
+};
+type RawNFTReceiveInstructions = {
+  principal: Principal;
+  accountId: AccountIdentifier;
+  accountKind: string;
+  standard: RawNFTStandard;
+  warning: string;
 };
 type RawCollectionIndexPageResult = {
   collectionId: CollectionId;
@@ -2168,6 +2189,18 @@ function fromRawCollectionSyncReadiness(
     indexStatus:
       indexStatus == null ? null : fromRawCollectionIndexStatus(indexStatus),
     recommendedAction: value.recommendedAction,
+  };
+}
+
+function fromRawNFTReceiveInstructions(
+  value: RawNFTReceiveInstructions,
+): NFTReceiveInstructions {
+  return {
+    principal: value.principal,
+    accountId: value.accountId,
+    accountKind: value.accountKind,
+    standard: fromRawNFTStandard(value.standard),
+    warning: value.warning,
   };
 }
 
@@ -3140,6 +3173,20 @@ function fromCollectionSyncReadinessResult(
     return {
       __kind__: "ok",
       ok: fromRawCollectionSyncReadiness(value.ok),
+    };
+  }
+  return { __kind__: "err", err: value.err };
+}
+
+function fromNFTReceiveInstructionsResult(
+  value: { ok: RawNFTReceiveInstructions } | { err: string },
+):
+  | { __kind__: "ok"; ok: NFTReceiveInstructions }
+  | { __kind__: "err"; err: string } {
+  if ("ok" in value) {
+    return {
+      __kind__: "ok",
+      ok: fromRawNFTReceiveInstructions(value.ok),
     };
   }
   return { __kind__: "err", err: value.err };
@@ -4186,6 +4233,17 @@ export class Backend implements backendInterface {
 
   async getNFTStats(user: Principal): Promise<NFTStats> {
     return this.run(() => this.actor.getNFTStats(user));
+  }
+
+  async getNFTReceiveInstructions(
+    collectionId: CollectionId,
+  ): Promise<
+    | { __kind__: "ok"; ok: NFTReceiveInstructions }
+    | { __kind__: "err"; err: string }
+  > {
+    return fromNFTReceiveInstructionsResult(
+      await this.run(() => this.actor.getNFTReceiveInstructions(collectionId)),
+    );
   }
 
   async getUserAccountId(): Promise<AccountIdentifier> {

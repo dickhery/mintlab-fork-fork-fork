@@ -120,7 +120,7 @@ export const helpSections: HelpSection[] = [
       "send",
     ],
     highlights: [
-      "Share your Principal ID to receive NFTs from ICP wallets and apps.",
+      "Use the Wallet receive panel to choose a collection and copy the exact NFT destination Mintlab will check.",
       "Share your Account ID to receive ICP transfers into your in-app ICP account.",
       "Click Sync after receiving NFTs so Mintlab checks on-chain ownership across supported collections.",
       "Use Import NFT when you know a token ID from an imported external collection that automatic sync has not found yet.",
@@ -365,7 +365,7 @@ export const glossaryItems: GlossaryItem[] = [
   {
     term: "Principal ID",
     definition:
-      "Your Internet Computer identity. Share it to receive NFTs or prove ownership in ICP apps.",
+      "Your Internet Computer identity. Some NFT standards receive to this ID; the Wallet receive panel shows when to use it.",
   },
   {
     term: "Vaulted NFT",

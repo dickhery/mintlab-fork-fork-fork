@@ -707,6 +707,13 @@ export const idlFactory = ({ IDL }) => {
     'totalCount' : IDL.Nat,
     'perCollection' : IDL.Vec(IDL.Tuple(CollectionId, IDL.Nat)),
   });
+  const NFTReceiveInstructions = IDL.Record({
+    'accountId' : AccountIdentifier,
+    'principal' : IDL.Principal,
+    'accountKind' : IDL.Text,
+    'warning' : IDL.Text,
+    'standard' : NFTStandard,
+  });
   const EXTTokenIndex = IDL.Nat32;
   const EXTMetadataLegacy = IDL.Variant({
     'fungible' : IDL.Record({
@@ -1409,6 +1416,11 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getNFTStats' : IDL.Func([IDL.Principal], [NFTStats], ['query']),
+    'getNFTReceiveInstructions' : IDL.Func(
+        [CollectionId],
+        [IDL.Variant({ 'ok' : NFTReceiveInstructions, 'err' : IDL.Text })],
+        ['query'],
+      ),
     'getRegistry' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(EXTTokenIndex, EXTAccountIdentifier))],
