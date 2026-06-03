@@ -12,6 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -90,6 +95,7 @@ import {
   ArrowUpRight,
   Check,
   CheckCircle2,
+  ChevronDown,
   Coins,
   Copy,
   ExternalLink,
@@ -463,6 +469,8 @@ function CopyField({ label, value, ocid }: CopyFieldProps) {
 interface RecentNFTTransactionsCardProps {
   transactions: RecentTransaction[];
   isLoading: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 function RecentNFTTransactionRow({ tx }: { tx: RecentTransaction }) {
@@ -511,82 +519,111 @@ function RecentNFTTransactionRow({ tx }: { tx: RecentTransaction }) {
 function RecentNFTTransactionsCard({
   transactions,
   isLoading,
+  open,
+  onOpenChange,
 }: RecentNFTTransactionsCardProps) {
   return (
-    <Card
-      className="min-w-0 overflow-hidden border-border/50 bg-card shadow-sm"
-      data-ocid="wallet.recent_nft_transactions_card"
+    <Collapsible
+      open={open}
+      onOpenChange={onOpenChange}
+      data-ocid="wallet.recent_nft_transactions_collapsible"
     >
-      <CardHeader className="min-w-0 pb-3">
-        <CardTitle className="flex min-w-0 items-center justify-between text-sm font-medium text-muted-foreground uppercase tracking-wider">
-          <span className="flex min-w-0 items-center gap-2">
-            <History className="h-4 w-4 text-accent" />
-            NFT Activity
-          </span>
-          {transactions.length > 0 && (
-            <Badge variant="secondary" className="font-mono text-[10px]">
-              {transactions.length}/10
-            </Badge>
-          )}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="min-w-0 overflow-hidden">
-        {isLoading ? (
-          <div
-            className="grid min-w-0 gap-0 overflow-hidden md:grid-cols-2 md:gap-x-6"
-            data-ocid="wallet.nft_transactions_loading_state"
-          >
-            {[0, 1, 2, 3].map((row) => (
+      <Card
+        className="min-w-0 overflow-hidden border-border/50 bg-card shadow-sm"
+        data-ocid="wallet.recent_nft_transactions_card"
+      >
+        <CardHeader className="min-w-0 pb-3">
+          <CardTitle className="flex min-w-0 flex-col gap-3 text-sm font-medium sm:flex-row sm:items-center sm:justify-between">
+            <span className="flex min-w-0 items-center gap-2 text-muted-foreground uppercase tracking-wider">
+              <History className="h-4 w-4 shrink-0 text-accent" />
+              <span className="truncate">NFT Activity</span>
+            </span>
+            <span className="flex shrink-0 items-center gap-2">
+              {transactions.length > 0 && (
+                <Badge variant="secondary" className="font-mono text-[10px]">
+                  {transactions.length}/10
+                </Badge>
+              )}
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  aria-controls="wallet-nft-activity-content"
+                  data-ocid="wallet.nft_activity.toggle_button"
+                >
+                  {open ? "Hide Activity" : "Show Activity"}
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${
+                      open ? "rotate-180" : ""
+                    }`}
+                  />
+                </Button>
+              </CollapsibleTrigger>
+            </span>
+          </CardTitle>
+        </CardHeader>
+        <CollapsibleContent id="wallet-nft-activity-content">
+          <CardContent className="min-w-0 overflow-hidden">
+            {isLoading ? (
               <div
-                key={row}
-                className={
-                  row > 1
-                    ? "hidden min-w-0 overflow-hidden md:block"
-                    : "min-w-0 overflow-hidden"
-                }
+                className="grid min-w-0 gap-0 overflow-hidden md:grid-cols-2 md:gap-x-6"
+                data-ocid="wallet.nft_transactions_loading_state"
               >
-                <div className="flex min-w-0 items-center gap-3 overflow-hidden py-3">
-                  <Skeleton className="h-9 w-9 rounded-md" />
-                  <div className="min-w-0 flex-1 space-y-2">
-                    <Skeleton className="h-4 w-32" />
-                    <Skeleton className="h-3 w-56 max-w-full" />
+                {[0, 1, 2, 3].map((row) => (
+                  <div
+                    key={row}
+                    className={
+                      row > 1
+                        ? "hidden min-w-0 overflow-hidden md:block"
+                        : "min-w-0 overflow-hidden"
+                    }
+                  >
+                    <div className="flex min-w-0 items-center gap-3 overflow-hidden py-3">
+                      <Skeleton className="h-9 w-9 rounded-md" />
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <Skeleton className="h-4 w-32" />
+                        <Skeleton className="h-3 w-56 max-w-full" />
+                      </div>
+                      <Skeleton className="h-5 w-16 shrink-0 rounded-full" />
+                    </div>
                   </div>
-                  <Skeleton className="h-5 w-16 shrink-0 rounded-full" />
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : transactions.length === 0 ? (
-          <div
-            className="flex flex-col items-center gap-2 py-6 text-center text-sm text-muted-foreground"
-            data-ocid="wallet.nft_transactions_empty_state"
-          >
-            <History className="h-5 w-5" />
-            <span>No NFT activity yet.</span>
-          </div>
-        ) : (
-          <div
-            className="grid min-w-0 gap-0 overflow-hidden md:grid-cols-2 md:gap-x-6"
-            data-ocid="wallet.nft_transactions_list"
-          >
-            {transactions.map((tx, index) => (
+            ) : transactions.length === 0 ? (
               <div
-                key={tx.id.toString()}
-                className={
-                  index === 0
-                    ? "min-w-0 overflow-hidden"
-                    : index === 1
-                      ? "min-w-0 overflow-hidden border-t border-border/50 md:border-t-0"
-                      : "min-w-0 overflow-hidden border-t border-border/50"
-                }
+                className="flex flex-col items-center gap-2 py-6 text-center text-sm text-muted-foreground"
+                data-ocid="wallet.nft_transactions_empty_state"
               >
-                <RecentNFTTransactionRow tx={tx} />
+                <History className="h-5 w-5" />
+                <span>No NFT activity yet.</span>
               </div>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+            ) : (
+              <div
+                className="grid min-w-0 gap-0 overflow-hidden md:grid-cols-2 md:gap-x-6"
+                data-ocid="wallet.nft_transactions_list"
+              >
+                {transactions.map((tx, index) => (
+                  <div
+                    key={tx.id.toString()}
+                    className={
+                      index === 0
+                        ? "min-w-0 overflow-hidden"
+                        : index === 1
+                          ? "min-w-0 overflow-hidden border-t border-border/50 md:border-t-0"
+                          : "min-w-0 overflow-hidden border-t border-border/50"
+                    }
+                  >
+                    <RecentNFTTransactionRow tx={tx} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }
 
@@ -1579,11 +1616,15 @@ function MintComposer({
   moderationConfig,
   mainCollection,
   creatorCollections,
+  open,
+  onOpenChange,
 }: {
   mintConfig: MintConfig | null;
   moderationConfig: PublicModerationConfig | null;
   mainCollection: Collection | null;
   creatorCollections: Collection[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const { actor } = useBackend();
   const { principalText, isAuthenticated } = useAuth();
@@ -1609,7 +1650,7 @@ function MintComposer({
         if (!actor) return [];
         return actor.getMyPendingMintPayments();
       },
-      enabled: !!actor && isAuthenticated,
+      enabled: !!actor && isAuthenticated && open,
     },
   );
 
@@ -1775,268 +1816,300 @@ function MintComposer({
 
   return (
     <>
-      <Card className="border-border bg-card">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Coins className="w-4 h-4 text-accent" />
-            Mint NFTs
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Upload artwork, choose a collection, and add optional traits for
-            filtering and discovery.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <HelpCallout
-            title="Minting starts here"
-            sectionId="wallet"
-            actionLabel="Minting guide"
-            ocid="wallet.mint.help_callout"
-          >
-            Use this panel to mint into the main app collection when public
-            minting is enabled, or into one of the Mintlab collections you
-            created.
-          </HelpCallout>
-
-          {pendingMintPayments.length > 0 && (
-            <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    Paid mint recovery
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Payment is recorded on-chain. Retry finishes the mint
-                    without charging again.
-                  </p>
-                </div>
-                <Badge className="shrink-0 bg-amber-500/20 text-amber-700 border-0 dark:text-amber-200">
-                  {pendingMintPayments.length}
-                </Badge>
-              </div>
-              <div className="space-y-2">
-                {pendingMintPayments.map((payment) => (
-                  <div
-                    key={payment.id.toString()}
-                    className="flex flex-col gap-2 rounded-md border border-border bg-background/70 p-3 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground">
-                        {pendingMintStatusLabel(payment.status)}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatICP(payment.amountE8s)} ICP
-                        {payment.paymentBlock == null
-                          ? ""
-                          : ` - block ${payment.paymentBlock.toString()}`}
-                      </p>
-                      {payment.lastError && (
-                        <p className="mt-1 text-xs text-destructive">
-                          {payment.lastError}
-                        </p>
-                      )}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-2 self-start sm:self-center"
-                      disabled={
-                        retryPendingMintMutation.isPending ||
-                        payment.status === "Minted"
-                      }
-                      onClick={() =>
-                        retryPendingMintMutation.mutate(payment.id)
-                      }
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                      Retry
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!mintConfig ? (
-            <p className="text-sm text-muted-foreground">
-              Minting has not been configured by the admin yet.
-            </p>
-          ) : !mainMintAvailable && creatorCollections.length === 0 ? (
-            <div className="space-y-3">
-              <div className="rounded-xl border border-accent/20 bg-accent/5 p-3 text-sm text-muted-foreground">
-                Create your first Mintlab collection on the Collections page, or
-                wait for the admin to enable public minting into the main
-                collection.
-              </div>
-              <div className="rounded-xl border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
-                Collection creation fee:{" "}
-                <strong className="text-foreground">
-                  {formatICP(mintConfig.collectionCreationPriceE8s)} ICP
-                </strong>
-                {mintConfig.collectionCreationEnabled
-                  ? ""
-                  : " - collection creation is currently disabled by the admin"}
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="mint-collection"
-                    className="flex items-center gap-1.5"
-                  >
-                    Mint target
-                    <HelpTooltip>
-                      Main app minting uses the admin-set price when enabled.
-                      Your creator collections mint into their own ICRC-7
-                      canisters.
-                    </HelpTooltip>
-                  </Label>
-                  <Select
-                    value={selectedTarget}
-                    onValueChange={setSelectedTarget}
-                  >
-                    <SelectTrigger
-                      id="mint-collection"
-                      data-ocid="wallet.mint.collection_select"
-                    >
-                      <SelectValue placeholder="Select a collection" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {mainMintAvailable && mainCollection && (
-                        <SelectItem value="main">
-                          {mainCollection.name} (
-                          {formatICP(mintConfig.mainMintPriceE8s)} ICP)
-                        </SelectItem>
-                      )}
-                      {creatorCollections.map((collection) => (
-                        <SelectItem
-                          key={collection.id.toString()}
-                          value={`collection:${collection.id.toString()}`}
-                        >
-                          {collection.name} ({collection.symbol})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                {targetCollection && (
-                  <CopyField
-                    label="Collection Canister"
-                    value={targetCollection.canisterId.toString()}
-                    ocid="wallet.mint.copy_canister_id"
-                  />
-                )}
-              </div>
-
-              <div className="rounded-xl border border-accent/20 bg-accent/5 p-3 text-sm text-muted-foreground">
-                {selectedTarget === "main"
-                  ? `Minting into the main collection costs ${formatICP(mintConfig.mainMintPriceE8s)} ICP from your in-app account.`
-                  : "Creator collections use their own dedicated ICRC-7 canister."}
-              </div>
-
-              {moderationConfig?.enabled && (
-                <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
-                  <p>{moderationConfig.userMessage}</p>
-                  <p className="mt-2">
-                    Mintlab uses AI moderation and copyright checks for uploads.
-                    Avoid potentially copyrighted images, characters, logos,
-                    watermarks, and protected artwork. NFTs or collections that
-                    fail checks may be hidden from public view.
-                  </p>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label htmlFor="mint-name">NFT name</Label>
-                  <Input
-                    id="mint-name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Vault Original #1"
-                    data-ocid="wallet.mint.name_input"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="mint-image">Image upload</Label>
-                  <Input
-                    id="mint-image"
-                    type="file"
-                    accept={MODERATION_IMAGE_ACCEPT}
-                    onChange={(e) =>
-                      void handleFileChange(e.target.files?.[0] ?? null)
-                    }
-                    data-ocid="wallet.mint.image_input"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {fileName ||
-                      (moderationConfig?.enabled
-                        ? "Choose a JPG or PNG under about 1 MB and avoid potentially copyrighted artwork"
-                        : "Choose an image to store with the minted NFT")}
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="mint-description">Description</Label>
-                <Textarea
-                  id="mint-description"
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe your NFT…"
-                  data-ocid="wallet.mint.description_textarea"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="mint-attributes">
-                  Attributes{" "}
-                  <span className="text-muted-foreground">(Trait: Value)</span>
-                </Label>
-                <Textarea
-                  id="mint-attributes"
-                  rows={3}
-                  value={attributesText}
-                  onChange={(e) => setAttributesText(e.target.value)}
-                  placeholder={"Rarity: Rare\nSeries: Genesis"}
-                  data-ocid="wallet.mint.attributes_textarea"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Attributes are optional traits like Background: Blue or
-                  Rarity: Rare. They appear as filters on collection pages.
+      <Collapsible
+        open={open}
+        onOpenChange={onOpenChange}
+        data-ocid="wallet.mint.collapsible"
+      >
+        <Card className="border-border bg-card">
+          <CardHeader className="space-y-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 space-y-1">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Coins className="w-4 h-4 shrink-0 text-accent" />
+                  <span className="truncate">Mint NFTs</span>
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Upload artwork, choose a collection, and add optional traits
+                  for filtering and discovery.
                 </p>
               </div>
-
-              {imageDataUrl && (
-                <div className="rounded-xl border border-border bg-muted/20 p-3">
-                  <img
-                    src={imageDataUrl}
-                    alt="Mint preview"
-                    className="w-28 h-28 rounded-lg object-cover border border-border/50"
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-1.5 sm:w-auto"
+                  aria-controls="wallet-mint-nfts-content"
+                  data-ocid="wallet.mint.toggle_button"
+                >
+                  {open ? "Hide Minting" : "Open Minting"}
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${
+                      open ? "rotate-180" : ""
+                    }`}
                   />
+                </Button>
+              </CollapsibleTrigger>
+            </div>
+          </CardHeader>
+          <CollapsibleContent id="wallet-mint-nfts-content">
+            <CardContent className="space-y-4">
+              <HelpCallout
+                title="Minting starts here"
+                sectionId="wallet"
+                actionLabel="Minting guide"
+                ocid="wallet.mint.help_callout"
+              >
+                Use this panel to mint into the main app collection when public
+                minting is enabled, or into one of the Mintlab collections you
+                created.
+              </HelpCallout>
+
+              {pendingMintPayments.length > 0 && (
+                <div className="space-y-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        Paid mint recovery
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Payment is recorded on-chain. Retry finishes the mint
+                        without charging again.
+                      </p>
+                    </div>
+                    <Badge className="shrink-0 bg-amber-500/20 text-amber-700 border-0 dark:text-amber-200">
+                      {pendingMintPayments.length}
+                    </Badge>
+                  </div>
+                  <div className="space-y-2">
+                    {pendingMintPayments.map((payment) => (
+                      <div
+                        key={payment.id.toString()}
+                        className="flex flex-col gap-2 rounded-md border border-border bg-background/70 p-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground">
+                            {pendingMintStatusLabel(payment.status)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatICP(payment.amountE8s)} ICP
+                            {payment.paymentBlock == null
+                              ? ""
+                              : ` - block ${payment.paymentBlock.toString()}`}
+                          </p>
+                          {payment.lastError && (
+                            <p className="mt-1 text-xs text-destructive">
+                              {payment.lastError}
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-2 self-start sm:self-center"
+                          disabled={
+                            retryPendingMintMutation.isPending ||
+                            payment.status === "Minted"
+                          }
+                          onClick={() =>
+                            retryPendingMintMutation.mutate(payment.id)
+                          }
+                        >
+                          <RefreshCw className="h-4 w-4" />
+                          Retry
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              <TermsAgreementNotice actionLabel="minting this NFT" />
+              {!mintConfig ? (
+                <p className="text-sm text-muted-foreground">
+                  Minting has not been configured by the admin yet.
+                </p>
+              ) : !mainMintAvailable && creatorCollections.length === 0 ? (
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-accent/20 bg-accent/5 p-3 text-sm text-muted-foreground">
+                    Create your first Mintlab collection on the Collections
+                    page, or wait for the admin to enable public minting into
+                    the main collection.
+                  </div>
+                  <div className="rounded-xl border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
+                    Collection creation fee:{" "}
+                    <strong className="text-foreground">
+                      {formatICP(mintConfig.collectionCreationPriceE8s)} ICP
+                    </strong>
+                    {mintConfig.collectionCreationEnabled
+                      ? ""
+                      : " - collection creation is currently disabled by the admin"}
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="mint-collection"
+                        className="flex items-center gap-1.5"
+                      >
+                        Mint target
+                        <HelpTooltip>
+                          Main app minting uses the admin-set price when
+                          enabled. Your creator collections mint into their own
+                          ICRC-7 canisters.
+                        </HelpTooltip>
+                      </Label>
+                      <Select
+                        value={selectedTarget}
+                        onValueChange={setSelectedTarget}
+                      >
+                        <SelectTrigger
+                          id="mint-collection"
+                          data-ocid="wallet.mint.collection_select"
+                        >
+                          <SelectValue placeholder="Select a collection" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {mainMintAvailable && mainCollection && (
+                            <SelectItem value="main">
+                              {mainCollection.name} (
+                              {formatICP(mintConfig.mainMintPriceE8s)} ICP)
+                            </SelectItem>
+                          )}
+                          {creatorCollections.map((collection) => (
+                            <SelectItem
+                              key={collection.id.toString()}
+                              value={`collection:${collection.id.toString()}`}
+                            >
+                              {collection.name} ({collection.symbol})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {targetCollection && (
+                      <CopyField
+                        label="Collection Canister"
+                        value={targetCollection.canisterId.toString()}
+                        ocid="wallet.mint.copy_canister_id"
+                      />
+                    )}
+                  </div>
 
-              <div className="flex justify-end">
-                <Button
-                  onClick={startMint}
-                  disabled={mutation.isPending || !targetCollection}
-                  className="gap-2"
-                  data-ocid="wallet.mint.submit_button"
-                >
-                  <ImagePlus className="w-4 h-4" />
-                  {mutation.isPending ? "Minting..." : "Mint NFT"}
-                </Button>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+                  <div className="rounded-xl border border-accent/20 bg-accent/5 p-3 text-sm text-muted-foreground">
+                    {selectedTarget === "main"
+                      ? `Minting into the main collection costs ${formatICP(mintConfig.mainMintPriceE8s)} ICP from your in-app account.`
+                      : "Creator collections use their own dedicated ICRC-7 canister."}
+                  </div>
+
+                  {moderationConfig?.enabled && (
+                    <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
+                      <p>{moderationConfig.userMessage}</p>
+                      <p className="mt-2">
+                        Mintlab uses AI moderation and copyright checks for
+                        uploads. Avoid potentially copyrighted images,
+                        characters, logos, watermarks, and protected artwork.
+                        NFTs or collections that fail checks may be hidden from
+                        public view.
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="mint-name">NFT name</Label>
+                      <Input
+                        id="mint-name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="e.g. Vault Original #1"
+                        data-ocid="wallet.mint.name_input"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="mint-image">Image upload</Label>
+                      <Input
+                        id="mint-image"
+                        type="file"
+                        accept={MODERATION_IMAGE_ACCEPT}
+                        onChange={(e) =>
+                          void handleFileChange(e.target.files?.[0] ?? null)
+                        }
+                        data-ocid="wallet.mint.image_input"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {fileName ||
+                          (moderationConfig?.enabled
+                            ? "Choose a JPG or PNG under about 1 MB and avoid potentially copyrighted artwork"
+                            : "Choose an image to store with the minted NFT")}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="mint-description">Description</Label>
+                    <Textarea
+                      id="mint-description"
+                      rows={3}
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      placeholder="Describe your NFT…"
+                      data-ocid="wallet.mint.description_textarea"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="mint-attributes">
+                      Attributes{" "}
+                      <span className="text-muted-foreground">
+                        (Trait: Value)
+                      </span>
+                    </Label>
+                    <Textarea
+                      id="mint-attributes"
+                      rows={3}
+                      value={attributesText}
+                      onChange={(e) => setAttributesText(e.target.value)}
+                      placeholder={"Rarity: Rare\nSeries: Genesis"}
+                      data-ocid="wallet.mint.attributes_textarea"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Attributes are optional traits like Background: Blue or
+                      Rarity: Rare. They appear as filters on collection pages.
+                    </p>
+                  </div>
+
+                  {imageDataUrl && (
+                    <div className="rounded-xl border border-border bg-muted/20 p-3">
+                      <img
+                        src={imageDataUrl}
+                        alt="Mint preview"
+                        className="w-28 h-28 rounded-lg object-cover border border-border/50"
+                      />
+                    </div>
+                  )}
+
+                  <TermsAgreementNotice actionLabel="minting this NFT" />
+
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={startMint}
+                      disabled={mutation.isPending || !targetCollection}
+                      className="gap-2"
+                      data-ocid="wallet.mint.submit_button"
+                    >
+                      <ImagePlus className="w-4 h-4" />
+                      {mutation.isPending ? "Minting..." : "Mint NFT"}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
       <PaymentConfirmationDialog
         open={confirmMintOpen}
         onOpenChange={setConfirmMintOpen}
@@ -3315,6 +3388,8 @@ export default function WalletPage() {
   const [indexingCollectionId, setIndexingCollectionId] = useState<
     bigint | null
   >(null);
+  const [nftActivityOpen, setNftActivityOpen] = useState(false);
+  const [mintComposerOpen, setMintComposerOpen] = useState(false);
 
   // Bootstrap admin on first login
   useEffect(() => {
@@ -3469,7 +3544,7 @@ export default function WalletPage() {
       if (!actor) return [];
       return actor.getMyRecentNFTTransactions(10n);
     },
-    enabled: !!actor && !isFetching && isAuthenticated,
+    enabled: !!actor && !isFetching && isAuthenticated && nftActivityOpen,
     refetchOnWindowFocus: false,
   });
 
@@ -4266,6 +4341,8 @@ export default function WalletPage() {
       <RecentNFTTransactionsCard
         transactions={recentNFTTransactions}
         isLoading={nftTransactionsLoading}
+        open={nftActivityOpen}
+        onOpenChange={setNftActivityOpen}
       />
 
       <ImportSpecificNFTModal
@@ -4291,6 +4368,8 @@ export default function WalletPage() {
             : null
         }
         creatorCollections={myCreatedCollections}
+        open={mintComposerOpen}
+        onOpenChange={setMintComposerOpen}
       />
 
       <div className="h-px bg-border" />

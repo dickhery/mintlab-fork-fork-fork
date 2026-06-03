@@ -21,6 +21,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -89,6 +94,7 @@ import {
 import {
   ArrowLeft,
   Check,
+  ChevronDown,
   CircleDollarSign,
   Copy,
   ExternalLink,
@@ -344,8 +350,12 @@ const defaultImportValues: ImportCollectionFormValues = {
 
 function ImportCollectionCard({
   onImported,
+  open,
+  onOpenChange,
 }: {
   onImported: (collection: Collection) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const { actor } = useBackend();
   const { isAuthenticated } = useAuth();
@@ -438,216 +448,252 @@ function ImportCollectionCard({
   const imagePreviewUrl = resolveImageUrl(selectedImage);
 
   return (
-    <Card id="import-collection" className="scroll-mt-24 border-border bg-card">
-      <CardHeader className="space-y-2">
-        <CardTitle className="flex items-center gap-2 text-base">
-          <Plus className="w-4 h-4 text-accent" />
-          Import an ICP NFT Collection
-        </CardTitle>
-        <CardDescription className="text-sm">
-          Add a supported collection from another ICP app or website. Once it is
-          added, the collection appears in Mintlab for every user.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="rounded-xl border border-accent/20 bg-accent/5 p-3 text-sm text-muted-foreground">
-          <p className="font-medium text-foreground">What you need</p>
-          <p className="mt-1">
-            Paste the collection canister ID, choose the NFT standard, and add
-            the display details you want Mintlab to show. EXT, DIP721, and
-            ICRC-7 collections are supported. Add the collection size when the
-            collection does not provide a reliable token list.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="import-name">Collection name</Label>
-            <Input
-              id="import-name"
-              value={values.name}
-              onChange={(event) => updateField("name", event.target.value)}
-              placeholder="e.g. Motoko Mugs"
-              data-ocid="collections.import.name_input"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="import-symbol">Symbol</Label>
-            <Input
-              id="import-symbol"
-              value={values.symbol}
-              onChange={(event) =>
-                updateField("symbol", event.target.value.toUpperCase())
-              }
-              placeholder="e.g. MUG"
-              data-ocid="collections.import.symbol_input"
-            />
-          </div>
-        </div>
-
-        <div className="space-y-1.5">
-          <Label htmlFor="import-description">Description</Label>
-          <Textarea
-            id="import-description"
-            rows={3}
-            value={values.description}
-            onChange={(event) => updateField("description", event.target.value)}
-            placeholder="Tell collectors what this collection is about…"
-            data-ocid="collections.import.description_textarea"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="import-canister">Collection canister ID</Label>
-            <Input
-              id="import-canister"
-              className="font-mono text-sm"
-              value={values.canisterId}
-              onChange={(event) =>
-                updateField("canisterId", event.target.value)
-              }
-              placeholder="ryjl3-tyaaa-aaaaa-aaaba-cai"
-              data-ocid="collections.import.canister_input"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="import-standard">NFT standard</Label>
-            <Select
-              value={values.standard}
-              onValueChange={(value: "EXT" | "DIP721" | "ICRC7") =>
-                updateField("standard", value)
-              }
-            >
-              <SelectTrigger
-                id="import-standard"
-                data-ocid="collections.import.standard_select"
+    <Collapsible
+      open={open}
+      onOpenChange={onOpenChange}
+      data-ocid="collections.import.collapsible"
+    >
+      <Card
+        id="import-collection"
+        className="scroll-mt-24 border-border bg-card"
+      >
+        <CardHeader className="space-y-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 space-y-2">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Plus className="w-4 h-4 shrink-0 text-accent" />
+                <span className="truncate">Import an ICP NFT Collection</span>
+              </CardTitle>
+              <CardDescription className="text-sm">
+                Add a supported collection from another ICP app or website. Once
+                it is added, the collection appears in Mintlab for every user.
+              </CardDescription>
+            </div>
+            <CollapsibleTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full gap-1.5 sm:w-auto"
+                aria-controls="collections-import-content"
+                data-ocid="collections.import.toggle_button"
               >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="EXT">EXT</SelectItem>
-                <SelectItem value="DIP721">DIP721</SelectItem>
-                <SelectItem value="ICRC7">ICRC-7</SelectItem>
-              </SelectContent>
-            </Select>
+                {open ? "Hide Import" : "Open Import"}
+                <ChevronDown
+                  className={`h-4 w-4 transition-transform ${
+                    open ? "rotate-180" : ""
+                  }`}
+                />
+              </Button>
+            </CollapsibleTrigger>
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="import-supply">Collection size</Label>
-            <Input
-              id="import-supply"
-              inputMode="numeric"
-              value={values.totalSupply}
-              onChange={(event) =>
-                updateField("totalSupply", event.target.value)
-              }
-              placeholder="e.g. 1000"
-              data-ocid="collections.import.total_supply_input"
-            />
-            <p className="text-xs text-muted-foreground">
-              Recommended when the collection does not provide a reliable token
-              list.
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="import-offset">First token index</Label>
-            <Input
-              id="import-offset"
-              inputMode="numeric"
-              value={values.tokenIndexOffset}
-              onChange={(event) =>
-                updateField("tokenIndexOffset", event.target.value)
-              }
-              placeholder="Default: 0"
-              data-ocid="collections.import.token_offset_input"
-            />
-            <p className="text-xs text-muted-foreground">
-              Use 1 if token IDs start at 1 instead of 0.
-            </p>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="import-image-file">Collection image</Label>
-          <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
-            <div className="space-y-1.5">
-              <Input
-                key={imageFileInputKey}
-                id="import-image-file"
-                type="file"
-                accept={MODERATION_IMAGE_ACCEPT}
-                onChange={(event) =>
-                  void handleImportImageFile(event.target.files?.[0] ?? null)
-                }
-                data-ocid="collections.import.image_file_input"
-              />
-              <p className="text-xs text-muted-foreground">
-                {imageFileName || "Choose an image from this device"}
+        </CardHeader>
+        <CollapsibleContent id="collections-import-content">
+          <CardContent className="space-y-4">
+            <div className="rounded-xl border border-accent/20 bg-accent/5 p-3 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">What you need</p>
+              <p className="mt-1">
+                Paste the collection canister ID, choose the NFT standard, and
+                add the display details you want Mintlab to show. EXT, DIP721,
+                and ICRC-7 collections are supported. Add the collection size
+                when the collection does not provide a reliable token list.
               </p>
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="import-name">Collection name</Label>
+                <Input
+                  id="import-name"
+                  value={values.name}
+                  onChange={(event) => updateField("name", event.target.value)}
+                  placeholder="e.g. Motoko Mugs"
+                  data-ocid="collections.import.name_input"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="import-symbol">Symbol</Label>
+                <Input
+                  id="import-symbol"
+                  value={values.symbol}
+                  onChange={(event) =>
+                    updateField("symbol", event.target.value.toUpperCase())
+                  }
+                  placeholder="e.g. MUG"
+                  data-ocid="collections.import.symbol_input"
+                />
+              </div>
+            </div>
+
             <div className="space-y-1.5">
-              <Label
-                htmlFor="import-image"
-                className="text-xs text-muted-foreground"
-              >
-                Or image URL
-              </Label>
-              <Input
-                id="import-image"
-                value={values.imageUrl}
-                onChange={(event) => updateImageUrl(event.target.value)}
-                placeholder="https://… or ipfs://…"
-                data-ocid="collections.import.image_input"
+              <Label htmlFor="import-description">Description</Label>
+              <Textarea
+                id="import-description"
+                rows={3}
+                value={values.description}
+                onChange={(event) =>
+                  updateField("description", event.target.value)
+                }
+                placeholder="Tell collectors what this collection is about…"
+                data-ocid="collections.import.description_textarea"
               />
             </div>
-            <div className="w-16 h-16 rounded-lg border border-border bg-muted flex items-center justify-center overflow-hidden shrink-0">
-              {imagePreviewUrl ? (
-                <img
-                  src={imagePreviewUrl}
-                  alt="Collection preview"
-                  className="w-full h-full object-cover"
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="import-canister">Collection canister ID</Label>
+                <Input
+                  id="import-canister"
+                  className="font-mono text-sm"
+                  value={values.canisterId}
+                  onChange={(event) =>
+                    updateField("canisterId", event.target.value)
+                  }
+                  placeholder="ryjl3-tyaaa-aaaaa-aaaba-cai"
+                  data-ocid="collections.import.canister_input"
                 />
-              ) : (
-                <ImageOff className="w-5 h-5 text-muted-foreground" />
-              )}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="import-standard">NFT standard</Label>
+                <Select
+                  value={values.standard}
+                  onValueChange={(value: "EXT" | "DIP721" | "ICRC7") =>
+                    updateField("standard", value)
+                  }
+                >
+                  <SelectTrigger
+                    id="import-standard"
+                    data-ocid="collections.import.standard_select"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EXT">EXT</SelectItem>
+                    <SelectItem value="DIP721">DIP721</SelectItem>
+                    <SelectItem value="ICRC7">ICRC-7</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
-        </div>
 
-        {!isAuthenticated && (
-          <div className="rounded-xl border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
-            Sign in with Internet Identity to import a collection into the
-            shared Mintlab directory.
-          </div>
-        )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="import-supply">Collection size</Label>
+                <Input
+                  id="import-supply"
+                  inputMode="numeric"
+                  value={values.totalSupply}
+                  onChange={(event) =>
+                    updateField("totalSupply", event.target.value)
+                  }
+                  placeholder="e.g. 1000"
+                  data-ocid="collections.import.total_supply_input"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Recommended when the collection does not provide a reliable
+                  token list.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="import-offset">First token index</Label>
+                <Input
+                  id="import-offset"
+                  inputMode="numeric"
+                  value={values.tokenIndexOffset}
+                  onChange={(event) =>
+                    updateField("tokenIndexOffset", event.target.value)
+                  }
+                  placeholder="Default: 0"
+                  data-ocid="collections.import.token_offset_input"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Use 1 if token IDs start at 1 instead of 0.
+                </p>
+              </div>
+            </div>
 
-        <TermsAgreementNotice actionLabel="adding this external collection" />
+            <div className="space-y-2">
+              <Label htmlFor="import-image-file">Collection image</Label>
+              <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+                <div className="space-y-1.5">
+                  <Input
+                    key={imageFileInputKey}
+                    id="import-image-file"
+                    type="file"
+                    accept={MODERATION_IMAGE_ACCEPT}
+                    onChange={(event) =>
+                      void handleImportImageFile(
+                        event.target.files?.[0] ?? null,
+                      )
+                    }
+                    data-ocid="collections.import.image_file_input"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {imageFileName || "Choose an image from this device"}
+                  </p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="import-image"
+                    className="text-xs text-muted-foreground"
+                  >
+                    Or image URL
+                  </Label>
+                  <Input
+                    id="import-image"
+                    value={values.imageUrl}
+                    onChange={(event) => updateImageUrl(event.target.value)}
+                    placeholder="https://… or ipfs://…"
+                    data-ocid="collections.import.image_input"
+                  />
+                </div>
+                <div className="w-16 h-16 rounded-lg border border-border bg-muted flex items-center justify-center overflow-hidden shrink-0">
+                  {imagePreviewUrl ? (
+                    <img
+                      src={imagePreviewUrl}
+                      alt="Collection preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <ImageOff className="w-5 h-5 text-muted-foreground" />
+                  )}
+                </div>
+              </div>
+            </div>
 
-        <div className="flex justify-end">
-          <Button
-            onClick={() => importMutation.mutate()}
-            disabled={importMutation.isPending || !isAuthenticated}
-            className="gap-2"
-            data-ocid="collections.import.submit_button"
-          >
-            {importMutation.isPending ? (
-              <>
-                <LoaderCircle className="w-4 h-4 animate-spin" />
-                Importing…
-              </>
-            ) : (
-              <>
-                <Plus className="w-4 h-4" />
-                Add Collection
-              </>
+            {!isAuthenticated && (
+              <div className="rounded-xl border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
+                Sign in with Internet Identity to import a collection into the
+                shared Mintlab directory.
+              </div>
             )}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+
+            <TermsAgreementNotice actionLabel="adding this external collection" />
+
+            <div className="flex justify-end">
+              <Button
+                onClick={() => importMutation.mutate()}
+                disabled={importMutation.isPending || !isAuthenticated}
+                className="gap-2"
+                data-ocid="collections.import.submit_button"
+              >
+                {importMutation.isPending ? (
+                  <>
+                    <LoaderCircle className="w-4 h-4 animate-spin" />
+                    Importing…
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    Add Collection
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </CollapsibleContent>
+      </Card>
+    </Collapsible>
   );
 }
 
@@ -655,10 +701,14 @@ function CreateCollectionCard({
   mintConfig,
   moderationConfig,
   onCreated,
+  open,
+  onOpenChange,
 }: {
   mintConfig: MintConfig | null;
   moderationConfig: PublicModerationConfig | null;
   onCreated: (collection: Collection) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const { actor } = useBackend();
   const { isAuthenticated } = useAuth();
@@ -691,7 +741,7 @@ function CreateCollectionCard({
         mintConfig.collectionCreationSecondaryPayoutBasisPoints,
       );
     },
-    enabled: !!actor && !!mintConfig,
+    enabled: !!actor && !!mintConfig && open,
     staleTime: 60_000,
   });
 
@@ -815,181 +865,213 @@ function CreateCollectionCard({
 
   return (
     <>
-      <Card className="border-border bg-card">
-        <CardHeader className="space-y-2">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Sparkles className="w-4 h-4 text-accent" />
-            Create Your Mintlab Collection
-          </CardTitle>
-          <CardDescription className="text-sm">
-            Pay the admin-set collection fee from your in-app ICP balance,
-            launch your own collection, then mint, list, and transfer NFTs
-            however you want.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {!mintConfig ? (
-            <div className="rounded-xl border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
-              The admin has not configured collection creation yet.
+      <Collapsible
+        open={open}
+        onOpenChange={onOpenChange}
+        data-ocid="collections.create.collapsible"
+      >
+        <Card className="border-border bg-card">
+          <CardHeader className="space-y-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0 space-y-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Sparkles className="w-4 h-4 shrink-0 text-accent" />
+                  <span className="truncate">
+                    Create Your Mintlab Collection
+                  </span>
+                </CardTitle>
+                <CardDescription className="text-sm">
+                  Pay the admin-set collection fee from your in-app ICP balance,
+                  launch your own collection, then mint, list, and transfer NFTs
+                  however you want.
+                </CardDescription>
+              </div>
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-1.5 sm:w-auto"
+                  aria-controls="collections-create-content"
+                  data-ocid="collections.create.toggle_button"
+                >
+                  {open ? "Hide Creator" : "Open Creator"}
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform ${
+                      open ? "rotate-180" : ""
+                    }`}
+                  />
+                </Button>
+              </CollapsibleTrigger>
             </div>
-          ) : (
-            <div className="rounded-xl border border-accent/20 bg-accent/5 p-3 text-sm text-muted-foreground">
-              Creation fee:{" "}
-              <strong className="text-foreground">
-                {formatICP(mintConfig.collectionCreationPriceE8s)} ICP
-              </strong>
-              .{" "}
-              {creationQuote ? (
-                <>
-                  {formatICP(creationQuote.cycleCostE8s)} ICP is converted into{" "}
-                  {formatCycles(creationQuote.totalCyclesToConvert)} cycles.
-                  Mintlab attaches those cycles to the IC canister creation call
-                  so the new collection canister receives about{" "}
-                  {formatCycles(creationQuote.collectionCanisterCycles)} after
-                  the IC creation fee, and the remaining{" "}
-                  {formatICP(creationQuote.adminPayoutE8s)} ICP is split across
-                  the configured payout account
-                  {creationQuote.adminSecondaryPayoutE8s > 0n ? "s" : ""}.
-                  Ledger fees bring the total debit to{" "}
-                  {formatICP(creationQuote.totalUserDebitE8s)} ICP.
-                </>
+          </CardHeader>
+          <CollapsibleContent id="collections-create-content">
+            <CardContent className="space-y-4">
+              {!mintConfig ? (
+                <div className="rounded-xl border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
+                  The admin has not configured collection creation yet.
+                </div>
               ) : (
-                "Part of the fee is converted into cycles for the new collection canister and the remainder goes to the admin payout account."
+                <div className="rounded-xl border border-accent/20 bg-accent/5 p-3 text-sm text-muted-foreground">
+                  Creation fee:{" "}
+                  <strong className="text-foreground">
+                    {formatICP(mintConfig.collectionCreationPriceE8s)} ICP
+                  </strong>
+                  .{" "}
+                  {creationQuote ? (
+                    <>
+                      {formatICP(creationQuote.cycleCostE8s)} ICP is converted
+                      into {formatCycles(creationQuote.totalCyclesToConvert)}{" "}
+                      cycles. Mintlab attaches those cycles to the IC canister
+                      creation call so the new collection canister receives
+                      about{" "}
+                      {formatCycles(creationQuote.collectionCanisterCycles)}{" "}
+                      after the IC creation fee, and the remaining{" "}
+                      {formatICP(creationQuote.adminPayoutE8s)} ICP is split
+                      across the configured payout account
+                      {creationQuote.adminSecondaryPayoutE8s > 0n ? "s" : ""}.
+                      Ledger fees bring the total debit to{" "}
+                      {formatICP(creationQuote.totalUserDebitE8s)} ICP.
+                    </>
+                  ) : (
+                    "Part of the fee is converted into cycles for the new collection canister and the remainder goes to the admin payout account."
+                  )}
+                </div>
               )}
-            </div>
-          )}
 
-          {moderationConfig?.enabled && (
-            <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
-              {moderationConfig.userMessage}
-            </div>
-          )}
-
-          <div className="space-y-1.5">
-            <Label htmlFor="create-name">Collection name</Label>
-            <Input
-              id="create-name"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="e.g. Studio Zero"
-              data-ocid="collections.create.name_input"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="create-symbol">Symbol</Label>
-              <Input
-                id="create-symbol"
-                value={symbol}
-                onChange={(event) =>
-                  setSymbol(event.target.value.toUpperCase())
-                }
-                placeholder="e.g. ST0"
-                data-ocid="collections.create.symbol_input"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="create-image">Collection image</Label>
-              <Input
-                id="create-image"
-                type="file"
-                accept={MODERATION_IMAGE_ACCEPT}
-                onChange={(event) =>
-                  void handleImageFile(event.target.files?.[0] ?? null)
-                }
-                data-ocid="collections.create.image_input"
-              />
-              <p className="text-xs text-muted-foreground">
-                {imageFileName ||
-                  (moderationConfig?.enabled
-                    ? "Choose a JPG or PNG under about 1 MB"
-                    : "Choose an image from this device")}
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="create-description">Description</Label>
-            <Textarea
-              id="create-description"
-              rows={3}
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              placeholder="Describe your collection for everyone browsing Mintlab…"
-              data-ocid="collections.create.description_textarea"
-            />
-          </div>
-
-          <div className="rounded-xl border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
-            Your collection gets its own ICRC-7 canister controlled by you and
-            Mintlab. You can copy the canister ID from the collection card and
-            wallet views.
-          </div>
-
-          <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-muted/20 p-3">
-            <div className="space-y-1">
-              <Label
-                htmlFor="create-dividends"
-                className="flex items-center gap-2 text-sm font-medium text-foreground"
-              >
-                <CircleDollarSign className="w-4 h-4 text-accent" />
-                Enable collection dividends
-                <HelpTooltip>
-                  Dividends create a dedicated ICP address for this collection.
-                  Deposits can be checked from the collection browser and
-                  claimed by current NFT holders from Dividends.
-                </HelpTooltip>
-              </Label>
-              <p className="text-xs text-muted-foreground leading-relaxed">
-                Creates a dedicated ICP address for this collection so deposits
-                can be split evenly across its NFTs.
-              </p>
-            </div>
-            <Switch
-              id="create-dividends"
-              checked={dividendsEnabled}
-              onCheckedChange={setDividendsEnabled}
-              data-ocid="collections.create.dividends_switch"
-            />
-          </div>
-
-          {!isAuthenticated && (
-            <div className="rounded-xl border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
-              Sign in with Internet Identity to create a collection.
-            </div>
-          )}
-
-          <TermsAgreementNotice actionLabel="creating this collection" />
-
-          <div className="flex justify-end">
-            <Button
-              onClick={openCreateConfirmation}
-              disabled={
-                createMutation.isPending ||
-                !isAuthenticated ||
-                !mintConfig?.collectionCreationEnabled ||
-                !mintConfig?.collectionCanisterWasmUploaded ||
-                !creationQuote
-              }
-              className="gap-2"
-              data-ocid="collections.create.submit_button"
-            >
-              {createMutation.isPending ? (
-                <>
-                  <LoaderCircle className="w-4 h-4 animate-spin" />
-                  Creating…
-                </>
-              ) : (
-                <>
-                  <Sparkles className="w-4 h-4" />
-                  Create Collection
-                </>
+              {moderationConfig?.enabled && (
+                <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 text-sm text-muted-foreground">
+                  {moderationConfig.userMessage}
+                </div>
               )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="create-name">Collection name</Label>
+                <Input
+                  id="create-name"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="e.g. Studio Zero"
+                  data-ocid="collections.create.name_input"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-symbol">Symbol</Label>
+                  <Input
+                    id="create-symbol"
+                    value={symbol}
+                    onChange={(event) =>
+                      setSymbol(event.target.value.toUpperCase())
+                    }
+                    placeholder="e.g. ST0"
+                    data-ocid="collections.create.symbol_input"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="create-image">Collection image</Label>
+                  <Input
+                    id="create-image"
+                    type="file"
+                    accept={MODERATION_IMAGE_ACCEPT}
+                    onChange={(event) =>
+                      void handleImageFile(event.target.files?.[0] ?? null)
+                    }
+                    data-ocid="collections.create.image_input"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {imageFileName ||
+                      (moderationConfig?.enabled
+                        ? "Choose a JPG or PNG under about 1 MB"
+                        : "Choose an image from this device")}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="create-description">Description</Label>
+                <Textarea
+                  id="create-description"
+                  rows={3}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  placeholder="Describe your collection for everyone browsing Mintlab…"
+                  data-ocid="collections.create.description_textarea"
+                />
+              </div>
+
+              <div className="rounded-xl border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
+                Your collection gets its own ICRC-7 canister controlled by you
+                and Mintlab. You can copy the canister ID from the collection
+                card and wallet views.
+              </div>
+
+              <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-muted/20 p-3">
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="create-dividends"
+                    className="flex items-center gap-2 text-sm font-medium text-foreground"
+                  >
+                    <CircleDollarSign className="w-4 h-4 text-accent" />
+                    Enable collection dividends
+                    <HelpTooltip>
+                      Dividends create a dedicated ICP address for this
+                      collection. Deposits can be checked from the collection
+                      browser and claimed by current NFT holders from Dividends.
+                    </HelpTooltip>
+                  </Label>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Creates a dedicated ICP address for this collection so
+                    deposits can be split evenly across its NFTs.
+                  </p>
+                </div>
+                <Switch
+                  id="create-dividends"
+                  checked={dividendsEnabled}
+                  onCheckedChange={setDividendsEnabled}
+                  data-ocid="collections.create.dividends_switch"
+                />
+              </div>
+
+              {!isAuthenticated && (
+                <div className="rounded-xl border border-border bg-muted/20 p-3 text-sm text-muted-foreground">
+                  Sign in with Internet Identity to create a collection.
+                </div>
+              )}
+
+              <TermsAgreementNotice actionLabel="creating this collection" />
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={openCreateConfirmation}
+                  disabled={
+                    createMutation.isPending ||
+                    !isAuthenticated ||
+                    !mintConfig?.collectionCreationEnabled ||
+                    !mintConfig?.collectionCanisterWasmUploaded ||
+                    !creationQuote
+                  }
+                  className="gap-2"
+                  data-ocid="collections.create.submit_button"
+                >
+                  {createMutation.isPending ? (
+                    <>
+                      <LoaderCircle className="w-4 h-4 animate-spin" />
+                      Creating…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      Create Collection
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
       <PaymentConfirmationDialog
         open={confirmCreateOpen}
         onOpenChange={setConfirmCreateOpen}
@@ -3093,6 +3175,8 @@ export default function CollectionsPage() {
   const [retryAfterTopUpRequestId, setRetryAfterTopUpRequestId] = useState<
     bigint | null
   >(null);
+  const [importCollectionOpen, setImportCollectionOpen] = useState(false);
+  const [createCollectionOpen, setCreateCollectionOpen] = useState(false);
 
   const { data: collections, isLoading } = useQuery<Collection[]>({
     queryKey: [
@@ -3407,11 +3491,15 @@ export default function CollectionsPage() {
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
               <ImportCollectionCard
                 onImported={(collection) => setSelectedCollection(collection)}
+                open={importCollectionOpen}
+                onOpenChange={setImportCollectionOpen}
               />
               <CreateCollectionCard
                 mintConfig={mintConfig ?? null}
                 moderationConfig={moderationConfig ?? null}
                 onCreated={(collection) => setSelectedCollection(collection)}
+                open={createCollectionOpen}
+                onOpenChange={setCreateCollectionOpen}
               />
             </div>
 
