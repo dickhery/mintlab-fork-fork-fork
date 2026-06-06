@@ -1618,6 +1618,8 @@ function MintComposer({
   creatorCollections,
   open,
   onOpenChange,
+  focusRequestId,
+  requestedTarget,
 }: {
   mintConfig: MintConfig | null;
   moderationConfig: PublicModerationConfig | null;
@@ -1625,6 +1627,8 @@ function MintComposer({
   creatorCollections: Collection[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  focusRequestId: number;
+  requestedTarget?: "main" | null;
 }) {
   const { actor } = useBackend();
   const { principalText, isAuthenticated } = useAuth();
@@ -1637,6 +1641,7 @@ function MintComposer({
   const [selectedTarget, setSelectedTarget] = useState("");
   const [confirmMintOpen, setConfirmMintOpen] = useState(false);
   const [cycleTopUpReason, setCycleTopUpReason] = useState<string | null>(null);
+  const [attentionActive, setAttentionActive] = useState(false);
 
   const mainMintAvailable =
     mintConfig?.mainMintEnabled === true &&
@@ -1693,6 +1698,41 @@ function MintComposer({
     }
     setSelectedTarget("");
   }, [creatorCollections, mainMintAvailable, selectedTarget]);
+
+  useEffect(() => {
+    if (focusRequestId === 0) return;
+    if (requestedTarget === "main" && mainMintAvailable) {
+      setSelectedTarget("main");
+    }
+  }, [focusRequestId, mainMintAvailable, requestedTarget]);
+
+  useEffect(() => {
+    if (!open || focusRequestId === 0) return;
+    setAttentionActive(true);
+    const scrollTimer = window.setTimeout(() => {
+      const sectionElement = document.getElementById("wallet-mint-section");
+      const prefersReducedMotion = window.matchMedia(
+        "(prefers-reduced-motion: reduce)",
+      ).matches;
+      sectionElement?.scrollIntoView({
+        behavior: prefersReducedMotion ? "auto" : "smooth",
+        block: "start",
+      });
+      const focusTarget =
+        document.getElementById("mint-collection") ??
+        document.getElementById("mint-name") ??
+        sectionElement;
+      focusTarget?.focus({ preventScroll: true });
+    }, 80);
+    const attentionTimer = window.setTimeout(
+      () => setAttentionActive(false),
+      2200,
+    );
+    return () => {
+      window.clearTimeout(scrollTimer);
+      window.clearTimeout(attentionTimer);
+    };
+  }, [focusRequestId, open]);
 
   const selectedCollection =
     creatorCollections.find(
@@ -1821,7 +1861,14 @@ function MintComposer({
         onOpenChange={onOpenChange}
         data-ocid="wallet.mint.collapsible"
       >
-        <Card className="border-border bg-card">
+        <Card
+          id="wallet-mint-section"
+          tabIndex={-1}
+          aria-label="Mint NFTs"
+          className={`scroll-mt-6 border-border bg-card outline-none transition-[box-shadow,border-color] duration-300 ${
+            attentionActive ? "border-accent/60 shadow-lg shadow-accent/10" : ""
+          }`}
+        >
           <CardHeader className="space-y-3">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 space-y-1">
@@ -3171,7 +3218,9 @@ interface CollectionSectionProps {
   listedNFTKeys: Set<string>;
   sectionIndex: number;
   isCreatorCollection: boolean;
+  isMainCollection: boolean;
   dividendBalances: Map<string, bigint>;
+  onMintInStudio?: () => void;
   onReportNFT: (collection: Collection, nft: WalletNFT) => void;
 }
 
@@ -3182,7 +3231,9 @@ function CollectionSection({
   listedNFTKeys,
   sectionIndex,
   isCreatorCollection,
+  isMainCollection,
   dividendBalances,
+  onMintInStudio,
   onReportNFT,
 }: CollectionSectionProps) {
   const [registerOpen, setRegisterOpen] = useState(false);
@@ -3191,6 +3242,10 @@ function CollectionSection({
   const collectionImageUrl = resolveImageUrl(collection.imageUrl);
   const isNFTListed = (nft: WalletNFT) =>
     listedNFTKeys.has(nftKey(nft.collectionId, nft.tokenId));
+  const canMintInStudio =
+    collection.kind !== "External" &&
+    isMainCollection &&
+    typeof onMintInStudio === "function";
 
   return (
     <motion.section
@@ -3244,10 +3299,16 @@ function CollectionSection({
         <Button
           size="sm"
           variant="outline"
-          onClick={() => setRegisterOpen(true)}
+          onClick={() => {
+            if (collection.kind === "External") {
+              setRegisterOpen(true);
+              return;
+            }
+            onMintInStudio?.();
+          }}
           className="shrink-0 gap-1.5 border-accent/30 text-accent hover:bg-accent/10 hover:border-accent/60"
           data-ocid={`wallet.register_nft_button.${sectionIndex + 1}`}
-          disabled={collection.kind !== "External"}
+          disabled={collection.kind !== "External" && !canMintInStudio}
         >
           <Plus className="w-3.5 h-3.5" />
           {collection.kind === "External" ? "Import NFT" : "Mint in Studio"}
@@ -3390,6 +3451,11 @@ export default function WalletPage() {
   >(null);
   const [nftActivityOpen, setNftActivityOpen] = useState(false);
   const [mintComposerOpen, setMintComposerOpen] = useState(false);
+  const [mintComposerFocusRequestId, setMintComposerFocusRequestId] =
+    useState(0);
+  const [requestedMintTarget, setRequestedMintTarget] = useState<"main" | null>(
+    null,
+  );
 
   // Bootstrap admin on first login
   useEffect(() => {
@@ -3567,6 +3633,11 @@ export default function WalletPage() {
   for (const c of collections ?? []) {
     collectionMap.set(c.id, c);
   }
+  const mainCollectionId = mintConfig?.collectionId ?? null;
+  const mainCollection =
+    mainCollectionId == null
+      ? null
+      : (collectionMap.get(mainCollectionId) ?? null);
   const importMetaMap = collectionMetaMap(collectionImportMetas);
   const indexingCollection =
     indexingCollectionId == null
@@ -4238,6 +4309,12 @@ export default function WalletPage() {
     setPreferredImportTokenId(null);
   }, []);
 
+  const openMainMintStudio = useCallback(() => {
+    setRequestedMintTarget("main");
+    setMintComposerOpen(true);
+    setMintComposerFocusRequestId((requestId) => requestId + 1);
+  }, []);
+
   useEffect(() => {
     if (
       !actor ||
@@ -4362,14 +4439,12 @@ export default function WalletPage() {
       <MintComposer
         mintConfig={mintConfig ?? null}
         moderationConfig={moderationConfig ?? null}
-        mainCollection={
-          mintConfig?.collectionId
-            ? (collectionMap.get(mintConfig.collectionId) ?? null)
-            : null
-        }
+        mainCollection={mainCollection}
         creatorCollections={myCreatedCollections}
         open={mintComposerOpen}
         onOpenChange={setMintComposerOpen}
+        focusRequestId={mintComposerFocusRequestId}
+        requestedTarget={requestedMintTarget}
       />
 
       <div className="h-px bg-border" />
@@ -4430,7 +4505,15 @@ export default function WalletPage() {
                 listedNFTKeys={listedNFTKeys}
                 sectionIndex={idx}
                 isCreatorCollection={myCreatedCollectionIds.has(collection.id)}
+                isMainCollection={
+                  mainCollectionId != null && collection.id === mainCollectionId
+                }
                 dividendBalances={dividendBalances}
+                onMintInStudio={
+                  mainCollectionId != null && collection.id === mainCollectionId
+                    ? openMainMintStudio
+                    : undefined
+                }
                 onReportNFT={handleReportWalletNFT}
               />
             ),
@@ -4459,7 +4542,17 @@ export default function WalletPage() {
                     isCreatorCollection={myCreatedCollectionIds.has(
                       collection.id,
                     )}
+                    isMainCollection={
+                      mainCollectionId != null &&
+                      collection.id === mainCollectionId
+                    }
                     dividendBalances={dividendBalances}
+                    onMintInStudio={
+                      mainCollectionId != null &&
+                      collection.id === mainCollectionId
+                        ? openMainMintStudio
+                        : undefined
+                    }
                     onReportNFT={handleReportWalletNFT}
                   />
                 ),
