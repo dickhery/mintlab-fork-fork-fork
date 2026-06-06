@@ -354,7 +354,7 @@ mixin (
     metadata : WalletTypes.NFTMetadata,
   ) : async { #ok : WalletTypes.WalletNFT; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to register an NFT");
+      return #err("You must be authenticated to do this.");
     };
     let collection = switch (CollectionLib.getCollection(collectionsState, collectionId)) {
       case null return #err("Collection not found");
@@ -442,7 +442,7 @@ mixin (
     tokenId : Text,
   ) : async { #ok : Text; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to prepare a deposit");
+      return #err("You must be authenticated to do this.");
     };
     let collection = switch (CollectionLib.getCollection(collectionsState, collectionId)) {
       case null return #err("Collection not found");
@@ -460,7 +460,7 @@ mixin (
     tokenId : Text,
   ) : async { #ok : WalletTypes.WalletNFT; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to claim a deposit");
+      return #err("You must be authenticated to do this.");
     };
     switch (TermsLib.acceptanceError(termsState, caller)) {
       case (?message) return #err(message);
@@ -607,7 +607,7 @@ mixin (
     recipient : Principal,
   ) : async { #ok : Text; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to send an NFT");
+      return #err("You must be authenticated to do this.");
     };
     switch (TermsLib.acceptanceError(termsState, caller)) {
       case (?message) return #err(message);
@@ -711,7 +711,7 @@ mixin (
     owner : Principal,
   ) : async { #ok : WalletTypes.WalletNFT; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to sync an NFT owner");
+      return #err("You must be authenticated to do this.");
     };
     if (Principal.isAnonymous(owner)) {
       return #err("Cannot sync an NFT to the anonymous principal");
@@ -934,7 +934,7 @@ mixin (
     #err : Text;
   } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to get receive instructions");
+      return #err("You must be authenticated to do this.");
     };
     let collection = switch (CollectionLib.getCollection(collectionsState, collectionId)) {
       case null return #err("Collection not found");
@@ -1000,7 +1000,7 @@ mixin (
     #err : Text;
   } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to index a collection");
+      return #err("You must be authenticated to do this.");
     };
     if (not AuthLib.isAdmin(authState, caller)) {
       return #err("Unauthorized: admin only");
@@ -1020,7 +1020,7 @@ mixin (
     #err : Text;
   } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to sync your wallet");
+      return #err("You must be authenticated to do this.");
     };
     if (not acquireWalletSyncLock(caller)) {
       return #err("Wallet sync is already running. Wait for the current sync to finish.");
@@ -1046,7 +1046,7 @@ mixin (
     #err : Text;
   } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to sync your wallet");
+      return #err("You must be authenticated to do this.");
     };
     if (not acquireWalletSyncLock(caller)) {
       return #err("Wallet sync is already running. Wait for the current sync to finish.");
@@ -1070,7 +1070,7 @@ mixin (
     #err : Text;
   } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to sync your wallet");
+      return #err("You must be authenticated to do this.");
     };
     if (not acquireWalletSyncLock(caller)) {
       return #err("Wallet sync is already running. Wait for the current sync to finish.");
@@ -1115,7 +1115,7 @@ mixin (
     #err : Text;
   } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to sync your wallet");
+      return #err("You must be authenticated to do this.");
     };
     if (not acquireWalletSyncLock(caller)) {
       return #err("Wallet sync is already running. Wait for the current sync to finish.");
@@ -1483,7 +1483,7 @@ mixin (
     #err : Text;
   } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to sync your wallet");
+      return #err("You must be authenticated to do this.");
     };
     if (not acquireWalletSyncLock(caller)) {
       return #err("Wallet sync is already running. Wait for the current sync to finish.");
@@ -1507,7 +1507,7 @@ mixin (
     #err : Text;
   } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to sync your wallet");
+      return #err("You must be authenticated to do this.");
     };
     let collections = CollectionLib.getCollections(collectionsState);
     let userAccountId = IcpLib.accountIdentifier(caller, IcpLib.zeroSubaccount());

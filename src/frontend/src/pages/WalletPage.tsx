@@ -673,7 +673,7 @@ function SendNFTModal({ open, onClose, nft, collection }: SendNFTModalProps) {
           );
         }
         if (!principal) {
-          throw new Error("You must be logged in to send this NFT");
+          throw new Error("You must be authenticated to do this.");
         }
         const message = await transferRegisteredNFT({
           agent: actor.getAgent(),
@@ -1144,7 +1144,7 @@ function RegisterNFTModal({
       if (!tokenId.trim()) throw new Error("Token ID is required");
       if (collection.kind === "External") {
         if (!principal)
-          throw new Error("You must be logged in to import an NFT");
+          throw new Error("You must be authenticated to do this.");
         const result = await actor.syncExternalNFTOwner(
           collection.id,
           tokenId.trim(),
@@ -1282,7 +1282,7 @@ function ImportSpecificNFTModal({
   const mutation = useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error("Not connected");
-      if (!principal) throw new Error("You must be logged in to import an NFT");
+      if (!principal) throw new Error("You must be authenticated to do this.");
       if (!selectedCollection) throw new Error("Choose an external collection");
       if (!tokenId.trim()) throw new Error("Token ID is required");
 

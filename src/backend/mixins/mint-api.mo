@@ -469,7 +469,7 @@ mixin (
     categories : MintTypes.ModerationCategorySettings,
     userMessage : Text,
   ) : async MintTypes.PublicModerationConfig {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     if (not AuthLib.isAdmin(authState, caller)) Runtime.trap("Unauthorized: admin only");
     let trimmedModel = Text.trim(model, #char ' ');
     let trimmedMessage = Text.trim(userMessage, #char ' ');
@@ -496,7 +496,7 @@ mixin (
     apiKey : ?Text,
     clearApiKey : Bool,
   ) : async MintTypes.PublicModerationConfig {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     if (not AuthLib.isAdmin(authState, caller)) Runtime.trap("Unauthorized: admin only");
     let normalizedApiKey = switch (apiKey) {
       case (?value) {
@@ -795,7 +795,7 @@ mixin (
     #err : Text;
   } {
     if (Principal.isAnonymous(caller)) {
-      return #err("Anonymous caller not allowed");
+      return #err("You must be authenticated to do this.");
     };
     if (not AuthLib.isAdmin(authState, caller)) {
       return #err("Unauthorized: admin only");
@@ -811,7 +811,7 @@ mixin (
     #err : Text;
   } {
     if (Principal.isAnonymous(caller)) {
-      return #err("Anonymous caller not allowed");
+      return #err("You must be authenticated to do this.");
     };
     if (not AuthLib.isAdmin(authState, caller)) {
       return #err("Unauthorized: admin only");
@@ -829,7 +829,7 @@ mixin (
     requestId : Nat
   ) : async { #ok : MintTypes.CollectionCreationRequestView; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to view a collection setup request");
+      return #err("You must be authenticated to do this.");
     };
     let request = switch (MintLib.getCollectionCreationRequest(collectionCreationState, requestId)) {
       case null return #err("Collection creation request not found");
@@ -845,7 +845,7 @@ mixin (
     requestId : Nat
   ) : async { #ok : MintTypes.CollectionCreationDiagnostics; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to inspect collection setup");
+      return #err("You must be authenticated to do this.");
     };
     let request = switch (MintLib.getCollectionCreationRequest(collectionCreationState, requestId)) {
       case null return #err("Collection creation request not found");
@@ -887,7 +887,7 @@ mixin (
     requestId : Nat
   ) : async { #ok : MintTypes.CollectionCreationRequestView; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("Anonymous caller not allowed");
+      return #err("You must be authenticated to do this.");
     };
     let request = switch (MintLib.getCollectionCreationRequest(collectionCreationState, requestId)) {
       case null return #err("Collection creation request not found");
@@ -903,7 +903,7 @@ mixin (
     requestId : Nat
   ) : async { #ok : Bool; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("Anonymous caller not allowed");
+      return #err("You must be authenticated to do this.");
     };
     if (not AuthLib.isAdmin(authState, caller)) {
       return #err("Unauthorized: admin only");
@@ -924,7 +924,7 @@ mixin (
     requestId : Nat
   ) : async { #ok : MintTypes.CollectionCreationReceipt; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to retry collection setup");
+      return #err("You must be authenticated to do this.");
     };
     let request = switch (MintLib.getCollectionCreationRequest(collectionCreationState, requestId)) {
       case null return #err("Collection creation request not found");
@@ -960,7 +960,7 @@ mixin (
     childCanisterId : Principal,
   ) : async { #ok : MintTypes.CollectionCreationReceipt; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("Anonymous caller not allowed");
+      return #err("You must be authenticated to do this.");
     };
     if (not AuthLib.isAdmin(authState, caller)) {
       return #err("Unauthorized: admin only");
@@ -1026,7 +1026,7 @@ mixin (
     dividendsEnabled : Bool,
   ) : async { #ok : MintTypes.CollectionCreationReceipt; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("Anonymous caller not allowed");
+      return #err("You must be authenticated to do this.");
     };
     if (not AuthLib.isAdmin(authState, caller)) {
       return #err("Unauthorized: admin only");
@@ -1091,7 +1091,7 @@ mixin (
     frontendCanisterId : ?Principal
   ) : async { #ok : [MintTypes.AppCanisterHealth]; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("Anonymous caller not allowed");
+      return #err("You must be authenticated to do this.");
     };
     if (not AuthLib.isAdmin(authState, caller)) {
       return #err("Unauthorized: admin only");
@@ -1208,7 +1208,7 @@ mixin (
     cyclesToTopUp : Nat,
   ) : async { #ok : MintTypes.AppCycleTopUpReceipt; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to top up a canister");
+      return #err("You must be authenticated to do this.");
     };
     switch (TermsLib.acceptanceError(termsState, caller)) {
       case (?message) return #err(message);
@@ -1318,7 +1318,7 @@ mixin (
     mainMintDividendsEnabled : Bool,
     collectionCanisterCycles : Nat,
   ) : async CollectionTypes.Collection {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     if (not AuthLib.isAdmin(authState, caller)) Runtime.trap("Unauthorized: admin only");
     validateCollectionProfile(name, description, symbol, imageUrl);
     validateOptionalAccountIdentifier(collectionCreationPayoutAccount, "Collection creation primary payout account");
@@ -1400,7 +1400,7 @@ mixin (
   public shared ({ caller }) func setCollectionCanisterWasm(
     wasm : Blob
   ) : async () {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     if (not AuthLib.isAdmin(authState, caller)) Runtime.trap("Unauthorized: admin only");
     if (wasm.size() == 0) Runtime.trap("Collection canister WASM is required");
     if (wasm.size() > 1_900_000) {
@@ -1417,7 +1417,7 @@ mixin (
     dividendsEnabled : Bool,
   ) : async { #ok : MintTypes.CollectionCreationReceipt; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to create a collection");
+      return #err("You must be authenticated to do this.");
     };
     switch (TermsLib.acceptanceError(termsState, caller)) {
       case (?message) return #err(message);
@@ -1860,7 +1860,7 @@ mixin (
     collectionId : CollectionTypes.CollectionId
   ) : async { #ok : CollectionTypes.Collection; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to retry collection setup");
+      return #err("You must be authenticated to do this.");
     };
     let collection = switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
       case null return #err("Collection not found");
@@ -1925,7 +1925,7 @@ mixin (
     collectionId : CollectionTypes.CollectionId
   ) : async { #ok : CollectionTypes.Collection; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to update collection setup");
+      return #err("You must be authenticated to do this.");
     };
     let collection = switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
       case null return #err("Collection not found");
@@ -2007,7 +2007,7 @@ mixin (
     cyclesToTopUp : Nat,
   ) : async { #ok : MintTypes.CollectionCycleTopUpReceipt; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to top up a collection canister");
+      return #err("You must be authenticated to do this.");
     };
     switch (TermsLib.acceptanceError(termsState, caller)) {
       case (?message) return #err(message);
@@ -2113,7 +2113,7 @@ mixin (
     metadata : WalletTypes.NFTMetadata,
   ) : async { #ok : MintTypes.MintReceipt; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to mint");
+      return #err("You must be authenticated to do this.");
     };
     switch (TermsLib.acceptanceError(termsState, caller)) {
       case (?message) return #err(message);
@@ -2264,7 +2264,7 @@ mixin (
     paymentId : Nat
   ) : async { #ok : MintTypes.MintReceipt; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to retry a pending mint");
+      return #err("You must be authenticated to do this.");
     };
     switch (TermsLib.acceptanceError(termsState, caller)) {
       case (?message) return #err(message);
@@ -2379,7 +2379,7 @@ mixin (
     metadata : WalletTypes.NFTMetadata,
   ) : async { #ok : WalletTypes.WalletNFT; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to mint");
+      return #err("You must be authenticated to do this.");
     };
     switch (TermsLib.acceptanceError(termsState, caller)) {
       case (?message) return #err(message);
@@ -4597,7 +4597,7 @@ mixin (
     collectionId : CollectionTypes.CollectionId,
   ) : async { #ok : CollectionTypes.Collection; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to manage collection controllers");
+      return #err("You must be authenticated to do this.");
     };
     let collection = switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
       case null return #err("Collection not found");

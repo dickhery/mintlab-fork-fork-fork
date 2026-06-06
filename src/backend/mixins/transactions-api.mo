@@ -10,7 +10,7 @@ mixin (
     limit : ?Nat
   ) : async [TransactionTypes.RecentTransaction] {
     if (Principal.isAnonymous(caller)) {
-      Runtime.trap("Anonymous caller not allowed");
+      Runtime.trap("You must be authenticated to do this.");
     };
     TransactionsLib.recentForUser(transactionState, caller, limit);
   };
@@ -19,7 +19,7 @@ mixin (
     limit : ?Nat
   ) : async [TransactionTypes.RecentTransaction] {
     if (Principal.isAnonymous(caller)) {
-      Runtime.trap("Anonymous caller not allowed");
+      Runtime.trap("You must be authenticated to do this.");
     };
     TransactionsLib.recentNFTForUser(transactionState, caller, limit);
   };

@@ -8,6 +8,7 @@ import {
 } from "@icp-sdk/core/agent";
 import type { Principal } from "@icp-sdk/core/principal";
 import { idlFactory } from "./backend-idl";
+import { asUserFacingError, toUserFacingErrorMessage } from "./lib/errors";
 
 export interface Tokens {
   e8s: bigint;
@@ -2259,7 +2260,7 @@ function fromRawCollectionNFTLookupResult(
     const nft = fromRawOption(value.ok);
     return { __kind__: "ok", ok: nft == null ? null : fromRawWalletNFT(nft) };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromRawFixedListing(value: RawFixedListing): FixedListing {
@@ -2919,14 +2920,14 @@ function fromWalletResult(
   if ("ok" in value) {
     return { __kind__: "ok", ok: fromRawWalletNFT(value.ok) };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromTextResult(
   value: { ok: string } | { err: string },
 ): { __kind__: "ok"; ok: string } | { __kind__: "err"; err: string } {
   if ("ok" in value) return { __kind__: "ok", ok: value.ok };
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromMintResult(
@@ -2935,7 +2936,7 @@ function fromMintResult(
   if ("ok" in value) {
     return { __kind__: "ok", ok: fromRawMintReceipt(value.ok) };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromCollectionCreationResult(
@@ -2946,7 +2947,7 @@ function fromCollectionCreationResult(
   if ("ok" in value) {
     return { __kind__: "ok", ok: fromRawCollectionCreationReceipt(value.ok) };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromCollectionCreationRequestViewResult(
@@ -2960,7 +2961,7 @@ function fromCollectionCreationRequestViewResult(
       ok: fromRawCollectionCreationRequestView(value.ok),
     };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromCollectionCreationRequestPageResult(
@@ -2974,7 +2975,7 @@ function fromCollectionCreationRequestPageResult(
       ok: fromRawCollectionCreationRequestPage(value.ok),
     };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromCollectionCreationDiagnosticsResult(
@@ -2988,7 +2989,7 @@ function fromCollectionCreationDiagnosticsResult(
       ok: fromRawCollectionCreationDiagnostics(value.ok),
     };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromBooleanResult(
@@ -2997,12 +2998,12 @@ function fromBooleanResult(
   if ("ok" in value) {
     return { __kind__: "ok", ok: value.ok };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function unwrapResult<T>(value: { ok: T } | { err: string }): T {
   if ("ok" in value) return value.ok;
-  throw new Error(value.err);
+  throw asUserFacingError(value.err);
 }
 
 function unwrapMarketplaceAction(value: RawMarketplaceActionResult): void {
@@ -3023,7 +3024,7 @@ function fromCollectionCycleTopUpResult(
   if ("ok" in value) {
     return { __kind__: "ok", ok: fromRawCollectionCycleTopUpReceipt(value.ok) };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromAppCycleTopUpResult(
@@ -3034,7 +3035,7 @@ function fromAppCycleTopUpResult(
   if ("ok" in value) {
     return { __kind__: "ok", ok: fromRawAppCycleTopUpReceipt(value.ok) };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromAppCanisterHealthResult(
@@ -3048,7 +3049,7 @@ function fromAppCanisterHealthResult(
       ok: value.ok.map(fromRawAppCanisterHealth),
     };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromCollectionResult(
@@ -3057,7 +3058,7 @@ function fromCollectionResult(
   if ("ok" in value) {
     return { __kind__: "ok", ok: fromRawCollection(value.ok) };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromCollectionImportMetaResult(
@@ -3068,7 +3069,7 @@ function fromCollectionImportMetaResult(
   if ("ok" in value) {
     return { __kind__: "ok", ok: fromRawCollectionImportMeta(value.ok) };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromNFTReportMetaResult(
@@ -3077,7 +3078,7 @@ function fromNFTReportMetaResult(
   if ("ok" in value) {
     return { __kind__: "ok", ok: fromRawNFTReportMeta(value.ok) };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromCollectionCanisterControllersResult(
@@ -3091,7 +3092,7 @@ function fromCollectionCanisterControllersResult(
       ok: fromRawCollectionCanisterControllers(value.ok),
     };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromDividendSyncResult(
@@ -3102,7 +3103,7 @@ function fromDividendSyncResult(
   if ("ok" in value) {
     return { __kind__: "ok", ok: fromRawDividendSyncReceipt(value.ok) };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromDividendClaimResult(
@@ -3113,7 +3114,7 @@ function fromDividendClaimResult(
   if ("ok" in value) {
     return { __kind__: "ok", ok: fromRawDividendClaimReceipt(value.ok) };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromDividendDisbursementPreviewResult(
@@ -3127,7 +3128,7 @@ function fromDividendDisbursementPreviewResult(
       ok: fromRawDividendDisbursementPreview(value.ok),
     };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromDividendDisbursementResult(
@@ -3141,7 +3142,7 @@ function fromDividendDisbursementResult(
       ok: fromRawDividendDisbursementReceipt(value.ok),
     };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromPreviewResult(
@@ -3150,7 +3151,7 @@ function fromPreviewResult(
   if ("ok" in value) {
     return { __kind__: "ok", ok: value.ok.map(fromRawWalletNFT) };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromSyncResult(
@@ -3161,7 +3162,7 @@ function fromSyncResult(
   if ("ok" in value) {
     return { __kind__: "ok", ok: value.ok };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromSyncV2Result(
@@ -3172,7 +3173,7 @@ function fromSyncV2Result(
   if ("ok" in value) {
     return { __kind__: "ok", ok: fromRawWalletSyncV2Result(value.ok) };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromSyncPageResult(
@@ -3183,7 +3184,7 @@ function fromSyncPageResult(
   if ("ok" in value) {
     return { __kind__: "ok", ok: fromRawWalletSyncPageResult(value.ok) };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromCollectionSyncProgressResult(
@@ -3197,7 +3198,7 @@ function fromCollectionSyncProgressResult(
       ok: fromRawWalletCollectionSyncProgress(value.ok),
     };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromCollectionSyncReadinessResult(
@@ -3211,7 +3212,7 @@ function fromCollectionSyncReadinessResult(
       ok: fromRawCollectionSyncReadiness(value.ok),
     };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromNFTReceiveInstructionsResult(
@@ -3225,7 +3226,7 @@ function fromNFTReceiveInstructionsResult(
       ok: fromRawNFTReceiveInstructions(value.ok),
     };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 function fromCollectionIndexPageResult(
@@ -3236,7 +3237,7 @@ function fromCollectionIndexPageResult(
   if ("ok" in value) {
     return { __kind__: "ok", ok: fromRawCollectionIndexPageResult(value.ok) };
   }
-  return { __kind__: "err", err: value.err };
+  return { __kind__: "err", err: toUserFacingErrorMessage(value.err) };
 }
 
 const PUBLIC_LIST_PAGE_SIZE = 100n;
@@ -3259,14 +3260,14 @@ export class Backend implements backendInterface {
   }
 
   private async run<T>(operation: () => Promise<T>): Promise<T> {
-    if (!this.processError) {
-      return operation();
-    }
     try {
       return await operation();
     } catch (error) {
-      this.processError(error);
-      throw new Error("unreachable");
+      if (this.processError) {
+        this.processError(error);
+        throw new Error("unreachable");
+      }
+      throw asUserFacingError(error);
     }
   }
 

@@ -31,7 +31,7 @@ mixin (
     symbol : Text,
     browseInfo : ?CollectionTypes.CollectionBrowseInfo,
   ) : async CollectionTypes.Collection {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     if (name == "") Runtime.trap("Collection name is required");
     if (symbol == "") Runtime.trap("Collection symbol is required");
     if (Principal.isAnonymous(canisterId)) Runtime.trap("Invalid collection canister");
@@ -180,7 +180,7 @@ mixin (
     reason : Text,
   ) : async { #ok : CollectionTypes.CollectionImportMeta; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("Anonymous caller not allowed");
+      return #err("You must be authenticated to do this.");
     };
     if (Text.size(reason) > 500) {
       return #err("Report reason is too long");
@@ -197,7 +197,7 @@ mixin (
     reason : Text,
   ) : async { #ok : CollectionTypes.NFTReportMeta; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("Anonymous caller not allowed");
+      return #err("You must be authenticated to do this.");
     };
     let normalizedTokenId = Text.trim(tokenId, #char ' ');
     if (normalizedTokenId == "") {
@@ -259,7 +259,7 @@ mixin (
     collectionId : CollectionTypes.CollectionId
   ) : async { #ok : CollectionTypes.CollectionImportMeta; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("Anonymous caller not allowed");
+      return #err("You must be authenticated to do this.");
     };
     if (not AuthLib.isAdmin(authState, caller)) {
       return #err("Unauthorized: admin only");
@@ -321,7 +321,7 @@ mixin (
     browseInfo : ?CollectionTypes.CollectionBrowseInfo,
   ) : async { #ok : CollectionTypes.Collection; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("Anonymous caller not allowed");
+      return #err("You must be authenticated to do this.");
     };
     if (not AuthLib.isAdmin(authState, caller)) {
       return #err("Unauthorized: admin only");
@@ -357,7 +357,7 @@ mixin (
     collectionId : CollectionTypes.CollectionId
   ) : async { #ok : Bool; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("Anonymous caller not allowed");
+      return #err("You must be authenticated to do this.");
     };
     if (not AuthLib.isAdmin(authState, caller)) {
       return #err("Unauthorized: admin only");
@@ -416,7 +416,7 @@ mixin (
     status : CollectionTypes.CollectionTrustStatus,
   ) : { #ok : CollectionTypes.CollectionImportMeta; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("Anonymous caller not allowed");
+      return #err("You must be authenticated to do this.");
     };
     if (not AuthLib.isAdmin(authState, caller)) {
       return #err("Unauthorized: admin only");
@@ -434,7 +434,7 @@ mixin (
     status : CollectionTypes.NFTReportStatus,
   ) : { #ok : CollectionTypes.NFTReportMeta; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("Anonymous caller not allowed");
+      return #err("You must be authenticated to do this.");
     };
     if (not AuthLib.isAdmin(authState, caller)) {
       return #err("Unauthorized: admin only");

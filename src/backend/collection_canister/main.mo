@@ -302,7 +302,7 @@ persistent actor class MintlabCollection(init : {
     metadata : NFTMetadata,
   ) : async { #ok : { tokenId : Nat; transactionId : Nat }; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("Anonymous caller not allowed");
+      return #err("You must be authenticated to do this.");
     };
     if (not Principal.equal(caller, parentCanister)) {
       return #err("Only the parent app can mint");

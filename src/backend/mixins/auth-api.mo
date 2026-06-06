@@ -6,7 +6,7 @@ mixin (authState : AuthLib.AdminState) {
 
   /// Called on every authenticated interaction to bootstrap admin on first use
   public shared ({ caller }) func bootstrapAdmin() : async () {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     AuthLib.initAdmin(authState, caller);
   };
 

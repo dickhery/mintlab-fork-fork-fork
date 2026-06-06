@@ -134,7 +134,7 @@ mixin (
   transient var externalListingModerationSampleCounts = Map.empty<CollectionTypes.CollectionId, Nat>();
 
   func requireMarketplaceAdmin(caller : Principal) {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     if (not AuthLib.isAdmin(authState, caller)) Runtime.trap("Unauthorized: admin only");
   };
 
@@ -1488,7 +1488,7 @@ mixin (
     nftId : MarketplaceTypes.NFTId,
     price : Nat64,
   ) : async MarketplaceTypes.FixedListing {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     TermsLib.requireCurrent(termsState, caller);
     if (price == 0) Runtime.trap("Price must be greater than zero");
     ensureMintlabFeeApplies(price, "Price");
@@ -1521,7 +1521,7 @@ mixin (
     startingBid : Nat64,
     endTime : Int,
   ) : async MarketplaceTypes.AuctionListing {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     TermsLib.requireCurrent(termsState, caller);
     if (startingBid < MarketplaceLib.MIN_AUCTION_STARTING_BID_E8S) {
       Runtime.trap("Starting bid must be at least 0.01 ICP");
@@ -1798,7 +1798,7 @@ mixin (
   public shared query ({ caller }) func getMyAuctionBidStatuses(
     listingIds : [MarketplaceTypes.ListingId]
   ) : async [MarketplaceTypes.AuctionBidStatus] {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
 
     var statuses : [MarketplaceTypes.AuctionBidStatus] = [];
     for (listingId in listingIds.values()) {
@@ -1840,12 +1840,12 @@ mixin (
   };
 
   public shared query ({ caller }) func getMyPendingAuctionRefunds() : async [MarketplaceTypes.AuctionEscrow] {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     MarketplaceLib.getPendingRefundsByBidder(marketplacePaymentState, caller);
   };
 
   public shared ({ caller }) func retryAuctionRefund(escrowId : Nat) : async MarketplaceActionResult {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     TermsLib.requireCurrent(termsState, caller);
     let escrow = switch (MarketplaceLib.getPendingRefund(marketplacePaymentState, escrowId)) {
       case null Runtime.trap("Pending refund not found");
@@ -2135,7 +2135,7 @@ mixin (
 
   /// Buy a fixed-price listing; ICP first moves into marketplace escrow, then settlement can be retried safely.
   public shared ({ caller }) func buyFixedListing(listingId : MarketplaceTypes.ListingId) : async MarketplaceActionResult {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     TermsLib.requireCurrent(termsState, caller);
     if (MarketplaceLib.isListingReturning(marketplaceListingReturnState, listingId)) {
       Runtime.trap("Listing is being cancelled and returned to the seller");
@@ -2623,7 +2623,7 @@ mixin (
     listingId : MarketplaceTypes.ListingId,
     amount : Nat64,
   ) : async MarketplaceBidResult {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     TermsLib.requireCurrent(termsState, caller);
     if (MarketplaceLib.isListingReturning(marketplaceListingReturnState, listingId)) {
       Runtime.trap("Auction is being cancelled and returned to the seller");
@@ -2679,7 +2679,7 @@ mixin (
   public shared ({ caller }) func retryPendingBid(
     listingId : MarketplaceTypes.ListingId
   ) : async MarketplaceBidResult {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     TermsLib.requireCurrent(termsState, caller);
     let pending = switch (MarketplaceLib.getPendingBidDeposit(marketplaceBidState, listingId)) {
       case null Runtime.trap("Pending bid deposit not found");
@@ -2708,7 +2708,7 @@ mixin (
   public shared ({ caller }) func cancelStalePendingBid(
     listingId : MarketplaceTypes.ListingId
   ) : async MarketplaceActionResult {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     TermsLib.requireCurrent(termsState, caller);
     if (not MarketplaceLib.acquireListingLock(marketplacePaymentState, listingId)) {
       Runtime.trap("Auction is processing another payment. Try again shortly.");
@@ -3100,7 +3100,7 @@ mixin (
 
   /// Settle an auction after its end time; NFT delivery happens before escrow payout and can be retried.
   public shared ({ caller }) func settleAuction(listingId : MarketplaceTypes.ListingId) : async MarketplaceActionResult {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     TermsLib.requireCurrent(termsState, caller);
     if (MarketplaceLib.isListingReturning(marketplaceListingReturnState, listingId)) {
       Runtime.trap("Auction is being cancelled and cannot be settled");
@@ -3776,7 +3776,7 @@ mixin (
 
   /// Cancel a listing; NFT returned from escrow; caller must be owner or admin
   public shared ({ caller }) func cancelListing(listingId : MarketplaceTypes.ListingId) : async MarketplaceActionResult {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     TermsLib.requireCurrent(termsState, caller);
     let isCallerAdmin = AuthLib.isAdmin(authState, caller);
 

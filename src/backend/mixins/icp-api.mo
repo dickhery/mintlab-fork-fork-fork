@@ -17,7 +17,7 @@ mixin (
 
   /// Query the caller's ICP subaccount balance (on-chain ledger call)
   public shared ({ caller }) func getUserICPBalance() : async Nat64 {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
     let sub = IcpLib.principalToSubaccount(caller);
     let account = IcpLib.accountIdentifier(canisterId, sub);
@@ -46,7 +46,7 @@ mixin (
     amount : Nat64,
     clientNonce : ?Nat64,
   ) : async CommonTypes.TransferResult {
-    if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     TermsLib.requireCurrent(termsState, caller);
     let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
     let feeE8s = await* IcpLib.getTransferFee(ledger);

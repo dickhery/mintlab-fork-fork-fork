@@ -12,11 +12,23 @@ export interface UseAuthReturn {
 }
 
 export function useAuth(): UseAuthReturn {
-  const { identity, isAuthenticated, isLoggingIn, login, clear } =
-    useInternetIdentity();
+  const {
+    identity,
+    isAuthenticated: rawIsAuthenticated,
+    isInitializing,
+    isLoggingIn,
+    login,
+    clear,
+  } = useInternetIdentity();
 
-  const principal =
-    isAuthenticated && identity ? identity.getPrincipal() : null;
+  const rawPrincipal = identity ? identity.getPrincipal() : null;
+  const rawPrincipalText = rawPrincipal ? rawPrincipal.toString() : null;
+  const hasAuthenticatedPrincipal =
+    rawIsAuthenticated &&
+    rawPrincipal !== null &&
+    rawPrincipalText !== "2vxsx-fae" &&
+    !rawPrincipal.isAnonymous();
+  const principal = hasAuthenticatedPrincipal ? rawPrincipal : null;
   const principalText = principal ? principal.toString() : null;
 
   const logout = useCallback(() => {
@@ -25,8 +37,8 @@ export function useAuth(): UseAuthReturn {
 
   return {
     principal,
-    isAuthenticated,
-    isLoading: isLoggingIn,
+    isAuthenticated: hasAuthenticatedPrincipal,
+    isLoading: isInitializing || isLoggingIn,
     login,
     logout,
     principalText,

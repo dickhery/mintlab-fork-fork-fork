@@ -25,7 +25,7 @@ module {
 
   public func acceptanceError(state : TermsState, caller : Principal) : ?Text {
     if (Principal.isAnonymous(caller)) {
-      return ?"You must be logged in with Internet Identity";
+      return ?"You must be authenticated to do this.";
     };
     if (hasAcceptedCurrent(state, caller)) {
       null;
@@ -71,7 +71,7 @@ module {
 
   public func acceptCurrent(state : TermsState, caller : Principal) : TermsAcceptanceStatus {
     if (Principal.isAnonymous(caller)) {
-      Runtime.trap("You must be logged in with Internet Identity to accept the Terms of Service");
+      Runtime.trap("You must be authenticated to do this.");
     };
     let record : TermsAcceptance = {
       version = CURRENT_TERMS_VERSION;

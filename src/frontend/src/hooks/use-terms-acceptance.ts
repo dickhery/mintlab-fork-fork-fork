@@ -1,18 +1,17 @@
 import type { TermsAcceptanceStatus } from "@/backend-client";
+import { getUserFacingErrorMessage } from "@/lib/errors";
 import { isCurrentTermsVersion } from "@/lib/terms";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "./use-auth";
 import { useBackend } from "./use-backend";
 
 function errorMessage(error: unknown) {
-  return error instanceof Error
-    ? error.message
-    : "Could not update terms acceptance";
+  return getUserFacingErrorMessage(error, "Could not update terms acceptance");
 }
 
 export function useTermsAcceptance() {
   const { actor } = useBackend();
-  const { isAuthenticated, isLoading, login } = useAuth();
+  const { isAuthenticated, isLoading, login, principalText } = useAuth();
   const [status, setStatus] = useState<TermsAcceptanceStatus | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [isAccepting, setIsAccepting] = useState(false);
@@ -20,8 +19,10 @@ export function useTermsAcceptance() {
 
   useEffect(() => {
     let cancelled = false;
+    const canCheckTerms =
+      isAuthenticated && principalText !== null && actor !== null;
 
-    if (!isAuthenticated || !actor) {
+    if (!canCheckTerms) {
       setStatus(null);
       setIsChecking(false);
       setError(null);
@@ -52,10 +53,10 @@ export function useTermsAcceptance() {
     return () => {
       cancelled = true;
     };
-  }, [actor, isAuthenticated]);
+  }, [actor, isAuthenticated, principalText]);
 
   const acceptTerms = useCallback(async () => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || principalText === null) {
       login();
       return;
     }
@@ -73,11 +74,12 @@ export function useTermsAcceptance() {
     } finally {
       setIsAccepting(false);
     }
-  }, [actor, isAuthenticated, login]);
+  }, [actor, isAuthenticated, login, principalText]);
 
   const accepted =
     status?.acceptedCurrent === true &&
-    isCurrentTermsVersion(status.currentVersion);
+    isCurrentTermsVersion(status.currentVersion) &&
+    isCurrentTermsVersion(status.acceptedVersion);
 
   return {
     accepted,

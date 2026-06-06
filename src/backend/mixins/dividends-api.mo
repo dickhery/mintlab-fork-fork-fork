@@ -517,7 +517,7 @@ mixin (
     collectionId : CollectionTypes.CollectionId
   ) : async { #ok : DividendTypes.DividendSyncReceipt; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to check collection dividends");
+      return #err("You must be authenticated to do this.");
     };
     let collection = switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
       case null return #err("Collection not found");
@@ -565,7 +565,7 @@ mixin (
     collectionId : CollectionTypes.CollectionId
   ) : async { #ok : DividendTypes.DividendDisbursementPreview; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to preview dividend disbursement costs");
+      return #err("You must be authenticated to do this.");
     };
     ignore collectionId;
     #err("Batch dividend disbursement is disabled. NFT owners collect dividends individually.");
@@ -576,7 +576,7 @@ mixin (
     maxTransfers : ?Nat,
   ) : async { #ok : DividendTypes.DividendDisbursementReceipt; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to disburse dividends");
+      return #err("You must be authenticated to do this.");
     };
     switch (TermsLib.acceptanceError(termsState, caller)) {
       case (?message) return #err(message);
@@ -592,7 +592,7 @@ mixin (
     tokenId : Text,
   ) : async { #ok : Bool; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("Anonymous caller not allowed");
+      return #err("You must be authenticated to do this.");
     };
     if (not AuthLib.isAdmin(authState, caller)) {
       return #err("Unauthorized: admin only");
@@ -607,7 +607,7 @@ mixin (
     collectionId : CollectionTypes.CollectionId
   ) : async { #ok : Bool; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("Anonymous caller not allowed");
+      return #err("You must be authenticated to do this.");
     };
     if (not AuthLib.isAdmin(authState, caller)) {
       return #err("Unauthorized: admin only");
@@ -625,7 +625,7 @@ mixin (
     nftId : WalletTypes.NFTId
   ) : async { #ok : DividendTypes.DividendClaimReceipt; #err : Text } {
     if (Principal.isAnonymous(caller)) {
-      return #err("You must be logged in to collect dividends");
+      return #err("You must be authenticated to do this.");
     };
     switch (TermsLib.acceptanceError(termsState, caller)) {
       case (?message) return #err(message);
