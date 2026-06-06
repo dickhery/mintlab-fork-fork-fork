@@ -1,5 +1,6 @@
 import IcpLib "../lib/icp";
 import MarketplaceLib "../lib/marketplace";
+import TermsLib "../lib/terms";
 import TransactionsLib "../lib/transactions";
 import CommonTypes "../types/common";
 import Runtime "mo:core/Runtime";
@@ -10,6 +11,7 @@ mixin (
   marketplaceUserPaymentLockState : MarketplaceLib.MarketplaceUserPaymentLockState,
   icpWithdrawalState : IcpLib.WithdrawalState,
   transactionState : TransactionsLib.TransactionState,
+  termsState : TermsLib.TermsState,
   canisterId : Principal,
 ) {
 
@@ -45,6 +47,7 @@ mixin (
     clientNonce : ?Nat64,
   ) : async CommonTypes.TransferResult {
     if (Principal.isAnonymous(caller)) Runtime.trap("Anonymous caller not allowed");
+    TermsLib.requireCurrent(termsState, caller);
     let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
     let feeE8s = await* IcpLib.getTransferFee(ledger);
     if (amount <= feeE8s) Runtime.trap("Amount must exceed the current transfer fee");

@@ -3,10 +3,9 @@ import {
   TERMS_LAST_UPDATED,
   termsRiskHighlights,
 } from "@/content/terms";
-import { acceptCurrentTerms, hasAcceptedCurrentTerms } from "@/lib/terms";
+import { useTermsAcceptance } from "@/hooks/use-terms-acceptance";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { AlertTriangle, FileText } from "lucide-react";
-import { useState } from "react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,16 +47,28 @@ export function TermsAgreementNotice({
 }
 
 export function TermsGate() {
-  const [acceptedInSession, setAcceptedInSession] = useState(() =>
-    hasAcceptedCurrentTerms(),
-  );
+  const {
+    accepted,
+    acceptTerms,
+    error,
+    isAccepting,
+    isAuthenticated,
+    isAuthLoading,
+    isBackendReady,
+    isChecking,
+  } = useTermsAcceptance();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
   const isTermsPage = pathname === "/terms";
-  const accepted = acceptedInSession || hasAcceptedCurrentTerms();
 
-  const open = !accepted && !isTermsPage;
+  const open =
+    isAuthenticated &&
+    !isAuthLoading &&
+    isBackendReady &&
+    !isChecking &&
+    !accepted &&
+    !isTermsPage;
 
   return (
     <AlertDialog open={open} onOpenChange={() => {}}>
@@ -103,16 +114,23 @@ export function TermsGate() {
           <TermsLink />
         </p>
 
+        {error ? (
+          <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs leading-relaxed text-destructive">
+            {error}
+          </p>
+        ) : null}
+
         <AlertDialogFooter>
           <AlertDialogAction
             className="bg-accent text-accent-foreground hover:bg-accent/90"
-            onClick={() => {
-              acceptCurrentTerms();
-              setAcceptedInSession(true);
+            disabled={isAccepting}
+            onClick={(event) => {
+              event.preventDefault();
+              void acceptTerms();
             }}
             data-ocid="terms.accept_button"
           >
-            I Agree
+            {isAccepting ? "Accepting..." : "I Agree"}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

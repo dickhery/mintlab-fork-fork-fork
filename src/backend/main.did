@@ -131,6 +131,13 @@ type TokenMetadata =
    transferred_by: opt principal;
  };
 type Timestamp = int;
+type TermsAcceptanceStatus =
+ record {
+   acceptedAt: opt nat64;
+   acceptedCurrent: bool;
+   acceptedVersion: opt text;
+   currentVersion: text;
+ };
 type SupportedStandard =
  record {
    name: text;
@@ -1126,6 +1133,7 @@ type ActiveListing =
  };
 type AccountIdentifier = blob;
 service : {
+  acceptCurrentTerms: () -> (TermsAcceptanceStatus);
   addCollection: (name: text, description: text, canisterId: principal,
    standard: NFTStandard, imageUrl: text, symbol: text, browseInfo:
    opt CollectionBrowseInfo) -> (Collection);
@@ -1350,6 +1358,7 @@ service : {
       err: text;
       ok: CollectionSyncReadiness;
     }) query;
+  getCurrentTermsVersion: () -> (text) query;
   getMarketplaceFeeConfig: () -> (MarketplaceFeeConfig);
   getMintConfig: () -> (MintConfig) query;
   getModerationConfig: () -> (PublicModerationConfig) query;
@@ -1372,6 +1381,7 @@ service : {
   getMyRecentNFTTransactions: (limit: opt nat) ->
    (vec RecentTransaction) query;
   getMyRecentTransactions: (limit: opt nat) -> (vec RecentTransaction) query;
+  getMyTermsAcceptanceStatus: () -> (TermsAcceptanceStatus) query;
   getNFTReceiveInstructions: (collectionId: CollectionId) ->
    (variant {
       err: text;
@@ -1393,6 +1403,7 @@ service : {
    (WalletNFTPage) query;
   getVaultAccountId: () -> (AccountIdentifier) query;
   getVaultPrincipal: () -> (principal) query;
+  hasAcceptedCurrentTerms: () -> (bool) query;
   http_request: (request: AssetHttpRequest) -> (AssetHttpResponse) query;
   http_request_update: (request: AssetHttpRequest) -> (AssetHttpResponse);
   icrc10_supported_standards: () -> (vec SupportedStandard) query;

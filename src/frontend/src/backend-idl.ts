@@ -137,6 +137,12 @@ export const idlFactory = ({ IDL }) => {
     'attributes' : IDL.Vec(IDL.Tuple(IDL.Text, IDL.Text)),
   });
   const Timestamp = IDL.Int;
+  const TermsAcceptanceStatus = IDL.Record({
+    'acceptedAt' : IDL.Opt(IDL.Nat64),
+    'acceptedCurrent' : IDL.Bool,
+    'acceptedVersion' : IDL.Opt(IDL.Text),
+    'currentVersion' : IDL.Text,
+  });
   const WalletLocation = IDL.Variant({
     'Vaulted' : IDL.Null,
     'Minted' : IDL.Null,
@@ -1120,6 +1126,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'balance' : IDL.Func([EXTBalanceRequest], [EXTBalanceResponse], ['query']),
+    'acceptCurrentTerms' : IDL.Func([], [TermsAcceptanceStatus], []),
     'bootstrapAdmin' : IDL.Func([], [], []),
     'buyFixedListing' : IDL.Func(
         [ListingId],
@@ -1260,6 +1267,7 @@ export const idlFactory = ({ IDL }) => {
         ['query'],
       ),
     'getAdminPrincipal' : IDL.Func([], [IDL.Opt(IDL.Principal)], ['query']),
+    'getCurrentTermsVersion' : IDL.Func([], [IDL.Text], ['query']),
     'getAllCollectionCreationRequests' : IDL.Func(
         [],
         [
@@ -1421,6 +1429,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Vec(PendingMintPaymentView)],
         ['query'],
       ),
+    'getMyTermsAcceptanceStatus' : IDL.Func(
+        [],
+        [TermsAcceptanceStatus],
+        ['query'],
+      ),
     'getNFTStats' : IDL.Func([IDL.Principal], [NFTStats], ['query']),
     'getNFTReceiveInstructions' : IDL.Func(
         [CollectionId],
@@ -1530,6 +1543,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : CollectionIndexPageResult, 'err' : IDL.Text })],
         [],
       ),
+    'hasAcceptedCurrentTerms' : IDL.Func([], [IDL.Bool], ['query']),
     'isAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'isNFTInUserWallet' : IDL.Func(
         [CollectionId, IDL.Text, UserId],

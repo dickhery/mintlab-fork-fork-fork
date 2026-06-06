@@ -9,6 +9,7 @@ import HttpMedia "../lib/http-media";
 import IcpLib "../lib/icp";
 import MarketplaceLib "../lib/marketplace";
 import MintLib "../lib/mint";
+import TermsLib "../lib/terms";
 import TransactionsLib "../lib/transactions";
 import DividendsLib "../lib/dividends";
 import WalletLib "../lib/wallet";
@@ -41,6 +42,7 @@ mixin (
   marketplaceUserPaymentLockState : MarketplaceLib.MarketplaceUserPaymentLockState,
   dividendAccumulatorState : DividendsLib.DividendAccumulatorState,
   transactionState : TransactionsLib.TransactionState,
+  termsState : TermsLib.TermsState,
   canisterId : Principal,
 ) {
   type CanisterSettings = {
@@ -1208,6 +1210,10 @@ mixin (
     if (Principal.isAnonymous(caller)) {
       return #err("You must be logged in to top up a canister");
     };
+    switch (TermsLib.acceptanceError(termsState, caller)) {
+      case (?message) return #err(message);
+      case null {};
+    };
     let normalizedCycles = normalizedCollectionTopUpCycles(cyclesToTopUp);
     let quote = try {
       await collectionCycleTopUpQuoteFor(normalizedCycles);
@@ -1412,6 +1418,10 @@ mixin (
   ) : async { #ok : MintTypes.CollectionCreationReceipt; #err : Text } {
     if (Principal.isAnonymous(caller)) {
       return #err("You must be logged in to create a collection");
+    };
+    switch (TermsLib.acceptanceError(termsState, caller)) {
+      case (?message) return #err(message);
+      case null {};
     };
     switch (
       enforcePrincipalCooldown(
@@ -1999,6 +2009,10 @@ mixin (
     if (Principal.isAnonymous(caller)) {
       return #err("You must be logged in to top up a collection canister");
     };
+    switch (TermsLib.acceptanceError(termsState, caller)) {
+      case (?message) return #err(message);
+      case null {};
+    };
     let collection = switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
       case null return #err("Collection not found");
       case (?value) value;
@@ -2100,6 +2114,10 @@ mixin (
   ) : async { #ok : MintTypes.MintReceipt; #err : Text } {
     if (Principal.isAnonymous(caller)) {
       return #err("You must be logged in to mint");
+    };
+    switch (TermsLib.acceptanceError(termsState, caller)) {
+      case (?message) return #err(message);
+      case null {};
     };
     switch (
       enforcePrincipalCooldown(
@@ -2248,6 +2266,10 @@ mixin (
     if (Principal.isAnonymous(caller)) {
       return #err("You must be logged in to retry a pending mint");
     };
+    switch (TermsLib.acceptanceError(termsState, caller)) {
+      case (?message) return #err(message);
+      case null {};
+    };
     let payment = switch (MintLib.getPendingMintPayment(pendingMintPaymentState, paymentId)) {
       case null return #err("Pending mint payment not found");
       case (?value) value;
@@ -2359,6 +2381,10 @@ mixin (
     if (Principal.isAnonymous(caller)) {
       return #err("You must be logged in to mint");
     };
+    switch (TermsLib.acceptanceError(termsState, caller)) {
+      case (?message) return #err(message);
+      case null {};
+    };
     switch (
       enforcePrincipalCooldown(
         mintCooldowns,
@@ -2455,6 +2481,9 @@ mixin (
     if (not Principal.equal(caller, from) and not Principal.equal(caller, canisterId)) {
       return #Err(#Unauthorized);
     };
+    if (not Principal.equal(caller, canisterId) and not TermsLib.hasAcceptedCurrent(termsState, caller)) {
+      return #Err(#Unauthorized);
+    };
     switch (MintLib.transferToken(mintState, tokenId, from, to)) {
       case (#err("Minted token not found")) #Err(#InvalidTokenId);
       case (#err(_)) #Err(#Unauthorized);
@@ -2470,6 +2499,9 @@ mixin (
     tokenId : Nat,
   ) : async NFTStandards.DIP721NatResult {
     if (Principal.isAnonymous(caller)) {
+      return #Err(#Unauthorized);
+    };
+    if (not TermsLib.hasAcceptedCurrent(termsState, caller)) {
       return #Err(#Unauthorized);
     };
     await transferFromDip721(caller, to, tokenId);
@@ -2605,6 +2637,9 @@ mixin (
   };
 
   public shared ({ caller }) func ext_transfer(request : EXTTransferRequest) : async EXTTransferResponse {
+    if (not TermsLib.hasAcceptedCurrent(termsState, caller)) {
+      return #err(#Unauthorized(""));
+    };
     extTransfer(caller, request);
   };
 
@@ -2849,6 +2884,8 @@ mixin (
     for (arg in args.values()) {
       let response = if (Principal.isAnonymous(caller)) {
         ?#Err(#Unauthorized);
+      } else if (not TermsLib.hasAcceptedCurrent(termsState, caller)) {
+        ?#Err(#Unauthorized);
       } else if (not isDefaultSubaccount(arg.from_subaccount)) {
         ?#Err(#Unauthorized);
       } else if (Principal.equal(arg.to.owner, caller) and isDefaultSubaccount(arg.to.subaccount)) {
@@ -3037,6 +3074,9 @@ mixin (
   func extTransfer(caller : Principal, request : EXTTransferRequest) : EXTTransferResponse {
     if (Principal.isAnonymous(caller)) {
       return #err(#Unauthorized(""));
+    };
+    if (not TermsLib.hasAcceptedCurrent(termsState, caller)) {
+      return #err(#Unauthorized(accountIdHex(caller)));
     };
     if (request.amount != 1) {
       return #err(#Other("EXT NFT transfers require amount 1"));

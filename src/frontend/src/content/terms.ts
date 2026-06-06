@@ -1,6 +1,6 @@
-export const TERMS_VERSION = "2026-06-02.1";
-export const TERMS_LAST_UPDATED = "June 2, 2026";
-export const TERMS_EFFECTIVE_DATE = "June 2, 2026";
+export const TERMS_VERSION = "2026-06-06.1";
+export const TERMS_LAST_UPDATED = "June 6, 2026";
+export const TERMS_EFFECTIVE_DATE = "June 6, 2026";
 
 export interface TermsSection {
   title: string;
@@ -16,6 +16,7 @@ export const termsRiskHighlights = [
   "External NFTs may need the collection and token ID entered during guided sync before they appear in your Mintlab wallet view.",
   "The in-app ICP account, marketplace escrow, vault, dividend, and cycle top-up flows depend on canister code and ICP ledger behavior.",
   "Smart contracts, external collection canisters, moderation services, gateways, and network infrastructure can contain bugs or become unavailable.",
+  "Mintlab is built and deployed using Caffeine AI, and Caffeine AI platform decisions or actions can affect app availability, deployment, upgrades, imports, and project control.",
 ];
 
 export const termsSections: TermsSection[] = [
@@ -119,6 +120,8 @@ export const termsSections: TermsSection[] = [
     bullets: [
       "Canisters, ledgers, external NFT standards, gateways, browser wallets, Internet Identity, and frontend infrastructure can fail, change, trap, run out of cycles, be exploited, or become unavailable.",
       "Upgrades, migrations, admin actions, emergency fixes, dependency changes, or network events may alter behavior, pause features, or require recovery steps.",
+      "Mintlab is built and deployed using Caffeine AI. You acknowledge that decisions, actions, outages, import/export behavior, deployment tooling changes, repository integration changes, account controls, policy enforcement, infrastructure issues, or other actions by Caffeine AI or its platform operators may affect Mintlab's availability, code deployment, frontend hosting, canister upgrades, project imports from GitHub, or the operator's ability to maintain and recover the app.",
+      "Caffeine AI may control or influence parts of the application environment where Mintlab was built and deployed. Those dependencies can introduce risks outside Mintlab's direct canister logic, including delayed updates, failed deployments, incompatible generated project changes, access interruptions, or changes to the way Mintlab can be reimported from GitHub.",
       "External collection imports rely on third-party canisters and metadata. Mintlab does not control those canisters and cannot guarantee their standards, availability, ownership data, media, or token behavior.",
       "Unverified external collections can be counterfeit, impersonate higher-value collections, expose unsafe content, disappear, change behavior, or report inaccurate metadata.",
     ],

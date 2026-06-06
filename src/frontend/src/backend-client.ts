@@ -20,6 +20,20 @@ export type NFTId = bigint;
 export type Timestamp = bigint;
 export type UserId = Principal;
 
+export interface TermsAcceptanceStatus {
+  currentVersion: string;
+  acceptedCurrent: boolean;
+  acceptedVersion: string | null;
+  acceptedAt: bigint | null;
+}
+
+interface RawTermsAcceptanceStatus {
+  currentVersion: string;
+  acceptedCurrent: boolean;
+  acceptedVersion: [] | [string];
+  acceptedAt: [] | [bigint];
+}
+
 export type NFTStandard =
   | { __kind__: "EXT"; EXT: null }
   | { __kind__: "DIP721"; DIP721: null }
@@ -762,6 +776,7 @@ export interface backendInterface {
     browseInfo: CollectionBrowseInfo | null,
   ): Promise<Collection>;
   bootstrapAdmin(): Promise<void>;
+  acceptCurrentTerms(): Promise<TermsAcceptanceStatus>;
   buyFixedListing(listingId: ListingId): Promise<void>;
   cancelListing(listingId: ListingId): Promise<void>;
   claimVaultDeposit(
@@ -985,6 +1000,7 @@ export interface backendInterface {
     listingIds: Array<ListingId>,
   ): Promise<Array<AuctionBidStatus>>;
   getAdminPrincipal(): Promise<Principal | null>;
+  getCurrentTermsVersion(): Promise<string>;
   getCollection(id: CollectionId): Promise<Collection | null>;
   getCollectionBrowseStats(
     collectionId: CollectionId,
@@ -1077,6 +1093,7 @@ export interface backendInterface {
   ): Promise<NFTDividendPage>;
   getMyPendingAuctionRefunds(): Promise<Array<AuctionEscrow>>;
   getMyPendingMintPayments(): Promise<Array<PendingMintPaymentView>>;
+  getMyTermsAcceptanceStatus(): Promise<TermsAcceptanceStatus>;
   refreshMyDividendNFTs(): Promise<Array<NFTDividend>>;
   refreshMyDividendNFTsPage(
     cursor: bigint | null,
@@ -1114,6 +1131,7 @@ export interface backendInterface {
     | { __kind__: "err"; err: string }
   >;
   isAdmin(): Promise<boolean>;
+  hasAcceptedCurrentTerms(): Promise<boolean>;
   isNFTInUserWallet(
     collectionId: CollectionId,
     tokenId: string,
@@ -1894,6 +1912,17 @@ function fromRawOption<T>(value: [] | [T] | null | undefined): T | null {
 
 function toRawOption<T>(value: T | null | undefined): [] | [T] {
   return value == null ? [] : [value];
+}
+
+function fromRawTermsAcceptanceStatus(
+  value: RawTermsAcceptanceStatus,
+): TermsAcceptanceStatus {
+  return {
+    currentVersion: value.currentVersion,
+    acceptedCurrent: value.acceptedCurrent,
+    acceptedVersion: fromRawOption(value.acceptedVersion),
+    acceptedAt: fromRawOption(value.acceptedAt),
+  };
 }
 
 function fromRawNFTStandard(value: RawNFTStandard): NFTStandard {
@@ -3271,6 +3300,12 @@ export class Backend implements backendInterface {
     return this.run(() => this.actor.bootstrapAdmin());
   }
 
+  async acceptCurrentTerms(): Promise<TermsAcceptanceStatus> {
+    return fromRawTermsAcceptanceStatus(
+      await this.run(() => this.actor.acceptCurrentTerms()),
+    );
+  }
+
   async buyFixedListing(listingId: ListingId): Promise<void> {
     unwrapMarketplaceAction(
       await this.run(() => this.actor.buyFixedListing(listingId)),
@@ -3892,6 +3927,10 @@ export class Backend implements backendInterface {
     return fromRawOption(await this.run(() => this.actor.getAdminPrincipal()));
   }
 
+  async getCurrentTermsVersion(): Promise<string> {
+    return this.run(() => this.actor.getCurrentTermsVersion());
+  }
+
   async getCollection(id: CollectionId): Promise<Collection | null> {
     const result = (await this.run(() => this.actor.getCollection(id))) as
       | []
@@ -4167,6 +4206,12 @@ export class Backend implements backendInterface {
     return result.map(fromRawPendingMintPaymentView);
   }
 
+  async getMyTermsAcceptanceStatus(): Promise<TermsAcceptanceStatus> {
+    return fromRawTermsAcceptanceStatus(
+      await this.run(() => this.actor.getMyTermsAcceptanceStatus()),
+    );
+  }
+
   async refreshMyDividendNFTs(): Promise<Array<NFTDividend>> {
     const dividends: Array<NFTDividend> = [];
     let cursor: bigint | null = null;
@@ -4353,6 +4398,10 @@ export class Backend implements backendInterface {
 
   async isAdmin(): Promise<boolean> {
     return this.run(() => this.actor.isAdmin());
+  }
+
+  async hasAcceptedCurrentTerms(): Promise<boolean> {
+    return this.run(() => this.actor.hasAcceptedCurrentTerms());
   }
 
   async isNFTInUserWallet(

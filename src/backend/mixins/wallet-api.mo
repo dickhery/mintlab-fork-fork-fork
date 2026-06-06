@@ -9,6 +9,7 @@ import IcpLib "../lib/icp";
 import MarketplaceLib "../lib/marketplace";
 import MintLib "../lib/mint";
 import NFTStandards "../lib/nft-standards";
+import TermsLib "../lib/terms";
 import TransactionsLib "../lib/transactions";
 import WalletLib "../lib/wallet";
 import CollectionTypes "../types/collections";
@@ -29,6 +30,7 @@ mixin (
   authState : AuthLib.AdminState,
   nftModerationState : CollectionLib.NFTModerationState,
   transactionState : TransactionsLib.TransactionState,
+  termsState : TermsLib.TermsState,
   canisterId : Principal,
 ) {
   type WalletChildTransferResult = {
@@ -460,6 +462,10 @@ mixin (
     if (Principal.isAnonymous(caller)) {
       return #err("You must be logged in to claim a deposit");
     };
+    switch (TermsLib.acceptanceError(termsState, caller)) {
+      case (?message) return #err(message);
+      case null {};
+    };
     let collection = switch (CollectionLib.getCollection(collectionsState, collectionId)) {
       case null return #err("Collection not found");
       case (?value) value;
@@ -602,6 +608,10 @@ mixin (
   ) : async { #ok : Text; #err : Text } {
     if (Principal.isAnonymous(caller)) {
       return #err("You must be logged in to send an NFT");
+    };
+    switch (TermsLib.acceptanceError(termsState, caller)) {
+      case (?message) return #err(message);
+      case null {};
     };
     if (Principal.isAnonymous(recipient)) {
       return #err("Cannot send an NFT to the anonymous principal");

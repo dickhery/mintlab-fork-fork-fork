@@ -5,6 +5,7 @@ import WalletLib "lib/wallet";
 import MarketplaceLib "lib/marketplace";
 import DividendsLib "lib/dividends";
 import IcpLib "lib/icp";
+import TermsLib "lib/terms";
 import TransactionsLib "lib/transactions";
 import Principal "mo:core/Principal";
 
@@ -16,6 +17,7 @@ import ICPApi "mixins/icp-api";
 import MarketplaceApi "mixins/marketplace-api";
 import BrowseApi "mixins/browse-api";
 import DividendsApi "mixins/dividends-api";
+import TermsApi "mixins/terms-api";
 import TransactionsApi "mixins/transactions-api";
 
 persistent actor Backend {
@@ -44,10 +46,12 @@ persistent actor Backend {
   let dividendsState = DividendsLib.newState();
   let dividendAccumulatorState = DividendsLib.newAccumulatorState();
   let dividendFeeState = DividendsLib.newFeeState();
+  let termsState = TermsLib.newState();
   let transactionState = TransactionsLib.newState();
 
   // ── Mixin composition ─────────────────────────────────────────────────────
   include AuthApi(authState);
+  include TermsApi(termsState);
   include CollectionsApi(collectionsState, nftModerationState, authState, ownershipIndexState);
   include MintApi(
     mintState,
@@ -61,6 +65,7 @@ persistent actor Backend {
     marketplaceUserPaymentLockState,
     dividendAccumulatorState,
     transactionState,
+    termsState,
     Principal.fromActor(Backend),
   );
   include WalletApi(
@@ -73,12 +78,14 @@ persistent actor Backend {
     authState,
     nftModerationState,
     transactionState,
+    termsState,
     Principal.fromActor(Backend),
   );
   include ICPApi(
     marketplaceUserPaymentLockState,
     icpWithdrawalState,
     transactionState,
+    termsState,
     Principal.fromActor(Backend),
   );
   include MarketplaceApi(
@@ -99,6 +106,7 @@ persistent actor Backend {
     authState,
     nftModerationState,
     transactionState,
+    termsState,
     Principal.fromActor(Backend),
   );
   include DividendsApi(
@@ -113,6 +121,7 @@ persistent actor Backend {
     mintState,
     authState,
     transactionState,
+    termsState,
     Principal.fromActor(Backend),
   );
   include BrowseApi(

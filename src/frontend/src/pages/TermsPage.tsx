@@ -7,7 +7,7 @@ import {
   termsRiskHighlights,
   termsSections,
 } from "@/content/terms";
-import { acceptCurrentTerms, hasAcceptedCurrentTerms } from "@/lib/terms";
+import { useTermsAcceptance } from "@/hooks/use-terms-acceptance";
 import { Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
@@ -17,14 +17,26 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useEffect, useState } from "react";
 
 export default function TermsPage() {
-  const [accepted, setAccepted] = useState(false);
+  const {
+    accepted,
+    acceptTerms,
+    error,
+    isAccepting,
+    isAuthenticated,
+    isAuthLoading,
+    isBackendReady,
+    isChecking,
+  } = useTermsAcceptance();
 
-  useEffect(() => {
-    setAccepted(hasAcceptedCurrentTerms());
-  }, []);
+  const acceptButtonLabel = !isAuthenticated
+    ? "Sign In to Accept"
+    : accepted
+      ? "Terms Accepted"
+      : isAccepting
+        ? "Accepting..."
+        : "Accept Terms";
 
   return (
     <div className="bg-background" data-ocid="terms.page">
@@ -67,16 +79,27 @@ export default function TermsPage() {
 
             <Button
               className="gap-2 bg-accent text-accent-foreground hover:bg-accent/90"
-              disabled={accepted}
+              disabled={
+                isAuthLoading ||
+                (isAuthenticated && !isBackendReady) ||
+                isAccepting ||
+                isChecking ||
+                (isAuthenticated && accepted)
+              }
               onClick={() => {
-                acceptCurrentTerms();
-                setAccepted(true);
+                void acceptTerms();
               }}
               data-ocid="terms.page.accept_button"
             >
               <ShieldCheck className="h-4 w-4" />
-              {accepted ? "Terms Accepted" : "Accept Terms"}
+              {acceptButtonLabel}
             </Button>
+
+            {error ? (
+              <p className="max-w-2xl rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm leading-relaxed text-destructive">
+                {error}
+              </p>
+            ) : null}
           </div>
         </div>
       </section>

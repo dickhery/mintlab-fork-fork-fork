@@ -12,10 +12,12 @@ import type {
   AccountIdentifier,
   ModerationCategorySettings,
   RecentTransaction,
+  TermsAcceptanceStatus,
 } from "../backend-client";
 import type { Agent } from "@icp-sdk/core/agent";
 import { ListingStatus } from "../backend-client";
 import { Principal } from "@icp-sdk/core/principal";
+import { TERMS_VERSION } from "../content/terms";
 
 const samplePrincipal = Principal.fromText("aaaaa-aa");
 const collectionPrincipal = Principal.fromText("rrkah-fqaaa-aaaaa-aaaaq-cai");
@@ -491,6 +493,17 @@ function mockNFTReportMeta(
   );
 }
 
+let mockTermsAcceptedAt: bigint | null = null;
+
+function mockTermsStatus(): TermsAcceptanceStatus {
+  return {
+    currentVersion: TERMS_VERSION,
+    acceptedCurrent: mockTermsAcceptedAt !== null,
+    acceptedVersion: mockTermsAcceptedAt === null ? null : TERMS_VERSION,
+    acceptedAt: mockTermsAcceptedAt,
+  };
+}
+
 export const mockBackend: backendInterface = {
   getAgent: (): Agent => {
     throw new Error("Mock backend does not provide an authenticated agent");
@@ -515,6 +528,10 @@ export const mockBackend: backendInterface = {
     browseInfo: browseInfo ?? undefined,
   }),
   bootstrapAdmin: async () => undefined,
+  acceptCurrentTerms: async () => {
+    mockTermsAcceptedAt = BigInt(Date.now()) * BigInt(1_000_000);
+    return mockTermsStatus();
+  },
   buyFixedListing: async () => undefined,
   cancelListing: async () => undefined,
   adminBlockCollection: async (collectionId) => ({
@@ -773,6 +790,7 @@ export const mockBackend: backendInterface = {
       ];
     }),
   getAdminPrincipal: async () => samplePrincipal,
+  getCurrentTermsVersion: async () => TERMS_VERSION,
   getCollection: async (id) => sampleCollections.find((c) => c.id === id) ?? null,
   getCollectionImportMeta: async (collectionId) =>
     sampleCollectionImportMetas.find(
@@ -1199,12 +1217,14 @@ export const mockBackend: backendInterface = {
   },
   getMyPendingAuctionRefunds: async () => [],
   getMyPendingMintPayments: async () => [],
+  getMyTermsAcceptanceStatus: async () => mockTermsStatus(),
   refreshMyDividendNFTs: async () => mockBackend.getMyDividendNFTs(),
   refreshMyDividendNFTsPage: async (cursor, limit) =>
     mockBackend.getMyDividendNFTsPage(cursor, limit),
   getVaultAccountId: async () => mockAccountId,
   getVaultPrincipal: async () => samplePrincipal,
   isAdmin: async () => true,
+  hasAcceptedCurrentTerms: async () => mockTermsStatus().acceptedCurrent,
   listCollections: async () => sampleCollections,
   listCollectionImportMetasPage: async (cursor, limit) => {
     const page = paginateMock(sampleCollectionImportMetas, cursor, limit);

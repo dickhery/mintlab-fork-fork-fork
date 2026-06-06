@@ -12,6 +12,7 @@ import IcpLib "../lib/icp";
 import MarketplaceLib "../lib/marketplace";
 import MintLib "../lib/mint";
 import NFTStandards "../lib/nft-standards";
+import TermsLib "../lib/terms";
 import TransactionsLib "../lib/transactions";
 import WalletLib "../lib/wallet";
 import CollectionTypes "../types/collections";
@@ -31,6 +32,7 @@ mixin (
   mintState : MintLib.MintState,
   authState : AuthLib.AdminState,
   transactionState : TransactionsLib.TransactionState,
+  termsState : TermsLib.TermsState,
   canisterId : Principal,
 ) {
   type ChildCollectionOwnerActor = actor {
@@ -576,6 +578,10 @@ mixin (
     if (Principal.isAnonymous(caller)) {
       return #err("You must be logged in to disburse dividends");
     };
+    switch (TermsLib.acceptanceError(termsState, caller)) {
+      case (?message) return #err(message);
+      case null {};
+    };
     ignore collectionId;
     ignore maxTransfers;
     #err("Batch dividend disbursement is disabled. NFT owners must collect dividends individually.");
@@ -620,6 +626,10 @@ mixin (
   ) : async { #ok : DividendTypes.DividendClaimReceipt; #err : Text } {
     if (Principal.isAnonymous(caller)) {
       return #err("You must be logged in to collect dividends");
+    };
+    switch (TermsLib.acceptanceError(termsState, caller)) {
+      case (?message) return #err(message);
+      case null {};
     };
     let nft = switch (findDividendNFTCandidate(caller, nftId)) {
       case null return #err("NFT not found in the dividend index");
