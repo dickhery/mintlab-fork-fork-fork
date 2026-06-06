@@ -1,12 +1,12 @@
 // Version: 1.0.0
-type Data__678143819<K, V> =
-  {var count : Nat__107743821; kvs : [var ?(K, V)]};
-type Internal__272372588<K, V> =
-  {children : [var ?Node__216023231<K, V>]; data : Data__678143819<K, V>};
-type Leaf__366843236<K, V> = {data : Data__678143819<K, V>};
-type MintedToken__700489535 =
+type Data__791452850<K, V> =
+  {var count : Nat__490723111; kvs : [var ?(K, V)]};
+type Internal__8484328<K, V> =
+  {children : [var ?Node__46230540<K, V>]; data : Data__791452850<K, V>};
+type Leaf__809889148<K, V> = {data : Data__791452850<K, V>};
+type MintedToken__156529978 =
   {
-    metadata : NFTMetadata__725390084;
+    metadata : NFTMetadata__605782097;
     mintedAt : Nat64;
     mintedBy : Principal;
     owner : Principal;
@@ -14,17 +14,17 @@ type MintedToken__700489535 =
     transferredAt : ?Nat64;
     transferredBy : ?Principal
   };
-type NFTMetadata__725390084 =
+type NFTMetadata__605782097 =
   {
     attributes : [(Text, Text)];
     description : ?Text;
     imageUrl : ?Text;
     name : ?Text
   };
-type Nat__107743821 = Nat__920180692;
+type Nat__490723111 = Nat__920180692;
 type Nat__920180692 = Nat;
-type Node__216023231<K, V> =
-  {#internal : Internal__272372588<K, V>; #leaf : Leaf__366843236<K, V>};
+type Node__46230540<K, V> =
+  {#internal : Internal__8484328<K, V>; #leaf : Leaf__809889148<K, V>};
 actor {
   stable var collectionDescription : Text;
   stable var collectionLogo : Text;
@@ -34,13 +34,13 @@ actor {
   stable var nextTokenId : Nat;
   stable var nextTransactionId : Nat;
   stable ownerTokenIndex :
-    {var root : Node__216023231<Principal, [Nat]>; var size : Nat__107743821};
+    {var root : Node__46230540<Principal, [Nat]>; var size : Nat__490723111};
   stable ownerTokenIndexReady :
-    {var root : Node__216023231<Principal, Bool>; var size : Nat__107743821};
+    {var root : Node__46230540<Principal, Bool>; var size : Nat__490723111};
   stable parentCanister : Principal;
   stable tokens :
     {
-      var root : Node__216023231<Nat, MintedToken__700489535>;
-      var size : Nat__107743821
+      var root : Node__46230540<Nat, MintedToken__156529978>;
+      var size : Nat__490723111
     }
 };

@@ -399,6 +399,7 @@ type StoredMintConfig__154708401 =
     mintPriceE8s : Nat64;
     payoutAccount : ?AccountIdentifier__537905862
   };
+type TermsAcceptance__714453075 = {acceptedAt : Nat64; version : Text};
 type Timestamp__301639476 = Int;
 type Timestamp__534280185 = Timestamp__301639476;
 type TokenDividendSnapshot__844801814 =
@@ -616,6 +617,8 @@ actor {
       payments : Map__605269027<Nat, PendingMintPayment__763212301>;
       paymentsByCaller : Map__605269027<Principal, [Nat]>
     };
+  stable termsState :
+    {acceptances : Map__605269027<Principal, TermsAcceptance__714453075>};
   stable transactionState :
     {
       var nextId : Nat;
