@@ -1707,7 +1707,6 @@ mixin (
       ensureNoActiveListingForNFT(currentNFT);
       WalletLib.removeNFT(walletState, nftId, caller);
       let listing = MarketplaceLib.createFixedListing(marketplaceState, caller, currentNFT, price);
-      await cacheShareImageForNFT(listing.id, currentNFT);
       listing;
     } finally {
       MarketplaceLib.releaseListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId);
@@ -1751,7 +1750,6 @@ mixin (
         startingBid,
         endTime,
       );
-      await cacheShareImageForNFT(listing.id, currentNFT);
       listing;
     } finally {
       MarketplaceLib.releaseListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId);

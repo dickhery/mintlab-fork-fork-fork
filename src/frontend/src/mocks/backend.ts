@@ -744,6 +744,7 @@ export const mockBackend: backendInterface = {
     nftId,
     price,
   }),
+  warmShareImageCacheForListing: async () => true,
   getActiveListingDetails: async () => sampleActiveListingDetails,
   getActiveListingDetailsPage: async (cursor, limit) => {
     const page = paginateMock(sampleActiveListingDetails, cursor, limit);

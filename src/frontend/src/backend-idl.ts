@@ -1860,6 +1860,7 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'ok' : Collection, 'err' : IDL.Text })],
         [],
       ),
+    'warmShareImageCacheForListing' : IDL.Func([ListingId], [IDL.Bool], []),
   });
 };
 export const init = ({ IDL }) => { return []; };

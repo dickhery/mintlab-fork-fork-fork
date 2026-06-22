@@ -957,6 +957,7 @@ export interface backendInterface {
     | { __kind__: "err"; err: string }
   >;
   createFixedListing(nftId: NFTId, price: bigint): Promise<FixedListing>;
+  warmShareImageCacheForListing(listingId: ListingId): Promise<boolean>;
   quoteCollectionCreationCost(
     collectionCanisterCycles: bigint,
     collectionCreationPriceE8s: bigint,
@@ -3807,6 +3808,10 @@ export class Backend implements backendInterface {
     return fromRawFixedListing(
       await this.run(() => this.actor.createFixedListing(nftId, price)),
     );
+  }
+
+  async warmShareImageCacheForListing(listingId: ListingId): Promise<boolean> {
+    return this.run(() => this.actor.warmShareImageCacheForListing(listingId));
   }
 
   async quoteCollectionCreationCost(

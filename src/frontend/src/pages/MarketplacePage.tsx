@@ -46,6 +46,7 @@ import {
   collectionTrustStatus,
   isMintlabVerifiedCollection,
 } from "@/lib/collection-trust";
+import { isAmbiguousListingFailureError } from "@/lib/errors";
 import { transferRegisteredNFT } from "@/lib/external-nft-transfer";
 import { formatICPAmount, parseICPToE8s } from "@/lib/icp";
 import {
@@ -2034,6 +2035,40 @@ export default function MarketplacePage() {
     reportListing({ collection, nft });
   }
 
+  async function findSellerListingForNFT(
+    nft: WalletNFT,
+    sellerPrincipal: string,
+    kind: "fixed" | "auction",
+  ): Promise<ActiveListingDetail | null> {
+    if (!actor) return null;
+    const details = await actor.getActiveListingDetails();
+    return (
+      details.find((detail) => {
+        if (
+          detail.nft.collectionId !== nft.collectionId ||
+          detail.nft.tokenId !== nft.tokenId
+        ) {
+          return false;
+        }
+        if (kind === "fixed") {
+          return (
+            detail.listing.__kind__ === "Fixed" &&
+            detail.listing.Fixed.seller.toString() === sellerPrincipal
+          );
+        }
+        return (
+          detail.listing.__kind__ === "Auction" &&
+          detail.listing.Auction.seller.toString() === sellerPrincipal
+        );
+      }) ?? null
+    );
+  }
+
+  function warmListingShareImage(listingId: ListingId) {
+    if (!actor) return;
+    void actor.warmShareImageCacheForListing(listingId).catch(() => {});
+  }
+
   async function ensureNFTReadyForListing(nft: WalletNFT): Promise<bigint> {
     if (!actor) throw new Error("Not connected");
     if (nft.location !== "Registered") return nft.id;
@@ -2185,12 +2220,27 @@ export default function MarketplacePage() {
     mutationFn: async ({ nft, price }: { nft: WalletNFT; price: bigint }) => {
       if (!actor) throw new Error("Not connected");
       const nftId = await ensureNFTReadyForListing(nft);
-      return actor.createFixedListing(nftId, price);
+      try {
+        return await actor.createFixedListing(nftId, price);
+      } catch (error) {
+        if (principal && isAmbiguousListingFailureError(error)) {
+          const recovered = await findSellerListingForNFT(
+            nft,
+            principal.toString(),
+            "fixed",
+          );
+          if (recovered?.listing.__kind__ === "Fixed") {
+            return recovered.listing.Fixed;
+          }
+        }
+        throw error;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (listing) => {
       toast.success("Fixed listing created!");
       setListModalOpen(false);
       refreshMarketplace();
+      warmListingShareImage(listing.id);
     },
     onError: (e: Error) => toast.error(`Listing failed: ${e.message}`),
   });
@@ -2207,12 +2257,27 @@ export default function MarketplacePage() {
     }) => {
       if (!actor) throw new Error("Not connected");
       const nftId = await ensureNFTReadyForListing(nft);
-      return actor.createAuctionListing(nftId, startingBid, endTime);
+      try {
+        return await actor.createAuctionListing(nftId, startingBid, endTime);
+      } catch (error) {
+        if (principal && isAmbiguousListingFailureError(error)) {
+          const recovered = await findSellerListingForNFT(
+            nft,
+            principal.toString(),
+            "auction",
+          );
+          if (recovered?.listing.__kind__ === "Auction") {
+            return recovered.listing.Auction;
+          }
+        }
+        throw error;
+      }
     },
-    onSuccess: () => {
+    onSuccess: (listing) => {
       toast.success("Auction listing created!");
       setListModalOpen(false);
       refreshMarketplace();
+      warmListingShareImage(listing.id);
     },
     onError: (e: Error) => toast.error(`Listing failed: ${e.message}`),
   });

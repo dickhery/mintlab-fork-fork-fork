@@ -50,3 +50,17 @@ export function asUserFacingError(
 ): Error {
   return new Error(getUserFacingErrorMessage(error, fallback));
 }
+
+const AMBIGUOUS_LISTING_FAILURE_PATTERNS = [
+  /ic0532/i,
+  /cannot grow memory/i,
+  /insufficient cycles/i,
+];
+
+export function isAmbiguousListingFailureError(error: unknown): boolean {
+  const message = getUserFacingErrorMessage(error, "");
+  return (
+    message !== "" &&
+    AMBIGUOUS_LISTING_FAILURE_PATTERNS.some((pattern) => pattern.test(message))
+  );
+}
