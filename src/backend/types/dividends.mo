@@ -13,6 +13,8 @@ module {
     processedBalanceE8s : Nat64;
     pendingE8s : Nat64;
     nftCount : Nat;
+    nftShareBasisPoints : Nat;
+    sourceDescription : ?Text;
   };
 
   public type NFTDividend = {

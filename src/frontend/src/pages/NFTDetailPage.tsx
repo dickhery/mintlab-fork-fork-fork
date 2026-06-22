@@ -6,10 +6,12 @@ import { ZoomableMediaImage } from "@/components/ZoomableMediaImage";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useBackend } from "@/hooks/use-backend";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import {
   collectionMetaMap,
   collectionTrustStatus,
 } from "@/lib/collection-trust";
+import { resolveImageUrl } from "@/lib/media";
 import {
   nftCustodyClass,
   nftCustodyDescription,
@@ -21,7 +23,7 @@ import {
   getNFTTokenLabel,
   getNFTVisibleAttributes,
 } from "@/lib/nft-display";
-import { nftShareUrl } from "@/lib/share-urls";
+import { appPageUrl, nftSharePath, nftShareUrl } from "@/lib/share-urls";
 import type { ActiveListingDetail, Collection, WalletNFT } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
@@ -125,6 +127,23 @@ export default function NFTDetailPage() {
   const isLoading = collectionLoading || nftLoading;
   const shareUrl =
     collectionId != null && tokenId ? nftShareUrl(collectionId, tokenId) : "";
+
+  const pageMeta = useMemo(() => {
+    if (!collection || !nft || collectionId == null || !tokenId) {
+      return {};
+    }
+    const name = getNFTDisplayName(nft, collection);
+    return {
+      title: `${name} — Mintlab`,
+      description: nft.metadata.description?.trim() || `${name} on Mintlab.`,
+      image: resolveImageUrl(nft.metadata.imageUrl, {
+        canisterId: collection.canisterId.toString(),
+        tokenId: nft.tokenId,
+      }),
+      url: appPageUrl(nftSharePath(collectionId, tokenId)),
+    };
+  }, [collection, collectionId, nft, tokenId]);
+  usePageMeta(pageMeta);
 
   if (collectionId == null || !tokenId) {
     return (

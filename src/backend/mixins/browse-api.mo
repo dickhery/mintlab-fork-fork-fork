@@ -8,7 +8,10 @@ import IcpLib "../lib/icp";
 import MarketplaceLib "../lib/marketplace";
 import MintLib "../lib/mint";
 import AuthLib "../lib/auth";
+import RateLimitLib "../lib/rate-limit";
 import CollectionLib "../lib/collections";
+import Runtime "mo:core/Runtime";
+import Time "mo:core/Time";
 import NFTStandards "../lib/nft-standards";
 import BrowseTypes "../types/browse";
 import WalletTypes "../types/wallet";
@@ -22,15 +25,70 @@ mixin (
   mintState : MintLib.MintState,
   authState : AuthLib.AdminState,
   nftModerationState : CollectionLib.NFTModerationState,
+  rateLimitState : RateLimitLib.RateLimitState,
   canisterId : Principal,
 ) {
+  let BROWSE_STATS_COOLDOWN_NS : Int = 2_000_000_000;
+  let BROWSE_STATS_WINDOW_NS : Int = 60_000_000_000;
+  let BROWSE_STATS_MAX_PER_WINDOW : Nat = 80;
+  let LOOKUP_NFT_COOLDOWN_NS : Int = 3_000_000_000;
+  let LOOKUP_NFT_WINDOW_NS : Int = 60_000_000_000;
+  let LOOKUP_NFT_MAX_PER_WINDOW : Nat = 30;
+  let PREVIEW_COLLECTION_COOLDOWN_NS : Int = 8_000_000_000;
+  let PREVIEW_COLLECTION_WINDOW_NS : Int = 60_000_000_000;
+  let PREVIEW_COLLECTION_MAX_PER_WINDOW : Nat = 20;
+
   let DEFAULT_COLLECTION_PAGE_SIZE : Nat = 24;
   let MAX_COLLECTION_PAGE_SIZE : Nat = 40;
   let MAX_RICH_METADATA_PAGE_SIZE : Nat = 8;
 
+  func enforceBrowseStatsRateLimit(caller : Principal, collectionId : CollectionTypes.CollectionId) {
+    if (AuthLib.isAdmin(authState, caller)) {
+      return;
+    };
+    let now = Time.now();
+    let key = RateLimitLib.keyFor(
+      "browse-stats",
+      caller,
+      Nat.toText(collectionId),
+    );
+    switch (
+      RateLimitLib.enforce(
+        rateLimitState,
+        key,
+        now,
+        BROWSE_STATS_COOLDOWN_NS,
+        BROWSE_STATS_WINDOW_NS,
+        BROWSE_STATS_MAX_PER_WINDOW,
+        "Please wait a few seconds before refreshing this collection's browse stats again.",
+        "You are browsing collections too quickly. Please wait about a minute and try again.",
+      )
+    ) {
+      case (?message) Runtime.trap(message);
+      case null {};
+    };
+  };
+
+  func enforceLookupNftRateLimit(caller : Principal, collectionId : CollectionTypes.CollectionId) : ?Text {
+    if (AuthLib.isAdmin(authState, caller)) {
+      return null;
+    };
+    RateLimitLib.enforce(
+      rateLimitState,
+      RateLimitLib.keyFor("lookup-nft", caller, Nat.toText(collectionId)),
+      Time.now(),
+      LOOKUP_NFT_COOLDOWN_NS,
+      LOOKUP_NFT_WINDOW_NS,
+      LOOKUP_NFT_MAX_PER_WINDOW,
+      "Please wait a few seconds before searching this collection again.",
+      "You are searching collections too quickly. Please wait about a minute and try again.",
+    );
+  };
+
   public shared ({ caller }) func getCollectionBrowseStats(
     collectionId : CollectionTypes.CollectionId
   ) : async BrowseTypes.CollectionBrowseStats {
+    enforceBrowseStatsRateLimit(caller, collectionId);
     let collection = switch (CollectionLib.getCollection(collectionsState, collectionId)) {
       case null {
         return {
@@ -120,6 +178,10 @@ mixin (
     collectionId : CollectionTypes.CollectionId,
     tokenId : Text,
   ) : async { #ok : ?WalletTypes.WalletNFT; #err : Text } {
+    switch (enforceLookupNftRateLimit(caller, collectionId)) {
+      case (?message) return #err(message);
+      case null {};
+    };
     let requestedTokenId = Text.trim(tokenId, #char ' ');
     if (requestedTokenId == "") {
       return #err("Enter a token ID to search this collection");
@@ -211,6 +273,23 @@ mixin (
     if (Principal.isAnonymous(caller)) {
       return #err("You must be signed in to preview collection ownership");
     };
+    if (not AuthLib.isAdmin(authState, caller)) {
+      switch (
+        RateLimitLib.enforce(
+          rateLimitState,
+          RateLimitLib.keyFor("preview-collection", caller, Nat.toText(collectionId)),
+          Time.now(),
+          PREVIEW_COLLECTION_COOLDOWN_NS,
+          PREVIEW_COLLECTION_WINDOW_NS,
+          PREVIEW_COLLECTION_MAX_PER_WINDOW,
+          "Please wait a few seconds before previewing this collection again.",
+          "You are previewing collections too quickly. Please wait about a minute and try again.",
+        )
+      ) {
+        case (?message) return #err(message);
+        case null {};
+      };
+    };
     let collection = switch (CollectionLib.getCollection(collectionsState, collectionId)) {
       case null return #err("Collection not found");
       case (?value) value;
@@ -291,6 +370,16 @@ mixin (
     switch (collection.kind) {
       case (#Minted) {
         if (not Principal.equal(collection.canisterId, canisterId)) {
+          switch (
+            statsFromConfiguredSupply(
+              collection,
+              viewerIsAdmin,
+              "Mintlab can browse this dedicated ICRC-7 collection using the configured token range.",
+            )
+          ) {
+            case (?stats) return stats;
+            case null {};
+          };
           let canister : NFTStandards.ICRC7Actor = actor (collection.canisterId.toText());
           let totalCount = try {
             await canister.icrc7_total_supply();
@@ -340,6 +429,16 @@ mixin (
       case (#External) {
         switch (collection.standard) {
           case (#ICRC7) {
+            switch (
+              statsFromConfiguredSupply(
+                collection,
+                viewerIsAdmin,
+                "Mintlab can browse the full ICRC-7 collection using the imported token range.",
+              )
+            ) {
+              case (?stats) return stats;
+              case null {};
+            };
             let canister : NFTStandards.ICRC7Actor = actor (collection.canisterId.toText());
             let totalCount = try {
               await canister.icrc7_total_supply();
@@ -739,6 +838,33 @@ mixin (
     switch (collection.browseInfo) {
       case null null;
       case (?browseInfo) browseInfo.totalSupply;
+    };
+  };
+
+  func statsFromConfiguredSupply(
+    collection : CollectionTypes.Collection,
+    viewerIsAdmin : Bool,
+    note : Text,
+  ) : ?BrowseTypes.CollectionBrowseStats {
+    switch (configuredBrowseSupply(collection)) {
+      case null null;
+      case (?configuredTotal) {
+        ?{
+          collectionId = collection.id;
+          totalCount = configuredTotal;
+          visibleCount = if (viewerIsAdmin) {
+            configuredTotal;
+          } else {
+            CollectionLib.visibleNFTTotal(
+              nftModerationState,
+              collection.id,
+              configuredTotal,
+            );
+          };
+          coverage = #Full;
+          note;
+        };
+      };
     };
   };
 

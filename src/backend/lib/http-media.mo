@@ -41,7 +41,7 @@ module {
       case (?value) {
         switch (Nat.fromText(value)) {
           case (?tokenId) ?tokenId;
-          case null extTokenIdFromIdentifier(value, canisterId);
+          case null extTokenIndexFromIdentifier(value, canisterId);
         };
       };
     };
@@ -101,6 +101,19 @@ module {
       ];
       body = Blob.fromArray([]);
       upgrade = false;
+    };
+  };
+
+  public func publicImageUrl(imageUrl : Text) : ?Text {
+    if (imageUrl == "") {
+      return null;
+    };
+    if (Text.startsWith(imageUrl, #text "https://") or Text.startsWith(imageUrl, #text "http://")) {
+      ?imageUrl;
+    } else if (Text.startsWith(imageUrl, #text "data:")) {
+      null;
+    } else {
+      redirectTarget(imageUrl);
     };
   };
 
@@ -185,6 +198,47 @@ module {
       indexBytes,
     );
     ?Principal.fromBlob(Blob.fromArray(combined)).toText();
+  };
+
+  public func extTokenIndexFromIdentifier(identifier : Text, canisterId : Principal) : ?Nat {
+    extTokenIdFromIdentifier(identifier, canisterId);
+  };
+
+  public func withoutThumbnailParam(url : Text) : Text {
+    if (not Text.contains(url, #text "type=thumbnail")) {
+      return url;
+    };
+    let withoutPrefix = Text.replace(url, #text "type=thumbnail&", "");
+    let withoutMiddle = Text.replace(withoutPrefix, #text "&type=thumbnail", "");
+    let withoutSuffix = Text.replace(withoutMiddle, #text "?type=thumbnail", "?");
+    normalizeAssetQuery(withoutSuffix);
+  };
+
+  public func fullTokenAssetUrl(canisterId : Principal, tokenIdentifier : Text) : Text {
+    "https://" #
+    canisterId.toText() #
+    ".raw.icp0.io/?tokenid=" #
+    tokenIdentifier;
+  };
+
+  public func sharePreviewImageUrl(imageUrl : Text) : Text {
+    withoutThumbnailParam(imageUrl);
+  };
+
+  func normalizeAssetQuery(url : Text) : Text {
+    if (Text.endsWith(url, #text "?")) {
+      switch (Text.stripEnd(url, #char '?')) {
+        case (?value) value;
+        case null url;
+      };
+    } else if (Text.endsWith(url, #text "&")) {
+      switch (Text.stripEnd(url, #char '&')) {
+        case (?value) value;
+        case null url;
+      };
+    } else {
+      url;
+    };
   };
 
   func extTokenIdFromIdentifier(identifier : Text, canisterId : Principal) : ?Nat {

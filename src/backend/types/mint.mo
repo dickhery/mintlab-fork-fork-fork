@@ -76,9 +76,26 @@ module {
     enabled : Bool;
     apiKeyConfigured : Bool;
     xaiApiKeyConfigured : Bool;
+    moderationReady : Bool;
     model : Text;
     categories : ModerationCategorySettings;
     userMessage : Text;
+  };
+
+  public type ModerationProviderTestOutcome = {
+    #ok : Text;
+    #err : Text;
+  };
+
+  public type ModerationProviderTestResult = {
+    configured : Bool;
+    outcome : ModerationProviderTestOutcome;
+  };
+
+  public type ModerationProviderTestReport = {
+    openAI : ModerationProviderTestResult;
+    xai : ModerationProviderTestResult;
+    ready : Bool;
   };
 
   public type CollectionCreationQuote = {
@@ -205,6 +222,10 @@ module {
     kind : AppCanisterKind;
     canisterId : Principal;
     cycles : ?Nat;
+    reservedCycles : ?Nat;
+    memorySizeBytes : ?Nat;
+    reservedCyclesLimit : ?Nat;
+    wasmMemoryLimit : ?Nat;
     moduleInstalled : ?Bool;
     freezingThresholdSeconds : ?Nat;
     idleCyclesBurnedPerDay : ?Nat;

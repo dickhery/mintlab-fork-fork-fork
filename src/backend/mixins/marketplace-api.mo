@@ -6,6 +6,8 @@ import TermsLib "../lib/terms";
 import AuthLib "../lib/auth";
 import CollectionsLib "../lib/collections";
 import TransactionsLib "../lib/transactions";
+import ShareImageCacheLib "../lib/share-image-cache";
+import ShareImageLib "../lib/share-image";
 import MarketplaceTypes "../types/marketplace";
 import WalletTypes "../types/wallet";
 import CollectionTypes "../types/collections";
@@ -44,6 +46,7 @@ mixin (
   nftModerationState : CollectionsLib.NFTModerationState,
   transactionState : TransactionsLib.TransactionState,
   termsState : TermsLib.TermsState,
+  shareImageCacheState : ShareImageCacheLib.ShareImageCacheState,
   canisterId : Principal,
 ) {
   type MarketplaceChildTransferResult = {
@@ -125,17 +128,197 @@ mixin (
     mintlab_owner_of : ([Nat]) -> async [?MarketplaceICRC7Account];
   };
 
+  transient var cachedLedgerTransferFeeE8s : ?Nat64 = null;
+  transient var cachedLedgerTransferFeeAt : Int = 0;
+  let LEDGER_TRANSFER_FEE_CACHE_NS : Int = 3_600_000_000_000;
+
   let PENDING_BID_TIMEOUT_NS : Int = 5 * 60 * 1_000_000_000;
   let EXTERNAL_LISTING_MODERATION_RESPONSE_BYTES : Nat64 = 24_000;
   let EXTERNAL_LISTING_MODERATION_MAX_REQUEST_BYTES : Nat = 48_000;
   let EXTERNAL_LISTING_MODERATION_CYCLE_RESERVE : Nat = 1_000_000_000_000;
   let EXTERNAL_LISTING_MODERATION_SAMPLE_LIMIT : Nat = 3;
+  let SHARE_IMAGE_FETCH_MAX_BYTES : Nat64 = 16_384;
+  let SHARE_IMAGE_FETCH_CYCLE_RESERVE : Nat = 500_000_000_000;
+  let SHARE_IMAGE_CACHE_WARM_COOLDOWN_NS : Int = 60_000_000_000;
+  transient var lastShareImageCacheWarmAt : Int = 0;
   transient var externalListingModerationNonce : Nat = 0;
   transient var externalListingModerationSampleCounts = Map.empty<CollectionTypes.CollectionId, Nat>();
 
   func requireMarketplaceAdmin(caller : Principal) {
     if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
     if (not AuthLib.isAdmin(authState, caller)) Runtime.trap("Unauthorized: admin only");
+  };
+
+  public query func transformShareImageHttpResponse(
+    args : {
+      context : Blob;
+      response : ExternalModerationHttpRequestResult;
+    },
+  ) : async ExternalModerationHttpRequestResult {
+    {
+      args.response with
+      headers = [];
+    };
+  };
+
+  func shareImageHttpRequestCost(url : Text) : Nat {
+    Prim.costHttpRequest(
+      Nat64.fromNat(url.size() + 64),
+      SHARE_IMAGE_FETCH_MAX_BYTES,
+    );
+  };
+
+  func fetchShareImageCandidate(url : Text) : async ?Text {
+    let normalizedUrl = ShareImageLib.normalizePreviewImageUrl(url);
+    let request : ExternalModerationHttpRequestArgs = {
+      url = normalizedUrl;
+      method = #get;
+      max_response_bytes = ?SHARE_IMAGE_FETCH_MAX_BYTES;
+      headers = [{ name = "User-Agent"; value = "mintlab-share-image" }];
+      body = null;
+      transform = ?{
+        function = transformShareImageHttpResponse;
+        context = Blob.fromArray([]);
+      };
+      is_replicated = null;
+    };
+    let cost = shareImageHttpRequestCost(normalizedUrl);
+    if (Cycles.balance() <= cost + SHARE_IMAGE_FETCH_CYCLE_RESERVE) {
+      return null;
+    };
+    let ic : ExternalModerationManagementActor = actor "aaaaa-aa";
+    let response = try {
+      await (with cycles = cost) ic.http_request(request);
+    } catch (_) {
+      return null;
+    };
+    ShareImageLib.resolveDirectImageFromHttpResponse(
+      normalizedUrl,
+      {
+        status = response.status;
+        body = response.body;
+        headers = Array.map<ExternalModerationHttpHeader, ShareImageLib.HttpHeader>(
+          response.headers,
+          func (header : ExternalModerationHttpHeader) : ShareImageLib.HttpHeader {
+            { name = header.name; value = header.value };
+          },
+        );
+      },
+    );
+  };
+
+  func persistShareImageForEscrowedNFT(
+    listingId : MarketplaceTypes.ListingId,
+    nft : WalletTypes.WalletNFT,
+    imageUrl : Text,
+  ) {
+    let updatedNFT = ShareImageLib.withShareImageAttribute(nft, imageUrl);
+    MarketplaceLib.setEscrowedNFT(marketplaceState, listingId, updatedNFT);
+    ShareImageCacheLib.put(
+      shareImageCacheState,
+      ShareImageCacheLib.cacheKey(updatedNFT.collectionId, updatedNFT.tokenId),
+      imageUrl,
+    );
+  };
+
+  func cacheShareImageForNFT(
+    listingId : MarketplaceTypes.ListingId,
+    nft : WalletTypes.WalletNFT,
+  ) : async () {
+    let collection = switch (CollectionsLib.getCollection(collectionsState, nft.collectionId)) {
+      case null return;
+      case (?value) value;
+    };
+    switch (ShareImageLib.shareImageUrlFromAttributes(nft)) {
+      case (?cachedUrl) {
+        if (not ShareImageLib.isIcAssetEndpointUrl(cachedUrl)) {
+          return;
+        };
+      };
+      case null {};
+    };
+    let key = ShareImageCacheLib.cacheKey(nft.collectionId, nft.tokenId);
+    switch (ShareImageCacheLib.get(shareImageCacheState, key)) {
+      case (?cachedUrl) {
+        if (not ShareImageLib.isIcAssetEndpointUrl(cachedUrl)) {
+          return;
+        };
+      };
+      case null {};
+    };
+    switch (ShareImageLib.directImageFromMetadata(collection, nft)) {
+      case (?directUrl) {
+        persistShareImageForEscrowedNFT(listingId, nft, directUrl);
+        return;
+      };
+      case null {};
+    };
+    label search loop {
+      for (candidate in ShareImageLib.candidateImageUrls(collection, nft).values()) {
+        if (not ShareImageLib.isIcAssetEndpointUrl(candidate)) {
+          continue;
+        };
+        switch (await fetchShareImageCandidate(candidate)) {
+          case (?directUrl) {
+            persistShareImageForEscrowedNFT(listingId, nft, directUrl);
+            return;
+          };
+          case null {};
+        };
+      };
+    };
+  };
+
+  public shared ({ caller }) func warmShareImageCacheForListing(listingId : Nat) : async Bool {
+    if (Principal.isAnonymous(caller)) {
+      return false;
+    };
+    switch (MarketplaceLib.getEscrowedNFT(marketplaceState, listingId)) {
+      case null false;
+      case (?nft) {
+        await cacheShareImageForNFT(listingId, nft);
+        switch (ShareImageLib.shareImageUrlFromAttributes(
+          switch (MarketplaceLib.getEscrowedNFT(marketplaceState, listingId)) {
+            case null nft;
+            case (?value) value;
+          },
+        )) {
+          case (?_) true;
+          case null false;
+        };
+      };
+    };
+  };
+
+  public shared ({ caller }) func adminRefreshShareImageCache() : async Nat {
+    requireMarketplaceAdmin(caller);
+    await warmEscrowedShareImageCache();
+  };
+
+  public shared ({ caller }) func warmShareImageCache() : async Nat {
+    if (Principal.isAnonymous(caller)) {
+      return 0;
+    };
+    let now = Time.now();
+    if (now < lastShareImageCacheWarmAt + SHARE_IMAGE_CACHE_WARM_COOLDOWN_NS) {
+      return 0;
+    };
+    let refreshed = await warmEscrowedShareImageCache();
+    if (refreshed > 0) {
+      lastShareImageCacheWarmAt := now;
+    };
+    refreshed;
+  };
+
+  func warmEscrowedShareImageCache() : async Nat {
+    var refreshed : Nat = 0;
+    for ((listingId, nft) in Map.entries(marketplaceState.escrowedNFTs)) {
+      try {
+        await cacheShareImageForNFT(listingId, nft);
+        refreshed += 1;
+      } catch (_) {};
+    };
+    refreshed;
   };
 
   func nat64Add(a : Nat64, b : Nat64) : Nat64 {
@@ -394,6 +577,7 @@ mixin (
     };
     let response = try {
       await callExternalListingModeration(
+        config.model,
         apiKey,
         title,
         description,
@@ -422,7 +606,20 @@ mixin (
     };
   };
 
+  func externalListingModerationModel(model : Text) : Text {
+    let trimmed = Text.trim(model, #char ' ');
+    if (
+      trimmed == "" or
+      trimmed == "openai-omni-moderation-latest"
+    ) {
+      MintLib.defaultModerationModel();
+    } else {
+      trimmed;
+    };
+  };
+
   func callExternalListingModeration(
+    model : Text,
     apiKey : Text,
     title : Text,
     description : Text,
@@ -437,7 +634,7 @@ mixin (
     };
     let body = Text.encodeUtf8(
       "{" #
-      "\"model\":\"omni-moderation-latest\"," #
+      "\"model\":" # externalListingJsonString(externalListingModerationModel(model)) # "," #
       "\"input\":[" #
       "{\"type\":\"text\",\"text\":" # externalListingJsonString(externalModerationTextInput(title, description, extraText)) # "}" #
       imageInput #
@@ -1509,7 +1706,9 @@ mixin (
       let currentNFT = recheckWalletNFTForListing(nftId, nft, caller);
       ensureNoActiveListingForNFT(currentNFT);
       WalletLib.removeNFT(walletState, nftId, caller);
-      MarketplaceLib.createFixedListing(marketplaceState, caller, currentNFT, price);
+      let listing = MarketplaceLib.createFixedListing(marketplaceState, caller, currentNFT, price);
+      await cacheShareImageForNFT(listing.id, currentNFT);
+      listing;
     } finally {
       MarketplaceLib.releaseListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId);
     };
@@ -1545,7 +1744,15 @@ mixin (
       let currentNFT = recheckWalletNFTForListing(nftId, nft, caller);
       ensureNoActiveListingForNFT(currentNFT);
       WalletLib.removeNFT(walletState, nftId, caller);
-      MarketplaceLib.createAuctionListing(marketplaceState, caller, currentNFT, startingBid, endTime);
+      let listing = MarketplaceLib.createAuctionListing(
+        marketplaceState,
+        caller,
+        currentNFT,
+        startingBid,
+        endTime,
+      );
+      await cacheShareImageForNFT(listing.id, currentNFT);
+      listing;
     } finally {
       MarketplaceLib.releaseListingTokenLock(marketplaceListingLockState, nft.collectionId, nft.tokenId);
     };
@@ -1812,9 +2019,25 @@ mixin (
     statuses;
   };
 
+  func ledgerTransferFeeE8s(ledger : IcpLib.Ledger) : async* Nat64 {
+    let now = Time.now();
+    switch (cachedLedgerTransferFeeE8s) {
+      case (?fee) {
+        if (now - cachedLedgerTransferFeeAt < LEDGER_TRANSFER_FEE_CACHE_NS) {
+          return fee;
+        };
+      };
+      case null {};
+    };
+    let fee = await* IcpLib.getTransferFee(ledger);
+    cachedLedgerTransferFeeE8s := ?fee;
+    cachedLedgerTransferFeeAt := now;
+    fee;
+  };
+
   public func getMarketplaceFeeConfig() : async MarketplaceTypes.MarketplaceFeeConfig {
     let ledger = actor (IcpLib.LEDGER_CANISTER_ID) : IcpLib.Ledger;
-    let feeE8s = await* IcpLib.getTransferFee(ledger);
+    let feeE8s = await* ledgerTransferFeeE8s(ledger);
     MarketplaceLib.getFeeConfig(marketplacePaymentState, marketplaceFeeState, feeE8s);
   };
 

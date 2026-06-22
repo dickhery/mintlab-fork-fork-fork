@@ -5,8 +5,11 @@ import Map "mo:core/Map";
 import Nat "mo:core/Nat";
 import Nat64 "mo:core/Nat64";
 import Principal "mo:core/Principal";
+import Runtime "mo:core/Runtime";
 import AuthLib "../lib/auth";
+import RateLimitLib "../lib/rate-limit";
 import CollectionsLib "../lib/collections";
+import Time "mo:core/Time";
 import DividendsLib "../lib/dividends";
 import IcpLib "../lib/icp";
 import MarketplaceLib "../lib/marketplace";
@@ -24,6 +27,7 @@ mixin (
   dividendsState : DividendsLib.DividendsState,
   dividendAccumulatorState : DividendsLib.DividendAccumulatorState,
   dividendFeeState : DividendsLib.DividendFeeState,
+  dividendSourceState : DividendsLib.DividendSourceState,
   collectionsState : CollectionsLib.CollectionsState,
   walletState : WalletLib.WalletState,
   marketplaceState : MarketplaceLib.MarketplaceState,
@@ -33,8 +37,21 @@ mixin (
   authState : AuthLib.AdminState,
   transactionState : TransactionsLib.TransactionState,
   termsState : TermsLib.TermsState,
+  rateLimitState : RateLimitLib.RateLimitState,
   canisterId : Principal,
 ) {
+  let DIVIDEND_INFO_COOLDOWN_NS : Int = 5_000_000_000;
+  let DIVIDEND_INFO_WINDOW_NS : Int = 3_600_000_000_000;
+  let DIVIDEND_INFO_MAX_PER_WINDOW : Nat = 40;
+  let DIVIDEND_REFRESH_COOLDOWN_NS : Int = 30_000_000_000;
+  let DIVIDEND_REFRESH_WINDOW_NS : Int = 3_600_000_000_000;
+  let DIVIDEND_REFRESH_MAX_PER_WINDOW : Nat = 20;
+  let DIVIDEND_SYNC_COOLDOWN_NS : Int = 10_000_000_000;
+  let DIVIDEND_SYNC_WINDOW_NS : Int = 3_600_000_000_000;
+  let DIVIDEND_SYNC_MAX_PER_WINDOW : Nat = 60;
+  let MY_DIVIDEND_REFRESH_COOLDOWN_NS : Int = 15_000_000_000;
+  let MY_DIVIDEND_REFRESH_WINDOW_NS : Int = 3_600_000_000_000;
+  let MY_DIVIDEND_REFRESH_MAX_PER_WINDOW : Nat = 12;
   type ChildCollectionOwnerActor = actor {
     icrc7_owner_of : ([Nat]) -> async [?NFTStandards.ICRC7Account];
   };
@@ -95,9 +112,73 @@ mixin (
     );
   };
 
-  public shared func getCollectionDividendInfo(
+  func enforceDividendRateLimit(
+    caller : Principal,
+    prefix : Text,
+    collectionId : CollectionTypes.CollectionId,
+    cooldownNs : Int,
+    windowNs : Int,
+    maxInWindow : Nat,
+    cooldownMessage : Text,
+    windowMessage : Text,
+  ) : ?Text {
+    if (AuthLib.isAdmin(authState, caller)) {
+      return null;
+    };
+    RateLimitLib.enforce(
+      rateLimitState,
+      RateLimitLib.keyFor(prefix, caller, Nat.toText(collectionId)),
+      Time.now(),
+      cooldownNs,
+      windowNs,
+      maxInWindow,
+      cooldownMessage,
+      windowMessage,
+    );
+  };
+
+  func enforceCallerRateLimit(
+    caller : Principal,
+    prefix : Text,
+    cooldownNs : Int,
+    windowNs : Int,
+    maxInWindow : Nat,
+    cooldownMessage : Text,
+    windowMessage : Text,
+  ) : ?Text {
+    if (AuthLib.isAdmin(authState, caller)) {
+      return null;
+    };
+    RateLimitLib.enforce(
+      rateLimitState,
+      RateLimitLib.keyFor(prefix, caller, "all"),
+      Time.now(),
+      cooldownNs,
+      windowNs,
+      maxInWindow,
+      cooldownMessage,
+      windowMessage,
+    );
+  };
+
+  public shared ({ caller }) func getCollectionDividendInfo(
     collectionId : CollectionTypes.CollectionId
   ) : async ?DividendTypes.CollectionDividendInfo {
+    switch (
+      enforceDividendRateLimit(
+        caller,
+        "dividend-info",
+        collectionId,
+        DIVIDEND_INFO_COOLDOWN_NS,
+        DIVIDEND_INFO_WINDOW_NS,
+        DIVIDEND_INFO_MAX_PER_WINDOW,
+        "Please wait a few seconds before refreshing dividend info for this collection again.",
+        "You are checking dividend info too often. Please wait a while and try again.",
+      )
+    ) {
+      case (?message) Runtime.trap(message);
+      case null {};
+    };
     let collection = switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
       case null return null;
       case (?value) value;
@@ -117,6 +198,11 @@ mixin (
       processedBalanceE8s;
       pendingE8s = processedBalanceE8s;
       nftCount;
+      nftShareBasisPoints = dividendShareBasisPoints(nftCount);
+      sourceDescription = DividendsLib.sourceDescriptionFor(
+        dividendSourceState,
+        collectionId,
+      );
     };
   };
 
@@ -163,9 +249,27 @@ mixin (
     dividendBalancePage(balances, dividendCursorOrZero(cursor), normalizeDividendPageSize(limit));
   };
 
-  public shared func refreshCollectionDividendBalances(
+  public shared ({ caller }) func refreshCollectionDividendBalances(
     collectionId : CollectionTypes.CollectionId
   ) : async [(Text, Nat64)] {
+    if (Principal.isAnonymous(caller)) {
+      Runtime.trap("You must be authenticated to do this.");
+    };
+    switch (
+      enforceDividendRateLimit(
+        caller,
+        "dividend-refresh",
+        collectionId,
+        DIVIDEND_REFRESH_COOLDOWN_NS,
+        DIVIDEND_REFRESH_WINDOW_NS,
+        DIVIDEND_REFRESH_MAX_PER_WINDOW,
+        "Please wait about 30 seconds before refreshing dividend balances for this collection again.",
+        "You are refreshing dividend balances too often. Please wait a while and try again.",
+      )
+    ) {
+      case (?message) Runtime.trap(message);
+      case null {};
+    };
     switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
       case null [];
       case (?collection) {
@@ -183,11 +287,29 @@ mixin (
     };
   };
 
-  public shared func refreshCollectionDividendBalancesPage(
+  public shared ({ caller }) func refreshCollectionDividendBalancesPage(
     collectionId : CollectionTypes.CollectionId,
     cursor : ?Nat,
     limit : ?Nat,
   ) : async DividendTypes.DividendBalancePage {
+    if (Principal.isAnonymous(caller)) {
+      Runtime.trap("You must be authenticated to do this.");
+    };
+    switch (
+      enforceDividendRateLimit(
+        caller,
+        "dividend-refresh",
+        collectionId,
+        DIVIDEND_REFRESH_COOLDOWN_NS,
+        DIVIDEND_REFRESH_WINDOW_NS,
+        DIVIDEND_REFRESH_MAX_PER_WINDOW,
+        "Please wait about 30 seconds before refreshing dividend balances for this collection again.",
+        "You are refreshing dividend balances too often. Please wait a while and try again.",
+      )
+    ) {
+      case (?message) Runtime.trap(message);
+      case null {};
+    };
     switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
       case null {
         {
@@ -211,10 +333,27 @@ mixin (
   };
 
   public shared ({ caller }) func getMyDividendNFTs() : async [DividendTypes.NFTDividend] {
-    await* refreshedDividendEntries(caller);
+    cachedDividendEntries(caller);
   };
 
   public shared ({ caller }) func refreshMyDividendNFTs() : async [DividendTypes.NFTDividend] {
+    if (Principal.isAnonymous(caller)) {
+      Runtime.trap("You must be authenticated to do this.");
+    };
+    switch (
+      enforceCallerRateLimit(
+        caller,
+        "my-dividend-refresh",
+        MY_DIVIDEND_REFRESH_COOLDOWN_NS,
+        MY_DIVIDEND_REFRESH_WINDOW_NS,
+        MY_DIVIDEND_REFRESH_MAX_PER_WINDOW,
+        "Please wait about 15 seconds before refreshing your dividend NFTs again.",
+        "You are refreshing dividend NFTs too often. Please wait a while and try again.",
+      )
+    ) {
+      case (?message) Runtime.trap(message);
+      case null {};
+    };
     await* refreshedDividendEntries(caller);
   };
 
@@ -222,7 +361,7 @@ mixin (
     cursor : ?Nat,
     limit : ?Nat,
   ) : async DividendTypes.NFTDividendPage {
-    let dividends = await* refreshedDividendEntries(caller);
+    let dividends = cachedDividendEntries(caller);
     nftDividendPage(dividends, dividendCursorOrZero(cursor), normalizeDividendPageSize(limit));
   };
 
@@ -230,8 +369,33 @@ mixin (
     cursor : ?Nat,
     limit : ?Nat,
   ) : async DividendTypes.NFTDividendPage {
+    if (Principal.isAnonymous(caller)) {
+      Runtime.trap("You must be authenticated to do this.");
+    };
+    switch (
+      enforceCallerRateLimit(
+        caller,
+        "my-dividend-refresh",
+        MY_DIVIDEND_REFRESH_COOLDOWN_NS,
+        MY_DIVIDEND_REFRESH_WINDOW_NS,
+        MY_DIVIDEND_REFRESH_MAX_PER_WINDOW,
+        "Please wait about 15 seconds before refreshing your dividend NFTs again.",
+        "You are refreshing dividend NFTs too often. Please wait a while and try again.",
+      )
+    ) {
+      case (?message) Runtime.trap(message);
+      case null {};
+    };
     let dividends = await* refreshedDividendEntries(caller);
     nftDividendPage(dividends, dividendCursorOrZero(cursor), normalizeDividendPageSize(limit));
+  };
+
+  func cachedDividendEntries(caller : Principal) : [DividendTypes.NFTDividend] {
+    if (Principal.isAnonymous(caller)) {
+      [];
+    } else {
+      dividendEntriesForNFTs(userAndListedNFTs(caller));
+    };
   };
 
   func refreshedDividendEntries(caller : Principal) : async* [DividendTypes.NFTDividend] {
@@ -518,6 +682,21 @@ mixin (
   ) : async { #ok : DividendTypes.DividendSyncReceipt; #err : Text } {
     if (Principal.isAnonymous(caller)) {
       return #err("You must be authenticated to do this.");
+    };
+    switch (
+      enforceDividendRateLimit(
+        caller,
+        "dividend-sync",
+        collectionId,
+        DIVIDEND_SYNC_COOLDOWN_NS,
+        DIVIDEND_SYNC_WINDOW_NS,
+        DIVIDEND_SYNC_MAX_PER_WINDOW,
+        "Please wait about 10 seconds before checking dividend deposits for this collection again.",
+        "You are checking dividend deposits too often. Please wait a while and try again.",
+      )
+    ) {
+      case (?message) return #err(message);
+      case null {};
     };
     let collection = switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
       case null return #err("Collection not found");
@@ -970,6 +1149,14 @@ mixin (
     collectionId : CollectionTypes.CollectionId
   ) : async CommonTypes.AccountIdentifier {
     collectionDividendAccountId(collectionId);
+  };
+
+  func dividendShareBasisPoints(nftCount : Nat) : Nat {
+    if (nftCount == 0) {
+      0;
+    } else {
+      10_000 / nftCount;
+    };
   };
 
   func collectionDividendAccountId(

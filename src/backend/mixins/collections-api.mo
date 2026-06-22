@@ -1,5 +1,6 @@
 import CollectionsLib "../lib/collections";
 import AuthLib "../lib/auth";
+import RateLimitLib "../lib/rate-limit";
 import WalletLib "../lib/wallet";
 import CollectionTypes "../types/collections";
 import Array "mo:core/Array";
@@ -14,7 +15,14 @@ mixin (
   nftModerationState : CollectionsLib.NFTModerationState,
   authState : AuthLib.AdminState,
   ownershipIndexState : WalletLib.OwnershipIndexState,
+  rateLimitState : RateLimitLib.RateLimitState,
 ) {
+  let REPORT_COLLECTION_COOLDOWN_NS : Int = 30_000_000_000;
+  let REPORT_COLLECTION_WINDOW_NS : Int = 86_400_000_000_000;
+  let REPORT_COLLECTION_MAX_PER_WINDOW : Nat = 15;
+  let REPORT_NFT_COOLDOWN_NS : Int = 30_000_000_000;
+  let REPORT_NFT_WINDOW_NS : Int = 86_400_000_000_000;
+  let REPORT_NFT_MAX_PER_WINDOW : Nat = 30;
   let IMPORT_INDEX_WARM_PAGE_LIMIT : Nat = 25;
   let MAX_IMPORTS_PER_USER_PER_DAY : Nat = 5;
   let IMPORT_COOLDOWN_NS : Int = 60_000_000_000;
@@ -44,7 +52,9 @@ mixin (
       case (#Other(_)) Runtime.trap("Only EXT, DIP721, and ICRC-7 collections are supported");
       case (_) {};
     };
-    enforceImportRateLimits(caller);
+    if (not AuthLib.isAdmin(authState, caller)) {
+      enforceImportRateLimits(caller);
+    };
     let (collection, shouldWarmIndex) = switch (CollectionsLib.findExternalCollectionByCanister(collectionsState, canisterId, standard)) {
       case (?existing) {
         ignore CollectionsLib.ensureImportMeta(
@@ -175,12 +185,50 @@ mixin (
     );
   };
 
+  func enforceReportRateLimit(
+    caller : Principal,
+    prefix : Text,
+    cooldownNs : Int,
+    windowNs : Int,
+    maxInWindow : Nat,
+    cooldownMessage : Text,
+    windowMessage : Text,
+  ) : ?Text {
+    if (AuthLib.isAdmin(authState, caller)) {
+      return null;
+    };
+    RateLimitLib.enforce(
+      rateLimitState,
+      RateLimitLib.keyFor(prefix, caller, "all"),
+      Time.now(),
+      cooldownNs,
+      windowNs,
+      maxInWindow,
+      cooldownMessage,
+      windowMessage,
+    );
+  };
+
   public shared ({ caller }) func reportCollection(
     collectionId : CollectionTypes.CollectionId,
     reason : Text,
   ) : async { #ok : CollectionTypes.CollectionImportMeta; #err : Text } {
     if (Principal.isAnonymous(caller)) {
       return #err("You must be authenticated to do this.");
+    };
+    switch (
+      enforceReportRateLimit(
+        caller,
+        "report-collection",
+        REPORT_COLLECTION_COOLDOWN_NS,
+        REPORT_COLLECTION_WINDOW_NS,
+        REPORT_COLLECTION_MAX_PER_WINDOW,
+        "Please wait about 30 seconds before submitting another collection report.",
+        "You have reached today's collection report limit. Please try again tomorrow.",
+      )
+    ) {
+      case (?message) return #err(message);
+      case null {};
     };
     if (Text.size(reason) > 500) {
       return #err("Report reason is too long");
@@ -198,6 +246,20 @@ mixin (
   ) : async { #ok : CollectionTypes.NFTReportMeta; #err : Text } {
     if (Principal.isAnonymous(caller)) {
       return #err("You must be authenticated to do this.");
+    };
+    switch (
+      enforceReportRateLimit(
+        caller,
+        "report-nft",
+        REPORT_NFT_COOLDOWN_NS,
+        REPORT_NFT_WINDOW_NS,
+        REPORT_NFT_MAX_PER_WINDOW,
+        "Please wait about 30 seconds before submitting another NFT report.",
+        "You have reached today's NFT report limit. Please try again tomorrow.",
+      )
+    ) {
+      case (?message) return #err(message);
+      case null {};
     };
     let normalizedTokenId = Text.trim(tokenId, #char ' ');
     if (normalizedTokenId == "") {
@@ -473,7 +535,9 @@ mixin (
     switch (CollectionsLib.lastImportAt(collectionsState, caller)) {
       case (?lastImportAt) {
         if (now - lastImportAt < IMPORT_COOLDOWN_NS) {
-          Runtime.trap("Please wait one minute between collection imports");
+          Runtime.trap(
+            "Please wait about 1 minute before importing another collection."
+          );
         };
       };
       case null {};
@@ -484,7 +548,11 @@ mixin (
       now - IMPORT_DAY_NS,
     );
     if (recent >= MAX_IMPORTS_PER_USER_PER_DAY) {
-      Runtime.trap("Daily collection import limit reached");
+      Runtime.trap(
+        "You have reached today's limit of "
+        # Nat.toText(MAX_IMPORTS_PER_USER_PER_DAY)
+        # " collection imports. Please wait until tomorrow to import another collection."
+      );
     };
   };
 

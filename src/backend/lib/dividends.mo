@@ -65,6 +65,38 @@ module {
     };
   };
 
+  public type DividendSourceState = {
+    descriptions : Map.Map<CollectionTypes.CollectionId, Text>;
+  };
+
+  public func newSourceState() : DividendSourceState {
+    {
+      descriptions = Map.empty<CollectionTypes.CollectionId, Text>();
+    };
+  };
+
+  public func sourceDescriptionFor(
+    state : DividendSourceState,
+    collectionId : CollectionTypes.CollectionId,
+  ) : ?Text {
+    Map.get(state.descriptions, Nat.compare, collectionId);
+  };
+
+  public func setSourceDescription(
+    state : DividendSourceState,
+    collectionId : CollectionTypes.CollectionId,
+    sourceDescription : ?Text,
+  ) {
+    switch (sourceDescription) {
+      case null {
+        Map.remove(state.descriptions, Nat.compare, collectionId);
+      };
+      case (?value) {
+        Map.add(state.descriptions, Nat.compare, collectionId, value);
+      };
+    };
+  };
+
   public func newAccumulatorState() : DividendAccumulatorState {
     {
       accumulators = Map.empty<CollectionTypes.CollectionId, CollectionDividendAccumulator>();

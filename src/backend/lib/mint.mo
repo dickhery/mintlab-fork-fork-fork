@@ -143,6 +143,32 @@ module {
     "omni-moderation-latest";
   };
 
+  public func hasActiveModerationRules(
+    categories : Types.ModerationCategorySettings,
+  ) : Bool {
+    categories.nudityOrSexual or
+    categories.graphicViolence or
+    categories.explicitLanguage or
+    categories.hateOrHarassment or
+    categories.hateSymbols or
+    categories.illegalOrDangerous or
+    categories.selfHarm or
+    categories.otherNsfw;
+  };
+
+  public func moderationReady(
+    config : Types.ModerationConfig,
+    xaiApiKeyConfigured : Bool,
+  ) : Bool {
+    if (not config.enabled) {
+      false;
+    } else {
+      let runOpenAI = hasActiveModerationRules(config.categories) and config.apiKey != null;
+      let runXai = xaiApiKeyConfigured;
+      runOpenAI or runXai;
+    };
+  };
+
   func legacyGoogleModerationModel() : Text {
     "google-vision-safe-search";
   };
@@ -401,10 +427,12 @@ module {
   public func getPublicModerationConfig(state : ModerationState) : Types.PublicModerationConfig {
     let config = normalizeModerationConfig(state.config);
     let secrets = moderationSecrets(state.config.apiKey);
+    let xaiConfigured = secrets.xaiApiKey != null;
     {
       enabled = config.enabled;
       apiKeyConfigured = config.apiKey != null;
-      xaiApiKeyConfigured = secrets.xaiApiKey != null;
+      xaiApiKeyConfigured = xaiConfigured;
+      moderationReady = moderationReady(config, xaiConfigured);
       model = config.model;
       categories = config.categories;
       userMessage = config.userMessage;
@@ -478,7 +506,7 @@ module {
     state.config := {
       current with
       apiKey = encodeModerationSecrets({
-        openAIApiKey = current.apiKey;
+        openAIApiKey = currentSecrets.openAIApiKey;
         xaiApiKey = nextXaiApiKey;
       });
     };

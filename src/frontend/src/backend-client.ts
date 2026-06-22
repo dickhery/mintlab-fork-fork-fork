@@ -412,9 +412,25 @@ export interface PublicModerationConfig {
   enabled: boolean;
   apiKeyConfigured: boolean;
   xaiApiKeyConfigured: boolean;
+  moderationReady: boolean;
   model: string;
   categories: ModerationCategorySettings;
   userMessage: string;
+}
+
+export type ModerationProviderTestOutcome =
+  | { __kind__: "ok"; ok: string }
+  | { __kind__: "err"; err: string };
+
+export interface ModerationProviderTestResult {
+  configured: boolean;
+  outcome: ModerationProviderTestOutcome;
+}
+
+export interface ModerationProviderTestReport {
+  openAI: ModerationProviderTestResult;
+  xai: ModerationProviderTestResult;
+  ready: boolean;
 }
 
 export interface CollectionCreationQuote {
@@ -511,6 +527,10 @@ export interface AppCanisterHealth {
   kind: AppCanisterKind;
   canisterId: Principal;
   cycles: bigint | null;
+  reservedCycles: bigint | null;
+  memorySizeBytes: bigint | null;
+  reservedCyclesLimit: bigint | null;
+  wasmMemoryLimit: bigint | null;
   moduleInstalled: boolean | null;
   freezingThresholdSeconds: bigint | null;
   idleCyclesBurnedPerDay: bigint | null;
@@ -576,6 +596,8 @@ export interface CollectionDividendInfo {
   processedBalanceE8s: bigint;
   pendingE8s: bigint;
   nftCount: bigint;
+  nftShareBasisPoints: bigint;
+  sourceDescription: string | null;
 }
 
 export interface NFTDividend {
@@ -776,8 +798,8 @@ export interface backendInterface {
     symbol: string,
     browseInfo: CollectionBrowseInfo | null,
   ): Promise<Collection>;
-  bootstrapAdmin(): Promise<void>;
   acceptCurrentTerms(): Promise<TermsAcceptanceStatus>;
+  bootstrapAdmin(): Promise<void>;
   buyFixedListing(listingId: ListingId): Promise<void>;
   cancelListing(listingId: ListingId): Promise<void>;
   claimVaultDeposit(
@@ -822,6 +844,7 @@ export interface backendInterface {
     apiKey: string | null,
     clearApiKey: boolean,
   ): Promise<PublicModerationConfig>;
+  adminTestModerationProviders(): Promise<ModerationProviderTestReport>;
   adminRecoverPaidCollectionCreation(
     owner: Principal,
     cyclePaymentBlock: bigint,
@@ -947,6 +970,12 @@ export interface backendInterface {
     cyclesToTopUp: bigint,
   ): Promise<CollectionCycleTopUpQuote>;
   getAppCanisterHealth(
+    frontendCanisterId: Principal | null,
+  ): Promise<
+    | { __kind__: "ok"; ok: Array<AppCanisterHealth> }
+    | { __kind__: "err"; err: string }
+  >;
+  getAppCanisterHealthSnapshot(
     frontendCanisterId: Principal | null,
   ): Promise<
     | { __kind__: "ok"; ok: Array<AppCanisterHealth> }
@@ -1193,6 +1222,12 @@ export interface backendInterface {
     { __kind__: "ok"; ok: WalletNFT } | { __kind__: "err"; err: string }
   >;
   removeCollection(id: CollectionId): Promise<boolean>;
+  updateCollectionDividendSourceDescription(
+    collectionId: CollectionId,
+    sourceDescription: string | null,
+  ): Promise<
+    { __kind__: "ok"; ok: Collection } | { __kind__: "err"; err: string }
+  >;
   updateCollectionBrowseInfo(
     collectionId: CollectionId,
     browseInfo: CollectionBrowseInfo | null,
@@ -1575,10 +1610,24 @@ type RawModerationCategorySettings = {
   selfHarm: boolean;
   otherNsfw: boolean;
 };
+type RawModerationProviderTestOutcome = { ok: string } | { err: string };
+
+type RawModerationProviderTestResult = {
+  configured: boolean;
+  outcome: RawModerationProviderTestOutcome;
+};
+
+type RawModerationProviderTestReport = {
+  openAI: RawModerationProviderTestResult;
+  xai: RawModerationProviderTestResult;
+  ready: boolean;
+};
+
 type RawPublicModerationConfig = {
   enabled: boolean;
   apiKeyConfigured: boolean;
   xaiApiKeyConfigured: boolean;
+  moderationReady: boolean;
   model: string;
   categories: RawModerationCategorySettings;
   userMessage: string;
@@ -1668,6 +1717,10 @@ type RawAppCanisterHealth = {
   kind: RawAppCanisterKind;
   canisterId: Principal;
   cycles: [] | [bigint];
+  reservedCycles: [] | [bigint];
+  memorySizeBytes: [] | [bigint];
+  reservedCyclesLimit: [] | [bigint];
+  wasmMemoryLimit: [] | [bigint];
   moduleInstalled: [] | [boolean];
   freezingThresholdSeconds: [] | [bigint];
   idleCyclesBurnedPerDay: [] | [bigint];
@@ -1839,6 +1892,8 @@ type RawCollectionDividendInfo = {
   processedBalanceE8s: bigint;
   pendingE8s: bigint;
   nftCount: bigint;
+  nftShareBasisPoints: bigint;
+  sourceDescription: [] | [string];
 };
 type RawNFTDividend = {
   nft: RawWalletNFT;
@@ -2514,6 +2569,34 @@ function toRawModerationCategories(
   };
 }
 
+function fromRawModerationProviderTestOutcome(
+  value: RawModerationProviderTestOutcome,
+): ModerationProviderTestOutcome {
+  if ("ok" in value) {
+    return { __kind__: "ok", ok: value.ok };
+  }
+  return { __kind__: "err", err: value.err };
+}
+
+function fromRawModerationProviderTestResult(
+  value: RawModerationProviderTestResult,
+): ModerationProviderTestResult {
+  return {
+    configured: value.configured,
+    outcome: fromRawModerationProviderTestOutcome(value.outcome),
+  };
+}
+
+function fromRawModerationProviderTestReport(
+  value: RawModerationProviderTestReport,
+): ModerationProviderTestReport {
+  return {
+    openAI: fromRawModerationProviderTestResult(value.openAI),
+    xai: fromRawModerationProviderTestResult(value.xai),
+    ready: value.ready,
+  };
+}
+
 function fromRawPublicModerationConfig(
   value: RawPublicModerationConfig,
 ): PublicModerationConfig {
@@ -2521,6 +2604,7 @@ function fromRawPublicModerationConfig(
     enabled: value.enabled,
     apiKeyConfigured: value.apiKeyConfigured,
     xaiApiKeyConfigured: value.xaiApiKeyConfigured,
+    moderationReady: value.moderationReady,
     model: value.model,
     categories: fromRawModerationCategories(value.categories),
     userMessage: value.userMessage,
@@ -2657,6 +2741,10 @@ function fromRawAppCanisterHealth(
     kind: fromRawAppCanisterKind(value.kind),
     canisterId: value.canisterId,
     cycles: fromRawOption(value.cycles),
+    reservedCycles: fromRawOption(value.reservedCycles),
+    memorySizeBytes: fromRawOption(value.memorySizeBytes),
+    reservedCyclesLimit: fromRawOption(value.reservedCyclesLimit),
+    wasmMemoryLimit: fromRawOption(value.wasmMemoryLimit),
     moduleInstalled: fromRawOption(value.moduleInstalled),
     freezingThresholdSeconds: fromRawOption(value.freezingThresholdSeconds),
     idleCyclesBurnedPerDay: fromRawOption(value.idleCyclesBurnedPerDay),
@@ -2747,6 +2835,8 @@ function fromRawCollectionDividendInfo(
     processedBalanceE8s: value.processedBalanceE8s,
     pendingE8s: value.pendingE8s,
     nftCount: value.nftCount,
+    nftShareBasisPoints: value.nftShareBasisPoints,
+    sourceDescription: fromRawOption(value.sourceDescription),
   };
 }
 
@@ -3297,14 +3387,14 @@ export class Backend implements backendInterface {
     );
   }
 
-  async bootstrapAdmin(): Promise<void> {
-    return this.run(() => this.actor.bootstrapAdmin());
-  }
-
   async acceptCurrentTerms(): Promise<TermsAcceptanceStatus> {
     return fromRawTermsAcceptanceStatus(
       await this.run(() => this.actor.acceptCurrentTerms()),
     );
+  }
+
+  async bootstrapAdmin(): Promise<void> {
+    return this.run(() => this.actor.bootstrapAdmin());
   }
 
   async buyFixedListing(listingId: ListingId): Promise<void> {
@@ -3427,6 +3517,12 @@ export class Backend implements backendInterface {
           clearApiKey,
         ),
       ),
+    );
+  }
+
+  async adminTestModerationProviders(): Promise<ModerationProviderTestReport> {
+    return fromRawModerationProviderTestReport(
+      await this.run(() => this.actor.adminTestModerationProviders()),
     );
   }
 
@@ -3758,6 +3854,21 @@ export class Backend implements backendInterface {
     return fromAppCanisterHealthResult(
       await this.run(() =>
         this.actor.getAppCanisterHealth(toRawOption(frontendCanisterId)),
+      ),
+    );
+  }
+
+  async getAppCanisterHealthSnapshot(
+    frontendCanisterId: Principal | null,
+  ): Promise<
+    | { __kind__: "ok"; ok: Array<AppCanisterHealth> }
+    | { __kind__: "err"; err: string }
+  > {
+    return fromAppCanisterHealthResult(
+      await this.run(() =>
+        this.actor.getAppCanisterHealthSnapshot(
+          toRawOption(frontendCanisterId),
+        ),
       ),
     );
   }
@@ -4573,6 +4684,28 @@ export class Backend implements backendInterface {
 
   async removeCollection(id: CollectionId): Promise<boolean> {
     return this.run(() => this.actor.removeCollection(id));
+  }
+
+  async updateCollectionDividendSourceDescription(
+    collectionId: CollectionId,
+    sourceDescription: string | null,
+  ): Promise<
+    { __kind__: "ok"; ok: Collection } | { __kind__: "err"; err: string }
+  > {
+    const normalized =
+      sourceDescription == null
+        ? null
+        : sourceDescription.trim() === ""
+          ? null
+          : sourceDescription.trim();
+    return fromCollectionResult(
+      await this.run(() =>
+        this.actor.updateCollectionDividendSourceDescription(
+          collectionId,
+          toRawOption(normalized),
+        ),
+      ),
+    );
   }
 
   async updateCollectionBrowseInfo(

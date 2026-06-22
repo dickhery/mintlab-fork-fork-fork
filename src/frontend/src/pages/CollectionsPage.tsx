@@ -248,6 +248,28 @@ function extractError(err: unknown): string {
   return "Something went wrong";
 }
 
+const MAX_DIVIDEND_SOURCE_DESCRIPTION_CHARS = 2000;
+
+function formatBasisPointsPercent(basisPoints: bigint): string {
+  if (basisPoints <= 0n) return "—";
+  const whole = basisPoints / 100n;
+  const fraction = basisPoints % 100n;
+  if (fraction === 0n) return `${whole}%`;
+  const padded = fraction < 10n ? `0${fraction}` : `${fraction}`;
+  return `${whole}.${padded}%`;
+}
+
+function formatDividendShareSummary(
+  nftCount: bigint,
+  nftShareBasisPoints: bigint,
+): string {
+  if (nftCount <= 0n) {
+    return "Each NFT's share will appear once tokens are minted.";
+  }
+  const percent = formatBasisPointsPercent(nftShareBasisPoints);
+  return `Each NFT receives ${percent} of every deposit (1 of ${nftCount.toString()} equal shares).`;
+}
+
 function readFileAsDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -2316,13 +2338,17 @@ interface AttributeFilter {
 interface NFTBrowserProps {
   collection: Collection;
   isCreatorCollection: boolean;
+  canManageCollection: boolean;
   onBack: () => void;
+  onCollectionChange?: (collection: Collection) => void;
 }
 
 function NFTBrowser({
   collection,
   isCreatorCollection,
+  canManageCollection,
   onBack,
+  onCollectionChange: _onCollectionChange,
 }: NFTBrowserProps) {
   const { actor, isFetching } = useBackend();
   const queryClient = useQueryClient();
@@ -2335,6 +2361,8 @@ function NFTBrowser({
   const canisterId = collection.canisterId.toString();
   const canisterUrl = `https://dashboard.internetcomputer.org/canister/${canisterId}`;
   const dividendsEnabled = collection.dividendConfig?.enabled === true;
+  const [editingDividendSource, setEditingDividendSource] = useState(false);
+  const [dividendSourceDraft, setDividendSourceDraft] = useState("");
 
   const {
     data: browsePages,
@@ -2392,7 +2420,7 @@ function NFTBrowser({
       return actor.getCollectionDividendInfo(collection.id);
     },
     enabled: !!actor && !isFetching && dividendsEnabled,
-    staleTime: 120_000,
+    staleTime: 300_000,
   });
   const { data: dividendBalances = [] } = useQuery<Array<[string, bigint]>>({
     queryKey: ["collectionDividendBalances", collection.id.toString()],
@@ -2401,7 +2429,7 @@ function NFTBrowser({
       return actor.getCollectionDividendBalances(collection.id);
     },
     enabled: !!actor && !isFetching && dividendsEnabled,
-    staleTime: 120_000,
+    staleTime: 300_000,
   });
   const syncDividendsMutation = useMutation({
     mutationFn: async () => {
@@ -2427,6 +2455,29 @@ function NFTBrowser({
       void queryClient.invalidateQueries({ queryKey: ["myDividendNFTs"] });
       void queryClient.invalidateQueries({
         queryKey: ["marketplaceDividendBalances"],
+      });
+    },
+    onError: (err: unknown) => {
+      toast.error(extractError(err));
+    },
+  });
+  const updateDividendSourceMutation = useMutation({
+    mutationFn: async (sourceDescription: string | null) => {
+      if (!actor) throw new Error("Backend not connected");
+      const result = await actor.updateCollectionDividendSourceDescription(
+        collection.id,
+        sourceDescription,
+      );
+      if (result.__kind__ === "err") {
+        throw new Error(result.err);
+      }
+      return result.ok;
+    },
+    onSuccess: () => {
+      setEditingDividendSource(false);
+      toast.success("Dividend source details updated");
+      void queryClient.invalidateQueries({
+        queryKey: ["collectionDividendInfo", collection.id.toString()],
       });
     },
     onError: (err: unknown) => {
@@ -2679,11 +2730,35 @@ function NFTBrowser({
                 Collection Dividends
               </p>
               <p className="text-sm text-muted-foreground mt-1">
-                Send ICP to this address, then check for deposits to split the
-                new balance evenly across minted NFTs in this collection.
+                Send ICP to this address, then check for deposits. New deposits
+                are split evenly across every minted NFT in this collection.
+              </p>
+              <p className="text-sm text-foreground mt-2">
+                {formatDividendShareSummary(
+                  dividendInfo.nftCount,
+                  dividendInfo.nftShareBasisPoints,
+                )}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              {canManageCollection && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10"
+                  onClick={() => {
+                    setDividendSourceDraft(
+                      dividendInfo.sourceDescription ?? "",
+                    );
+                    setEditingDividendSource(true);
+                  }}
+                  data-ocid="collections.dividends.edit_source_button"
+                >
+                  {dividendInfo.sourceDescription
+                    ? "Edit source"
+                    : "Add source"}
+                </Button>
+              )}
               <Button
                 size="sm"
                 variant="outline"
@@ -2700,6 +2775,23 @@ function NFTBrowser({
                 Check Deposits
               </Button>
             </div>
+          </div>
+
+          <div className="rounded-lg border border-border/50 bg-card/60 px-3 py-3 space-y-1.5">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">
+              Expected dividend source
+            </p>
+            {dividendInfo.sourceDescription ? (
+              <p className="text-sm text-foreground whitespace-pre-wrap">
+                {dividendInfo.sourceDescription}
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground italic">
+                {canManageCollection
+                  ? "Describe where this collection expects ICP dividend deposits to come from."
+                  : "The collection creator has not described the expected dividend source yet."}
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-3 items-end">
@@ -2727,6 +2819,69 @@ function NFTBrowser({
               </div>
             </div>
           </div>
+
+          <Dialog
+            open={editingDividendSource}
+            onOpenChange={setEditingDividendSource}
+          >
+            <DialogContent
+              className="sm:max-w-lg"
+              data-ocid="collections.dividends.source_dialog"
+            >
+              <DialogHeader>
+                <DialogTitle>Expected dividend source</DialogTitle>
+                <DialogDescription>
+                  Tell holders where ICP sent to this collection&apos;s dividend
+                  address is expected to come from.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-2">
+                <Label htmlFor="dividend-source-description">
+                  Source details
+                </Label>
+                <Textarea
+                  id="dividend-source-description"
+                  value={dividendSourceDraft}
+                  onChange={(event) =>
+                    setDividendSourceDraft(event.target.value)
+                  }
+                  maxLength={MAX_DIVIDEND_SOURCE_DESCRIPTION_CHARS}
+                  rows={5}
+                  placeholder="Example: Weekly ICP royalties from our game marketplace sales are sent to this address."
+                  data-ocid="collections.dividends.source_input"
+                />
+                <p className="text-xs text-muted-foreground text-right">
+                  {dividendSourceDraft.length}/
+                  {MAX_DIVIDEND_SOURCE_DESCRIPTION_CHARS}
+                </p>
+              </div>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setEditingDividendSource(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() =>
+                    updateDividendSourceMutation.mutate(
+                      dividendSourceDraft.trim() === ""
+                        ? null
+                        : dividendSourceDraft.trim(),
+                    )
+                  }
+                  disabled={updateDividendSourceMutation.isPending}
+                  data-ocid="collections.dividends.source_save_button"
+                >
+                  {updateDividendSourceMutation.isPending ? (
+                    <LoaderCircle className="w-4 h-4 animate-spin" />
+                  ) : (
+                    "Save"
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       )}
 
@@ -3119,7 +3274,7 @@ function PendingCollectionCreationCard({
         return actor.getCollectionCreationDiagnostics(request.id);
       },
       enabled: !!actor && !isFetching,
-      refetchInterval: 60_000,
+      refetchInterval: 120_000,
     },
   );
   const diagnostics =
@@ -3275,8 +3430,7 @@ export default function CollectionsPage() {
       !isFetching &&
       isAuthenticated &&
       myCreatedCollections.length > 0,
-    staleTime: 120_000,
-    refetchInterval: 300_000,
+    staleTime: 300_000,
   });
 
   const { data: pendingCreationRequests = [] } = useQuery<
@@ -3288,8 +3442,13 @@ export default function CollectionsPage() {
       return actor.getMyCollectionCreationRequests();
     },
     enabled: !!actor && !isFetching && isAuthenticated,
-    staleTime: 30_000,
-    refetchInterval: 60_000,
+    staleTime: 120_000,
+    refetchInterval: (query) => {
+      const requests = query.state.data ?? [];
+      return requests.some(isRepairableCollectionCreationRequest)
+        ? 120_000
+        : false;
+    },
   });
   const visiblePendingCreationRequests = useMemo(
     () => pendingCreationRequests.filter(isRepairableCollectionCreationRequest),
@@ -3396,6 +3555,8 @@ export default function CollectionsPage() {
       return stats;
     },
     enabled: !!actor && !isFetching && !!collections && collections.length > 0,
+    staleTime: 300_000,
+    refetchOnMount: false,
   });
 
   const browseStats =
@@ -3478,6 +3639,11 @@ export default function CollectionsPage() {
               isCreatorCollection={myCreatedCollectionIds.has(
                 selectedCollection.id.toString(),
               )}
+              canManageCollection={
+                myCreatedCollectionIds.has(selectedCollection.id.toString()) ||
+                (isAdmin && selectedCollection.kind === "Minted")
+              }
+              onCollectionChange={setSelectedCollection}
               onBack={() => setSelectedCollection(null)}
             />
           </motion.div>

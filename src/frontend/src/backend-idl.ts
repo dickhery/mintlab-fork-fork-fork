@@ -336,8 +336,22 @@ export const idlFactory = ({ IDL }) => {
     'model' : IDL.Text,
     'apiKeyConfigured' : IDL.Bool,
     'xaiApiKeyConfigured' : IDL.Bool,
+    'moderationReady' : IDL.Bool,
     'userMessage' : IDL.Text,
     'enabled' : IDL.Bool,
+  });
+  const ModerationProviderTestOutcome = IDL.Variant({
+    'ok' : IDL.Text,
+    'err' : IDL.Text,
+  });
+  const ModerationProviderTestResult = IDL.Record({
+    'configured' : IDL.Bool,
+    'outcome' : ModerationProviderTestOutcome,
+  });
+  const ModerationProviderTestReport = IDL.Record({
+    'openAI' : ModerationProviderTestResult,
+    'xai' : ModerationProviderTestResult,
+    'ready' : IDL.Bool,
   });
   const ListingStatus = IDL.Variant({
     'Sold' : IDL.Null,
@@ -554,6 +568,10 @@ export const idlFactory = ({ IDL }) => {
     'moduleInstalled' : IDL.Opt(IDL.Bool),
     'error' : IDL.Opt(IDL.Text),
     'cycles' : IDL.Opt(IDL.Nat),
+    'reservedCycles' : IDL.Opt(IDL.Nat),
+    'memorySizeBytes' : IDL.Opt(IDL.Nat),
+    'reservedCyclesLimit' : IDL.Opt(IDL.Nat),
+    'wasmMemoryLimit' : IDL.Opt(IDL.Nat),
     'freezingThresholdSeconds' : IDL.Opt(IDL.Nat),
     'idleCyclesBurnedPerDay' : IDL.Opt(IDL.Nat),
     'canisterId' : IDL.Principal,
@@ -591,6 +609,8 @@ export const idlFactory = ({ IDL }) => {
     'collectionId' : CollectionId,
     'feeReserveE8s' : IDL.Nat64,
     'nftCount' : IDL.Nat,
+    'nftShareBasisPoints' : IDL.Nat,
+    'sourceDescription' : IDL.Opt(IDL.Text),
     'enabled' : IDL.Bool,
     'balanceE8s' : IDL.Nat64,
     'processedBalanceE8s' : IDL.Nat64,
@@ -1184,6 +1204,11 @@ export const idlFactory = ({ IDL }) => {
         [Collection],
         [],
       ),
+    'adminTestModerationProviders' : IDL.Func(
+        [],
+        [ModerationProviderTestReport],
+        [],
+      ),
     'configureModeration' : IDL.Func(
         [
           IDL.Bool,
@@ -1292,6 +1317,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(IDL.Principal)],
         [IDL.Variant({ 'ok' : IDL.Vec(AppCanisterHealth), 'err' : IDL.Text })],
         [],
+      ),
+    'getAppCanisterHealthSnapshot' : IDL.Func(
+        [IDL.Opt(IDL.Principal)],
+        [IDL.Variant({ 'ok' : IDL.Vec(AppCanisterHealth), 'err' : IDL.Text })],
+        ['query'],
       ),
     'getCollection' : IDL.Func(
         [CollectionId],
@@ -1814,6 +1844,11 @@ export const idlFactory = ({ IDL }) => {
         ],
         [HttpRequestResult],
         ['query'],
+      ),
+    'updateCollectionDividendSourceDescription' : IDL.Func(
+        [CollectionId, IDL.Opt(IDL.Text)],
+        [IDL.Variant({ 'ok' : Collection, 'err' : IDL.Text })],
+        [],
       ),
     'updateCollectionBrowseInfo' : IDL.Func(
         [CollectionId, IDL.Opt(CollectionBrowseInfo)],

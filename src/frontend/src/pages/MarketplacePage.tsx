@@ -39,6 +39,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
+import { usePageMeta } from "@/hooks/use-page-meta";
 import {
   COMMUNITY_COLLECTION_NOTICE,
   collectionMetaMap,
@@ -56,6 +57,7 @@ import {
   listingIdFromItem,
   sortMarketplaceListings,
 } from "@/lib/marketplace-discovery";
+import { resolveImageUrl } from "@/lib/media";
 import {
   VAULTED_PURCHASE_NOTICE,
   WITHDRAW_TO_EXTERNAL_WALLET_LABEL,
@@ -65,7 +67,11 @@ import {
   nftCustodyLabel,
 } from "@/lib/nft-custody";
 import { getNFTDisplayName, getNFTTokenLabel } from "@/lib/nft-display";
-import { listingShareUrl, nftShareUrl } from "@/lib/share-urls";
+import {
+  appPageUrl,
+  listingSharePath,
+  listingShareUrl,
+} from "@/lib/share-urls";
 import type {
   ActiveListing,
   ActiveListingDetail,
@@ -470,11 +476,6 @@ function ListingDetailModal({
                     data-ocid="marketplace.nft_detail.share_listing_button"
                   />
                 )}
-                <ShareLinkButton
-                  url={nftShareUrl(nft.collectionId, nft.tokenId)}
-                  label="Copy NFT link"
-                  data-ocid="marketplace.nft_detail.share_nft_button"
-                />
                 <Button
                   type="button"
                   size="sm"
@@ -1498,6 +1499,25 @@ export default function MarketplacePage() {
   const [detailTarget, setDetailTarget] = useState<ListingDetailState | null>(
     null,
   );
+  const listingPageMeta = useMemo(() => {
+    if (!detailTarget) return {};
+    const { listing, nft, collection } = detailTarget;
+    const name = getNFTDisplayName(nft, collection);
+    const listingId =
+      listing.__kind__ === "Fixed" ? listing.Fixed.id : listing.Auction.id;
+    return {
+      title: `${name} — Mintlab Marketplace`,
+      description:
+        nft.metadata.description?.trim() ||
+        `${name} is listed on Mintlab Marketplace.`,
+      image: resolveImageUrl(nft.metadata.imageUrl, {
+        canisterId: collection?.canisterId.toString(),
+        tokenId: nft.tokenId,
+      }),
+      url: appPageUrl(listingSharePath(listingId)),
+    };
+  }, [detailTarget]);
+  usePageMeta(listingPageMeta);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const discoverySearch = useMemo(
@@ -1574,7 +1594,8 @@ export default function MarketplacePage() {
       return actor.getActiveListingDetails();
     },
     enabled: !!actor && !actorLoading,
-    refetchInterval: 120_000,
+    staleTime: 120_000,
+    refetchInterval: 300_000,
   });
 
   const { data: collections = [] } = useQuery<Collection[]>({
@@ -1613,7 +1634,7 @@ export default function MarketplacePage() {
       return actor.getMarketplaceFeeConfig();
     },
     enabled: !!actor && !actorLoading,
-    staleTime: 60_000,
+    staleTime: 3_600_000,
   });
 
   const { data: userNFTs = [] } = useQuery<WalletNFT[]>({
@@ -1641,7 +1662,8 @@ export default function MarketplacePage() {
       return page.statuses;
     },
     enabled: !!actor && !actorLoading && isAuthenticated,
-    refetchInterval: 120_000,
+    staleTime: 120_000,
+    refetchInterval: 300_000,
   });
 
   const collectionMap = useMemo(
@@ -1811,7 +1833,8 @@ export default function MarketplacePage() {
       isAuthenticated &&
       !!principal &&
       auctionListingIds.length > 0,
-    refetchInterval: 120_000,
+    staleTime: 120_000,
+    refetchInterval: 300_000,
   });
 
   const myAuctionBidStatusMap = new Map(

@@ -143,6 +143,22 @@ type SupportedStandard =
    name: text;
    url: text;
  };
+type ShareRoute = 
+ variant {
+   Listing: nat;
+   Nft: record {
+          collectionId: nat;
+          tokenId: text;
+        };
+ };
+type SharePreviewMetadata = 
+ record {
+   canonicalUrl: text;
+   description: text;
+   imageUrl: text;
+   redirectUrl: text;
+   title: text;
+ };
 type SettlementStatusRole = 
  variant {
    Bidder;
@@ -230,6 +246,7 @@ type PublicModerationConfig =
    categories: ModerationCategorySettings;
    enabled: bool;
    model: text;
+   moderationReady: bool;
    userMessage: text;
    xaiApiKeyConfigured: bool;
  };
@@ -364,6 +381,22 @@ type NFTDividend =
    claimableE8s: nat64;
    collection: Collection;
    nft: WalletNFT;
+ };
+type ModerationProviderTestResult = 
+ record {
+   configured: bool;
+   outcome: ModerationProviderTestOutcome;
+ };
+type ModerationProviderTestReport = 
+ record {
+   openAI: ModerationProviderTestResult;
+   ready: bool;
+   xai: ModerationProviderTestResult;
+ };
+type ModerationProviderTestOutcome = 
+ variant {
+   err: text;
+   ok: text;
  };
 type ModerationCategorySettings = 
  record {
@@ -876,8 +909,10 @@ type CollectionDividendInfo =
    enabled: bool;
    feeReserveE8s: nat64;
    nftCount: nat;
+   nftShareBasisPoints: nat;
    pendingE8s: nat64;
    processedBalanceE8s: nat64;
+   sourceDescription: opt text;
  };
 type CollectionDividendConfig = record {enabled: bool;};
 type CollectionCycleTopUpReceipt = 
@@ -1107,7 +1142,11 @@ type AppCanisterHealth =
    freezingThresholdSeconds: opt nat;
    idleCyclesBurnedPerDay: opt nat;
    kind: AppCanisterKind;
+   memorySizeBytes: opt nat;
    moduleInstalled: opt bool;
+   reservedCycles: opt nat;
+   reservedCyclesLimit: opt nat;
+   wasmMemoryLimit: opt nat;
  };
 type ActiveListingPage = 
  record {
@@ -1198,6 +1237,7 @@ service : {
       err: text;
       ok: CollectionCreationReceipt;
     });
+  adminRefreshShareImageCache: () -> (nat);
   adminReleaseDividendClaimLock: (collectionId: CollectionId, tokenId:
    text) -> (variant {
                err: text;
@@ -1224,6 +1264,7 @@ service : {
    (MarketplaceActionResult);
   adminRetryNoBidAuctionReturn: (listingId: ListingId) ->
    (MarketplaceActionResult);
+  adminTestModerationProviders: () -> (ModerationProviderTestReport);
   adminTopUpSettlementEscrow: (listingId: ListingId, amount: nat64) ->
    (SettlementEscrowTopUpReceipt);
   adminVerifyCollection: (collectionId: CollectionId) ->
@@ -1319,6 +1360,11 @@ service : {
       err: text;
       ok: vec AppCanisterHealth;
     });
+  getAppCanisterHealthSnapshot: (frontendCanisterId: opt principal) ->
+   (variant {
+      err: text;
+      ok: vec AppCanisterHealth;
+    }) query;
   getCollection: (id: CollectionId) -> (opt Collection) query;
   getCollectionBrowseStats: (collectionId: CollectionId) ->
    (CollectionBrowseStats);
@@ -1392,6 +1438,8 @@ service : {
                             EXTTokenIndex;
                             EXTAccountIdentifier;
                           }) query;
+  getSharePreviewMetadata: (route: ShareRoute) ->
+   (opt SharePreviewMetadata) query;
   getTokens: () -> (vec record {
                           EXTTokenIndex;
                           EXTMetadataLegacy;
@@ -1631,6 +1679,11 @@ service : {
      context: blob;
      response: HttpRequestResult;
    }) -> (HttpRequestResult) query;
+  transformShareImageHttpResponse: (args:
+   record {
+     context: blob;
+     response: ExternalModerationHttpRequestResult;
+   }) -> (ExternalModerationHttpRequestResult) query;
   transformXaiCopyrightResponse: (args:
    record {
      context: blob;
@@ -1641,9 +1694,16 @@ service : {
                                    err: text;
                                    ok: Collection;
                                  });
+  updateCollectionDividendSourceDescription: (collectionId: CollectionId,
+   sourceDescription: opt text) -> (variant {
+                                      err: text;
+                                      ok: Collection;
+                                    });
   upgradeCollectionCanister: (collectionId: CollectionId) ->
    (variant {
       err: text;
       ok: Collection;
     });
+  warmShareImageCache: () -> (nat);
+  warmShareImageCacheForListing: (listingId: nat) -> (bool);
 }

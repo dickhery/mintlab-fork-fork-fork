@@ -1,10 +1,14 @@
 import Array "mo:core/Array";
+import Int "mo:core/Int";
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
 import Principal "mo:core/Principal";
 import Text "mo:core/Text";
 
+import AuthLib "lib/auth";
+
 import CollectionsLib "lib/collections";
+import RateLimitLib "lib/rate-limit";
 import CollectionTypes "types/collections";
 import MarketplaceLib "lib/marketplace";
 import MarketplaceTypes "types/marketplace";
@@ -75,6 +79,188 @@ module {
   type MarketplaceBidIndexes = {
     bidderStatuses : Map.Map<Text, MarketplaceTypes.BidderAuctionStatus>;
     bidSummaries : Map.Map<MarketplaceTypes.ListingId, MarketplaceTypes.AuctionBidSummary>;
+  };
+
+  public type UpgradeState = {
+    authState : AuthLib.AdminState;
+    rateLimitState : RateLimitLib.RateLimitState;
+    collectionsState : CollectionsLib.CollectionsState;
+    mintState : MintLib.MintState;
+    ownershipIndexState : WalletLib.OwnershipIndexState;
+    marketplaceState : MarketplaceLib.MarketplaceState;
+    marketplacePaymentState : MarketplaceLib.MarketplacePaymentState;
+    marketplaceSettlementState : MarketplaceLib.MarketplaceSettlementState;
+    marketplaceNoBidAuctionReturnState : MarketplaceLib.NoBidAuctionReturnState;
+    marketplaceListingReturnState : MarketplaceLib.ListingReturnState;
+    marketplaceBidState : MarketplaceLib.MarketplaceBidState;
+  };
+
+  /// Runs after every canister upgrade to preserve admin access and rebuild
+  /// secondary indexes that may be null on upgraded stable state.
+  public func runPostUpgrade(state : UpgradeState) {
+    RateLimitLib.ensureIndexes(state.rateLimitState);
+    ensureMintIndexes(state.mintState);
+    ensureOwnershipOwnerIndex(state.ownershipIndexState);
+    ensureMarketplaceBidIndexes(state.marketplaceState);
+    ensureSettlementStatusIndex(state.marketplaceSettlementState);
+    ensureNoBidStatusIndex(state.marketplaceNoBidAuctionReturnState);
+    ensureListingReturnStatusIndex(state.marketplaceListingReturnState);
+    ensurePendingBidIndex(state.marketplaceBidState);
+    ensurePendingRefundIndex(state.marketplacePaymentState);
+    ensureCollectionImportIndexes(state.collectionsState);
+  };
+
+  func ensureMintIndexes(state : MintLib.MintState) {
+    let needsRebuild = switch (
+      state.tokensByOwner,
+      state.tokensByCollection,
+      state.tokensByOwnerCollection,
+    ) {
+      case (null, _, _) true;
+      case (_, null, _) true;
+      case (_, _, null) true;
+      case (_, _, _) false;
+    };
+    if (needsRebuild) {
+      let indexes = buildMintTokenIndexes({
+        tokens = state.tokens;
+        pendingCollectionCreates = state.pendingCollectionCreates;
+        var nextTokenId = state.nextTokenId;
+        var nextTransactionId = state.nextTransactionId;
+        var config = state.config;
+        var collectionCanisterWasm = state.collectionCanisterWasm;
+      });
+      switch (state.tokensByOwner) {
+        case null { state.tokensByOwner := ?indexes.tokensByOwner };
+        case (?_) {};
+      };
+      switch (state.tokensByCollection) {
+        case null { state.tokensByCollection := ?indexes.tokensByCollection };
+        case (?_) {};
+      };
+      switch (state.tokensByOwnerCollection) {
+        case null { state.tokensByOwnerCollection := ?indexes.tokensByOwnerCollection };
+        case (?_) {};
+      };
+    };
+  };
+
+  func ensureOwnershipOwnerIndex(state : WalletLib.OwnershipIndexState) {
+    switch (state.recordsByOwner) {
+      case null {
+        state.recordsByOwner := ?buildOwnershipOwnerIndex({
+          records = state.records;
+          status = state.status;
+        });
+      };
+      case (?_) {};
+    };
+  };
+
+  func ensureMarketplaceBidIndexes(state : MarketplaceLib.MarketplaceState) {
+    let needsRebuild = switch (state.bidderStatuses, state.bidSummaries) {
+      case (null, _) true;
+      case (_, null) true;
+      case (_, _) false;
+    };
+    if (needsRebuild) {
+      let indexes = buildMarketplaceBidIndexes({
+        fixedListings = state.fixedListings;
+        auctionListings = state.auctionListings;
+        bids = state.bids;
+        escrowedNFTs = state.escrowedNFTs;
+        var nextId = state.nextId;
+      });
+      switch (state.bidderStatuses) {
+        case null { state.bidderStatuses := ?indexes.bidderStatuses };
+        case (?_) {};
+      };
+      switch (state.bidSummaries) {
+        case null { state.bidSummaries := ?indexes.bidSummaries };
+        case (?_) {};
+      };
+    };
+  };
+
+  func ensureSettlementStatusIndex(state : MarketplaceLib.MarketplaceSettlementState) {
+    switch (state.statusListingIdsByUser) {
+      case null {
+        state.statusListingIdsByUser := ?buildSettlementStatusIndex({
+          fixedPurchaseSettlements = state.fixedPurchaseSettlements;
+          auctionSettlements = state.auctionSettlements;
+        });
+      };
+      case (?_) {};
+    };
+  };
+
+  func ensureNoBidStatusIndex(state : MarketplaceLib.NoBidAuctionReturnState) {
+    switch (state.statusListingIdsByUser) {
+      case null {
+        state.statusListingIdsByUser := ?buildNoBidStatusIndex({
+          returns = state.returns;
+        });
+      };
+      case (?_) {};
+    };
+  };
+
+  func ensureListingReturnStatusIndex(state : MarketplaceLib.ListingReturnState) {
+    switch (state.statusListingIdsByUser) {
+      case null {
+        state.statusListingIdsByUser := ?buildListingReturnStatusIndex({
+          returns = state.returns;
+        });
+      };
+      case (?_) {};
+    };
+  };
+
+  func ensurePendingBidIndex(state : MarketplaceLib.MarketplaceBidState) {
+    switch (state.pendingBidIdsByUser) {
+      case null {
+        state.pendingBidIdsByUser := ?buildPendingBidIndex({
+          pendingBidDeposits = state.pendingBidDeposits;
+        });
+      };
+      case (?_) {};
+    };
+  };
+
+  func ensurePendingRefundIndex(state : MarketplaceLib.MarketplacePaymentState) {
+    switch (state.pendingRefundIdsByUser) {
+      case null {
+        state.pendingRefundIdsByUser := ?buildPendingRefundIndex({
+          auctionEscrows = state.auctionEscrows;
+          pendingRefunds = state.pendingRefunds;
+          listingLocks = state.listingLocks;
+          var nextEscrowId = state.nextEscrowId;
+          var mintlabFeeRecipient = state.mintlabFeeRecipient;
+        });
+      };
+      case (?_) {};
+    };
+  };
+
+  func ensureCollectionImportIndexes(state : CollectionsLib.CollectionsState) {
+    switch (state.importMetas) {
+      case null {
+        state.importMetas := ?Map.empty<CollectionTypes.CollectionId, CollectionTypes.CollectionImportMeta>();
+      };
+      case (?_) {};
+    };
+    switch (state.importsByUser) {
+      case null {
+        state.importsByUser := ?Map.empty<Principal, [CollectionTypes.CollectionId]>();
+      };
+      case (?_) {};
+    };
+    switch (state.lastImportAtByUser) {
+      case null {
+        state.lastImportAtByUser := ?Map.empty<Principal, Int>();
+      };
+      case (?_) {};
+    };
   };
 
   public func migration(

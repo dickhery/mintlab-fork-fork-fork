@@ -6,6 +6,8 @@ import Error "mo:core/Error";
 import Int "mo:core/Int";
 import CollectionsLib "../lib/collections";
 import HttpMedia "../lib/http-media";
+import ShareImageCacheLib "../lib/share-image-cache";
+import SharePreviewLib "../lib/share-preview";
 import IcpLib "../lib/icp";
 import MarketplaceLib "../lib/marketplace";
 import MintLib "../lib/mint";
@@ -37,10 +39,17 @@ mixin (
   moderationState : MintLib.ModerationState,
   pendingMintPaymentState : MintLib.PendingMintPaymentState,
   collectionsState : CollectionsLib.CollectionsState,
+  nftModerationState : CollectionsLib.NFTModerationState,
   walletState : WalletLib.WalletState,
   authState : AuthLib.AdminState,
+  marketplaceState : MarketplaceLib.MarketplaceState,
+  marketplaceSettlementState : MarketplaceLib.MarketplaceSettlementState,
+  marketplaceNoBidAuctionReturnState : MarketplaceLib.NoBidAuctionReturnState,
+  marketplaceListingReturnState : MarketplaceLib.ListingReturnState,
+  shareImageCacheState : ShareImageCacheLib.ShareImageCacheState,
   marketplaceUserPaymentLockState : MarketplaceLib.MarketplaceUserPaymentLockState,
   dividendAccumulatorState : DividendsLib.DividendAccumulatorState,
+  dividendSourceState : DividendsLib.DividendSourceState,
   transactionState : TransactionsLib.TransactionState,
   termsState : TermsLib.TermsState,
   canisterId : Principal,
@@ -91,6 +100,11 @@ mixin (
     headers : [HttpHeader];
   };
 
+  type HttpRequestCallResult = {
+    #ok : HttpRequestResult;
+    #err : Text;
+  };
+
   type HttpRequestArgs = {
     url : Text;
     method : { #get; #put; #head; #post; #delete };
@@ -110,10 +124,14 @@ mixin (
   type CanisterStatusSettings = {
     controllers : [Principal];
     freezing_threshold : Nat;
+    reserved_cycles_limit : Nat;
+    wasm_memory_limit : Nat;
   };
 
   type CanisterStatusResult = {
     cycles : Nat;
+    reserved_cycles : Nat;
+    memory_size : Nat;
     module_hash : ?Blob;
     idle_cycles_burned_per_day : Nat;
     settings : CanisterStatusSettings;
@@ -259,13 +277,24 @@ mixin (
   type PreparedModerationImage = {
     imageUrl : Text;
     requestId : Text;
+    temporaryImageId : ?Text;
   };
 
   transient let MAX_ON_CHAIN_IMAGE_CHARS : Nat = 1_900_000;
-  // Keep Base64 image moderation comfortably below IC outcall payload limits.
-  transient let MODERATION_MAX_IMAGE_DATA_URL_CHARS : Nat = 320_000;
-  transient let MODERATION_MAX_REQUEST_BODY_BYTES : Nat = 380_000;
+  // Keep temporary moderation images small enough for canister HTTP serving and
+  // avoid embedding Base64 image data directly in provider request bodies.
+  transient let MODERATION_MAX_IMAGE_DATA_URL_CHARS : Nat = 180_000;
+  transient let MODERATION_MAX_REQUEST_BODY_BYTES : Nat = 220_000;
   transient let MODERATION_MAX_RESPONSE_BYTES : Nat64 = 24_000;
+  transient let MODERATION_TEMP_IMAGE_QUERY_PARAM : Text = "mintlab_moderation_image";
+  transient let MODERATION_MAX_CONCURRENT_IMAGES : Nat = 4;
+  transient let MODERATION_MAX_PENDING_IMAGE_CHARS : Nat = 720_000;
+  transient let HTTPS_OUTCALL_CYCLE_BUDGET_MULTIPLIER : Nat = 4;
+  transient let HTTPS_OUTCALL_CYCLE_BUDGET_EXTRA_CYCLES : Nat = 5_000_000_000;
+  transient let HTTPS_OUTCALL_MIN_CYCLE_BUDGET : Nat = 25_000_000_000;
+  transient let HTTPS_OUTCALL_RETRY_CYCLE_BUDGET_MULTIPLIER : Nat = 10;
+  transient let HTTPS_OUTCALL_RETRY_CYCLE_BUDGET_EXTRA_CYCLES : Nat = 10_000_000_000;
+  transient let HTTPS_OUTCALL_RETRY_MIN_CYCLE_BUDGET : Nat = 100_000_000_000;
   transient let XAI_COPYRIGHT_MODEL : Text = "grok-4.3";
   transient let XAI_COPYRIGHT_MAX_RESPONSE_BYTES : Nat64 = 16_000;
   transient let XAI_COPYRIGHT_MAX_OUTPUT_TOKENS : Nat = 96;
@@ -277,6 +306,8 @@ mixin (
   transient let COLLECTION_CREATION_PAGE_DEFAULT : Nat = 25;
   transient let COLLECTION_CREATION_PAGE_MAX : Nat = 100;
   transient var moderationImageNonce : Nat = 0;
+  transient let moderationImages = Map.empty<Text, Text>();
+  transient var moderationImageCharsInUse : Nat = 0;
   transient var cachedCmcRate : ?IcpLib.IcpXdrConversionRate = null;
   transient var cachedCmcRateFetchedAt : Nat64 = 0;
   transient let mintCooldowns = Map.empty<Principal, Int>();
@@ -422,13 +453,12 @@ mixin (
 
   transient let managementCanister : ManagementCanisterActor = actor "aaaaa-aa";
 
-  func assertCyclesForCall(amount : Nat, operationLabel : Text) {
+  func assertCyclesForCallWithReserve(amount : Nat, reserve : Nat, operationLabel : Text) {
     if (amount == 0) {
       Runtime.trap(operationLabel # ": refusing to attach 0 cycles");
     };
 
     let backendBalance = Cycles.balance();
-    let reserve = minimumFactoryOperatingReserveCycles();
     if (backendBalance <= amount + reserve) {
       Runtime.trap(
         operationLabel #
@@ -451,6 +481,14 @@ mixin (
         Nat.toText(backendBalance)
       );
     };
+  };
+
+  func assertCyclesForCall(amount : Nat, operationLabel : Text) {
+    assertCyclesForCallWithReserve(
+      amount,
+      minimumFactoryOperatingReserveCycles(),
+      operationLabel,
+    );
   };
 
   public query func getMintConfig() : async MintTypes.MintConfig {
@@ -511,6 +549,59 @@ mixin (
       clearApiKey,
     );
     MintLib.getPublicModerationConfig(moderationState);
+  };
+
+  public shared ({ caller }) func adminTestModerationProviders() : async MintTypes.ModerationProviderTestReport {
+    if (Principal.isAnonymous(caller)) Runtime.trap("You must be authenticated to do this.");
+    if (not AuthLib.isAdmin(authState, caller)) Runtime.trap("Unauthorized: admin only");
+    let config = MintLib.getModerationConfig(moderationState);
+    let xaiApiKey = switch (MintLib.getXaiCopyrightApiKey(moderationState)) {
+      case (?value) {
+        let sanitized = sanitizeModerationApiKey(value);
+        if (sanitized == "") null else ?sanitized;
+      };
+      case null null;
+    };
+    let openAIResult = if (MintLib.hasActiveModerationRules(config.categories)) {
+      switch (config.apiKey) {
+        case (?value) {
+          let sanitized = sanitizeModerationApiKey(value);
+          if (sanitized == "") {
+            {
+              configured = false;
+              outcome = #err("OpenAI moderation is enabled but no API key is stored.");
+            };
+          } else {
+            await testOpenAIModerationProvider(sanitized, config.model);
+          };
+        };
+        case null {
+          {
+            configured = false;
+            outcome = #err("OpenAI moderation categories are active but no API key is stored.");
+          };
+        };
+      };
+    } else {
+      {
+        configured = false;
+        outcome = #err("OpenAI category checks are disabled. Enable at least one category to test OpenAI.");
+      };
+    };
+    let xaiResult = switch (xaiApiKey) {
+      case (?apiKey) await testXaiCopyrightProvider(apiKey);
+      case null {
+        {
+          configured = false;
+          outcome = #err("No xAI API key is stored.");
+        };
+      };
+    };
+    {
+      openAI = openAIResult;
+      xai = xaiResult;
+      ready = MintLib.moderationReady(config, xaiApiKey != null);
+    };
   };
 
   public query func transformModerationResponse(
@@ -1087,7 +1178,7 @@ mixin (
     };
   };
 
-  public shared ({ caller }) func getAppCanisterHealth(
+  public shared query ({ caller }) func getAppCanisterHealthSnapshot(
     frontendCanisterId : ?Principal
   ) : async { #ok : [MintTypes.AppCanisterHealth]; #err : Text } {
     if (Principal.isAnonymous(caller)) {
@@ -1103,7 +1194,34 @@ mixin (
         if (not Principal.isAnonymous(id) and not Principal.equal(id, canisterId)) {
           health := Array.concat<MintTypes.AppCanisterHealth>(
             health,
-            [await appCanisterHealthFromStatus(#Frontend, id)],
+            [appCanisterHealthSnapshot(#Frontend, id)],
+          );
+        };
+      };
+      case null {};
+    };
+    #ok(health);
+  };
+
+  public shared ({ caller }) func getAppCanisterHealth(
+    frontendCanisterId : ?Principal
+  ) : async { #ok : [MintTypes.AppCanisterHealth]; #err : Text } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("You must be authenticated to do this.");
+    };
+    if (not AuthLib.isAdmin(authState, caller)) {
+      return #err("Unauthorized: admin only");
+    };
+
+    var health = [
+      await appCanisterHealthFromStatus(#Backend, canisterId, ?Cycles.balance())
+    ];
+    switch (frontendCanisterId) {
+      case (?id) {
+        if (not Principal.isAnonymous(id) and not Principal.equal(id, canisterId)) {
+          health := Array.concat<MintTypes.AppCanisterHealth>(
+            health,
+            [await appCanisterHealthFromStatus(#Frontend, id, null)],
           );
         };
       };
@@ -1143,6 +1261,30 @@ mixin (
         } catch (error) {
           #err("Could not add controller: " # Error.message(error));
         };
+      };
+    };
+  };
+
+  public shared ({ caller }) func updateCollectionDividendSourceDescription(
+    collectionId : CollectionTypes.CollectionId,
+    sourceDescription : ?Text,
+  ) : async { #ok : CollectionTypes.Collection; #err : Text } {
+    switch (validateDividendSourceDescription(sourceDescription)) {
+      case (?message) return #err(message);
+      case null {};
+    };
+    switch (await manageableDividendSourceCollection(caller, collectionId)) {
+      case (#err(message)) #err(message);
+      case (#ok(collection)) {
+        if (not DividendsLib.collectionEnabled(collection)) {
+          return #err("Dividends are not enabled for this collection");
+        };
+        DividendsLib.setSourceDescription(
+          dividendSourceState,
+          collectionId,
+          sourceDescription,
+        );
+        #ok(collection);
       };
     };
   };
@@ -2636,6 +2778,12 @@ mixin (
     httpAssetResponse(request);
   };
 
+  public query func getSharePreviewMetadata(
+    route : SharePreviewLib.ShareRoute,
+  ) : async ?SharePreviewLib.SharePreviewMetadata {
+    SharePreviewLib.resolveSharePreview(sharePreviewContext(), route);
+  };
+
   public shared ({ caller }) func ext_transfer(request : EXTTransferRequest) : async EXTTransferResponse {
     if (not TermsLib.hasAcceptedCurrent(termsState, caller)) {
       return #err(#Unauthorized(""));
@@ -3244,15 +3392,112 @@ mixin (
     };
   };
 
+  func sharePreviewContext() : SharePreviewLib.SharePreviewContext {
+    {
+      siteOrigin = SharePreviewLib.DEFAULT_SITE_ORIGIN;
+      backendCanisterId = canisterId;
+      collectionsState;
+      nftModerationState;
+      walletState;
+      mintState;
+      marketplaceState;
+      marketplaceSettlementState;
+      marketplaceNoBidAuctionReturnState;
+      marketplaceListingReturnState;
+      shareImageCacheState;
+    };
+  };
+
   func httpAssetResponse(request : AssetHttpRequest) : AssetHttpResponse {
-    switch (HttpMedia.tokenIdFromUrl(request.url, canisterId)) {
-      case null HttpMedia.notFoundResponse();
-      case (?tokenId) {
-        switch (mainTokenById(tokenId)) {
-          case (?token) HttpMedia.imageResponse(mainTokenOriginalImageUrl(token));
-          case null HttpMedia.notFoundResponse();
+    switch (SharePreviewLib.parseShareRoute(request.url)) {
+      case (?route) {
+        switch (SharePreviewLib.resolveSharePreview(sharePreviewContext(), route)) {
+          case (?metadata) SharePreviewLib.sharePreviewResponse(metadata);
+          case null {
+            let redirectUrl = switch (route) {
+              case (#Listing(listingId)) {
+                SharePreviewLib.DEFAULT_SITE_ORIGIN # "/marketplace/listing/" # Nat.toText(listingId);
+              };
+              case (#Nft({ collectionId; tokenId })) {
+                SharePreviewLib.DEFAULT_SITE_ORIGIN #
+                "/nft/" #
+                Nat.toText(collectionId) #
+                "/" #
+                tokenId;
+              };
+            };
+            SharePreviewLib.fallbackSharePreviewResponse(
+              SharePreviewLib.DEFAULT_SITE_ORIGIN,
+              redirectUrl,
+            );
+          };
         };
       };
+      case null {
+        switch (moderationImageIdFromUrl(request.url)) {
+          case (?imageId) {
+            switch (Map.get(moderationImages, Text.compare, imageId)) {
+              case (?imageUrl) HttpMedia.temporaryImageResponse(imageUrl);
+              case null HttpMedia.notFoundResponse();
+            };
+          };
+          case null {
+            switch (HttpMedia.tokenIdFromUrl(request.url, canisterId)) {
+              case null HttpMedia.notFoundResponse();
+              case (?tokenId) {
+                switch (mainTokenById(tokenId)) {
+                  case (?token) HttpMedia.imageResponse(mainTokenOriginalImageUrl(token));
+                  case null HttpMedia.notFoundResponse();
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+  };
+
+  func moderationImageIdFromUrl(url : Text) : ?Text {
+    for (queryOrPath in Text.split(url, #char '?')) {
+      for (pair in Text.split(queryOrPath, #char '&')) {
+        switch (Text.stripStart(pair, #text (MODERATION_TEMP_IMAGE_QUERY_PARAM # "="))) {
+          case (?value) {
+            if (value != "") {
+              return ?value;
+            };
+          };
+          case null {};
+        };
+      };
+    };
+    null;
+  };
+
+  func temporaryModerationImageUrl(requestId : Text) : Text {
+    "https://" #
+    canisterId.toText() #
+    ".raw.icp0.io/?" #
+    MODERATION_TEMP_IMAGE_QUERY_PARAM #
+    "=" #
+    requestId;
+  };
+
+  func clearPreparedModerationImage(preparedImage : PreparedModerationImage) {
+    switch (preparedImage.temporaryImageId) {
+      case (?imageId) {
+        switch (Map.get(moderationImages, Text.compare, imageId)) {
+          case (?imageUrl) {
+            if (moderationImageCharsInUse >= imageUrl.size()) {
+              moderationImageCharsInUse -= imageUrl.size();
+            } else {
+              moderationImageCharsInUse := 0;
+            };
+          };
+          case null {};
+        };
+        Map.remove(moderationImages, Text.compare, imageId);
+      };
+      case null {};
     };
   };
 
@@ -3450,9 +3695,11 @@ mixin (
       };
       case null null;
     };
-    let runOpenAI = hasActiveModerationRules(config.categories);
+    let runOpenAI = MintLib.hasActiveModerationRules(config.categories);
     if (not runOpenAI and xaiApiKey == null) {
-      return null;
+      return ?moderationUnavailableReason(
+        "Moderation is enabled but no OpenAI category checks or xAI copyright review are configured. Ask an admin to save API keys and enable moderation categories in the admin settings."
+      );
     };
     let openAIApiKey = if (runOpenAI) {
       switch (config.apiKey) {
@@ -3477,21 +3724,63 @@ mixin (
       case (#err(message)) return ?moderationUnavailableReason(message);
     };
 
+    try {
+      await moderatePreparedUpload(
+        config,
+        openAIApiKey,
+        xaiApiKey,
+        kind,
+        title,
+        description,
+        extraText,
+        imageUrl,
+        preparedImage,
+      );
+    } finally {
+      clearPreparedModerationImage(preparedImage);
+    };
+  };
+
+  func moderatePreparedUpload(
+    config : MintTypes.ModerationConfig,
+    openAIApiKey : ?Text,
+    xaiApiKey : ?Text,
+    kind : Text,
+    title : Text,
+    description : Text,
+    extraText : Text,
+    originalImageUrl : Text,
+    preparedImage : PreparedModerationImage,
+  ) : async ?Text {
     switch (openAIApiKey) {
       case (?apiKey) {
-        let response = try {
-          await callOpenAIModeration(apiKey, kind, title, description, extraText, preparedImage.imageUrl, preparedImage.requestId);
+        let responseResult = try {
+          await callOpenAIModeration(
+            config.model,
+            apiKey,
+            kind,
+            title,
+            description,
+            extraText,
+            preparedImage.imageUrl,
+            preparedImage.requestId,
+          );
         } catch (error) {
-          let errMsg = Error.message(error);
-          Debug.print("=== OPENAI MODERATION OUTCALL FAILURE ===");
-          Debug.print("Error: " # errMsg);
-          Debug.print("Request ID: " # preparedImage.requestId);
-          Debug.print("Original image kind: " # moderationImageKind(imageUrl));
-          Debug.print("Original image chars: " # Nat.toText(imageUrl.size()));
-          Debug.print("Prepared image kind: " # moderationImageKind(preparedImage.imageUrl));
-          Debug.print("Prepared image chars: " # Nat.toText(preparedImage.imageUrl.size()));
-          Debug.print("======================================");
-          return ?moderationUnavailableReason(moderationRequestFailureMessage(errMsg));
+          #err(Error.message(error));
+        };
+        let response = switch (responseResult) {
+          case (#ok(value)) value;
+          case (#err(errMsg)) {
+            Debug.print("=== OPENAI MODERATION OUTCALL FAILURE ===");
+            Debug.print("Error: " # errMsg);
+            Debug.print("Request ID: " # preparedImage.requestId);
+            Debug.print("Original image kind: " # moderationImageKind(originalImageUrl));
+            Debug.print("Original image chars: " # Nat.toText(originalImageUrl.size()));
+            Debug.print("Prepared image kind: " # moderationImageKind(preparedImage.imageUrl));
+            Debug.print("Prepared image chars: " # Nat.toText(preparedImage.imageUrl.size()));
+            Debug.print("======================================");
+            return ?moderationUnavailableReason(moderationRequestFailureMessage(errMsg));
+          };
         };
         if (response.status != 200) {
           let diagnostic = moderationResponseDiagnostic(response.body);
@@ -3521,19 +3810,24 @@ mixin (
 
     switch (xaiApiKey) {
       case (?apiKey) {
-        let response = try {
+        let responseResult = try {
           await callXaiCopyrightCheck(apiKey, kind, title, description, extraText, preparedImage.imageUrl, preparedImage.requestId);
         } catch (error) {
-          let errMsg = Error.message(error);
-          Debug.print("=== XAI COPYRIGHT OUTCALL FAILURE ===");
-          Debug.print("Error: " # errMsg);
-          Debug.print("Request ID: " # preparedImage.requestId);
-          Debug.print("Original image kind: " # moderationImageKind(imageUrl));
-          Debug.print("Original image chars: " # Nat.toText(imageUrl.size()));
-          Debug.print("Prepared image kind: " # moderationImageKind(preparedImage.imageUrl));
-          Debug.print("Prepared image chars: " # Nat.toText(preparedImage.imageUrl.size()));
-          Debug.print("====================================");
-          return ?moderationUnavailableReason(xaiCopyrightRequestFailureMessage(errMsg));
+          #err(Error.message(error));
+        };
+        let response = switch (responseResult) {
+          case (#ok(value)) value;
+          case (#err(errMsg)) {
+            Debug.print("=== XAI COPYRIGHT OUTCALL FAILURE ===");
+            Debug.print("Error: " # errMsg);
+            Debug.print("Request ID: " # preparedImage.requestId);
+            Debug.print("Original image kind: " # moderationImageKind(originalImageUrl));
+            Debug.print("Original image chars: " # Nat.toText(originalImageUrl.size()));
+            Debug.print("Prepared image kind: " # moderationImageKind(preparedImage.imageUrl));
+            Debug.print("Prepared image chars: " # Nat.toText(preparedImage.imageUrl.size()));
+            Debug.print("====================================");
+            return ?moderationUnavailableReason(xaiCopyrightRequestFailureMessage(errMsg));
+          };
         };
         if (response.status != 200) {
           let diagnostic = moderationResponseDiagnostic(response.body);
@@ -3562,7 +3856,147 @@ mixin (
     };
   };
 
+  func openAIModerationModel(model : Text) : Text {
+    let trimmed = Text.trim(model, #char ' ');
+    if (
+      trimmed == "" or
+      trimmed == "openai-omni-moderation-latest"
+    ) {
+      MintLib.defaultModerationModel();
+    } else {
+      trimmed;
+    };
+  };
+
+  func testOpenAIModerationProvider(
+    apiKey : Text,
+    model : Text,
+  ) : async MintTypes.ModerationProviderTestResult {
+    let requestId = moderationRequestId(newModerationToken());
+    let responseResult = try {
+      await callOpenAIModerationTextOnly(
+        openAIModerationModel(model),
+        apiKey,
+        "Mintlab moderation connectivity test.",
+        requestId,
+      );
+    } catch (error) {
+      return {
+        configured = true;
+        outcome = #err(moderationRequestFailureMessage(Error.message(error)));
+      };
+    };
+    switch (responseResult) {
+      case (#ok(response)) {
+        if (response.status != 200) {
+          let diagnostic = moderationResponseDiagnostic(response.body);
+          {
+            configured = true;
+            outcome = #err(moderationStatusFailureMessage(response.status, diagnostic));
+          };
+        } else {
+          switch (Text.decodeUtf8(response.body)) {
+            case (?summary) {
+              if (Text.startsWith(summary, #text "ERROR") or summary == "UNKNOWN") {
+                {
+                  configured = true;
+                  outcome = #err(moderationProviderFailureMessage(summary));
+                };
+              } else {
+                {
+                  configured = true;
+                  outcome = #ok("OpenAI moderation responded successfully.");
+                };
+              };
+            };
+            case null {
+              {
+                configured = true;
+                outcome = #err("The OpenAI moderation response could not be verified.");
+              };
+            };
+          };
+        };
+      };
+      case (#err(message)) {
+        {
+          configured = true;
+          outcome = #err(moderationRequestFailureMessage(message));
+        };
+      };
+    };
+  };
+
+  func testXaiCopyrightProvider(apiKey : Text) : async MintTypes.ModerationProviderTestResult {
+    let requestId = moderationRequestId(newModerationToken());
+    let responseResult = try {
+      await callXaiCopyrightTextOnly(apiKey, requestId);
+    } catch (error) {
+      return {
+        configured = true;
+        outcome = #err(xaiCopyrightRequestFailureMessage(Error.message(error)));
+      };
+    };
+    switch (responseResult) {
+      case (#ok(response)) {
+        if (response.status != 200) {
+          let diagnostic = moderationResponseDiagnostic(response.body);
+          {
+            configured = true;
+            outcome = #err(xaiCopyrightStatusFailureMessage(response.status, diagnostic));
+          };
+        } else {
+          switch (Text.decodeUtf8(response.body)) {
+            case (?summary) {
+              if (Text.startsWith(summary, #text "ERROR") or summary == "UNKNOWN") {
+                {
+                  configured = true;
+                  outcome = #err(xaiCopyrightProviderFailureMessage(summary));
+                };
+              } else {
+                {
+                  configured = true;
+                  outcome = #ok("xAI copyright review responded successfully.");
+                };
+              };
+            };
+            case null {
+              {
+                configured = true;
+                outcome = #err("The xAI copyright response could not be verified.");
+              };
+            };
+          };
+        };
+      };
+      case (#err(message)) {
+        {
+          configured = true;
+          outcome = #err(xaiCopyrightRequestFailureMessage(message));
+        };
+      };
+    };
+  };
+
+  func callOpenAIModerationTextOnly(
+    model : Text,
+    apiKey : Text,
+    text : Text,
+    requestId : Text,
+  ) : async HttpRequestCallResult {
+    let body = Text.encodeUtf8(
+      "{" #
+      "\"model\":" # jsonString(model) # "," #
+      "\"input\":[" #
+      "{\"type\":\"text\",\"text\":" # jsonString(text) # "}" #
+      "]" #
+      "}"
+    );
+    await callOpenAIModerationRequest(apiKey, body, requestId);
+  };
+
   func callOpenAIModeration(
+    model : Text,
     apiKey : Text,
     kind : Text,
     title : Text,
@@ -3570,10 +4004,10 @@ mixin (
     extraText : Text,
     imageUrl : Text,
     requestId : Text,
-  ) : async HttpRequestResult {
+  ) : async HttpRequestCallResult {
     let body = Text.encodeUtf8(
       "{" #
-      "\"model\":\"omni-moderation-latest\"," #
+      "\"model\":" # jsonString(openAIModerationModel(model)) # "," #
       "\"input\":[" #
       "{\"type\":\"text\",\"text\":" # jsonString(moderationTextInput(kind, title, description, extraText)) # "}," #
       "{\"type\":\"image_url\",\"image_url\":{\"url\":" # jsonString(imageUrl) # "}}" #
@@ -3583,6 +4017,22 @@ mixin (
     if (body.size() > MODERATION_MAX_REQUEST_BODY_BYTES) {
       Runtime.trap("The OpenAI moderation request was too large.");
     };
+    if (CYCLE_DEBUG_LOGS_ENABLED) {
+      Debug.print(
+        "OPENAI MODERATION OUTCALL" #
+        " requestId=" # requestId #
+        " imageKind=" # moderationImageKind(imageUrl) #
+        " imageChars=" # Nat.toText(imageUrl.size())
+      );
+    };
+    await callOpenAIModerationRequest(apiKey, body, requestId);
+  };
+
+  func callOpenAIModerationRequest(
+    apiKey : Text,
+    body : Blob,
+    requestId : Text,
+  ) : async HttpRequestCallResult {
     let request : HttpRequestArgs = {
       url = "https://api.openai.com/v1/moderations";
       method = #post;
@@ -3602,26 +4052,53 @@ mixin (
       // This response gates minting/payment, so replicas must agree on it.
       is_replicated = null;
     };
-    let ic : ManagementCanisterActor = actor "aaaaa-aa";
     let requestSize = httpRequestSize(request);
     let cost = httpRequestCost(requestSize, request.max_response_bytes);
-    if (Cycles.balance() <= cost + minimumFactoryOperatingReserveCycles()) {
-      Runtime.trap("The app canister does not have enough cycles to call OpenAI moderation.");
-    };
-    if (CYCLE_DEBUG_LOGS_ENABLED) {
-      Debug.print(
-        "OPENAI MODERATION OUTCALL" #
-        " requestBytes=" # Nat.toText(requestSize) #
-        " maxResponseBytes=" # (switch (request.max_response_bytes) { case (?b) Nat64.toText(b); case null "unlimited" }) #
-        " estimatedCycles=" # Nat.toText(cost) #
-        " canisterCycleBalance=" # Nat.toText(Cycles.balance()) #
-        " requestId=" # requestId #
-        " imageKind=" # moderationImageKind(imageUrl) #
-        " imageChars=" # Nat.toText(imageUrl.size())
+    let cycleBudget = httpRequestCycleBudget(requestSize, request.max_response_bytes);
+    let reserve = moderationOutcallOperatingReserveCycles();
+    if (Cycles.balance() <= cycleBudget + reserve) {
+      Runtime.trap(
+        "The app canister needs " #
+        Nat.toText(cycleBudget) #
+        " cycles for the OpenAI moderation HTTPS outcall plus " #
+        Nat.toText(reserve) #
+        " cycles of moderation reserve. Current balance: " #
+        Nat.toText(Cycles.balance())
       );
     };
-    assertCyclesForCall(cost, "OpenAI moderation HTTPS outcall");
-    await (with cycles = cost) ic.http_request(request);
+    assertCyclesForCallWithReserve(cycleBudget, reserve, "OpenAI moderation HTTPS outcall");
+    await httpRequestWithCycleBudget(
+      request,
+      cycleBudget,
+      reserve,
+      "OpenAI moderation HTTPS outcall",
+    );
+  };
+
+  func callXaiCopyrightTextOnly(
+    apiKey : Text,
+    requestId : Text,
+  ) : async HttpRequestCallResult {
+    let body = Text.encodeUtf8(
+      "{" #
+      "\"model\":" # jsonString(XAI_COPYRIGHT_MODEL) # "," #
+      "\"stream\":false," #
+      "\"max_tokens\":" # Nat.toText(XAI_COPYRIGHT_MAX_OUTPUT_TOKENS) # "," #
+      "\"messages\":[{" #
+      "\"role\":\"user\"," #
+      "\"content\":\"Mintlab copyright connectivity test. Return allow for original artwork with no protected IP.\"" #
+      "}]," #
+      "\"response_format\":{\"type\":\"json_schema\",\"json_schema\":{\"name\":\"mintlab_copyright_check\",\"strict\":true,\"schema\":{" #
+      "\"type\":\"object\",\"additionalProperties\":false,\"properties\":{" #
+      "\"has_copyright_risk\":{\"type\":\"boolean\"}," #
+      "\"risk_level\":{\"type\":\"string\",\"enum\":[\"low\",\"medium\",\"high\"]}," #
+      "\"recommendation\":{\"type\":\"string\",\"enum\":[\"allow\",\"review\",\"reject\"]}" #
+      "}," #
+      "\"required\":[\"has_copyright_risk\",\"risk_level\",\"recommendation\"]" #
+      "}}}" #
+      "}"
+    );
+    await callXaiCopyrightRequest(apiKey, body, requestId);
   };
 
   func callXaiCopyrightCheck(
@@ -3632,7 +4109,7 @@ mixin (
     extraText : Text,
     imageUrl : Text,
     requestId : Text,
-  ) : async HttpRequestResult {
+  ) : async HttpRequestCallResult {
     let body = Text.encodeUtf8(
       "{" #
       "\"model\":" # jsonString(XAI_COPYRIGHT_MODEL) # "," #
@@ -3658,6 +4135,22 @@ mixin (
     if (body.size() > MODERATION_MAX_REQUEST_BODY_BYTES) {
       Runtime.trap("The xAI copyright request was too large.");
     };
+    if (CYCLE_DEBUG_LOGS_ENABLED) {
+      Debug.print(
+        "XAI COPYRIGHT OUTCALL" #
+        " requestId=" # requestId #
+        " imageKind=" # moderationImageKind(imageUrl) #
+        " imageChars=" # Nat.toText(imageUrl.size())
+      );
+    };
+    await callXaiCopyrightRequest(apiKey, body, requestId);
+  };
+
+  func callXaiCopyrightRequest(
+    apiKey : Text,
+    body : Blob,
+    requestId : Text,
+  ) : async HttpRequestCallResult {
     let request : HttpRequestArgs = {
       url = "https://api.x.ai/v1/chat/completions";
       method = #post;
@@ -3679,26 +4172,27 @@ mixin (
       // for this policy check and avoids duplicate provider requests.
       is_replicated = ?false;
     };
-    let ic : ManagementCanisterActor = actor "aaaaa-aa";
     let requestSize = httpRequestSize(request);
     let cost = httpRequestCost(requestSize, request.max_response_bytes);
-    if (Cycles.balance() <= cost + minimumFactoryOperatingReserveCycles()) {
-      Runtime.trap("The app canister does not have enough cycles to call xAI copyright moderation.");
-    };
-    if (CYCLE_DEBUG_LOGS_ENABLED) {
-      Debug.print(
-        "XAI COPYRIGHT OUTCALL" #
-        " requestBytes=" # Nat.toText(requestSize) #
-        " maxResponseBytes=" # (switch (request.max_response_bytes) { case (?b) Nat64.toText(b); case null "unlimited" }) #
-        " estimatedCycles=" # Nat.toText(cost) #
-        " canisterCycleBalance=" # Nat.toText(Cycles.balance()) #
-        " requestId=" # requestId #
-        " imageKind=" # moderationImageKind(imageUrl) #
-        " imageChars=" # Nat.toText(imageUrl.size())
+    let cycleBudget = httpRequestCycleBudget(requestSize, request.max_response_bytes);
+    let reserve = moderationOutcallOperatingReserveCycles();
+    if (Cycles.balance() <= cycleBudget + reserve) {
+      Runtime.trap(
+        "The app canister needs " #
+        Nat.toText(cycleBudget) #
+        " cycles for the xAI copyright HTTPS outcall plus " #
+        Nat.toText(reserve) #
+        " cycles of moderation reserve. Current balance: " #
+        Nat.toText(Cycles.balance())
       );
     };
-    assertCyclesForCall(cost, "xAI copyright HTTPS outcall");
-    await (with cycles = cost) ic.http_request(request);
+    assertCyclesForCallWithReserve(cycleBudget, reserve, "xAI copyright HTTPS outcall");
+    await httpRequestWithCycleBudget(
+      request,
+      cycleBudget,
+      reserve,
+      "xAI copyright HTTPS outcall",
+    );
   };
 
   func moderationTextInput(kind : Text, title : Text, description : Text, extraText : Text) : Text {
@@ -3719,17 +4213,31 @@ mixin (
 
   func prepareModerationImage(imageUrl : Text) : { #ok : PreparedModerationImage; #err : Text } {
     let token = newModerationToken();
+    let requestId = moderationRequestId(token);
     let normalizedImageUrl = normalizeModerationImageUrl(imageUrl);
     if (Text.startsWith(normalizedImageUrl, #text "data:image/")) {
       if (normalizedImageUrl.size() > MODERATION_MAX_IMAGE_DATA_URL_CHARS) {
         return #err("The uploaded image is too large for AI moderation. Please upload a smaller JPG or PNG.");
       };
+      if (
+        moderationImages.size() >= MODERATION_MAX_CONCURRENT_IMAGES or
+        moderationImageCharsInUse + normalizedImageUrl.size() > MODERATION_MAX_PENDING_IMAGE_CHARS
+      ) {
+        return #err("Image moderation is busy. Please wait a moment and try again.");
+      };
+      Map.add(moderationImages, Text.compare, requestId, normalizedImageUrl);
+      moderationImageCharsInUse += normalizedImageUrl.size();
       #ok({
-        imageUrl = normalizedImageUrl;
-        requestId = moderationRequestId(token);
+        imageUrl = temporaryModerationImageUrl(requestId);
+        requestId;
+        temporaryImageId = ?requestId;
       });
     } else {
-      #ok({ imageUrl = normalizedImageUrl; requestId = moderationRequestId(token) });
+      #ok({
+        imageUrl = normalizedImageUrl;
+        requestId;
+        temporaryImageId = null;
+      });
     };
   };
 
@@ -3879,6 +4387,126 @@ mixin (
     Prim.costHttpRequest(Nat64.fromNat(requestSize), Nat64.fromNat(maxResponseBytes));
   };
 
+  func httpRequestBufferedCycleBudget(cost : Nat, multiplier : Nat, extraCycles : Nat, minimum : Nat) : Nat {
+    let buffered =
+      (cost * multiplier) +
+      extraCycles;
+    if (buffered < minimum) {
+      minimum;
+    } else {
+      buffered;
+    };
+  };
+
+  func httpRequestCycleBudget(requestSize : Nat, maxResponseBytesOption : ?Nat64) : Nat {
+    httpRequestBufferedCycleBudget(
+      httpRequestCost(requestSize, maxResponseBytesOption),
+      HTTPS_OUTCALL_CYCLE_BUDGET_MULTIPLIER,
+      HTTPS_OUTCALL_CYCLE_BUDGET_EXTRA_CYCLES,
+      HTTPS_OUTCALL_MIN_CYCLE_BUDGET,
+    );
+  };
+
+  func httpRequestRetryCycleBudget(request : HttpRequestArgs) : Nat {
+    httpRequestBufferedCycleBudget(
+      httpRequestCost(httpRequestSize(request), request.max_response_bytes),
+      HTTPS_OUTCALL_RETRY_CYCLE_BUDGET_MULTIPLIER,
+      HTTPS_OUTCALL_RETRY_CYCLE_BUDGET_EXTRA_CYCLES,
+      HTTPS_OUTCALL_RETRY_MIN_CYCLE_BUDGET,
+    );
+  };
+
+  func httpRequestWithCycleBudget(
+    request : HttpRequestArgs,
+    cycleBudget : Nat,
+    reserve : Nat,
+    operationLabel : Text,
+  ) : async HttpRequestCallResult {
+    try {
+      #ok(await (with cycles = cycleBudget) managementCanister.http_request(request));
+    } catch (error) {
+      let errMsg = Error.message(error);
+      let lowerErrMsg = Text.toLower(errMsg);
+      if (reservedCyclesLimitFailure(lowerErrMsg) or memoryGrowthInsufficientCyclesFailure(lowerErrMsg)) {
+        return #err(errMsg);
+      };
+      let retryBudget = httpRequestRetryCycleBudget(request);
+      if (
+        retryBudget > cycleBudget and
+        httpOutcallRetryableCycleFailure(lowerErrMsg)
+      ) {
+        assertCyclesForCallWithReserve(
+          retryBudget,
+          reserve,
+          operationLabel # " retry",
+        );
+        if (CYCLE_DEBUG_LOGS_ENABLED) {
+          Debug.print(
+            operationLabel #
+            " retrying after IC cycle-budget reject initialCycles=" #
+            Nat.toText(cycleBudget) #
+            " retryCycles=" #
+            Nat.toText(retryBudget) #
+            " backendBalanceBeforeRetry=" #
+            Nat.toText(Cycles.balance())
+          );
+        };
+        try {
+          #ok(await (with cycles = retryBudget) managementCanister.http_request(request));
+        } catch (retryError) {
+          #err(
+            operationLabel #
+            " failed after retry. Initial attached cycles: " #
+            Nat.toText(cycleBudget) #
+            "; retry attached cycles: " #
+            Nat.toText(retryBudget) #
+            "; backend balance after retry reject: " #
+            Nat.toText(Cycles.balance()) #
+            "; IC reject: " #
+            Error.message(retryError)
+          );
+        };
+      } else {
+        #err(errMsg);
+      };
+    };
+  };
+
+  func moderationOutcallOperatingReserveCycles() : Nat {
+    100_000_000_000;
+  };
+
+  func moderationCycleFailureMessage(provider : Text) : Text {
+    let balance = Cycles.balance();
+    let required = HTTPS_OUTCALL_RETRY_MIN_CYCLE_BUDGET + moderationOutcallOperatingReserveCycles();
+    if (balance <= required) {
+      "The backend needs at least " #
+      Nat.toText(required) #
+      " cycles to run " #
+      provider #
+      " moderation safely. Current balance: " #
+      Nat.toText(balance) #
+      ". Please ask the admin to top up the canister.";
+    } else {
+      provider #
+      " moderation could not complete because the IC HTTPS outcall rejected the attached cycle budget. Backend balance: " #
+      Nat.toText(balance) #
+      " cycles. This backend now attaches a bounded retry budget of at least " #
+      Nat.toText(HTTPS_OUTCALL_RETRY_MIN_CYCLE_BUDGET) #
+      " cycles based on the IC cost estimate. Ask the admin to redeploy this backend build, then try again.";
+    };
+  };
+
+  func reservedCyclesLimitFailureMessage(provider : Text) : Text {
+    provider #
+    " moderation could not complete because the backend canister hit its reserved cycles limit while growing memory. Ask the admin to apply the configured reserved_cycles_limit increase and top up the backend if its liquid cycle balance is low, then try again.";
+  };
+
+  func memoryGrowthInsufficientCyclesFailureMessage(provider : Text) : Text {
+    provider #
+    " moderation could not complete because the backend does not have enough liquid cycles to reserve the Wasm memory growth. Top up the Mintlab backend canister, then try again. No ICP was transferred for the mint.";
+  };
+
   func moderationDeclineReason(config : MintTypes.ModerationConfig) : Text {
     "Upload declined by moderation. " # config.userMessage;
   };
@@ -3917,13 +4545,60 @@ mixin (
     };
   };
 
+  func httpOutcallCycleBudgetFailure(lowerMessage : Text) : Bool {
+    Text.contains(lowerMessage, #text "http_request") and
+    Text.contains(lowerMessage, #text "cycles") and
+    (
+      Text.contains(lowerMessage, #text "attach") or
+      Text.contains(lowerMessage, #text "attached") or
+      Text.contains(lowerMessage, #text "sent with") or
+      Text.contains(lowerMessage, #text "required") or
+      Text.contains(lowerMessage, #text "provided")
+    );
+  };
+
+  func httpOutcallRetryableCycleFailure(lowerMessage : Text) : Bool {
+    httpOutcallCycleBudgetFailure(lowerMessage) or
+    Text.contains(lowerMessage, #text "insufficientcycles") or
+    Text.contains(lowerMessage, #text "canisteroutofcycles") or
+    Text.contains(lowerMessage, #text "out of cycles") or
+    (
+      Text.contains(lowerMessage, #text "cycles") and
+      (
+        Text.contains(lowerMessage, #text "insufficient") or
+        Text.contains(lowerMessage, #text "required") or
+        Text.contains(lowerMessage, #text "provided")
+      )
+    );
+  };
+
+  func reservedCyclesLimitFailure(lowerMessage : Text) : Bool {
+    Text.contains(lowerMessage, #text "reserved cycles limit") or
+    Text.contains(lowerMessage, #text "ic0534");
+  };
+
+  func memoryGrowthInsufficientCyclesFailure(lowerMessage : Text) : Bool {
+    Text.contains(lowerMessage, #text "ic0532") or
+    (
+      Text.contains(lowerMessage, #text "cannot grow memory") and
+      (
+        Text.contains(lowerMessage, #text "insufficient cycles") or
+        Text.contains(lowerMessage, #text "out of cycles")
+      )
+    );
+  };
+
   func isAsciiWhitespace(char : Char) : Bool {
     char == ' ' or char == '\n' or char == '\r' or char == '\t';
   };
 
   func moderationRequestFailureMessage(message : Text) : Text {
     let lowerMessage = Text.toLower(message);
-    if (
+    if (reservedCyclesLimitFailure(lowerMessage)) {
+      reservedCyclesLimitFailureMessage("OpenAI");
+    } else if (memoryGrowthInsufficientCyclesFailure(lowerMessage)) {
+      memoryGrowthInsufficientCyclesFailureMessage("OpenAI");
+    } else if (
       Text.contains(lowerMessage, #text "replicated") or
       Text.contains(lowerMessage, #text "non-replicated") or
       Text.contains(lowerMessage, #text "is_replicated") or
@@ -3931,13 +4606,15 @@ mixin (
       Text.contains(lowerMessage, #text "consensus")
     ) {
       "The OpenAI moderation outcall is configured incorrectly. Contact the admin to fix the moderation setup.";
+    } else if (httpOutcallCycleBudgetFailure(lowerMessage)) {
+      moderationCycleFailureMessage("OpenAI");
     } else if (
       Text.contains(lowerMessage, #text "cycles") or
       Text.contains(lowerMessage, #text "canisteroutofcycles") or
       Text.contains(lowerMessage, #text "insufficientcycles") or
       Text.contains(lowerMessage, #text "out of cycles")
     ) {
-      "The backend is running low on cycles. Please ask the admin to top up the canister.";
+      moderationCycleFailureMessage("OpenAI");
     } else if (
       Text.contains(lowerMessage, #text "timeout") or
       Text.contains(lowerMessage, #text "timed out") or
@@ -3972,7 +4649,11 @@ mixin (
 
   func xaiCopyrightRequestFailureMessage(message : Text) : Text {
     let lowerMessage = Text.toLower(message);
-    if (
+    if (reservedCyclesLimitFailure(lowerMessage)) {
+      reservedCyclesLimitFailureMessage("xAI copyright");
+    } else if (memoryGrowthInsufficientCyclesFailure(lowerMessage)) {
+      memoryGrowthInsufficientCyclesFailureMessage("xAI copyright");
+    } else if (
       Text.contains(lowerMessage, #text "replicated") or
       Text.contains(lowerMessage, #text "non-replicated") or
       Text.contains(lowerMessage, #text "is_replicated") or
@@ -3980,13 +4661,15 @@ mixin (
       Text.contains(lowerMessage, #text "consensus")
     ) {
       "The xAI copyright outcall could not complete through the IC HTTPS outcall layer. Redeploy the backend with the single-replica xAI copyright outcall update, or temporarily clear the xAI key in admin moderation settings.";
+    } else if (httpOutcallCycleBudgetFailure(lowerMessage)) {
+      moderationCycleFailureMessage("xAI copyright");
     } else if (
       Text.contains(lowerMessage, #text "cycles") or
       Text.contains(lowerMessage, #text "canisteroutofcycles") or
       Text.contains(lowerMessage, #text "insufficientcycles") or
       Text.contains(lowerMessage, #text "out of cycles")
     ) {
-      "The backend is running low on cycles. Please ask the admin to top up the canister.";
+      moderationCycleFailureMessage("xAI copyright");
     } else if (
       Text.contains(lowerMessage, #text "timeout") or
       Text.contains(lowerMessage, #text "timed out") or
@@ -4102,17 +4785,6 @@ mixin (
     Text.startsWith(imageUrl, #text "https://");
   };
 
-  func hasActiveModerationRules(categories : MintTypes.ModerationCategorySettings) : Bool {
-    categories.nudityOrSexual or
-    categories.graphicViolence or
-    categories.explicitLanguage or
-    categories.hateOrHarassment or
-    categories.hateSymbols or
-    categories.illegalOrDangerous or
-    categories.selfHarm or
-    categories.otherNsfw;
-  };
-
   func validateCollectionProfile(
     name : Text,
     description : Text,
@@ -4122,6 +4794,22 @@ mixin (
     switch (validateCollectionProfileResult(name, description, symbol, imageUrl)) {
       case (?message) Runtime.trap(message);
       case null {};
+    };
+  };
+
+  func validateDividendSourceDescription(sourceDescription : ?Text) : ?Text {
+    switch (sourceDescription) {
+      case null null;
+      case (?value) {
+        let trimmed = Text.trim(value, #char ' ');
+        if (trimmed == "") {
+          null;
+        } else if (Text.size(trimmed) > 2_000) {
+          ?"Dividend source description is too long";
+        } else {
+          null;
+        };
+      };
     };
   };
 
@@ -4528,6 +5216,10 @@ mixin (
       kind = #Backend;
       canisterId;
       cycles = ?Cycles.balance();
+      reservedCycles = null;
+      memorySizeBytes = null;
+      reservedCyclesLimit = null;
+      wasmMemoryLimit = null;
       moduleInstalled = ?true;
       freezingThresholdSeconds = null;
       idleCyclesBurnedPerDay = null;
@@ -4535,9 +5227,31 @@ mixin (
     };
   };
 
+  func appCanisterHealthSnapshot(
+    kind : MintTypes.AppCanisterKind,
+    targetCanisterId : Principal,
+  ) : MintTypes.AppCanisterHealth {
+    {
+      kind;
+      canisterId = targetCanisterId;
+      cycles = null;
+      reservedCycles = null;
+      memorySizeBytes = null;
+      reservedCyclesLimit = null;
+      wasmMemoryLimit = null;
+      moduleInstalled = null;
+      freezingThresholdSeconds = null;
+      idleCyclesBurnedPerDay = null;
+      error = ?(
+        "Live cycle metrics need a controller status refresh. Top-up remains available."
+      );
+    };
+  };
+
   func appCanisterHealthFromStatus(
     kind : MintTypes.AppCanisterKind,
     targetCanisterId : Principal,
+    fallbackCycles : ?Nat,
   ) : async MintTypes.AppCanisterHealth {
     try {
       let status = await managementCanister.canister_status({
@@ -4547,6 +5261,10 @@ mixin (
         kind;
         canisterId = targetCanisterId;
         cycles = ?status.cycles;
+        reservedCycles = ?status.reserved_cycles;
+        memorySizeBytes = ?status.memory_size;
+        reservedCyclesLimit = ?status.settings.reserved_cycles_limit;
+        wasmMemoryLimit = ?status.settings.wasm_memory_limit;
         moduleInstalled = ?(status.module_hash != null);
         freezingThresholdSeconds = ?status.settings.freezing_threshold;
         idleCyclesBurnedPerDay = ?status.idle_cycles_burned_per_day;
@@ -4556,7 +5274,11 @@ mixin (
       {
         kind;
         canisterId = targetCanisterId;
-        cycles = null;
+        cycles = fallbackCycles;
+        reservedCycles = null;
+        memorySizeBytes = null;
+        reservedCyclesLimit = null;
+        wasmMemoryLimit = null;
         moduleInstalled = null;
         freezingThresholdSeconds = null;
         idleCyclesBurnedPerDay = null;
@@ -4589,6 +5311,32 @@ mixin (
       case null {
         #err("Could not read this collection canister's controllers. Mintlab may no longer be a controller of the canister.");
       };
+    };
+  };
+
+  func manageableDividendSourceCollection(
+    caller : Principal,
+    collectionId : CollectionTypes.CollectionId,
+  ) : async { #ok : CollectionTypes.Collection; #err : Text } {
+    if (Principal.isAnonymous(caller)) {
+      return #err("You must be authenticated to do this.");
+    };
+    let collection = switch (CollectionsLib.getCollection(collectionsState, collectionId)) {
+      case null return #err("Collection not found");
+      case (?value) value;
+    };
+    if (collection.kind != #Minted) {
+      return #err("Dividend source details can only be set for Mintlab-created collections");
+    };
+    if (Principal.equal(collection.canisterId, canisterId)) {
+      if (not AuthLib.isAdmin(authState, caller)) {
+        return #err("Only the app admin can update dividend source details for the main app collection");
+      };
+      return #ok(collection);
+    };
+    switch (await manageableMintedCollection(caller, collectionId)) {
+      case (#err(message)) #err(message);
+      case (#ok(value)) #ok(value);
     };
   };
 

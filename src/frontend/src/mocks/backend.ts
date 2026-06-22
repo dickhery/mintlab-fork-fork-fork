@@ -842,17 +842,22 @@ export const mockBackend: backendInterface = {
     mockBackend.getCollectionDividendBalances(collectionId),
   refreshCollectionDividendBalancesPage: async (collectionId, cursor, limit) =>
     mockBackend.getCollectionDividendBalancesPage(collectionId, cursor, limit),
-  getCollectionDividendInfo: async (collectionId) => ({
-    collectionId,
-    enabled: collectionId === 4n,
-    accountId: mockAccountId,
-    balanceE8s: 100_000_000n,
-    distributableBalanceE8s: 99_980_000n,
-    feeReserveE8s: 20_000n,
-    processedBalanceE8s: 100_000_000n,
-    pendingE8s: collectionId === 4n ? 100_000_000n : 0n,
-    nftCount: BigInt(sampleCollectionNFTs(collectionId).length),
-  }),
+  getCollectionDividendInfo: async (collectionId) => {
+    const nftCount = BigInt(sampleCollectionNFTs(collectionId).length);
+    return {
+      collectionId,
+      enabled: collectionId === 4n,
+      accountId: mockAccountId,
+      balanceE8s: 100_000_000n,
+      distributableBalanceE8s: 99_980_000n,
+      feeReserveE8s: 20_000n,
+      processedBalanceE8s: 100_000_000n,
+      pendingE8s: collectionId === 4n ? 100_000_000n : 0n,
+      nftCount,
+      nftShareBasisPoints: nftCount > 0n ? 10_000n / nftCount : 0n,
+      sourceDescription: null,
+    };
+  },
   getCollectionNFTPage: async (collectionId, cursor, limit) => {
     const items = sampleCollectionNFTs(collectionId);
     const start = cursor == null ? 0 : Number.parseInt(cursor, 10) || 0;
@@ -946,10 +951,28 @@ export const mockBackend: backendInterface = {
     collectionCanisterWasmUploaded: true,
     collectionCanisterCycles: 2_000_000_000_000n,
   }),
+  adminTestModerationProviders: async () => ({
+    openAI: {
+      configured: true,
+      outcome: {
+        __kind__: "ok" as const,
+        ok: "OpenAI moderation responded successfully.",
+      },
+    },
+    xai: {
+      configured: true,
+      outcome: {
+        __kind__: "ok" as const,
+        ok: "xAI copyright review responded successfully.",
+      },
+    },
+    ready: true,
+  }),
   getModerationConfig: async () => ({
     enabled: true,
     apiKeyConfigured: true,
     xaiApiKeyConfigured: true,
+    moderationReady: true,
     model: "openai-omni-moderation-latest",
     categories: mockModerationCategories,
     userMessage:
@@ -966,6 +989,7 @@ export const mockBackend: backendInterface = {
     enabled,
     apiKeyConfigured: !clearApiKey,
     xaiApiKeyConfigured: true,
+    moderationReady: enabled && !clearApiKey,
     model,
     categories,
     userMessage,
@@ -974,6 +998,7 @@ export const mockBackend: backendInterface = {
     enabled: true,
     apiKeyConfigured: true,
     xaiApiKeyConfigured: !!apiKey || !clearApiKey,
+    moderationReady: !!apiKey || !clearApiKey,
     model: "openai-omni-moderation-latest",
     categories: mockModerationCategories,
     userMessage:
@@ -1081,6 +1106,8 @@ export const mockBackend: backendInterface = {
   }),
   quoteAppCanisterCycleTopUp: async (cyclesToTopUp) =>
     mockBackend.quoteCollectionCycleTopUp(cyclesToTopUp),
+  getAppCanisterHealthSnapshot: async (frontendCanisterId) =>
+    mockBackend.getAppCanisterHealth(frontendCanisterId),
   getAppCanisterHealth: async (frontendCanisterId) => ({
     __kind__: "ok" as const,
     ok: [
@@ -1088,6 +1115,10 @@ export const mockBackend: backendInterface = {
         kind: "Backend" as const,
         canisterId: samplePrincipal,
         cycles: 3_400_000_000_000n,
+        reservedCycles: 10_500_000_000_000n,
+        memorySizeBytes: 206_000_000n,
+        reservedCyclesLimit: 50_000_000_000_000n,
+        wasmMemoryLimit: 3_221_225_472n,
         moduleInstalled: true,
         freezingThresholdSeconds: null,
         idleCyclesBurnedPerDay: null,
@@ -1097,6 +1128,10 @@ export const mockBackend: backendInterface = {
         kind: "Frontend" as const,
         canisterId: frontendCanisterId ?? frontendPrincipal,
         cycles: 1_900_000_000_000n,
+        reservedCycles: 0n,
+        memorySizeBytes: 25_000_000n,
+        reservedCyclesLimit: 5_000_000_000_000n,
+        wasmMemoryLimit: 3_221_225_472n,
         moduleInstalled: true,
         freezingThresholdSeconds: 2_592_000n,
         idleCyclesBurnedPerDay: 4_200_000_000n,
@@ -1313,6 +1348,15 @@ export const mockBackend: backendInterface = {
     },
   }),
   removeCollection: async () => true,
+  updateCollectionDividendSourceDescription: async (collectionId) => {
+    const collection =
+      sampleCollections.find((item) => item.id === collectionId) ??
+      sampleCollections[0];
+    return {
+      __kind__: "ok" as const,
+      ok: collection,
+    };
+  },
   updateCollectionBrowseInfo: async (collectionId, browseInfo) => {
     const collection =
       sampleCollections.find((item) => item.id === collectionId) ??

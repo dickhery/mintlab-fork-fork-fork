@@ -1,4 +1,5 @@
 import AuthLib "lib/auth";
+import MigrationLib "migration";
 import CollectionsLib "lib/collections";
 import MintLib "lib/mint";
 import WalletLib "lib/wallet";
@@ -7,6 +8,8 @@ import DividendsLib "lib/dividends";
 import IcpLib "lib/icp";
 import TermsLib "lib/terms";
 import TransactionsLib "lib/transactions";
+import RateLimitLib "lib/rate-limit";
+import ShareImageCacheLib "lib/share-image-cache";
 import Principal "mo:core/Principal";
 
 import AuthApi "mixins/auth-api";
@@ -46,13 +49,22 @@ persistent actor Backend {
   let dividendsState = DividendsLib.newState();
   let dividendAccumulatorState = DividendsLib.newAccumulatorState();
   let dividendFeeState = DividendsLib.newFeeState();
+  let dividendSourceState = DividendsLib.newSourceState();
   let termsState = TermsLib.newState();
   let transactionState = TransactionsLib.newState();
+  let rateLimitState = RateLimitLib.newState();
+  let shareImageCacheState = ShareImageCacheLib.newState();
 
   // ── Mixin composition ─────────────────────────────────────────────────────
   include AuthApi(authState);
   include TermsApi(termsState);
-  include CollectionsApi(collectionsState, nftModerationState, authState, ownershipIndexState);
+  include CollectionsApi(
+    collectionsState,
+    nftModerationState,
+    authState,
+    ownershipIndexState,
+    rateLimitState,
+  );
   include MintApi(
     mintState,
     collectionCreationState,
@@ -60,10 +72,17 @@ persistent actor Backend {
     moderationState,
     pendingMintPaymentState,
     collectionsState,
+    nftModerationState,
     walletState,
     authState,
+    marketplaceState,
+    marketplaceSettlementState,
+    marketplaceNoBidAuctionReturnState,
+    marketplaceListingReturnState,
+    shareImageCacheState,
     marketplaceUserPaymentLockState,
     dividendAccumulatorState,
+    dividendSourceState,
     transactionState,
     termsState,
     Principal.fromActor(Backend),
@@ -107,12 +126,14 @@ persistent actor Backend {
     nftModerationState,
     transactionState,
     termsState,
+    shareImageCacheState,
     Principal.fromActor(Backend),
   );
   include DividendsApi(
     dividendsState,
     dividendAccumulatorState,
     dividendFeeState,
+    dividendSourceState,
     collectionsState,
     walletState,
     marketplaceState,
@@ -122,6 +143,7 @@ persistent actor Backend {
     authState,
     transactionState,
     termsState,
+    rateLimitState,
     Principal.fromActor(Backend),
   );
   include BrowseApi(
@@ -131,7 +153,24 @@ persistent actor Backend {
     mintState,
     authState,
     nftModerationState,
+    rateLimitState,
     Principal.fromActor(Backend),
   );
   include TransactionsApi(transactionState);
+
+  system func postupgrade() {
+    MigrationLib.runPostUpgrade({
+      authState;
+      rateLimitState;
+      collectionsState;
+      mintState;
+      ownershipIndexState;
+      marketplaceState;
+      marketplacePaymentState;
+      marketplaceSettlementState;
+      marketplaceNoBidAuctionReturnState;
+      marketplaceListingReturnState;
+      marketplaceBidState;
+    });
+  };
 };

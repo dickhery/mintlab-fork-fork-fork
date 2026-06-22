@@ -1287,6 +1287,14 @@ module {
     Map.get(state.escrowedNFTs, Nat.compare, listingId);
   };
 
+  public func setEscrowedNFT(
+    state : MarketplaceState,
+    listingId : Types.ListingId,
+    nft : WalletTypes.WalletNFT,
+  ) {
+    Map.add(state.escrowedNFTs, Nat.compare, listingId, nft);
+  };
+
   public func getActiveEscrowedNFTsBySeller(
     state : MarketplaceState,
     seller : Types.UserId,
