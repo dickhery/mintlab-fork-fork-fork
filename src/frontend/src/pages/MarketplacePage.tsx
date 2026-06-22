@@ -1664,7 +1664,10 @@ export default function MarketplacePage() {
     },
     enabled: !!actor && !actorLoading && isAuthenticated,
     staleTime: 120_000,
-    refetchInterval: 300_000,
+    refetchInterval: (query) => {
+      const statuses = query.state.data ?? [];
+      return statuses.length > 0 ? 300_000 : false;
+    },
   });
 
   const collectionMap = useMemo(
@@ -1708,7 +1711,7 @@ export default function MarketplacePage() {
     },
     enabled: !!actor && !actorLoading && listingDetails.length > 0,
     refetchOnWindowFocus: false,
-    staleTime: 60_000,
+    staleTime: 300_000,
   });
 
   const listingDividendMap = useMemo(
@@ -1835,7 +1838,10 @@ export default function MarketplacePage() {
       !!principal &&
       auctionListingIds.length > 0,
     staleTime: 120_000,
-    refetchInterval: 300_000,
+    refetchInterval: (query) => {
+      const statuses = query.state.data ?? [];
+      return statuses.length > 0 ? 300_000 : false;
+    },
   });
 
   const myAuctionBidStatusMap = new Map(

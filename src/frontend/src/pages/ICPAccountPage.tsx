@@ -288,7 +288,8 @@ export default function ICPAccountPage() {
       return actor.getUserICPBalance();
     },
     enabled: !!actor && !isFetching && isAuthenticated,
-    refetchInterval: 30_000,
+    staleTime: 120_000,
+    refetchInterval: 300_000,
   });
 
   const { data: accountIdBytes, isLoading: accountIdLoading } =
@@ -309,7 +310,8 @@ export default function ICPAccountPage() {
         return actor.getMyRecentTransactions(10n);
       },
       enabled: !!actor && !isFetching && isAuthenticated,
-      refetchInterval: 30_000,
+      staleTime: 120_000,
+      refetchInterval: 300_000,
     });
 
   const accountIdHex = accountIdBytes ? accountIdToHex(accountIdBytes) : null;

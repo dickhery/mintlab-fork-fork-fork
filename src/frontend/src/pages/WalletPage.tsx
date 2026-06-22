@@ -168,7 +168,9 @@ const SYNC_PAGE_COLLECTION_LIMIT = 2n;
 const TARGET_SYNC_INDEX_PAGE_LIMIT = 3n;
 const MAX_SYNC_PAGES_PER_CLICK = 5;
 const SYNC_SLOW_NOTICE_MS = 15_000;
-const SYNC_REFRESH_INTERVAL_MS = 6_000;
+const SYNC_REFRESH_INTERVAL_MS = 30_000;
+const AUTO_SYNC_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const AUTO_SYNC_STORAGE_KEY = "mintlab-wallet-auto-sync";
 const SYNC_FINISHED_STATUS_CLEAR_MS = 6_000;
 const WALLET_NFT_PAGE_SIZE = 50n;
 const WALLET_COLLECTION_PAGE_SIZE = 50n;
@@ -4344,7 +4346,19 @@ export default function WalletPage() {
 
     if (autoSyncedPrincipalRef.current === principalText) return;
 
+    const autoSyncKey = `${AUTO_SYNC_STORAGE_KEY}:${principalText}`;
+    const lastAutoSync = Number(localStorage.getItem(autoSyncKey) ?? "0");
+    if (
+      Number.isFinite(lastAutoSync) &&
+      lastAutoSync > 0 &&
+      Date.now() - lastAutoSync < AUTO_SYNC_COOLDOWN_MS
+    ) {
+      autoSyncedPrincipalRef.current = principalText;
+      return;
+    }
+
     autoSyncedPrincipalRef.current = principalText;
+    localStorage.setItem(autoSyncKey, String(Date.now()));
     void handleSync({ silent: true });
   }, [
     actor,

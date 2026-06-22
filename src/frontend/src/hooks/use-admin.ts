@@ -29,7 +29,7 @@ export function useAdmin(): UseAdminReturn {
       const p = await actor.getAdminPrincipal();
       return p ? p.toString() : null;
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor && !isFetching && isAuthenticated,
     staleTime: 60_000,
   });
 

@@ -116,7 +116,8 @@ export default function ActivityPage() {
       return actor.getMyRecentTransactions(ACTIVITY_FETCH_LIMIT);
     },
     enabled: !!actor && !isFetching && isAuthenticated,
-    refetchInterval: 120_000,
+    staleTime: 120_000,
+    refetchInterval: 300_000,
   });
 
   const filteredTransactions = useMemo(
