@@ -1602,7 +1602,8 @@ function CollectionCreationRequestRow({
         return actor.getCollectionCreationDiagnostics(request.id);
       },
       enabled: !!actor && !isFetching,
-      refetchInterval: 60_000,
+      staleTime: 120_000,
+      refetchInterval: 120_000,
     },
   );
   const diagnostics =
@@ -1716,12 +1717,12 @@ function CollectionCreationRequestsPanel() {
       return actor.getAllCollectionCreationRequests();
     },
     enabled: !!actor && !isFetching,
-    staleTime: 60_000,
+    staleTime: 120_000,
     refetchInterval: (query) => {
       const result = query.state.data;
       const requests = result?.__kind__ === "ok" ? result.ok : [];
       return requests.some(isRepairableCollectionCreationRequest)
-        ? 60_000
+        ? 120_000
         : false;
     },
   });

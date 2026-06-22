@@ -1595,8 +1595,8 @@ export default function MarketplacePage() {
       return actor.getActiveListingDetails();
     },
     enabled: !!actor && !actorLoading,
-    staleTime: 120_000,
-    refetchInterval: 300_000,
+    staleTime: 300_000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: collections = [] } = useQuery<Collection[]>({
@@ -1649,7 +1649,14 @@ export default function MarketplacePage() {
       );
       return page.nfts;
     },
-    enabled: !!actor && !actorLoading && isAuthenticated && !!principal,
+    enabled:
+      !!actor &&
+      !actorLoading &&
+      isAuthenticated &&
+      !!principal &&
+      listModalOpen,
+    staleTime: 120_000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: settlementStatuses = [] } = useQuery<SettlementStatus[]>({
@@ -1666,7 +1673,13 @@ export default function MarketplacePage() {
     staleTime: 120_000,
     refetchInterval: (query) => {
       const statuses = query.state.data ?? [];
-      return statuses.length > 0 ? 300_000 : false;
+      const hasPendingSettlement = statuses.some(
+        (status) =>
+          status.kind === "PendingBidDeposit" ||
+          status.kind === "PendingAuctionRefund" ||
+          status.stage.toLowerCase().includes("pending"),
+      );
+      return hasPendingSettlement ? 300_000 : false;
     },
   });
 
@@ -1840,7 +1853,7 @@ export default function MarketplacePage() {
     staleTime: 120_000,
     refetchInterval: (query) => {
       const statuses = query.state.data ?? [];
-      return statuses.length > 0 ? 300_000 : false;
+      return statuses.some((status) => status.hasBid) ? 300_000 : false;
     },
   });
 

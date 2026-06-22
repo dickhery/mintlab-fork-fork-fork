@@ -19,7 +19,8 @@ export function useAdmin(): UseAdminReturn {
       return actor.isAdmin();
     },
     enabled: !!actor && !isFetching && isAuthenticated,
-    staleTime: 30_000,
+    staleTime: 300_000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: adminPrincipal, isLoading: isPrincipalLoading } = useQuery({
@@ -30,7 +31,8 @@ export function useAdmin(): UseAdminReturn {
       return p ? p.toString() : null;
     },
     enabled: !!actor && !isFetching && isAuthenticated,
-    staleTime: 60_000,
+    staleTime: 300_000,
+    refetchOnWindowFocus: false,
   });
 
   return {

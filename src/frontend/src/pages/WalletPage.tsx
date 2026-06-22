@@ -168,9 +168,6 @@ const SYNC_PAGE_COLLECTION_LIMIT = 2n;
 const TARGET_SYNC_INDEX_PAGE_LIMIT = 3n;
 const MAX_SYNC_PAGES_PER_CLICK = 5;
 const SYNC_SLOW_NOTICE_MS = 15_000;
-const SYNC_REFRESH_INTERVAL_MS = 30_000;
-const AUTO_SYNC_COOLDOWN_MS = 24 * 60 * 60 * 1000;
-const AUTO_SYNC_STORAGE_KEY = "mintlab-wallet-auto-sync";
 const SYNC_FINISHED_STATUS_CLEAR_MS = 6_000;
 const WALLET_NFT_PAGE_SIZE = 50n;
 const WALLET_COLLECTION_PAGE_SIZE = 50n;
@@ -3452,7 +3449,7 @@ export default function WalletPage() {
   const { isAdmin } = useAdmin();
   const queryClient = useQueryClient();
   const bootstrappedRef = useRef(false);
-  const autoSyncedPrincipalRef = useRef<string | null>(null);
+
   const syncInFlightRef = useRef<Promise<SyncResult> | null>(null);
   const syncModeRef = useRef<SyncMode | null>(null);
   const syncScopeRef = useRef<string | null>(null);
@@ -3561,6 +3558,8 @@ export default function WalletPage() {
       return actor.getMintConfig();
     },
     enabled: !!actor && !isFetching && isAuthenticated,
+    staleTime: 3_600_000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: moderationConfig } = useQuery<PublicModerationConfig | null>({
@@ -3570,6 +3569,8 @@ export default function WalletPage() {
       return actor.getModerationConfig();
     },
     enabled: !!actor && !isFetching && isAuthenticated,
+    staleTime: 3_600_000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: myCreatedCollections = [] } = useQuery<Collection[]>({
@@ -3596,6 +3597,8 @@ export default function WalletPage() {
       return page.details;
     },
     enabled: !!actor && !isFetching && isAuthenticated,
+    staleTime: 300_000,
+    refetchOnWindowFocus: false,
   });
 
   const { data: myDividendNFTs = [] } = useQuery<NFTDividend[]>({
@@ -3615,7 +3618,7 @@ export default function WalletPage() {
     },
     enabled: !!actor && !isFetching && isAuthenticated,
     refetchOnWindowFocus: false,
-    staleTime: 60_000,
+    staleTime: 300_000,
   });
 
   const {
@@ -4186,7 +4189,6 @@ export default function WalletPage() {
         existingSync !== null &&
         syncModeRef.current === requestedMode &&
         syncScopeRef.current === requestedScope;
-      const startedNewSync = !canReuseExistingSync;
       let rawSyncPromise: Promise<SyncResult>;
       let syncPromise: Promise<SyncResult>;
       if (canReuseExistingSync) {
@@ -4200,18 +4202,11 @@ export default function WalletPage() {
       syncPromise = rawSyncPromise;
 
       let slowNoticeId: number | undefined;
-      let refreshId: number | undefined;
       let keepRefreshUntilRawSettles = false;
       if (!silent) {
         slowNoticeId = window.setTimeout(() => {
           setSyncStatus({ kind: "syncing", slow: true });
         }, SYNC_SLOW_NOTICE_MS);
-      }
-      if (startedNewSync) {
-        refreshId = window.setInterval(() => {
-          void refetchNFTs();
-          void queryClient.invalidateQueries({ queryKey: ["userStats"] });
-        }, SYNC_REFRESH_INTERVAL_MS);
       }
 
       try {
@@ -4262,9 +4257,6 @@ export default function WalletPage() {
               }
             })
             .finally(() => {
-              if (refreshId !== undefined) {
-                window.clearInterval(refreshId);
-              }
               if (syncInFlightRef.current === rawSyncPromise) {
                 syncInFlightRef.current = null;
                 syncModeRef.current = null;
@@ -4282,9 +4274,6 @@ export default function WalletPage() {
       } finally {
         if (slowNoticeId !== undefined) {
           window.clearTimeout(slowNoticeId);
-        }
-        if (refreshId !== undefined && !keepRefreshUntilRawSettles) {
-          window.clearInterval(refreshId);
         }
         if (
           !keepRefreshUntilRawSettles &&
@@ -4331,44 +4320,6 @@ export default function WalletPage() {
     setMintComposerOpen(true);
     setMintComposerFocusRequestId((requestId) => requestId + 1);
   }, []);
-
-  useEffect(() => {
-    if (
-      !actor ||
-      !isAuthenticated ||
-      !principalText ||
-      isFetching ||
-      nftsLoading ||
-      !collections
-    ) {
-      return;
-    }
-
-    if (autoSyncedPrincipalRef.current === principalText) return;
-
-    const autoSyncKey = `${AUTO_SYNC_STORAGE_KEY}:${principalText}`;
-    const lastAutoSync = Number(localStorage.getItem(autoSyncKey) ?? "0");
-    if (
-      Number.isFinite(lastAutoSync) &&
-      lastAutoSync > 0 &&
-      Date.now() - lastAutoSync < AUTO_SYNC_COOLDOWN_MS
-    ) {
-      autoSyncedPrincipalRef.current = principalText;
-      return;
-    }
-
-    autoSyncedPrincipalRef.current = principalText;
-    localStorage.setItem(autoSyncKey, String(Date.now()));
-    void handleSync({ silent: true });
-  }, [
-    actor,
-    collections,
-    isAuthenticated,
-    isFetching,
-    nftsLoading,
-    principalText,
-    handleSync,
-  ]);
 
   // ── render: not authenticated ─────────────────────────────────────────────
 

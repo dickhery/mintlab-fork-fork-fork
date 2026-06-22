@@ -17,7 +17,7 @@ declare global {
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 120_000,
+      staleTime: 300_000,
       refetchOnWindowFocus: false,
       refetchIntervalInBackground: false,
     },

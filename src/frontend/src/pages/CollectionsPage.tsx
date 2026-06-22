@@ -3274,7 +3274,8 @@ function PendingCollectionCreationCard({
         return actor.getCollectionCreationDiagnostics(request.id);
       },
       enabled: !!actor && !isFetching,
-      refetchInterval: 120_000,
+      staleTime: 300_000,
+      refetchInterval: 300_000,
     },
   );
   const diagnostics =
@@ -3442,11 +3443,11 @@ export default function CollectionsPage() {
       return actor.getMyCollectionCreationRequests();
     },
     enabled: !!actor && !isFetching && isAuthenticated,
-    staleTime: 120_000,
+    staleTime: 300_000,
     refetchInterval: (query) => {
       const requests = query.state.data ?? [];
       return requests.some(isRepairableCollectionCreationRequest)
-        ? 120_000
+        ? 300_000
         : false;
     },
   });
@@ -3555,8 +3556,9 @@ export default function CollectionsPage() {
       return stats;
     },
     enabled: !!actor && !isFetching && !!collections && collections.length > 0,
-    staleTime: 300_000,
+    staleTime: 600_000,
     refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   const browseStats =

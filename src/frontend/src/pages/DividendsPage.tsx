@@ -163,7 +163,7 @@ export default function DividendsPage() {
     },
     enabled: !!actor && !isFetching && isAuthenticated,
     refetchOnWindowFocus: false,
-    staleTime: 60_000,
+    staleTime: 300_000,
   });
 
   const { data: mediaNFTs = [] } = useQuery<WalletNFT[]>({
@@ -179,7 +179,7 @@ export default function DividendsPage() {
     },
     enabled: !!actor && !isFetching && isAuthenticated && !!principal,
     refetchOnWindowFocus: false,
-    staleTime: 60_000,
+    staleTime: 300_000,
   });
 
   const {
@@ -199,7 +199,7 @@ export default function DividendsPage() {
     },
     enabled: !!actor && !isFetching && isAuthenticated && !!principalText,
     refetchOnWindowFocus: false,
-    staleTime: 30_000,
+    staleTime: 300_000,
   });
 
   const { data: marketplaceFeeConfig, isLoading: marketplaceFeeConfigLoading } =
@@ -211,7 +211,7 @@ export default function DividendsPage() {
       },
       enabled: !!actor && !isFetching && isAuthenticated,
       refetchOnWindowFocus: false,
-      staleTime: 60_000,
+      staleTime: 3_600_000,
     });
 
   const claimMutation = useMutation({

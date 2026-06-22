@@ -122,6 +122,9 @@ export default function NFTDetailPage() {
       );
     },
     enabled: !!actor && !isFetching && collectionId != null && !!tokenId,
+    staleTime: 300_000,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
   });
 
   const isLoading = collectionLoading || nftLoading;
