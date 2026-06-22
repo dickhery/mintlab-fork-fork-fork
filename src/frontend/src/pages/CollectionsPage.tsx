@@ -9,6 +9,7 @@ import { HelpCallout, HelpTooltip } from "@/components/HelpCallout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { MediaImage } from "@/components/MediaImage";
 import { PaymentConfirmationDialog } from "@/components/PaymentConfirmationDialog";
+import { ShareLinkButton } from "@/components/ShareLinkButton";
 import { TermsAgreementNotice } from "@/components/TermsAcceptance";
 import { ZoomableMediaImage } from "@/components/ZoomableMediaImage";
 import { Badge } from "@/components/ui/badge";
@@ -49,6 +50,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAdmin } from "@/hooks/use-admin";
 import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import {
   COMMUNITY_COLLECTION_NOTICE,
   collectionMetaMap,
@@ -67,6 +69,7 @@ import {
   getNFTTokenLabel,
   getNFTVisibleAttributes,
 } from "@/lib/nft-display";
+import { nftShareUrl } from "@/lib/share-urls";
 import type {
   ActiveListingDetail,
   Collection,
@@ -91,6 +94,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
   Check,
@@ -291,8 +295,11 @@ interface CopyFieldProps {
 function CopyField({ label, value, ocid }: CopyFieldProps) {
   const [copied, setCopied] = useState(false);
 
-  function handleCopy() {
-    void navigator.clipboard.writeText(value);
+  async function handleCopy() {
+    if (!(await copyTextToClipboard(value))) {
+      toast.error(`Could not copy ${label.toLowerCase()}`);
+      return;
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 1600);
     toast.success(`${label} copied`);
@@ -1814,6 +1821,28 @@ function NFTDetailModal({
                   {nftName}
                 </DialogTitle>
                 <div className="flex items-center gap-2 flex-wrap">
+                  <ShareLinkButton
+                    url={nftShareUrl(collection.id, nft.tokenId)}
+                    data-ocid="collections.nft_detail.share_button"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="h-7 gap-1.5 text-xs"
+                    asChild
+                  >
+                    <Link
+                      to="/nft/$collectionId/$tokenId"
+                      params={{
+                        collectionId: collection.id.toString(),
+                        tokenId: encodeURIComponent(nft.tokenId),
+                      }}
+                      data-ocid="collections.nft_detail.open_page_link"
+                    >
+                      Open NFT page
+                    </Link>
+                  </Button>
                   <Badge
                     variant="secondary"
                     className="font-mono text-xs bg-muted/60 text-muted-foreground border border-border/40"
@@ -2104,9 +2133,12 @@ function CollectionControllersDialog({
     },
   });
 
-  function copyPrincipal(value: string) {
-    void navigator.clipboard.writeText(value);
-    toast.success("Controller principal copied");
+  async function copyPrincipal(value: string) {
+    if (await copyTextToClipboard(value)) {
+      toast.success("Controller principal copied");
+    } else {
+      toast.error("Could not copy controller principal");
+    }
   }
 
   function removeController(controller: Principal) {
@@ -2360,20 +2392,16 @@ function NFTBrowser({
       return actor.getCollectionDividendInfo(collection.id);
     },
     enabled: !!actor && !isFetching && dividendsEnabled,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    refetchInterval: 30_000,
+    staleTime: 120_000,
   });
   const { data: dividendBalances = [] } = useQuery<Array<[string, bigint]>>({
     queryKey: ["collectionDividendBalances", collection.id.toString()],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.refreshCollectionDividendBalances(collection.id);
+      return actor.getCollectionDividendBalances(collection.id);
     },
     enabled: !!actor && !isFetching && dividendsEnabled,
-    refetchOnMount: "always",
-    refetchOnWindowFocus: true,
-    refetchInterval: 30_000,
+    staleTime: 120_000,
   });
   const syncDividendsMutation = useMutation({
     mutationFn: async () => {
@@ -2570,9 +2598,12 @@ function NFTBrowser({
             size="sm"
             variant="outline"
             className="gap-1.5"
-            onClick={() => {
-              void navigator.clipboard.writeText(canisterId);
-              toast.success("Collection canister copied");
+            onClick={async () => {
+              if (await copyTextToClipboard(canisterId)) {
+                toast.success("Collection canister copied");
+              } else {
+                toast.error("Could not copy collection canister");
+              }
             }}
             data-ocid="collections.copy_canister_button"
           >
@@ -3088,7 +3119,7 @@ function PendingCollectionCreationCard({
         return actor.getCollectionCreationDiagnostics(request.id);
       },
       enabled: !!actor && !isFetching,
-      refetchInterval: 15_000,
+      refetchInterval: 60_000,
     },
   );
   const diagnostics =

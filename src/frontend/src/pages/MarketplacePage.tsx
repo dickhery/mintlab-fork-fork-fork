@@ -6,6 +6,7 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { MediaImage } from "@/components/MediaImage";
 import { PaymentConfirmationDialog } from "@/components/PaymentConfirmationDialog";
 import { PriceDisplay } from "@/components/PriceDisplay";
+import { ShareLinkButton } from "@/components/ShareLinkButton";
 import { TermsAgreementNotice } from "@/components/TermsAcceptance";
 import { ZoomableMediaImage } from "@/components/ZoomableMediaImage";
 import {
@@ -28,6 +29,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
@@ -40,6 +48,15 @@ import {
 import { transferRegisteredNFT } from "@/lib/external-nft-transfer";
 import { formatICPAmount, parseICPToE8s } from "@/lib/icp";
 import {
+  type MarketplaceSearchState,
+  type MarketplaceSort,
+  type MarketplaceTab,
+  type MarketplaceTrustFilter,
+  filterMarketplaceListings,
+  listingIdFromItem,
+  sortMarketplaceListings,
+} from "@/lib/marketplace-discovery";
+import {
   VAULTED_PURCHASE_NOTICE,
   WITHDRAW_TO_EXTERNAL_WALLET_LABEL,
   isVaultedInMintlab,
@@ -48,6 +65,7 @@ import {
   nftCustodyLabel,
 } from "@/lib/nft-custody";
 import { getNFTDisplayName, getNFTTokenLabel } from "@/lib/nft-display";
+import { listingShareUrl, nftShareUrl } from "@/lib/share-urls";
 import type {
   ActiveListing,
   ActiveListingDetail,
@@ -62,7 +80,12 @@ import type {
   WalletNFT,
 } from "@/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearch,
+} from "@tanstack/react-router";
 import {
   Clock,
   Coins,
@@ -71,12 +94,14 @@ import {
   ImageOff,
   Lock,
   RefreshCw,
+  Search,
   ShoppingBag,
+  SlidersHorizontal,
   Tag,
   X,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -101,10 +126,7 @@ const MIN_AUCTION_STARTING_BID_E8S = 1_000_000n;
 const MIN_AUCTION_BID_INCREMENT_E8S = 1_000_000n;
 const MARKETPLACE_COLLECTION_PAGE_SIZE = 50n;
 const MARKETPLACE_WALLET_PAGE_SIZE = 50n;
-const MARKETPLACE_DIVIDEND_PAGE_SIZE = 50n;
 const MARKETPLACE_STATUS_PAGE_SIZE = 25n;
-
-type MarketplaceTab = "all" | "fixed" | "auctions";
 
 type FixedListingItem = {
   kind: "fixed";
@@ -393,6 +415,7 @@ function ListingDetailModal({
     : "";
   const custodyLabel = nftCustodyLabel(nft.location);
   const custodyDescription = nftCustodyDescription(nft, collection);
+  const listingId = fixed?.id ?? auction?.id ?? null;
 
   return (
     <Dialog open={!!detail} onOpenChange={(value) => !value && onClose()}>
@@ -441,6 +464,35 @@ function ListingDetailModal({
                   {custodyLabel}
                 </Badge>
                 <DividendBalanceBadge e8s={dividendE8s} size="md" />
+                {listingId != null && (
+                  <ShareLinkButton
+                    url={listingShareUrl(listingId)}
+                    data-ocid="marketplace.nft_detail.share_listing_button"
+                  />
+                )}
+                <ShareLinkButton
+                  url={nftShareUrl(nft.collectionId, nft.tokenId)}
+                  label="Copy NFT link"
+                  data-ocid="marketplace.nft_detail.share_nft_button"
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1.5 text-xs"
+                  asChild
+                >
+                  <Link
+                    to="/nft/$collectionId/$tokenId"
+                    params={{
+                      collectionId: nft.collectionId.toString(),
+                      tokenId: encodeURIComponent(nft.tokenId),
+                    }}
+                    data-ocid="marketplace.nft_detail.open_nft_page_link"
+                  >
+                    Open NFT page
+                  </Link>
+                </Button>
                 <Button
                   type="button"
                   size="sm"
@@ -1414,20 +1466,85 @@ function PlaceBidModal({
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+type ListingDetailState = NonNullable<ListingDetailModalProps["detail"]>;
+
 export default function MarketplacePage() {
   const { actor, isFetching: actorLoading } = useBackend();
   const { isAuthenticated, principal, login } = useAuth();
   const qc = useQueryClient();
   const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as MarketplaceSearchState;
+  const params = useParams({ strict: false }) as { listingId?: string };
+  const listingIdParam = params.listingId;
   const principalStr = principal?.toString() ?? null;
 
-  const [activeTab, setActiveTab] = useState<MarketplaceTab>("all");
+  const [activeTab, setActiveTab] = useState<MarketplaceTab>(
+    search.tab ?? "all",
+  );
+  const [searchQuery, setSearchQuery] = useState(search.q ?? "");
+  const [collectionFilter, setCollectionFilter] = useState<string>(
+    search.collection ?? "all",
+  );
+  const [trustFilter, setTrustFilter] = useState<MarketplaceTrustFilter>(
+    search.trust ?? "all",
+  );
+  const [sortBy, setSortBy] = useState<MarketplaceSort>(
+    search.sort ?? "newest",
+  );
   const [buyTarget, setBuyTarget] = useState<ListingId | null>(null);
   const [cancelTarget, setCancelTarget] = useState<ListingId | null>(null);
   const [bidTarget, setBidTarget] = useState<AuctionListing | null>(null);
   const [listModalOpen, setListModalOpen] = useState(false);
-  const [detailTarget, setDetailTarget] =
-    useState<ListingDetailModalProps["detail"]>(null);
+  const [detailTarget, setDetailTarget] = useState<ListingDetailState | null>(
+    null,
+  );
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const discoverySearch = useMemo(
+    () => ({
+      q: searchQuery.trim() || undefined,
+      collection: collectionFilter === "all" ? undefined : collectionFilter,
+      trust: trustFilter === "all" ? undefined : trustFilter,
+      sort: sortBy === "newest" ? undefined : sortBy,
+      tab: activeTab === "all" ? undefined : activeTab,
+    }),
+    [searchQuery, collectionFilter, trustFilter, sortBy, activeTab],
+  );
+
+  const syncDiscoveryToUrl = useCallback(
+    (overrides?: Partial<MarketplaceSearchState>) => {
+      const nextSearch = { ...discoverySearch, ...overrides };
+      void navigate({
+        to: listingIdParam ? "/marketplace/listing/$listingId" : "/marketplace",
+        params: listingIdParam ? { listingId: listingIdParam } : undefined,
+        search: nextSearch,
+        replace: true,
+      });
+    },
+    [discoverySearch, listingIdParam, navigate],
+  );
+
+  useEffect(() => {
+    setActiveTab(search.tab ?? "all");
+    setSearchQuery(search.q ?? "");
+    setCollectionFilter(search.collection ?? "all");
+    setTrustFilter(search.trust ?? "all");
+    setSortBy(search.sort ?? "newest");
+  }, [search.q, search.collection, search.trust, search.sort, search.tab]);
+
+  useEffect(() => {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+    searchDebounceRef.current = setTimeout(() => {
+      syncDiscoveryToUrl();
+    }, 300);
+    return () => {
+      if (searchDebounceRef.current) {
+        clearTimeout(searchDebounceRef.current);
+      }
+    };
+  }, [syncDiscoveryToUrl]);
 
   const showVaultedPurchaseToast = useCallback(
     (title: string) => {
@@ -1457,7 +1574,7 @@ export default function MarketplacePage() {
       return actor.getActiveListingDetails();
     },
     enabled: !!actor && !actorLoading,
-    refetchInterval: 30_000,
+    refetchInterval: 120_000,
   });
 
   const { data: collections = [] } = useQuery<Collection[]>({
@@ -1524,13 +1641,20 @@ export default function MarketplacePage() {
       return page.statuses;
     },
     enabled: !!actor && !actorLoading && isAuthenticated,
-    refetchInterval: 30_000,
+    refetchInterval: 120_000,
   });
 
-  const collectionMap = new Map<bigint, Collection>(
-    collections.map((collection) => [collection.id, collection]),
+  const collectionMap = useMemo(
+    () =>
+      new Map<bigint, Collection>(
+        collections.map((collection) => [collection.id, collection]),
+      ),
+    [collections],
   );
-  const importMetaMap = collectionMetaMap(collectionImportMetas);
+  const importMetaMap = useMemo(
+    () => collectionMetaMap(collectionImportMetas),
+    [collectionImportMetas],
+  );
 
   const { data: listingDividendBalances = [] } = useQuery<
     Array<[string, bigint]>
@@ -1551,12 +1675,8 @@ export default function MarketplacePage() {
       for (const collectionId of collectionIds) {
         const collection = collectionMap.get(collectionId);
         if (!collection?.dividendConfig?.enabled) continue;
-        const page = await actor.refreshCollectionDividendBalancesPage(
-          collectionId,
-          null,
-          MARKETPLACE_DIVIDEND_PAGE_SIZE,
-        );
-        const balances = page.balances;
+        const balances =
+          await actor.getCollectionDividendBalances(collectionId);
         for (const [tokenId, balance] of balances) {
           entries.push([`${collectionId.toString()}:${tokenId}`, balance]);
         }
@@ -1568,7 +1688,10 @@ export default function MarketplacePage() {
     staleTime: 60_000,
   });
 
-  const listingDividendMap = new Map<string, bigint>(listingDividendBalances);
+  const listingDividendMap = useMemo(
+    () => new Map<string, bigint>(listingDividendBalances),
+    [listingDividendBalances],
+  );
   const ledgerFeeE8s =
     marketplaceFeeConfig?.ledgerFeeE8s ?? DEFAULT_ICP_LEDGER_FEE_E8S;
   const auctionBidFeeReserveE8s =
@@ -1578,35 +1701,62 @@ export default function MarketplacePage() {
 
   // ── Derived lists ──────────────────────────────────────────────────────────
 
-  const allListings: MarketplaceListingItem[] = listingDetails.map((detail) => {
-    const collection = collectionMap.get(detail.nft.collectionId);
-    const trustStatus = collection
-      ? collectionTrustStatus(
-          collection,
-          importMetaMap.get(collection.id.toString()),
-        )
-      : null;
+  const allListings = useMemo<MarketplaceListingItem[]>(() => {
+    return listingDetails.map((detail) => {
+      const collection = collectionMap.get(detail.nft.collectionId);
+      const trustStatus = collection
+        ? collectionTrustStatus(
+            collection,
+            importMetaMap.get(collection.id.toString()),
+          )
+        : null;
 
-    if (detail.listing.__kind__ === "Fixed") {
+      if (detail.listing.__kind__ === "Fixed") {
+        return {
+          kind: "fixed" as const,
+          listing: detail.listing.Fixed,
+          nft: detail.nft,
+          collection,
+          trustStatus,
+        };
+      }
+
       return {
-        kind: "fixed",
-        listing: detail.listing.Fixed,
+        kind: "auction" as const,
+        listing: detail.listing.Auction,
         nft: detail.nft,
         collection,
         trustStatus,
       };
-    }
+    });
+  }, [listingDetails, collectionMap, importMetaMap]);
 
-    return {
-      kind: "auction",
-      listing: detail.listing.Auction,
-      nft: detail.nft,
-      collection,
-      trustStatus,
-    };
-  });
+  const isVerifiedListing = useCallback(
+    ({ collection }: { collection?: Collection }) =>
+      collection != null &&
+      isMintlabVerifiedCollection(
+        collection,
+        importMetaMap.get(collection.id.toString()),
+      ),
+    [importMetaMap],
+  );
 
-  const fixedListings = allListings.filter(
+  const applyDiscovery = useCallback(
+    (items: MarketplaceListingItem[]) => {
+      const filtered = filterMarketplaceListings(items, {
+        query: searchQuery,
+        collectionId: collectionFilter === "all" ? null : collectionFilter,
+        trust: trustFilter,
+        isVerified: isVerifiedListing,
+      });
+      return sortMarketplaceListings(filtered, sortBy);
+    },
+    [searchQuery, collectionFilter, trustFilter, sortBy, isVerifiedListing],
+  );
+
+  const discoveredAllListings = applyDiscovery(allListings);
+
+  const fixedListings = discoveredAllListings.filter(
     (item): item is FixedListingItem => item.kind === "fixed",
   );
 
@@ -1615,23 +1765,12 @@ export default function MarketplacePage() {
       ? null
       : (fixedListings.find(({ listing }) => listing.id === buyTarget) ?? null);
 
-  const auctionListings = allListings.filter(
+  const auctionListings = discoveredAllListings.filter(
     (item): item is AuctionListingItem => item.kind === "auction",
   );
 
-  const isVerifiedListing = ({
-    collection,
-  }: {
-    collection?: Collection;
-  }) =>
-    collection != null &&
-    isMintlabVerifiedCollection(
-      collection,
-      importMetaMap.get(collection.id.toString()),
-    );
-
-  const verifiedListings = allListings.filter(isVerifiedListing);
-  const communityListings = allListings.filter(
+  const verifiedListings = discoveredAllListings.filter(isVerifiedListing);
+  const communityListings = discoveredAllListings.filter(
     (item) => !isVerifiedListing(item),
   );
   const verifiedFixedListings = fixedListings.filter(isVerifiedListing);
@@ -1672,7 +1811,7 @@ export default function MarketplacePage() {
       isAuthenticated &&
       !!principal &&
       auctionListingIds.length > 0,
-    refetchInterval: 30_000,
+    refetchInterval: 120_000,
   });
 
   const myAuctionBidStatusMap = new Map(
@@ -1703,6 +1842,117 @@ export default function MarketplacePage() {
     const collection = collectionMap.get(nft.collectionId);
     return collection?.kind === "External";
   });
+
+  const listingCollectionOptions = useMemo(() => {
+    const listedCollectionIds = new Set(
+      allListings.map((item) => item.nft.collectionId.toString()),
+    );
+    return collections
+      .filter((collection) => listedCollectionIds.has(collection.id.toString()))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [allListings, collections]);
+
+  const hasActiveDiscoveryFilters =
+    searchQuery.trim().length > 0 ||
+    collectionFilter !== "all" ||
+    trustFilter !== "all" ||
+    sortBy !== "newest";
+
+  const buildListingDetail = useCallback(
+    (item: MarketplaceListingItem): ListingDetailState => {
+      const dividendE8s =
+        listingDividendMap.get(
+          nftKey(item.nft.collectionId, item.nft.tokenId),
+        ) ?? 0n;
+      if (item.kind === "fixed") {
+        return {
+          listing: { __kind__: "Fixed", Fixed: item.listing },
+          nft: item.nft,
+          collection: item.collection,
+          trustStatus: item.trustStatus,
+          dividendE8s,
+        };
+      }
+      return {
+        listing: {
+          __kind__: "Auction",
+          Auction: item.listing as AuctionListing,
+        },
+        nft: item.nft,
+        collection: item.collection,
+        trustStatus: item.trustStatus,
+        dividendE8s,
+      };
+    },
+    [listingDividendMap],
+  );
+
+  const openListingDetail = useCallback(
+    (detail: ListingDetailState) => {
+      setDetailTarget(detail);
+      const listingId =
+        detail.listing.__kind__ === "Fixed"
+          ? detail.listing.Fixed.id
+          : detail.listing.Auction.id;
+      void navigate({
+        to: "/marketplace/listing/$listingId",
+        params: { listingId: listingId.toString() },
+        search: discoverySearch,
+      });
+    },
+    [discoverySearch, navigate],
+  );
+
+  const closeListingDetail = useCallback(() => {
+    setDetailTarget(null);
+    void navigate({
+      to: "/marketplace",
+      search: discoverySearch,
+    });
+  }, [discoverySearch, navigate]);
+
+  useEffect(() => {
+    if (!listingIdParam || listingsLoading) return;
+    let listingId: bigint;
+    try {
+      listingId = BigInt(listingIdParam);
+    } catch {
+      return;
+    }
+    const item = allListings.find(
+      (listingItem) => listingIdFromItem(listingItem) === listingId,
+    );
+    if (!item) return;
+
+    const nextDetail = buildListingDetail(item);
+    setDetailTarget((current) => {
+      if (!current) return nextDetail;
+      const currentListingId =
+        current.listing.__kind__ === "Fixed"
+          ? current.listing.Fixed.id
+          : current.listing.Auction.id;
+      if (
+        currentListingId === listingId &&
+        current.dividendE8s === nextDetail.dividendE8s
+      ) {
+        return current;
+      }
+      return nextDetail;
+    });
+  }, [listingIdParam, listingsLoading, allListings, buildListingDetail]);
+
+  const clearDiscoveryFilters = () => {
+    setSearchQuery("");
+    setCollectionFilter("all");
+    setTrustFilter("all");
+    setSortBy("newest");
+    void navigate({
+      to: listingIdParam ? "/marketplace/listing/$listingId" : "/marketplace",
+      params: listingIdParam ? { listingId: listingIdParam } : undefined,
+      search: {},
+      replace: true,
+    });
+  };
 
   // ── Mutations ──────────────────────────────────────────────────────────────
 
@@ -1981,15 +2231,7 @@ export default function MarketplacePage() {
           currentPrincipal={principalStr}
           onBuy={(id) => setBuyTarget(id)}
           onCancel={(id) => setCancelTarget(id)}
-          onDetails={() =>
-            setDetailTarget({
-              listing: { __kind__: "Fixed", Fixed: item.listing },
-              nft: item.nft,
-              collection: item.collection,
-              trustStatus: item.trustStatus,
-              dividendE8s,
-            })
-          }
+          onDetails={() => openListingDetail(buildListingDetail(item))}
           isBuying={isBuying && buyTarget === item.listing.id}
           isCancelling={isCancelling && cancelTarget === item.listing.id}
         />
@@ -2011,18 +2253,7 @@ export default function MarketplacePage() {
         onBid={(listing) => setBidTarget(listing)}
         onSettle={(id) => settleAuction(id)}
         onCancel={(id) => setCancelTarget(id)}
-        onDetails={() =>
-          setDetailTarget({
-            listing: {
-              __kind__: "Auction",
-              Auction: item.listing,
-            },
-            nft: item.nft,
-            collection: item.collection,
-            trustStatus: item.trustStatus,
-            dividendE8s,
-          })
-        }
+        onDetails={() => openListingDetail(buildListingDetail(item))}
         isSettling={isSettling}
         isCancelling={isCancelling && cancelTarget === item.listing.id}
       />
@@ -2158,9 +2389,119 @@ export default function MarketplacePage() {
           </div>
         )}
 
+        <div
+          className="mb-6 space-y-3 rounded-xl border border-border bg-card/70 p-4"
+          data-ocid="marketplace.discovery.toolbar"
+        >
+          <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <SlidersHorizontal className="h-4 w-4 text-accent" />
+            Discover listings
+          </div>
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,0.7fr))_auto]">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Search NFTs, collections, sellers, token IDs…"
+                className="bg-background pl-9"
+                data-ocid="marketplace.discovery.search_input"
+              />
+            </div>
+            <Select
+              value={collectionFilter}
+              onValueChange={(value) => {
+                setCollectionFilter(value);
+                syncDiscoveryToUrl({
+                  collection: value === "all" ? undefined : value,
+                });
+              }}
+            >
+              <SelectTrigger data-ocid="marketplace.discovery.collection_filter">
+                <SelectValue placeholder="All collections" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All collections</SelectItem>
+                {listingCollectionOptions.map((collection) => (
+                  <SelectItem
+                    key={collection.id.toString()}
+                    value={collection.id.toString()}
+                  >
+                    {collection.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select
+              value={trustFilter}
+              onValueChange={(value) => {
+                const nextTrust = value as MarketplaceTrustFilter;
+                setTrustFilter(nextTrust);
+                syncDiscoveryToUrl({
+                  trust: nextTrust === "all" ? undefined : nextTrust,
+                });
+              }}
+            >
+              <SelectTrigger data-ocid="marketplace.discovery.trust_filter">
+                <SelectValue placeholder="All trust levels" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All trust levels</SelectItem>
+                <SelectItem value="verified">Mintlab verified</SelectItem>
+                <SelectItem value="community">Community only</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={sortBy}
+              onValueChange={(value) => {
+                const nextSort = value as MarketplaceSort;
+                setSortBy(nextSort);
+                syncDiscoveryToUrl({
+                  sort: nextSort === "newest" ? undefined : nextSort,
+                });
+              }}
+            >
+              <SelectTrigger data-ocid="marketplace.discovery.sort_filter">
+                <SelectValue placeholder="Sort listings" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest listed</SelectItem>
+                <SelectItem value="price-asc">Price: low to high</SelectItem>
+                <SelectItem value="price-desc">Price: high to low</SelectItem>
+                <SelectItem value="ending-soon">Ending soon</SelectItem>
+              </SelectContent>
+            </Select>
+            {hasActiveDiscoveryFilters && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-muted-foreground"
+                onClick={clearDiscoveryFilters}
+                data-ocid="marketplace.discovery.clear_filters"
+              >
+                <X className="h-3.5 w-3.5" />
+                Clear
+              </Button>
+            )}
+          </div>
+          {!listingsLoading && (
+            <p className="text-xs text-muted-foreground">
+              Showing {discoveredAllListings.length} of {allListings.length}{" "}
+              active listings
+            </p>
+          )}
+        </div>
+
         <Tabs
           value={activeTab}
-          onValueChange={(v) => setActiveTab(v as MarketplaceTab)}
+          onValueChange={(value) => {
+            const nextTab = value as MarketplaceTab;
+            setActiveTab(nextTab);
+            syncDiscoveryToUrl({
+              tab: nextTab === "all" ? undefined : nextTab,
+            });
+          }}
         >
           <TabsList
             className="bg-muted/60 border border-border mb-6"
@@ -2173,9 +2514,9 @@ export default function MarketplacePage() {
             >
               <ShoppingBag className="w-4 h-4 mr-2" />
               All Listings
-              {allListings.length > 0 && (
+              {discoveredAllListings.length > 0 && (
                 <Badge className="ml-2 bg-background/20 text-current text-[10px] px-1.5 py-0 font-mono border-0">
-                  {allListings.length}
+                  {discoveredAllListings.length}
                 </Badge>
               )}
             </TabsTrigger>
@@ -2232,6 +2573,18 @@ export default function MarketplacePage() {
                 }
                 data-ocid="marketplace.all.empty_state"
               />
+            ) : discoveredAllListings.length === 0 ? (
+              <EmptyState
+                icon={Search}
+                title="No listings match your filters"
+                description="Try a broader search, another collection, or clear the current filters to see more marketplace listings."
+                action={{
+                  label: "Clear filters",
+                  onClick: clearDiscoveryFilters,
+                  "data-ocid": "marketplace.all.clear_filters_cta",
+                }}
+                data-ocid="marketplace.all.filtered_empty_state"
+              />
             ) : (
               <div className="space-y-8">
                 {verifiedListings.length > 0 && (
@@ -2286,7 +2639,8 @@ export default function MarketplacePage() {
               >
                 <LoadingSpinner size="lg" label="Loading listings…" />
               </div>
-            ) : fixedListings.length === 0 ? (
+            ) : allListings.filter((item) => item.kind === "fixed").length ===
+              0 ? (
               <EmptyState
                 icon={ShoppingBag}
                 title="No fixed-price listings"
@@ -2301,6 +2655,18 @@ export default function MarketplacePage() {
                     : undefined
                 }
                 data-ocid="marketplace.fixed.empty_state"
+              />
+            ) : fixedListings.length === 0 ? (
+              <EmptyState
+                icon={Search}
+                title="No fixed listings match your filters"
+                description="Adjust your search or clear filters to see fixed-price listings again."
+                action={{
+                  label: "Clear filters",
+                  onClick: clearDiscoveryFilters,
+                  "data-ocid": "marketplace.fixed.clear_filters_cta",
+                }}
+                data-ocid="marketplace.fixed.filtered_empty_state"
               />
             ) : (
               <div className="space-y-8">
@@ -2324,16 +2690,15 @@ export default function MarketplacePage() {
                           onBuy={(id) => setBuyTarget(id)}
                           onCancel={(id) => setCancelTarget(id)}
                           onDetails={() =>
-                            setDetailTarget({
-                              listing: { __kind__: "Fixed", Fixed: listing },
-                              nft,
-                              collection,
-                              trustStatus,
-                              dividendE8s:
-                                listingDividendMap.get(
-                                  nftKey(nft.collectionId, nft.tokenId),
-                                ) ?? 0n,
-                            })
+                            openListingDetail(
+                              buildListingDetail({
+                                kind: "fixed",
+                                listing,
+                                nft,
+                                collection,
+                                trustStatus,
+                              }),
+                            )
                           }
                           isBuying={isBuying && buyTarget === listing.id}
                           isCancelling={
@@ -2376,16 +2741,15 @@ export default function MarketplacePage() {
                             onBuy={(id) => setBuyTarget(id)}
                             onCancel={(id) => setCancelTarget(id)}
                             onDetails={() =>
-                              setDetailTarget({
-                                listing: { __kind__: "Fixed", Fixed: listing },
-                                nft,
-                                collection,
-                                trustStatus,
-                                dividendE8s:
-                                  listingDividendMap.get(
-                                    nftKey(nft.collectionId, nft.tokenId),
-                                  ) ?? 0n,
-                              })
+                              openListingDetail(
+                                buildListingDetail({
+                                  kind: "fixed",
+                                  listing,
+                                  nft,
+                                  collection,
+                                  trustStatus,
+                                }),
+                              )
                             }
                             isBuying={isBuying && buyTarget === listing.id}
                             isCancelling={
@@ -2410,7 +2774,8 @@ export default function MarketplacePage() {
               >
                 <LoadingSpinner size="lg" label="Loading auctions…" />
               </div>
-            ) : auctionListings.length === 0 ? (
+            ) : allListings.filter((item) => item.kind === "auction").length ===
+              0 ? (
               <EmptyState
                 icon={Gavel}
                 title="No active auctions"
@@ -2425,6 +2790,18 @@ export default function MarketplacePage() {
                     : undefined
                 }
                 data-ocid="marketplace.auction.empty_state"
+              />
+            ) : auctionListings.length === 0 ? (
+              <EmptyState
+                icon={Search}
+                title="No auctions match your filters"
+                description="Adjust your search or clear filters to see active auctions again."
+                action={{
+                  label: "Clear filters",
+                  onClick: clearDiscoveryFilters,
+                  "data-ocid": "marketplace.auction.clear_filters_cta",
+                }}
+                data-ocid="marketplace.auction.filtered_empty_state"
               />
             ) : (
               <div className="space-y-8">
@@ -2452,19 +2829,15 @@ export default function MarketplacePage() {
                           onSettle={(id) => settleAuction(id)}
                           onCancel={(id) => setCancelTarget(id)}
                           onDetails={() =>
-                            setDetailTarget({
-                              listing: {
-                                __kind__: "Auction",
-                                Auction: listing,
-                              },
-                              nft,
-                              collection,
-                              trustStatus,
-                              dividendE8s:
-                                listingDividendMap.get(
-                                  nftKey(nft.collectionId, nft.tokenId),
-                                ) ?? 0n,
-                            })
+                            openListingDetail(
+                              buildListingDetail({
+                                kind: "auction",
+                                listing,
+                                nft,
+                                collection,
+                                trustStatus,
+                              }),
+                            )
                           }
                           isSettling={isSettling}
                           isCancelling={
@@ -2511,19 +2884,15 @@ export default function MarketplacePage() {
                             onSettle={(id) => settleAuction(id)}
                             onCancel={(id) => setCancelTarget(id)}
                             onDetails={() =>
-                              setDetailTarget({
-                                listing: {
-                                  __kind__: "Auction",
-                                  Auction: listing,
-                                },
-                                nft,
-                                collection,
-                                trustStatus,
-                                dividendE8s:
-                                  listingDividendMap.get(
-                                    nftKey(nft.collectionId, nft.tokenId),
-                                  ) ?? 0n,
-                              })
+                              openListingDetail(
+                                buildListingDetail({
+                                  kind: "auction",
+                                  listing,
+                                  nft,
+                                  collection,
+                                  trustStatus,
+                                }),
+                              )
                             }
                             isSettling={isSettling}
                             isCancelling={
@@ -2545,7 +2914,7 @@ export default function MarketplacePage() {
         detail={detailTarget}
         currentPrincipal={principalStr}
         bidStatusMap={myAuctionBidStatusMap}
-        onClose={() => setDetailTarget(null)}
+        onClose={closeListingDetail}
         onBuy={(id) => setBuyTarget(id)}
         onCancel={(id) => setCancelTarget(id)}
         onBid={(listing) => setBidTarget(listing)}

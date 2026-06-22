@@ -5,6 +5,7 @@ export type HelpSectionId =
   | "marketplace"
   | "dividends"
   | "icp-account"
+  | "activity"
   | "troubleshooting";
 
 export interface HelpLink {
@@ -18,6 +19,7 @@ export type HelpRouteHref =
   | "/marketplace"
   | "/dividends"
   | "/icp-account"
+  | "/activity"
   | "/help";
 
 export interface HelpSection {
@@ -265,6 +267,31 @@ export const helpSections: HelpSection[] = [
       "Keep enough ICP for the action amount plus ledger fees and fee reserves.",
     ],
     links: [{ label: "Open ICP Account", href: "/icp-account" }],
+  },
+  {
+    id: "activity",
+    navTitle: "Activity",
+    title: "Global Activity Feed",
+    summary:
+      "The Activity page shows your latest Mintlab events in one feed, including ICP transfers, NFT mints, marketplace trades, dividend claims, and collection operations.",
+    keywords: [
+      "activity",
+      "history",
+      "transactions",
+      "feed",
+      "recent",
+      "marketplace",
+      "mint",
+      "transfer",
+    ],
+    highlights: [
+      "Open Activity from the main navigation to see up to 25 recent events across the app.",
+      "Filter by scope such as NFT, marketplace, ICP account, dividends, or collections.",
+      "Search titles, details, and references to find a specific action quickly.",
+      "Wallet and ICP Account pages include View all links that open Activity with a matching scope filter.",
+      "Use Refresh to pull the latest on-chain activity without leaving the page.",
+    ],
+    links: [{ label: "Open Activity", href: "/activity" }],
   },
   {
     id: "troubleshooting",

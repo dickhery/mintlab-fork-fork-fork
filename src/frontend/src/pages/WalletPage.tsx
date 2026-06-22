@@ -89,7 +89,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowDownLeft,
   ArrowUpRight,
@@ -544,6 +544,21 @@ function RecentNFTTransactionsCard({
                   {transactions.length}/10
                 </Badge>
               )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5 text-xs text-accent"
+                asChild
+              >
+                <Link
+                  to="/activity"
+                  search={{ scope: "nft" }}
+                  data-ocid="wallet.view_all_activity.link"
+                >
+                  View all
+                </Link>
+              </Button>
               <CollapsibleTrigger asChild>
                 <Button
                   type="button"

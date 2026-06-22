@@ -19,6 +19,7 @@ import {
   CircleHelp,
   CreditCard,
   Grid3X3,
+  History,
   Search,
   ShieldCheck,
   ShoppingBag,
@@ -35,6 +36,7 @@ const sectionIcons: Record<HelpSection["id"], LucideIcon> = {
   marketplace: ShoppingBag,
   dividends: CircleDollarSign,
   "icp-account": CreditCard,
+  activity: History,
   troubleshooting: Wrench,
 };
 

@@ -2,6 +2,8 @@ import { Layout } from "@/components/Layout";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { TermsGate } from "@/components/TermsAcceptance";
 import { Toaster } from "@/components/ui/sonner";
+import { parseActivitySearch } from "@/lib/activity-filters";
+import { parseMarketplaceSearch } from "@/lib/marketplace-discovery";
 import {
   Outlet,
   RouterProvider,
@@ -20,6 +22,8 @@ const CollectionsPage = lazy(() => import("@/pages/CollectionsPage"));
 const DividendsPage = lazy(() => import("@/pages/DividendsPage"));
 const HelpPage = lazy(() => import("@/pages/HelpPage"));
 const TermsPage = lazy(() => import("@/pages/TermsPage"));
+const ActivityPage = lazy(() => import("@/pages/ActivityPage"));
+const NFTDetailPage = lazy(() => import("@/pages/NFTDetailPage"));
 
 const rootRoute = createRootRoute({
   component: () => (
@@ -54,6 +58,20 @@ const marketplaceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/marketplace",
   component: MarketplacePage,
+  validateSearch: parseMarketplaceSearch,
+});
+
+const marketplaceListingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/marketplace/listing/$listingId",
+  component: MarketplacePage,
+  validateSearch: parseMarketplaceSearch,
+});
+
+const nftDetailRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/nft/$collectionId/$tokenId",
+  component: NFTDetailPage,
 });
 
 const icpAccountRoute = createRoute({
@@ -80,6 +98,13 @@ const dividendsRoute = createRoute({
   component: DividendsPage,
 });
 
+const activityRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/activity",
+  component: ActivityPage,
+  validateSearch: parseActivitySearch,
+});
+
 const helpRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/help",
@@ -96,10 +121,13 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   walletRoute,
   marketplaceRoute,
+  marketplaceListingRoute,
+  nftDetailRoute,
   icpAccountRoute,
   adminRoute,
   collectionsRoute,
   dividendsRoute,
+  activityRoute,
   helpRoute,
   termsRoute,
 ]);

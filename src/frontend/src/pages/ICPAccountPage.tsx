@@ -23,6 +23,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import { ICP_E8S, parseICPToE8s } from "@/lib/icp";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import {
   AlertCircle,
   ArrowDownLeft,
@@ -533,11 +534,28 @@ export default function ICPAccountPage() {
               <History className="h-4 w-4 text-accent" />
               Recent Transactions
             </span>
-            {recentTransactions.length > 0 && (
-              <Badge variant="secondary" className="font-mono text-[10px]">
-                {recentTransactions.length}/10
-              </Badge>
-            )}
+            <span className="flex shrink-0 items-center gap-2">
+              {recentTransactions.length > 0 && (
+                <Badge variant="secondary" className="font-mono text-[10px]">
+                  {recentTransactions.length}/10
+                </Badge>
+              )}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-8 gap-1.5 text-xs text-accent"
+                asChild
+              >
+                <Link
+                  to="/activity"
+                  search={{ scope: "icp" }}
+                  data-ocid="icp-account.view_all_activity.link"
+                >
+                  View all
+                </Link>
+              </Button>
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent>
