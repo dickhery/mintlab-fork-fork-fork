@@ -456,7 +456,19 @@ type WithdrawalStatus__328667338 = {#Completed; #Failed; #Pending};
 actor {
   stable AUTO_INDEX_MAX_PAGES_PER_SYNC : Nat;
   stable AUTO_INDEX_PAGE_LIMIT : Nat;
+  stable BROWSE_STATS_COOLDOWN_NS : Int;
+  stable BROWSE_STATS_MAX_PER_WINDOW : Nat;
+  stable BROWSE_STATS_WINDOW_NS : Int;
   stable DEFAULT_COLLECTION_PAGE_SIZE : Nat;
+  stable DIVIDEND_INFO_COOLDOWN_NS : Int;
+  stable DIVIDEND_INFO_MAX_PER_WINDOW : Nat;
+  stable DIVIDEND_INFO_WINDOW_NS : Int;
+  stable DIVIDEND_REFRESH_COOLDOWN_NS : Int;
+  stable DIVIDEND_REFRESH_MAX_PER_WINDOW : Nat;
+  stable DIVIDEND_REFRESH_WINDOW_NS : Int;
+  stable DIVIDEND_SYNC_COOLDOWN_NS : Int;
+  stable DIVIDEND_SYNC_MAX_PER_WINDOW : Nat;
+  stable DIVIDEND_SYNC_WINDOW_NS : Int;
   stable EXTERNAL_LISTING_MODERATION_CYCLE_RESERVE : Nat;
   stable EXTERNAL_LISTING_MODERATION_MAX_REQUEST_BYTES : Nat;
   stable EXTERNAL_LISTING_MODERATION_RESPONSE_BYTES : Nat64;
@@ -464,11 +476,30 @@ actor {
   stable IMPORT_COOLDOWN_NS : Int;
   stable IMPORT_DAY_NS : Int;
   stable IMPORT_INDEX_WARM_PAGE_LIMIT : Nat;
+  stable LEDGER_TRANSFER_FEE_CACHE_NS : Int;
+  stable LOOKUP_NFT_COOLDOWN_NS : Int;
+  stable LOOKUP_NFT_MAX_PER_WINDOW : Nat;
+  stable LOOKUP_NFT_WINDOW_NS : Int;
   stable MAX_COLLECTION_PAGE_SIZE : Nat;
   stable MAX_IMPORTS_PER_USER_PER_DAY : Nat;
   stable MAX_RICH_METADATA_PAGE_SIZE : Nat;
   stable MAX_UNVERIFIED_COLLECTIONS_VISIBLE : Nat;
+  stable MY_DIVIDEND_REFRESH_COOLDOWN_NS : Int;
+  stable MY_DIVIDEND_REFRESH_MAX_PER_WINDOW : Nat;
+  stable MY_DIVIDEND_REFRESH_WINDOW_NS : Int;
   stable PENDING_BID_TIMEOUT_NS : Int;
+  stable PREVIEW_COLLECTION_COOLDOWN_NS : Int;
+  stable PREVIEW_COLLECTION_MAX_PER_WINDOW : Nat;
+  stable PREVIEW_COLLECTION_WINDOW_NS : Int;
+  stable REPORT_COLLECTION_COOLDOWN_NS : Int;
+  stable REPORT_COLLECTION_MAX_PER_WINDOW : Nat;
+  stable REPORT_COLLECTION_WINDOW_NS : Int;
+  stable REPORT_NFT_COOLDOWN_NS : Int;
+  stable REPORT_NFT_MAX_PER_WINDOW : Nat;
+  stable REPORT_NFT_WINDOW_NS : Int;
+  stable SHARE_IMAGE_CACHE_WARM_COOLDOWN_NS : Int;
+  stable SHARE_IMAGE_FETCH_CYCLE_RESERVE : Nat;
+  stable SHARE_IMAGE_FETCH_MAX_BYTES : Nat64;
   stable authState : {var adminPrincipal : ?Principal};
   stable collectionCreationPayoutSplitState :
     {
@@ -511,6 +542,8 @@ actor {
       disbursementLocks : Map__605269027<CollectionId__674876002, Bool>;
       feeReserveE8s : Map__605269027<CollectionId__674876002, Nat64>
     };
+  stable dividendSourceState :
+    {descriptions : Map__605269027<CollectionId__674876002, Text>};
   stable dividendsState :
     {
       claimableE8s : Map__605269027<Text, Nat64>;
@@ -617,6 +650,12 @@ actor {
       payments : Map__605269027<Nat, PendingMintPayment__763212301>;
       paymentsByCaller : Map__605269027<Principal, [Nat]>
     };
+  stable rateLimitState :
+    {
+      var lastAtByKey : ?Map__605269027<Text, Int>;
+      var windowCallsByKey : ?Map__605269027<Text, [Int]>
+    };
+  stable shareImageCacheState : {urls : Map__605269027<Text, Text>};
   stable termsState :
     {acceptances : Map__605269027<Principal, TermsAcceptance__714453075>};
   stable transactionState :
