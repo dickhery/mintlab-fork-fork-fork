@@ -296,6 +296,39 @@ persistent actor class MintlabCollection(init : {
   var collectionDescription : Text = init.description;
   var collectionSymbol : Text = init.symbol;
   var collectionLogo : Text = init.logo;
+  var authorizedWalletCanisters : [Principal] = [];
+
+  func isAuthorizedWallet(caller : Principal) : Bool {
+    for (walletId in authorizedWalletCanisters.values()) {
+      if (Principal.equal(walletId, caller)) {
+        return true;
+      };
+    };
+    false;
+  };
+
+  func canMediateTransfer(caller : Principal) : Bool {
+    Principal.equal(caller, parentCanister) or isAuthorizedWallet(caller);
+  };
+
+  public shared ({ caller }) func mintlab_authorize_wallet(
+    walletCanisterId : Principal,
+  ) : async { #ok; #err : Text } {
+    if (not Principal.equal(caller, parentCanister)) {
+      return #err("Only the parent app can authorize wallet canisters");
+    };
+    if (Principal.isAnonymous(walletCanisterId)) {
+      return #err("Cannot authorize the anonymous principal");
+    };
+    if (isAuthorizedWallet(walletCanisterId)) {
+      return #ok;
+    };
+    authorizedWalletCanisters := Array.concat<Principal>(
+      authorizedWalletCanisters,
+      [walletCanisterId],
+    );
+    #ok;
+  };
 
   public shared ({ caller }) func mintlab_mint(
     to : Principal,
@@ -337,8 +370,8 @@ persistent actor class MintlabCollection(init : {
     to : Principal,
     tokenId : Nat,
   ) : async { #ok : Nat; #err : Text } {
-    if (not Principal.equal(caller, parentCanister)) {
-      return #err("Only the parent app can use app-mediated transfers");
+    if (not canMediateTransfer(caller)) {
+      return #err("Only the parent app or an authorized wallet can use app-mediated transfers");
     };
     switch (transferToken(tokenId, from, to)) {
       case (#err(message)) #err(message);

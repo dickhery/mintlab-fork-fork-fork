@@ -2649,6 +2649,31 @@ mixin (
     await transferFromDip721(caller, to, tokenId);
   };
 
+  /// Lets an authorized Mintlab Wallet backend transfer on behalf of a user.
+  public shared ({ caller }) func mintlab_wallet_transfer_from(
+    from : Principal,
+    to : Principal,
+    tokenId : Nat,
+  ) : async { #ok : Nat; #err : Text } {
+    if (not AuthLib.isAuthorizedWallet(authState, caller)) {
+      return #err("Unauthorized wallet canister");
+    };
+    if (Principal.isAnonymous(from) or Principal.isAnonymous(to)) {
+      return #err("Invalid transfer principal");
+    };
+    if (Principal.equal(from, to)) {
+      return #err("Cannot transfer an NFT to the same owner");
+    };
+    switch (MintLib.transferToken(mintState, tokenId, from, to)) {
+      case (#err("Minted token not found")) #err("Token not found");
+      case (#err(message)) #err(message);
+      case (#ok(transfer)) {
+        syncTransferredManagedNFT(from, to, transfer.token);
+        #ok(transfer.transactionId);
+      };
+    };
+  };
+
   public query func dip721_owner_token_identifiers(
     owner : Principal,
   ) : async NFTStandards.DIP721TokensResult {

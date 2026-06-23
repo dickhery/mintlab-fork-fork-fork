@@ -19,4 +19,21 @@ mixin (authState : AuthLib.AdminState) {
   public query func getAdminPrincipal() : async ?Principal {
     AuthLib.getAdminPrincipal(authState);
   };
+
+  /// Authorize a Mintlab Wallet backend canister to mediate NFT transfers.
+  public shared ({ caller }) func authorizeWalletCanister(
+    walletCanisterId : Principal,
+  ) : async { #ok; #err : Text } {
+    if (not AuthLib.isAdmin(authState, caller)) {
+      return #err("Only admins can authorize wallet canisters");
+    };
+    switch (AuthLib.authorizeWalletCanister(authState, walletCanisterId)) {
+      case (#ok) #ok;
+      case (#err(message)) #err(message);
+    };
+  };
+
+  public query func listAuthorizedWalletCanisters() : async [Principal] {
+    AuthLib.listAuthorizedWalletCanisters(authState);
+  };
 };
