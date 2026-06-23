@@ -2,17 +2,20 @@ import Array "mo:core/Array";
 import Principal "mo:core/Principal";
 
 module {
-  public type AdminState = {
-    var adminPrincipal : ?Principal;
+  public type AdminState = { var adminPrincipal : ?Principal };
+
+  /// Separate stable state so upgrades stay compatible with deployed canisters.
+  public type WalletAuthState = {
     var authorizedWalletCanisters : [Principal];
   };
 
   /// Initialise fresh admin state
   public func newState() : AdminState {
-    {
-      var adminPrincipal = null;
-      var authorizedWalletCanisters = [];
-    };
+    { var adminPrincipal = null };
+  };
+
+  public func newWalletAuthState() : WalletAuthState {
+    { var authorizedWalletCanisters = [] };
   };
 
   /// Register the first caller as admin; no-op if already set
@@ -36,7 +39,7 @@ module {
     state.adminPrincipal;
   };
 
-  public func isAuthorizedWallet(state : AdminState, caller : Principal) : Bool {
+  public func isAuthorizedWallet(state : WalletAuthState, caller : Principal) : Bool {
     for (walletId in state.authorizedWalletCanisters.values()) {
       if (Principal.equal(walletId, caller)) {
         return true;
@@ -46,7 +49,7 @@ module {
   };
 
   public func authorizeWalletCanister(
-    state : AdminState,
+    state : WalletAuthState,
     walletCanisterId : Principal,
   ) : { #ok; #err : Text } {
     if (Principal.isAnonymous(walletCanisterId)) {
@@ -62,7 +65,7 @@ module {
     #ok;
   };
 
-  public func listAuthorizedWalletCanisters(state : AdminState) : [Principal] {
+  public func listAuthorizedWalletCanisters(state : WalletAuthState) : [Principal] {
     state.authorizedWalletCanisters;
   };
 };

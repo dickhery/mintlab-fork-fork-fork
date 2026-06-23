@@ -54,9 +54,10 @@ persistent actor Backend {
   let transactionState = TransactionsLib.newState();
   let rateLimitState = RateLimitLib.newState();
   let shareImageCacheState = ShareImageCacheLib.newState();
+  let walletAuthState = AuthLib.newWalletAuthState();
 
   // ── Mixin composition ─────────────────────────────────────────────────────
-  include AuthApi(authState);
+  include AuthApi(authState, walletAuthState);
   include TermsApi(termsState);
   include CollectionsApi(
     collectionsState,
@@ -75,6 +76,7 @@ persistent actor Backend {
     nftModerationState,
     walletState,
     authState,
+    walletAuthState,
     marketplaceState,
     marketplaceSettlementState,
     marketplaceNoBidAuctionReturnState,

@@ -2,7 +2,7 @@ import AuthLib "../lib/auth";
 import Runtime "mo:core/Runtime";
 import Principal "mo:core/Principal";
 
-mixin (authState : AuthLib.AdminState) {
+mixin (authState : AuthLib.AdminState, walletAuthState : AuthLib.WalletAuthState) {
 
   /// Called on every authenticated interaction to bootstrap admin on first use
   public shared ({ caller }) func bootstrapAdmin() : async () {
@@ -27,13 +27,13 @@ mixin (authState : AuthLib.AdminState) {
     if (not AuthLib.isAdmin(authState, caller)) {
       return #err("Only admins can authorize wallet canisters");
     };
-    switch (AuthLib.authorizeWalletCanister(authState, walletCanisterId)) {
+    switch (AuthLib.authorizeWalletCanister(walletAuthState, walletCanisterId)) {
       case (#ok) #ok;
       case (#err(message)) #err(message);
     };
   };
 
   public query func listAuthorizedWalletCanisters() : async [Principal] {
-    AuthLib.listAuthorizedWalletCanisters(authState);
+    AuthLib.listAuthorizedWalletCanisters(walletAuthState);
   };
 };

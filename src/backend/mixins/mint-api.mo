@@ -42,6 +42,7 @@ mixin (
   nftModerationState : CollectionsLib.NFTModerationState,
   walletState : WalletLib.WalletState,
   authState : AuthLib.AdminState,
+  walletAuthState : AuthLib.WalletAuthState,
   marketplaceState : MarketplaceLib.MarketplaceState,
   marketplaceSettlementState : MarketplaceLib.MarketplaceSettlementState,
   marketplaceNoBidAuctionReturnState : MarketplaceLib.NoBidAuctionReturnState,
@@ -2655,7 +2656,7 @@ mixin (
     to : Principal,
     tokenId : Nat,
   ) : async { #ok : Nat; #err : Text } {
-    if (not AuthLib.isAuthorizedWallet(authState, caller)) {
+    if (not AuthLib.isAuthorizedWallet(walletAuthState, caller)) {
       return #err("Unauthorized wallet canister");
     };
     if (Principal.isAnonymous(from) or Principal.isAnonymous(to)) {
